@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: leadboard-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: leadboard
+      POSTGRES_USER: leadboard
+      POSTGRES_PASSWORD: leadboard
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
