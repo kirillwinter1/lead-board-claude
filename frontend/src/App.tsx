@@ -1,6 +1,31 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import axios from 'axios'
 import './App.css'
+
+import epicIcon from './icons/epic.png'
+import storyIcon from './icons/story.png'
+import subtaskIcon from './icons/subtask.png'
+
+const issueTypeIcons: Record<string, string> = {
+  'Эпик': epicIcon,
+  'Epic': epicIcon,
+  'История': storyIcon,
+  'Story': storyIcon,
+  'Подзадача': subtaskIcon,
+  'Sub-task': subtaskIcon,
+  'Subtask': subtaskIcon,
+  // Custom subtask types
+  'Аналитика': subtaskIcon,
+  'Разработка': subtaskIcon,
+  'Тестирование': subtaskIcon,
+  'Analytics': subtaskIcon,
+  'Development': subtaskIcon,
+  'Testing': subtaskIcon,
+}
+
+function getIssueIcon(issueType: string): string {
+  return issueTypeIcons[issueType] || storyIcon
+}
 
 interface RoleMetrics {
   estimateSeconds: number
@@ -33,65 +58,276 @@ interface BoardResponse {
   total: number
 }
 
-function formatTime(seconds: number | null): string {
-  if (!seconds) return '-'
-  const hours = Math.floor(seconds / 3600)
-  if (hours < 8) return `${hours}h`
-  const days = (hours / 8).toFixed(1)
-  return `${days}d`
+function formatDays(seconds: number | null): string {
+  if (!seconds) return '0 d'
+  const days = seconds / 3600 / 8
+  return `${days.toFixed(days % 1 === 0 ? 0 : 2)} d`
 }
 
-function ProgressBar({ progress, label }: { progress: number; label?: string }) {
+function ProgressBar({ progress }: { progress: number }) {
   return (
-    <div className="progress-bar-container">
-      {label && <span className="progress-label">{label}</span>}
+    <div className="progress-cell">
       <div className="progress-bar">
         <div
           className={`progress-fill ${progress >= 100 ? 'complete' : ''}`}
           style={{ width: `${Math.min(progress, 100)}%` }}
         />
       </div>
-      <span className="progress-text">{progress}%</span>
+      <span className="progress-percent">{progress.toFixed(2)}%</span>
     </div>
   )
 }
 
-function RoleProgressBars({ roleProgress }: { roleProgress: RoleProgress }) {
-  const hasData = roleProgress.analytics.estimateSeconds > 0 ||
-                  roleProgress.development.estimateSeconds > 0 ||
-                  roleProgress.testing.estimateSeconds > 0
-
-  if (!hasData) return null
+function RoleChip({ label, metrics }: { label: string; metrics: RoleMetrics | null }) {
+  const hasEstimate = metrics && metrics.estimateSeconds > 0
+  const progress = hasEstimate ? Math.min(metrics.progress, 100) : 0
+  const roleClass = label.toLowerCase()
 
   return (
-    <div className="role-progress">
-      {roleProgress.analytics.estimateSeconds > 0 && (
-        <ProgressBar progress={roleProgress.analytics.progress} label="SA" />
-      )}
-      {roleProgress.development.estimateSeconds > 0 && (
-        <ProgressBar progress={roleProgress.development.progress} label="DEV" />
-      )}
-      {roleProgress.testing.estimateSeconds > 0 && (
-        <ProgressBar progress={roleProgress.testing.progress} label="QA" />
+    <div className={`role-chip ${roleClass} ${hasEstimate ? '' : 'disabled'}`}>
+      <div className="role-chip-fill" style={{ width: `${progress}%` }} />
+      <span className="role-chip-label">{label}</span>
+      {hasEstimate && <span className="role-chip-percent">{metrics.progress}%</span>}
+    </div>
+  )
+}
+
+function RoleChips({ roleProgress }: { roleProgress: RoleProgress | null }) {
+  return (
+    <div className="role-chips">
+      <RoleChip label="SA" metrics={roleProgress?.analytics || null} />
+      <RoleChip label="DEV" metrics={roleProgress?.development || null} />
+      <RoleChip label="QA" metrics={roleProgress?.testing || null} />
+    </div>
+  )
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const statusClass = status.toLowerCase().replace(/\s+/g, '-')
+  return <span className={`status-badge ${statusClass}`}>{status}</span>
+}
+
+function AlertIcon({ node }: { node: BoardNode }) {
+  // Check for data quality issues
+  const hasAlert =
+    (node.loggedSeconds && node.loggedSeconds > 0 && (!node.estimateSeconds || node.estimateSeconds === 0)) ||
+    (node.estimateSeconds && node.loggedSeconds && node.loggedSeconds > node.estimateSeconds)
+
+  if (hasAlert) {
+    return <span className="alert-icon" title="Data quality issue">!</span>
+  }
+  return <span className="no-alert">--</span>
+}
+
+interface BoardRowProps {
+  node: BoardNode
+  level: number
+  expanded: boolean
+  onToggle: () => void
+  hasChildren: boolean
+}
+
+function BoardRow({ node, level, expanded, onToggle, hasChildren }: BoardRowProps) {
+  return (
+    <tr className={`board-row level-${level}`}>
+      <td className="cell-expander">
+        {hasChildren ? (
+          <button className="expander-btn" onClick={onToggle}>
+            <span className={`chevron ${expanded ? 'expanded' : ''}`}>›</span>
+          </button>
+        ) : (
+          <span className="expander-placeholder" />
+        )}
+      </td>
+      <td className="cell-name">
+        <div className="name-content" style={{ paddingLeft: `${level * 20}px` }}>
+          <img src={getIssueIcon(node.issueType)} alt={node.issueType} className="issue-type-icon" />
+          <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
+            {node.issueKey}
+          </a>
+          <span className="issue-title">{node.title}</span>
+        </div>
+      </td>
+      <td className="cell-team">--</td>
+      <td className="cell-estimate">{formatDays(node.estimateSeconds)}</td>
+      <td className="cell-logged">{formatDays(node.loggedSeconds)}</td>
+      <td className="cell-progress">
+        <ProgressBar progress={node.progress || 0} />
+      </td>
+      <td className="cell-roles">
+        <RoleChips roleProgress={node.roleProgress} />
+      </td>
+      <td className="cell-status">
+        <StatusBadge status={node.status} />
+      </td>
+      <td className="cell-alerts">
+        <AlertIcon node={node} />
+      </td>
+    </tr>
+  )
+}
+
+function BoardTable({ items }: { items: BoardNode[] }) {
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+
+  const toggleExpand = (key: string) => {
+    setExpandedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
+  const renderRows = (nodes: BoardNode[], level: number): JSX.Element[] => {
+    const rows: JSX.Element[] = []
+
+    for (const node of nodes) {
+      const isExpanded = expandedKeys.has(node.issueKey)
+      const hasChildren = node.children.length > 0
+
+      rows.push(
+        <BoardRow
+          key={node.issueKey}
+          node={node}
+          level={level}
+          expanded={isExpanded}
+          onToggle={() => toggleExpand(node.issueKey)}
+          hasChildren={hasChildren}
+        />
+      )
+
+      if (isExpanded && hasChildren) {
+        rows.push(...renderRows(node.children, level + 1))
+      }
+    }
+
+    return rows
+  }
+
+  return (
+    <div className="board-table-container">
+      <table className="board-table">
+        <thead>
+          <tr>
+            <th className="th-expander"></th>
+            <th className="th-name">NAME</th>
+            <th className="th-team">TEAM</th>
+            <th className="th-estimate">ESTIMATE</th>
+            <th className="th-logged">LOGGED TIME</th>
+            <th className="th-progress">OVERALL PROGRESS</th>
+            <th className="th-roles">ROLE-BASED PROGRESS</th>
+            <th className="th-status">STATUS</th>
+            <th className="th-alerts">ALERTS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {renderRows(items, 0)}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+interface FilterPanelProps {
+  searchKey: string
+  onSearchKeyChange: (value: string) => void
+  availableStatuses: string[]
+  selectedStatuses: Set<string>
+  onStatusToggle: (status: string) => void
+  availableTeams: string[]
+  selectedTeams: Set<string>
+  onTeamToggle: (team: string) => void
+  onClearFilters: () => void
+}
+
+function FilterPanel({
+  searchKey,
+  onSearchKeyChange,
+  availableStatuses,
+  selectedStatuses,
+  onStatusToggle,
+  availableTeams,
+  selectedTeams,
+  onTeamToggle,
+  onClearFilters,
+}: FilterPanelProps) {
+  const hasActiveFilters = searchKey || selectedStatuses.size > 0 || selectedTeams.size > 0
+
+  return (
+    <div className="filter-panel">
+      <div className="filter-group">
+        <label className="filter-label">Search by key</label>
+        <input
+          type="text"
+          placeholder="e.g. LB-1"
+          value={searchKey}
+          onChange={(e) => onSearchKeyChange(e.target.value)}
+          className="filter-input"
+        />
+      </div>
+
+      <div className="filter-group">
+        <label className="filter-label">Team</label>
+        <div className="filter-checkboxes">
+          {availableTeams.length === 0 ? (
+            <span className="filter-empty">No teams</span>
+          ) : (
+            availableTeams.map(team => (
+              <label key={team} className="filter-checkbox">
+                <input
+                  type="checkbox"
+                  checked={selectedTeams.has(team)}
+                  onChange={() => onTeamToggle(team)}
+                />
+                <span>{team}</span>
+              </label>
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="filter-group">
+        <label className="filter-label">Status</label>
+        <div className="filter-checkboxes">
+          {availableStatuses.map(status => (
+            <label key={status} className="filter-checkbox">
+              <input
+                type="checkbox"
+                checked={selectedStatuses.has(status)}
+                onChange={() => onStatusToggle(status)}
+              />
+              <span>{status}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {hasActiveFilters && (
+        <button className="btn btn-secondary btn-clear" onClick={onClearFilters}>
+          Clear filters
+        </button>
       )}
     </div>
   )
 }
 
 function App() {
-  const [status, setStatus] = useState<string>('loading...')
   const [board, setBoard] = useState<BoardNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [query, setQuery] = useState('')
-  const [searchInput, setSearchInput] = useState('')
 
-  const fetchBoard = useCallback((searchQuery?: string) => {
+  // Filter state
+  const [searchKey, setSearchKey] = useState('')
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
+  const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
+
+  const fetchBoard = useCallback(() => {
     setLoading(true)
-    const params = new URLSearchParams()
-    if (searchQuery) params.append('query', searchQuery)
-
-    axios.get<BoardResponse>(`/api/board?${params.toString()}`)
+    axios.get<BoardResponse>('/api/board')
       .then(response => {
         setBoard(response.data.items)
         setLoading(false)
@@ -103,140 +339,106 @@ function App() {
   }, [])
 
   useEffect(() => {
-    axios.get('/api/health')
-      .then(response => setStatus(response.data.status))
-      .catch(() => setStatus('error'))
-
     fetchBoard()
   }, [fetchBoard])
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    setQuery(searchInput)
-    fetchBoard(searchInput)
+  // Extract unique statuses from epics
+  const availableStatuses = useMemo(() => {
+    const statuses = new Set<string>()
+    board.forEach(epic => statuses.add(epic.status))
+    return Array.from(statuses).sort()
+  }, [board])
+
+  // Extract unique teams from epics (placeholder for now)
+  const availableTeams = useMemo(() => {
+    const teams = new Set<string>()
+    // When team field is added to backend, extract from board
+    // board.forEach(epic => { if (epic.team) teams.add(epic.team) })
+    return Array.from(teams).sort()
+  }, [board])
+
+  // Filter epics
+  const filteredBoard = useMemo(() => {
+    return board.filter(epic => {
+      // Filter by key
+      if (searchKey) {
+        const keyLower = searchKey.toLowerCase()
+        if (!epic.issueKey.toLowerCase().includes(keyLower)) {
+          return false
+        }
+      }
+
+      // Filter by status
+      if (selectedStatuses.size > 0 && !selectedStatuses.has(epic.status)) {
+        return false
+      }
+
+      // Filter by team (when implemented)
+      // if (selectedTeams.size > 0 && epic.team && !selectedTeams.has(epic.team)) {
+      //   return false
+      // }
+
+      return true
+    })
+  }, [board, searchKey, selectedStatuses, selectedTeams])
+
+  const handleStatusToggle = (status: string) => {
+    setSelectedStatuses(prev => {
+      const next = new Set(prev)
+      if (next.has(status)) {
+        next.delete(status)
+      } else {
+        next.add(status)
+      }
+      return next
+    })
   }
 
-  const clearSearch = () => {
-    setSearchInput('')
-    setQuery('')
-    fetchBoard()
+  const handleTeamToggle = (team: string) => {
+    setSelectedTeams(prev => {
+      const next = new Set(prev)
+      if (next.has(team)) {
+        next.delete(team)
+      } else {
+        next.add(team)
+      }
+      return next
+    })
+  }
+
+  const clearFilters = () => {
+    setSearchKey('')
+    setSelectedStatuses(new Set())
+    setSelectedTeams(new Set())
   }
 
   return (
     <div className="app">
       <header className="header">
         <h1>Lead Board</h1>
-        <span className={`status-badge ${status}`}>{status}</span>
       </header>
 
-      <div className="filters">
-        <form onSubmit={handleSearch} className="search-form">
-          <input
-            type="text"
-            placeholder="Search by key or title..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="search-input"
-          />
-          <button type="submit" className="search-btn">Search</button>
-          {query && (
-            <button type="button" onClick={clearSearch} className="clear-btn">Clear</button>
-          )}
-        </form>
-      </div>
+      <FilterPanel
+        searchKey={searchKey}
+        onSearchKeyChange={setSearchKey}
+        availableStatuses={availableStatuses}
+        selectedStatuses={selectedStatuses}
+        onStatusToggle={handleStatusToggle}
+        availableTeams={availableTeams}
+        selectedTeams={selectedTeams}
+        onTeamToggle={handleTeamToggle}
+        onClearFilters={clearFilters}
+      />
 
-      <main className="board">
-        {loading && <p className="loading">Loading board...</p>}
-        {error && <p className="error">Error: {error}</p>}
-        {!loading && !error && board.length === 0 && (
-          <p className="empty">
-            {query ? `No results for "${query}"` : 'No epics found. Configure JIRA_* environment variables.'}
-          </p>
+      <main className="main-content">
+        {loading && <div className="loading">Loading board...</div>}
+        {error && <div className="error">Error: {error}</div>}
+        {!loading && !error && filteredBoard.length === 0 && (
+          <div className="empty">No epics found</div>
         )}
-
-        {board.map(epic => (
-          <div key={epic.issueKey} className="epic-card">
-            <div className="epic-header">
-              <a href={epic.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-                {epic.issueKey}
-              </a>
-              <span className="issue-title">{epic.title}</span>
-              <span className={`status-tag ${epic.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                {epic.status}
-              </span>
-            </div>
-
-            <div className="epic-metrics">
-              <div className="time-info">
-                <span className="metric">
-                  <span className="metric-label">Est:</span> {formatTime(epic.estimateSeconds)}
-                </span>
-                <span className="metric">
-                  <span className="metric-label">Log:</span> {formatTime(epic.loggedSeconds)}
-                </span>
-              </div>
-              {epic.progress !== null && epic.progress > 0 && (
-                <ProgressBar progress={epic.progress} />
-              )}
-              {epic.roleProgress && <RoleProgressBars roleProgress={epic.roleProgress} />}
-            </div>
-
-            {epic.children.length > 0 && (
-              <div className="stories">
-                {epic.children.map(story => (
-                  <div key={story.issueKey} className="story-item">
-                    <div className="story-row">
-                      <a href={story.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-                        {story.issueKey}
-                      </a>
-                      <span className="issue-title">{story.title}</span>
-                      <div className="story-metrics">
-                        {story.estimateSeconds && (
-                          <span className="metric small">{formatTime(story.estimateSeconds)}</span>
-                        )}
-                        {story.progress !== null && story.progress > 0 && (
-                          <div className="mini-progress">
-                            <div
-                              className="mini-progress-fill"
-                              style={{ width: `${Math.min(story.progress, 100)}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <span className={`status-tag ${story.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                        {story.status}
-                      </span>
-                    </div>
-
-                    {story.children.length > 0 && (
-                      <div className="subtasks">
-                        {story.children.map(subtask => (
-                          <div key={subtask.issueKey} className="subtask-row">
-                            <span className={`role-badge ${subtask.role?.toLowerCase() || 'unknown'}`}>
-                              {subtask.role === 'ANALYTICS' ? 'SA' :
-                               subtask.role === 'DEVELOPMENT' ? 'DEV' :
-                               subtask.role === 'TESTING' ? 'QA' : '?'}
-                            </span>
-                            <a href={subtask.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key small">
-                              {subtask.issueKey}
-                            </a>
-                            <span className="issue-title small">{subtask.title}</span>
-                            {subtask.estimateSeconds && (
-                              <span className="metric small">{formatTime(subtask.estimateSeconds)}</span>
-                            )}
-                            <span className={`status-tag small ${subtask.status.toLowerCase().replace(/\s+/g, '-')}`}>
-                              {subtask.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+        {!loading && !error && filteredBoard.length > 0 && (
+          <BoardTable items={filteredBoard} />
+        )}
       </main>
     </div>
   )
