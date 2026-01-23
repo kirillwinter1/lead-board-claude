@@ -22,6 +22,24 @@
 
 ---
 
+## Технические исправления
+
+### 2026-01-23: Jira API cursor-based pagination
+
+**Проблема:** Jira REST API `/rest/api/3/search/jql` изменил формат пагинации с offset-based (`startAt`, `total`) на cursor-based (`nextPageToken`, `isLast`).
+
+**Симптомы:**
+- Синхронизация загружала только часть задач
+- Ошибка "200 OK from GET..." в статусе синхронизации
+- `DataBufferLimitException` при больших ответах (>256KB)
+
+**Исправления:**
+1. `JiraSearchResponse` — добавлены поля `nextPageToken`, `isLast`
+2. `JiraClient` — поддержка `nextPageToken` в запросах, увеличен буфер до 16MB
+3. `SyncService` — использование cursor-based пагинации вместо offset
+
+---
+
 ## Фаза 1: Базовая инфраструктура
 
 ### F1. Bootstrap проекта ✅

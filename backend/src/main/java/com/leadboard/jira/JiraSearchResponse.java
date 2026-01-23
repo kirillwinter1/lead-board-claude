@@ -7,9 +7,15 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JiraSearchResponse {
 
+    // Legacy fields (for old API)
     private int startAt;
     private int maxResults;
     private int total;
+
+    // New cursor-based pagination fields (for /search/jql)
+    private boolean isLast;
+    private String nextPageToken;
+
     private List<JiraIssue> issues;
 
     public int getStartAt() {
@@ -34,6 +40,22 @@ public class JiraSearchResponse {
 
     public void setTotal(int total) {
         this.total = total;
+    }
+
+    public boolean isLast() {
+        return isLast;
+    }
+
+    public void setLast(boolean last) {
+        isLast = last;
+    }
+
+    public String getNextPageToken() {
+        return nextPageToken;
+    }
+
+    public void setNextPageToken(String nextPageToken) {
+        this.nextPageToken = nextPageToken;
     }
 
     public List<JiraIssue> getIssues() {

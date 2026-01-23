@@ -124,14 +124,14 @@ public class SyncService {
                 log.info("Full sync for project: {} (first run)", projectKey);
             }
 
-            int startAt = 0;
             int maxResults = 100;
+            String nextPageToken = null;
 
             while (true) {
-                JiraSearchResponse response = jiraClient.search(jql, startAt, maxResults);
+                JiraSearchResponse response = jiraClient.search(jql, maxResults, nextPageToken);
                 List<JiraIssue> issues = response.getIssues();
 
-                if (issues.isEmpty()) {
+                if (issues == null || issues.isEmpty()) {
                     break;
                 }
 
@@ -140,11 +140,11 @@ public class SyncService {
                     totalSynced++;
                 }
 
-                startAt += issues.size();
-
-                if (issues.size() < maxResults) {
+                // Use cursor-based pagination
+                if (response.isLast() || response.getNextPageToken() == null) {
                     break;
                 }
+                nextPageToken = response.getNextPageToken();
             }
 
             // Mark sync as completed
