@@ -14,6 +14,7 @@
 | F4. OAuth 2.0 + RBAC | ✅ Готово | 2026-01-23 |
 | F5. Team Management Backend | ✅ Готово | 2026-01-23 |
 | F6. Team Management UI | ✅ Готово | 2026-01-23 |
+| F7. Team Sync from Atlassian | ✅ Готово | 2026-01-23 |
 | F10. Epic-Team Mapping | ✅ Готово | 2026-01-23 |
 
 ---
@@ -73,6 +74,11 @@ jira:
 - Ручной refresh через UI
 - API для статуса синхронизации
 
+**Инкрементальная синхронизация:**
+- Первый запуск: полная загрузка всех задач проекта
+- Последующие: только задачи с `updated >= lastSyncCompletedAt - 1 minute`
+- JQL: `project = KEY AND updated >= 'YYYY-MM-DD HH:mm' ORDER BY updated DESC`
+
 **Таблицы:**
 - `jira_issues` — кэш задач
 - `jira_sync_state` — состояние синхронизации
@@ -84,9 +90,10 @@ JIRA_SYNC_INTERVAL_SECONDS (default 300)
 ```
 
 **Критерии готовности:**
-- /api/board читает только из PostgreSQL
-- Кнопка "Refresh" запускает синхронизацию
-- Показывается статус синхронизации
+- /api/board читает только из PostgreSQL ✅
+- Кнопка "Refresh" запускает синхронизацию ✅
+- Показывается статус синхронизации ✅
+- Инкрементальная синхронизация работает ✅
 
 ---
 
@@ -171,14 +178,25 @@ LB_ADMIN_ACCOUNT_IDS
 
 ## Фаза 3: Синхронизация команд
 
-### F7. Team Sync from Jira (Atlassian Teams)
+### F7. Team Sync from Jira (Atlassian Teams) ✅
 **Цель:** Автоматическая синхронизация команд из Atlassian.
 
 **Состав:**
 - Получение команд из Atlassian Teams API
 - Синхронизация участников
 - Защита локальных полей (role, grade, hoursPerDay)
-- Scheduled sync + manual trigger
+- Manual trigger через UI
+
+**API:**
+- GET /api/teams/config — конфигурация (manualTeamManagement, organizationId)
+- GET /api/teams/sync/status — статус синхронизации
+- POST /api/teams/sync/trigger — запустить синхронизацию
+
+**Конфигурация:**
+```
+JIRA_ORGANIZATION_ID — ID организации Atlassian (из admin.atlassian.com)
+JIRA_MANUAL_TEAM_MANAGEMENT — разрешить ручное управление командами (default: false)
+```
 
 **Правила синхронизации:**
 - Новая команда в Atlassian → создать
@@ -191,9 +209,9 @@ LB_ADMIN_ACCOUNT_IDS
 - hoursPerDay = 6.0
 
 **Критерии готовности:**
-- Команды синхронизируются из Atlassian
-- Локальные поля не перезаписываются
-- Кнопка ручной синхронизации работает
+- Команды синхронизируются из Atlassian ✅
+- Локальные поля не перезаписываются ✅
+- Кнопка ручной синхронизации работает ✅
 
 ---
 

@@ -33,11 +33,12 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | Фича | Описание |
 |------|----------|
 | **F1. Bootstrap** | Монорепозиторий: Java 21 + Spring Boot 3 backend, React + Vite + TypeScript frontend |
-| **F2. Jira Integration** | Интеграция с Jira REST API v3, иерархия Epic → Story → Sub-task |
-| **F3. Sync & Cache** | PostgreSQL кэш, периодическая синхронизация, кнопка Refresh |
+| **F2. Jira Integration** | Интеграция с Jira REST API v3, иерархия Epic → Story → Sub-task → Bug |
+| **F3. Sync & Cache** | PostgreSQL кэш, инкрементальная синхронизация, кнопка Refresh |
 | **F4. OAuth 2.0** | Авторизация через Atlassian, хранение токенов, автообновление |
 | **F5. Team Backend** | CRUD API для команд и участников (/api/teams) |
 | **F6. Team UI** | Страницы управления командами и участниками |
+| **F7. Team Sync** | Синхронизация команд и участников из Atlassian Teams API |
 | **F10. Epic-Team Mapping** | Синхронизация команды из Jira Team field, отображение на Board |
 
 ### Текущий UI
@@ -54,7 +55,8 @@ Lead Board — SaaS-продукт для управления IT-доставк
 
 **Страница команд — `/teams`:**
 - Список всех команд с количеством участников
-- Создание/редактирование/деактивация команд
+- Кнопка "Sync from Atlassian" для синхронизации команд
+- Создание/редактирование/деактивация команд (если включено manualTeamManagement)
 - Jira Team Value для маппинга с Epic
 
 **Страница участников — `/teams/:id`:**
@@ -68,13 +70,16 @@ Lead Board — SaaS-продукт для управления IT-доставк
 |-------|------|----------|
 | GET | /api/health | Проверка работоспособности |
 | GET | /api/board | Получить доску (из кэша) |
-| GET | /api/sync/status | Статус синхронизации |
-| POST | /api/sync/trigger | Запустить синхронизацию |
+| GET | /api/sync/status | Статус синхронизации задач |
+| POST | /api/sync/trigger | Запустить синхронизацию задач |
 | GET | /api/teams | Список команд |
 | POST | /api/teams | Создать команду |
 | GET | /api/teams/{id} | Получить команду |
 | PUT | /api/teams/{id} | Обновить команду |
 | DELETE | /api/teams/{id} | Деактивировать команду |
+| GET | /api/teams/config | Конфигурация команд |
+| GET | /api/teams/sync/status | Статус синхронизации команд |
+| POST | /api/teams/sync/trigger | Синхронизировать команды из Atlassian |
 | GET | /api/teams/{id}/members | Участники команды |
 | POST | /api/teams/{id}/members | Добавить участника |
 | PUT | /api/teams/{id}/members/{mid} | Обновить участника |
