@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
+import logo from '../icons/logo.png'
 
 interface AuthUser {
   id: number
@@ -50,7 +51,9 @@ export function Layout() {
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <h1>Lead Board</h1>
+          <NavLink to="/" className="logo-link">
+            <img src={logo} alt="Lead Board" className="header-logo" />
+          </NavLink>
           <nav className="nav-tabs">
             <NavLink to="/" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
               Board

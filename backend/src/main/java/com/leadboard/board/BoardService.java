@@ -62,6 +62,10 @@ public class BoardService {
                     .filter(e -> "История".equals(e.getIssueType()) || "Story".equals(e.getIssueType()))
                     .collect(Collectors.toList());
 
+            List<JiraIssueEntity> bugs = allIssues.stream()
+                    .filter(e -> "Баг".equals(e.getIssueType()) || "Bug".equals(e.getIssueType()))
+                    .collect(Collectors.toList());
+
             List<JiraIssueEntity> subtasks = allIssues.stream()
                     .filter(JiraIssueEntity::isSubtask)
                     .collect(Collectors.toList());
@@ -108,7 +112,18 @@ public class BoardService {
                 }
             }
 
-            // Create Sub-task nodes and attach to Stories
+            // Create Bug nodes and attach to Epics (same level as Stories)
+            for (JiraIssueEntity bug : bugs) {
+                BoardNode bugNode = mapToNode(bug, baseUrl, teamNames);
+                storyMap.put(bug.getIssueKey(), bugNode);
+
+                String parentKey = bug.getParentKey();
+                if (parentKey != null && epicMap.containsKey(parentKey)) {
+                    epicMap.get(parentKey).addChild(bugNode);
+                }
+            }
+
+            // Create Sub-task nodes and attach to Stories/Bugs
             for (JiraIssueEntity subtask : subtasks) {
                 BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames);
 

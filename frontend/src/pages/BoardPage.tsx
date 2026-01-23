@@ -3,6 +3,7 @@ import axios from 'axios'
 
 import epicIcon from '../icons/epic.png'
 import storyIcon from '../icons/story.png'
+import bugIcon from '../icons/bug.png'
 import subtaskIcon from '../icons/subtask.png'
 
 const issueTypeIcons: Record<string, string> = {
@@ -10,6 +11,8 @@ const issueTypeIcons: Record<string, string> = {
   'Epic': epicIcon,
   'История': storyIcon,
   'Story': storyIcon,
+  'Баг': bugIcon,
+  'Bug': bugIcon,
   'Подзадача': subtaskIcon,
   'Sub-task': subtaskIcon,
   'Subtask': subtaskIcon,
@@ -424,6 +427,11 @@ export function BoardPage() {
 
   const availableTeams = useMemo(() => {
     const teams = new Set<string>()
+    board.forEach(epic => {
+      if (epic.teamName) {
+        teams.add(epic.teamName)
+      }
+    })
     return Array.from(teams).sort()
   }, [board])
 
@@ -436,6 +444,9 @@ export function BoardPage() {
         }
       }
       if (selectedStatuses.size > 0 && !selectedStatuses.has(epic.status)) {
+        return false
+      }
+      if (selectedTeams.size > 0 && (!epic.teamName || !selectedTeams.has(epic.teamName))) {
         return false
       }
       return true
