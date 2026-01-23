@@ -164,7 +164,7 @@ export function TeamMembersPage() {
                 <th>JIRA ACCOUNT ID</th>
                 <th>ROLE</th>
                 <th>GRADE</th>
-                <th>HOURS/DAY</th>
+                <th>HOURS PER DAY</th>
                 <th>ACTIONS</th>
               </tr>
             </thead>
@@ -260,8 +260,8 @@ export function TeamMembersPage() {
                 id="hoursPerDay"
                 type="number"
                 min="0.1"
-                max="12"
-                step="0.5"
+                max="24"
+                step="0.1"
                 value={formData.hoursPerDay}
                 onChange={e => setFormData({ ...formData, hoursPerDay: parseFloat(e.target.value) || 6 })}
               />
