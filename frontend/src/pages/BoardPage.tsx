@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import axios from 'axios'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
+import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '../api/forecast'
 
 import epicIcon from '../icons/epic.png'
 import storyIcon from '../icons/story.png'
@@ -317,6 +318,121 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`status-badge ${statusClass}`}>{status}</span>
 }
 
+// Priority Boost Editor for Epics
+interface PriorityBoostProps {
+  epicKey: string
+  currentBoost: number
+  autoScore: number | null
+  onUpdate: (epicKey: string, boost: number) => Promise<void>
+}
+
+function PriorityBoost({ epicKey, currentBoost, autoScore, onUpdate }: PriorityBoostProps) {
+  const [saving, setSaving] = useState(false)
+  const [localBoost, setLocalBoost] = useState(currentBoost)
+
+  useEffect(() => {
+    setLocalBoost(currentBoost)
+  }, [currentBoost])
+
+  const handleChange = async (delta: number) => {
+    const newBoost = Math.max(0, Math.min(5, localBoost + delta))
+    if (newBoost === localBoost) return
+
+    setLocalBoost(newBoost)
+    setSaving(true)
+    try {
+      await onUpdate(epicKey, newBoost)
+    } catch (err) {
+      console.error('Failed to update boost:', err)
+      setLocalBoost(currentBoost) // Revert on error
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const hasBoost = localBoost > 0
+
+  return (
+    <div className={`priority-boost ${hasBoost ? 'boosted' : ''} ${saving ? 'saving' : ''}`}>
+      <button
+        className="boost-btn minus"
+        onClick={() => handleChange(-1)}
+        disabled={saving || localBoost <= 0}
+        title="Decrease priority"
+      >
+        −
+      </button>
+      <span className="boost-value" title={`AutoScore: ${autoScore?.toFixed(1) ?? '--'}`}>
+        {hasBoost ? `+${localBoost}` : '0'}
+      </span>
+      <button
+        className="boost-btn plus"
+        onClick={() => handleChange(1)}
+        disabled={saving || localBoost >= 5}
+        title="Increase priority"
+      >
+        +
+      </button>
+    </div>
+  )
+}
+
+// Expected Done cell with confidence indicator
+interface ExpectedDoneCellProps {
+  forecast: EpicForecast | null
+}
+
+function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
+  if (!forecast) {
+    return <span className="expected-done-empty">--</span>
+  }
+
+  const { expectedDone, confidence, dueDateDeltaDays, dueDate } = forecast
+
+  // Format date as "15 мар" or "15.03"
+  const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return '--'
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  }
+
+  // Confidence colors
+  const confidenceClass = confidence.toLowerCase()
+  const confidenceTitle = {
+    HIGH: 'Высокая уверенность',
+    MEDIUM: 'Средняя уверенность',
+    LOW: 'Низкая уверенность'
+  }[confidence]
+
+  // Delta indicator
+  let deltaClass = ''
+  let deltaText = ''
+  if (dueDateDeltaDays !== null) {
+    if (dueDateDeltaDays > 0) {
+      deltaClass = 'delta-late'
+      deltaText = `+${dueDateDeltaDays}d`
+    } else if (dueDateDeltaDays < 0) {
+      deltaClass = 'delta-early'
+      deltaText = `${dueDateDeltaDays}d`
+    } else {
+      deltaClass = 'delta-ontime'
+      deltaText = 'on time'
+    }
+  }
+
+  return (
+    <div className="expected-done-cell">
+      <span className={`confidence-dot ${confidenceClass}`} title={confidenceTitle} />
+      <span className="expected-done-date">{formatDate(expectedDone)}</span>
+      {deltaText && (
+        <span className={`expected-done-delta ${deltaClass}`} title={`Due: ${formatDate(dueDate)}`}>
+          {deltaText}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function AlertIcon({ node }: { node: BoardNode }) {
   const hasAlert =
     (node.loggedSeconds && node.loggedSeconds > 0 && (!node.estimateSeconds || node.estimateSeconds === 0)) ||
@@ -336,9 +452,12 @@ interface BoardRowProps {
   hasChildren: boolean
   roughEstimateConfig: RoughEstimateConfig | null
   onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
+  forecast: EpicForecast | null
+  showForecast: boolean
+  onBoostUpdate: (epicKey: string, boost: number) => Promise<void>
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, showForecast, onBoostUpdate }: BoardRowProps) {
   return (
     <tr className={`board-row level-${level}`}>
       <td className="cell-expander">
@@ -360,6 +479,29 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         </div>
       </td>
       <td className="cell-team">{node.teamName || '--'}</td>
+      {showForecast && (
+        <>
+          <td className="cell-priority">
+            {isEpic(node.issueType) && forecast ? (
+              <PriorityBoost
+                epicKey={node.issueKey}
+                currentBoost={forecast.manualPriorityBoost ?? 0}
+                autoScore={forecast.autoScore}
+                onUpdate={onBoostUpdate}
+              />
+            ) : (
+              <span className="priority-empty">--</span>
+            )}
+          </td>
+          <td className="cell-expected-done">
+            {isEpic(node.issueType) ? (
+              <ExpectedDoneCell forecast={forecast} />
+            ) : (
+              <span className="expected-done-empty">--</span>
+            )}
+          </td>
+        </>
+      )}
       <td className="cell-logged">{formatDays(node.loggedSeconds)}</td>
       <td className="cell-estimate">{formatDays(node.estimateSeconds)}</td>
       <td className="cell-progress">
@@ -386,9 +528,12 @@ interface BoardTableProps {
   items: BoardNode[]
   roughEstimateConfig: RoughEstimateConfig | null
   onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
+  forecastMap: Map<string, EpicForecast>
+  showForecast: boolean
+  onBoostUpdate: (epicKey: string, boost: number) => Promise<void>
 }
 
-function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate }: BoardTableProps) {
+function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, showForecast, onBoostUpdate }: BoardTableProps) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
   const toggleExpand = (key: string) => {
@@ -409,6 +554,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate }: Board
     for (const node of nodes) {
       const isExpanded = expandedKeys.has(node.issueKey)
       const hasChildren = node.children.length > 0
+      const forecast = forecastMap.get(node.issueKey) || null
 
       rows.push(
         <BoardRow
@@ -420,6 +566,9 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate }: Board
           hasChildren={hasChildren}
           roughEstimateConfig={roughEstimateConfig}
           onRoughEstimateUpdate={onRoughEstimateUpdate}
+          forecast={forecast}
+          showForecast={showForecast}
+          onBoostUpdate={onBoostUpdate}
         />
       )
 
@@ -439,6 +588,12 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate }: Board
             <th className="th-expander"></th>
             <th className="th-name">NAME</th>
             <th className="th-team">TEAM</th>
+            {showForecast && (
+              <>
+                <th className="th-priority">BOOST</th>
+                <th className="th-expected-done">EXPECTED DONE</th>
+              </>
+            )}
             <th className="th-logged">LOGGED TIME</th>
             <th className="th-estimate">ESTIMATE</th>
             <th className="th-progress">OVERALL PROGRESS</th>
@@ -579,6 +734,7 @@ export function BoardPage() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [roughEstimateConfig, setRoughEstimateConfig] = useState<RoughEstimateConfig | null>(null)
+  const [forecastData, setForecastData] = useState<ForecastResponse | null>(null)
 
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
@@ -639,11 +795,56 @@ export function BoardPage() {
     fetchRoughEstimateConfig()
   }, [fetchBoard, fetchSyncStatus, fetchRoughEstimateConfig])
 
+  // Load forecast when exactly one team is selected
+  const selectedTeamId = useMemo(() => {
+    if (selectedTeams.size !== 1) return null
+    const teamName = Array.from(selectedTeams)[0]
+    // Find team ID from board data
+    const epic = board.find(e => e.teamName === teamName)
+    return epic?.teamId || null
+  }, [selectedTeams, board])
+
+  useEffect(() => {
+    if (!selectedTeamId) {
+      setForecastData(null)
+      return
+    }
+
+    getForecast(selectedTeamId)
+      .then(data => {
+        setForecastData(data)
+      })
+      .catch(err => {
+        console.error('Failed to load forecast:', err)
+        setForecastData(null)
+      })
+  }, [selectedTeamId])
+
+  // Create forecast map for quick lookup
+  const forecastMap = useMemo(() => {
+    const map = new Map<string, EpicForecast>()
+    if (forecastData) {
+      forecastData.epics.forEach(f => map.set(f.epicKey, f))
+    }
+    return map
+  }, [forecastData])
+
+  const showForecast = selectedTeamId !== null && forecastData !== null
+
   const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => {
     await updateRoughEstimate(epicKey, role, { days })
     // Refetch board to get updated data
     await fetchBoard()
   }, [fetchBoard])
+
+  const handleBoostUpdate = useCallback(async (epicKey: string, boost: number) => {
+    await updateManualBoost(epicKey, boost)
+    // Refetch forecast to get updated AutoScore
+    if (selectedTeamId) {
+      const data = await getForecast(selectedTeamId)
+      setForecastData(data)
+    }
+  }, [selectedTeamId])
 
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
@@ -737,6 +938,9 @@ export function BoardPage() {
             items={filteredBoard}
             roughEstimateConfig={roughEstimateConfig}
             onRoughEstimateUpdate={handleRoughEstimateUpdate}
+            forecastMap={forecastMap}
+            showForecast={showForecast}
+            onBoostUpdate={handleBoostUpdate}
           />
         )}
       </main>

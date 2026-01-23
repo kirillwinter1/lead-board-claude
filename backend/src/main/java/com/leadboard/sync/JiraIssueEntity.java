@@ -2,6 +2,7 @@ package com.leadboard.sync;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -62,6 +63,24 @@ public class JiraIssueEntity {
 
     @Column(name = "rough_estimate_updated_by", length = 255)
     private String roughEstimateUpdatedBy;
+
+    @Column(name = "priority", length = 50)
+    private String priority;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @Column(name = "jira_created_at")
+    private OffsetDateTime jiraCreatedAt;
+
+    @Column(name = "manual_priority_boost")
+    private Integer manualPriorityBoost = 0;
+
+    @Column(name = "auto_score", precision = 5, scale = 2)
+    private BigDecimal autoScore;
+
+    @Column(name = "auto_score_calculated_at")
+    private OffsetDateTime autoScoreCalculatedAt;
 
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
@@ -250,5 +269,53 @@ public class JiraIssueEntity {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+
+    public LocalDate getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(LocalDate dueDate) {
+        this.dueDate = dueDate;
+    }
+
+    public OffsetDateTime getJiraCreatedAt() {
+        return jiraCreatedAt;
+    }
+
+    public void setJiraCreatedAt(OffsetDateTime jiraCreatedAt) {
+        this.jiraCreatedAt = jiraCreatedAt;
+    }
+
+    public Integer getManualPriorityBoost() {
+        return manualPriorityBoost;
+    }
+
+    public void setManualPriorityBoost(Integer manualPriorityBoost) {
+        this.manualPriorityBoost = manualPriorityBoost;
+    }
+
+    public BigDecimal getAutoScore() {
+        return autoScore;
+    }
+
+    public void setAutoScore(BigDecimal autoScore) {
+        this.autoScore = autoScore;
+    }
+
+    public OffsetDateTime getAutoScoreCalculatedAt() {
+        return autoScoreCalculatedAt;
+    }
+
+    public void setAutoScoreCalculatedAt(OffsetDateTime autoScoreCalculatedAt) {
+        this.autoScoreCalculatedAt = autoScoreCalculatedAt;
     }
 }

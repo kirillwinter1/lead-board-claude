@@ -1,6 +1,8 @@
 package com.leadboard.team;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.config.JiraProperties;
+import com.leadboard.planning.AutoScoreService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -29,6 +31,15 @@ class TeamControllerTest {
 
     @MockBean
     private TeamService teamService;
+
+    @MockBean
+    private TeamSyncService teamSyncService;
+
+    @MockBean
+    private JiraProperties jiraProperties;
+
+    @MockBean
+    private AutoScoreService autoScoreService;
 
     // ==================== Team Tests ====================
 

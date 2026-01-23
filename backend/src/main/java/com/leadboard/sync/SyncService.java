@@ -13,7 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -168,12 +171,15 @@ public class SyncService {
         JiraIssueEntity entity = issueRepository.findByIssueKey(jiraIssue.getKey())
                 .orElse(new JiraIssueEntity());
 
-        // Preserve rough estimate fields (local Lead Board data that survives sync)
+        // Preserve local Lead Board data that survives sync
         BigDecimal savedRoughEstimateSaDays = entity.getRoughEstimateSaDays();
         BigDecimal savedRoughEstimateDevDays = entity.getRoughEstimateDevDays();
         BigDecimal savedRoughEstimateQaDays = entity.getRoughEstimateQaDays();
         OffsetDateTime savedRoughEstimateUpdatedAt = entity.getRoughEstimateUpdatedAt();
         String savedRoughEstimateUpdatedBy = entity.getRoughEstimateUpdatedBy();
+        Integer savedManualPriorityBoost = entity.getManualPriorityBoost();
+        BigDecimal savedAutoScore = entity.getAutoScore();
+        OffsetDateTime savedAutoScoreCalculatedAt = entity.getAutoScoreCalculatedAt();
 
         entity.setIssueKey(jiraIssue.getKey());
         entity.setIssueId(jiraIssue.getId());
@@ -200,14 +206,52 @@ public class SyncService {
         entity.setTeamFieldValue(teamFieldValue);
         entity.setTeamId(findTeamIdByFieldValue(teamFieldValue));
 
-        // Restore rough estimate fields
+        // Extract priority
+        if (jiraIssue.getFields().getPriority() != null) {
+            entity.setPriority(jiraIssue.getFields().getPriority().getName());
+        }
+
+        // Extract due date
+        entity.setDueDate(parseLocalDate(jiraIssue.getFields().getDuedate()));
+
+        // Extract created date
+        entity.setJiraCreatedAt(parseOffsetDateTime(jiraIssue.getFields().getCreated()));
+
+        // Restore local Lead Board fields
         entity.setRoughEstimateSaDays(savedRoughEstimateSaDays);
         entity.setRoughEstimateDevDays(savedRoughEstimateDevDays);
         entity.setRoughEstimateQaDays(savedRoughEstimateQaDays);
         entity.setRoughEstimateUpdatedAt(savedRoughEstimateUpdatedAt);
         entity.setRoughEstimateUpdatedBy(savedRoughEstimateUpdatedBy);
+        entity.setManualPriorityBoost(savedManualPriorityBoost != null ? savedManualPriorityBoost : 0);
+        entity.setAutoScore(savedAutoScore);
+        entity.setAutoScoreCalculatedAt(savedAutoScoreCalculatedAt);
 
         issueRepository.save(entity);
+    }
+
+    private LocalDate parseLocalDate(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(dateStr);
+        } catch (DateTimeParseException e) {
+            log.warn("Failed to parse date: {}", dateStr);
+            return null;
+        }
+    }
+
+    private OffsetDateTime parseOffsetDateTime(String dateTimeStr) {
+        if (dateTimeStr == null || dateTimeStr.isEmpty()) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(dateTimeStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } catch (DateTimeParseException e) {
+            log.warn("Failed to parse datetime: {}", dateTimeStr);
+            return null;
+        }
     }
 
     private String extractTeamFieldValue(JiraIssue jiraIssue) {

@@ -1134,3 +1134,149 @@ body {
   justify-content: center;
   color: #ff8b00;
 }
+
+/* Expected Done Column */
+.th-expected-done {
+  width: 130px;
+  min-width: 130px;
+}
+
+.cell-expected-done {
+  width: 130px;
+  min-width: 130px;
+}
+
+.expected-done-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.expected-done-empty {
+  color: #8993a4;
+}
+
+.confidence-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.confidence-dot.high {
+  background: #36b37e;
+}
+
+.confidence-dot.medium {
+  background: #ffab00;
+}
+
+.confidence-dot.low {
+  background: #ff5630;
+}
+
+.expected-done-date {
+  font-weight: 500;
+  color: #172b4d;
+}
+
+.expected-done-delta {
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.expected-done-delta.delta-late {
+  background: #ffebe6;
+  color: #de350b;
+}
+
+.expected-done-delta.delta-early {
+  background: #e3fcef;
+  color: #006644;
+}
+
+.expected-done-delta.delta-ontime {
+  background: #deebff;
+  color: #0052cc;
+}
+
+/* Priority Boost */
+.th-priority {
+  width: 80px;
+  min-width: 80px;
+}
+
+.cell-priority {
+  width: 80px;
+  min-width: 80px;
+}
+
+.priority-empty {
+  color: #8993a4;
+}
+
+.priority-boost {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #f4f5f7;
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.priority-boost.boosted {
+  background: #e3fcef;
+}
+
+.priority-boost.saving {
+  opacity: 0.6;
+}
+
+.boost-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #6b778c;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.boost-btn:hover:not(:disabled) {
+  background: #dfe1e6;
+  color: #172b4d;
+}
+
+.boost-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.boost-btn.plus:hover:not(:disabled) {
+  background: #36b37e;
+  color: white;
+}
+
+.boost-btn.minus:hover:not(:disabled) {
+  background: #ff5630;
+  color: white;
+}
+
+.boost-value {
+  min-width: 24px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.priority-boost.boosted .boost-value {
+  color: #006644;
+}

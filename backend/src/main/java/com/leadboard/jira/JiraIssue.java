@@ -54,6 +54,9 @@ public class JiraIssue {
         private JiraParent parent;
         private JiraProject project;
         private JiraTimeTracking timetracking;
+        private JiraPriority priority;
+        private String duedate;
+        private String created;
         private Map<String, Object> customFields = new HashMap<>();
 
         @JsonAnySetter
@@ -117,6 +120,30 @@ public class JiraIssue {
 
         public void setTimetracking(JiraTimeTracking timetracking) {
             this.timetracking = timetracking;
+        }
+
+        public JiraPriority getPriority() {
+            return priority;
+        }
+
+        public void setPriority(JiraPriority priority) {
+            this.priority = priority;
+        }
+
+        public String getDuedate() {
+            return duedate;
+        }
+
+        public void setDuedate(String duedate) {
+            this.duedate = duedate;
+        }
+
+        public String getCreated() {
+            return created;
+        }
+
+        public void setCreated(String created) {
+            this.created = created;
         }
     }
 
@@ -218,6 +245,28 @@ public class JiraIssue {
 
         public void setName(String name) {
             this.name = name;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraPriority {
+        private String name;
+        private String id;
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
         }
     }
 }
