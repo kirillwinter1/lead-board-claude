@@ -15,5 +15,7 @@ public interface TeamRepository extends JpaRepository<TeamEntity, Long> {
 
     Optional<TeamEntity> findByJiraTeamValue(String jiraTeamValue);
 
+    Optional<TeamEntity> findByAtlassianTeamId(String atlassianTeamId);
+
     boolean existsByNameAndActiveTrue(String name);
 }

@@ -17,6 +17,8 @@ public class JiraProperties {
     private int syncIntervalSeconds = 300;
     private String teamFieldId; // e.g. customfield_12345
     private Map<String, String> subtaskRoles = new HashMap<>();
+    private String organizationId; // Atlassian Organization ID for Teams API
+    private boolean manualTeamManagement = false; // If true, allow manual team creation/deletion
 
     public String getBaseUrl() {
         return baseUrl;
@@ -72,6 +74,22 @@ public class JiraProperties {
 
     public void setSubtaskRoles(Map<String, String> subtaskRoles) {
         this.subtaskRoles = subtaskRoles;
+    }
+
+    public String getOrganizationId() {
+        return organizationId;
+    }
+
+    public void setOrganizationId(String organizationId) {
+        this.organizationId = organizationId;
+    }
+
+    public boolean isManualTeamManagement() {
+        return manualTeamManagement;
+    }
+
+    public void setManualTeamManagement(boolean manualTeamManagement) {
+        this.manualTeamManagement = manualTeamManagement;
     }
 
     public String getRoleForSubtaskType(String subtaskType) {

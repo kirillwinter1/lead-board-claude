@@ -643,6 +643,16 @@ body {
   margin: 0;
 }
 
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sync-error {
+  color: #de350b;
+}
+
 .page-header-left {
   display: flex;
   align-items: center;

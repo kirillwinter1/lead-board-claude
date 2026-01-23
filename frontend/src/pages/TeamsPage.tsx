@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { teamsApi, Team, CreateTeamRequest } from '../api/teams'
+import { teamsApi, Team, CreateTeamRequest, TeamsConfig, TeamSyncStatus } from '../api/teams'
 import { Modal } from '../components/Modal'
 
 export function TeamsPage() {
@@ -12,7 +12,11 @@ export function TeamsPage() {
   const [formData, setFormData] = useState<CreateTeamRequest>({ name: '', jiraTeamValue: '' })
   const [saving, setSaving] = useState(false)
 
-  const fetchTeams = () => {
+  const [config, setConfig] = useState<TeamsConfig | null>(null)
+  const [syncStatus, setSyncStatus] = useState<TeamSyncStatus | null>(null)
+  const [syncing, setSyncing] = useState(false)
+
+  const fetchTeams = useCallback(() => {
     setLoading(true)
     teamsApi.getAll()
       .then(data => {
@@ -23,11 +27,50 @@ export function TeamsPage() {
         setError(err.response?.data?.error || err.message)
       })
       .finally(() => setLoading(false))
-  }
+  }, [])
+
+  const fetchConfig = useCallback(() => {
+    teamsApi.getConfig()
+      .then(setConfig)
+      .catch(() => setConfig({ manualTeamManagement: true, organizationId: '' }))
+  }, [])
+
+  const fetchSyncStatus = useCallback(() => {
+    teamsApi.getSyncStatus()
+      .then(status => {
+        setSyncStatus(status)
+        setSyncing(status.syncInProgress)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
+    fetchConfig()
     fetchTeams()
-  }, [])
+    fetchSyncStatus()
+  }, [fetchConfig, fetchTeams, fetchSyncStatus])
+
+  const handleSync = () => {
+    setSyncing(true)
+    teamsApi.triggerSync()
+      .then(() => {
+        const pollInterval = setInterval(() => {
+          teamsApi.getSyncStatus()
+            .then(status => {
+              setSyncStatus(status)
+              if (!status.syncInProgress) {
+                setSyncing(false)
+                clearInterval(pollInterval)
+                fetchTeams()
+              }
+            })
+        }, 2000)
+      })
+      .catch(err => {
+        setSyncing(false)
+        alert('Sync failed: ' + (err.response?.data?.error || err.message))
+      })
+  }
 
   const openCreateModal = () => {
     setEditingTeam(null)
@@ -76,20 +119,60 @@ export function TeamsPage() {
       })
   }
 
+  const formatSyncTime = (isoString: string | null): string => {
+    if (!isoString) return 'Never'
+    const date = new Date(isoString)
+    return date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const canManageTeams = config?.manualTeamManagement ?? false
+  const canSync = config?.organizationId && config.organizationId.length > 0
+
   return (
     <main className="main-content">
       <div className="page-header">
         <h2>Teams</h2>
-        <button className="btn btn-primary" onClick={openCreateModal}>
-          + Add Team
-        </button>
+        <div className="page-header-actions">
+          {canSync && (
+            <div className="sync-status">
+              {syncStatus && (
+                <span className="sync-info">
+                  Last sync: {formatSyncTime(syncStatus.lastSyncTime)}
+                  {syncStatus.error && <span className="sync-error"> (Error)</span>}
+                </span>
+              )}
+              <button
+                className={`btn btn-secondary ${syncing ? 'syncing' : ''}`}
+                onClick={handleSync}
+                disabled={syncing}
+              >
+                {syncing ? 'Syncing...' : 'Sync from Atlassian'}
+              </button>
+            </div>
+          )}
+          {canManageTeams && (
+            <button className="btn btn-primary" onClick={openCreateModal}>
+              + Add Team
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && <div className="loading">Loading teams...</div>}
       {error && <div className="error">Error: {error}</div>}
 
       {!loading && !error && teams.length === 0 && (
-        <div className="empty">No teams yet. Create your first team!</div>
+        <div className="empty">
+          {canSync
+            ? 'No teams yet. Click "Sync from Atlassian" to import teams.'
+            : 'No teams yet. Create your first team!'}
+        </div>
       )}
 
       {!loading && !error && teams.length > 0 && (
@@ -121,12 +204,19 @@ export function TeamsPage() {
                   </td>
                   <td>
                     <div className="actions">
-                      <button className="btn btn-small btn-secondary" onClick={() => openEditModal(team)}>
-                        Edit
-                      </button>
-                      <button className="btn btn-small btn-danger" onClick={() => handleDelete(team)}>
-                        Delete
-                      </button>
+                      {canManageTeams && (
+                        <>
+                          <button className="btn btn-small btn-secondary" onClick={() => openEditModal(team)}>
+                            Edit
+                          </button>
+                          <button className="btn btn-small btn-danger" onClick={() => handleDelete(team)}>
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      {!canManageTeams && (
+                        <span className="cell-muted">--</span>
+                      )}
                     </div>
                   </td>
                 </tr>

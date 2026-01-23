@@ -108,8 +108,21 @@ public class SyncService {
         try {
             int totalSynced = 0;
 
-            // Fetch all issues for the project
-            String jql = String.format("project = %s ORDER BY updated DESC", projectKey);
+            // Build JQL - incremental sync if we have a previous sync time
+            String jql;
+            OffsetDateTime lastSync = state.getLastSyncCompletedAt();
+            if (lastSync != null) {
+                // Incremental sync: only fetch issues updated since last sync
+                // Subtract 1 minute to account for timing differences
+                String lastSyncTime = lastSync.minusMinutes(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                jql = String.format("project = %s AND updated >= '%s' ORDER BY updated DESC", projectKey, lastSyncTime);
+                log.info("Incremental sync for project: {} (changes since {})", projectKey, lastSyncTime);
+            } else {
+                // Full sync on first run
+                jql = String.format("project = %s ORDER BY updated DESC", projectKey);
+                log.info("Full sync for project: {} (first run)", projectKey);
+            }
+
             int startAt = 0;
             int maxResults = 100;
 
@@ -139,7 +152,8 @@ public class SyncService {
             state.setLastSyncIssuesCount(totalSynced);
             syncStateRepository.save(state);
 
-            log.info("Sync completed for project: {}. Total issues synced: {}", projectKey, totalSynced);
+            log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
+                    lastSync != null ? "incremental" : "full");
 
         } catch (Exception e) {
             log.error("Sync failed for project: {}", projectKey, e);

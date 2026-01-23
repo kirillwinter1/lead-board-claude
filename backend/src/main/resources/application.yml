@@ -27,6 +27,8 @@ jira:
   project-key: ${JIRA_PROJECT_KEY:}
   sync-interval-seconds: ${JIRA_SYNC_INTERVAL_SECONDS:300}
   team-field-id: ${JIRA_TEAM_FIELD_ID:}
+  organization-id: ${JIRA_ORGANIZATION_ID:}
+  manual-team-management: ${JIRA_MANUAL_TEAM_MANAGEMENT:false}
   subtask-roles:
     Аналитика: ANALYTICS
     Разработка: DEVELOPMENT

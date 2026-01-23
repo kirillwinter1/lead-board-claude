@@ -1,5 +1,6 @@
 package com.leadboard.team;
 
+import com.leadboard.config.JiraProperties;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,9 +14,35 @@ import java.util.Map;
 public class TeamController {
 
     private final TeamService teamService;
+    private final TeamSyncService teamSyncService;
+    private final JiraProperties jiraProperties;
 
-    public TeamController(TeamService teamService) {
+    public TeamController(TeamService teamService, TeamSyncService teamSyncService, JiraProperties jiraProperties) {
         this.teamService = teamService;
+        this.teamSyncService = teamSyncService;
+        this.jiraProperties = jiraProperties;
+    }
+
+    // ==================== Config Endpoint ====================
+
+    @GetMapping("/config")
+    public Map<String, Object> getConfig() {
+        return Map.of(
+                "manualTeamManagement", jiraProperties.isManualTeamManagement(),
+                "organizationId", jiraProperties.getOrganizationId() != null ? jiraProperties.getOrganizationId() : ""
+        );
+    }
+
+    // ==================== Sync Endpoints ====================
+
+    @GetMapping("/sync/status")
+    public TeamSyncService.TeamSyncStatus getSyncStatus() {
+        return teamSyncService.getStatus();
+    }
+
+    @PostMapping("/sync/trigger")
+    public TeamSyncService.TeamSyncStatus triggerSync() {
+        return teamSyncService.syncTeams();
     }
 
     // ==================== Team Endpoints ====================

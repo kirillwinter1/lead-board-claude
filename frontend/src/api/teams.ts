@@ -48,7 +48,24 @@ export interface UpdateTeamMemberRequest {
   hoursPerDay?: number
 }
 
+export interface TeamsConfig {
+  manualTeamManagement: boolean
+  organizationId: string
+}
+
+export interface TeamSyncStatus {
+  syncInProgress: boolean
+  lastSyncTime: string | null
+  error: string | null
+}
+
 export const teamsApi = {
+  getConfig: () => axios.get<TeamsConfig>('/api/teams/config').then(r => r.data),
+
+  getSyncStatus: () => axios.get<TeamSyncStatus>('/api/teams/sync/status').then(r => r.data),
+
+  triggerSync: () => axios.post<TeamSyncStatus>('/api/teams/sync/trigger').then(r => r.data),
+
   getAll: () => axios.get<Team[]>('/api/teams').then(r => r.data),
 
   getById: (id: number) => axios.get<Team>(`/api/teams/${id}`).then(r => r.data),

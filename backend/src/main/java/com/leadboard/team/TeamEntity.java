@@ -19,6 +19,9 @@ public class TeamEntity {
     @Column(name = "jira_team_value", length = 255)
     private String jiraTeamValue;
 
+    @Column(name = "atlassian_team_id", length = 100)
+    private String atlassianTeamId;
+
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
@@ -65,6 +68,14 @@ public class TeamEntity {
 
     public void setJiraTeamValue(String jiraTeamValue) {
         this.jiraTeamValue = jiraTeamValue;
+    }
+
+    public String getAtlassianTeamId() {
+        return atlassianTeamId;
+    }
+
+    public void setAtlassianTeamId(String atlassianTeamId) {
+        this.atlassianTeamId = atlassianTeamId;
     }
 
     public Boolean getActive() {
