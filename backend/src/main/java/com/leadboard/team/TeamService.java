@@ -1,8 +1,12 @@
 package com.leadboard.team;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.team.dto.PlanningConfigDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -11,10 +15,12 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
+    private final ObjectMapper objectMapper;
 
-    public TeamService(TeamRepository teamRepository, TeamMemberRepository memberRepository) {
+    public TeamService(TeamRepository teamRepository, TeamMemberRepository memberRepository, ObjectMapper objectMapper) {
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
+        this.objectMapper = objectMapper;
     }
 
     // ==================== Team Operations ====================
@@ -151,6 +157,78 @@ public class TeamService {
         memberRepository.save(member);
     }
 
+    // ==================== Planning Config Operations ====================
+
+    @Transactional(readOnly = true)
+    public PlanningConfigDto getPlanningConfig(Long teamId) {
+        TeamEntity team = teamRepository.findByIdAndActiveTrue(teamId)
+                .orElseThrow(() -> new TeamNotFoundException("Team not found: " + teamId));
+
+        String configJson = team.getPlanningConfig();
+        if (configJson == null || configJson.isBlank()) {
+            return PlanningConfigDto.defaults();
+        }
+
+        try {
+            return objectMapper.readValue(configJson, PlanningConfigDto.class);
+        } catch (JsonProcessingException e) {
+            // If parsing fails, return defaults
+            return PlanningConfigDto.defaults();
+        }
+    }
+
+    public PlanningConfigDto updatePlanningConfig(Long teamId, PlanningConfigDto config) {
+        TeamEntity team = teamRepository.findByIdAndActiveTrue(teamId)
+                .orElseThrow(() -> new TeamNotFoundException("Team not found: " + teamId));
+
+        // Validate config
+        validatePlanningConfig(config);
+
+        try {
+            String configJson = objectMapper.writeValueAsString(config);
+            team.setPlanningConfig(configJson);
+            teamRepository.save(team);
+            return config;
+        } catch (JsonProcessingException e) {
+            throw new InvalidPlanningConfigException("Failed to serialize planning config: " + e.getMessage());
+        }
+    }
+
+    private void validatePlanningConfig(PlanningConfigDto config) {
+        if (config.gradeCoefficients() != null) {
+            var gc = config.gradeCoefficients();
+            if (gc.senior() != null && gc.senior().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidPlanningConfigException("Senior grade coefficient must be positive");
+            }
+            if (gc.middle() != null && gc.middle().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidPlanningConfigException("Middle grade coefficient must be positive");
+            }
+            if (gc.junior() != null && gc.junior().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidPlanningConfigException("Junior grade coefficient must be positive");
+            }
+        }
+
+        if (config.riskBuffer() != null && config.riskBuffer().compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidPlanningConfigException("Risk buffer cannot be negative");
+        }
+
+        if (config.wipLimits() != null) {
+            var wip = config.wipLimits();
+            if (wip.team() != null && wip.team() < 1) {
+                throw new InvalidPlanningConfigException("Team WIP limit must be at least 1");
+            }
+            if (wip.sa() != null && wip.sa() < 1) {
+                throw new InvalidPlanningConfigException("SA WIP limit must be at least 1");
+            }
+            if (wip.dev() != null && wip.dev() < 1) {
+                throw new InvalidPlanningConfigException("DEV WIP limit must be at least 1");
+            }
+            if (wip.qa() != null && wip.qa() < 1) {
+                throw new InvalidPlanningConfigException("QA WIP limit must be at least 1");
+            }
+        }
+    }
+
     // ==================== Exceptions ====================
 
     public static class TeamNotFoundException extends RuntimeException {
@@ -173,6 +251,12 @@ public class TeamService {
 
     public static class TeamMemberAlreadyExistsException extends RuntimeException {
         public TeamMemberAlreadyExistsException(String message) {
+            super(message);
+        }
+    }
+
+    public static class InvalidPlanningConfigException extends RuntimeException {
+        public InvalidPlanningConfigException(String message) {
             super(message);
         }
     }

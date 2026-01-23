@@ -1,6 +1,9 @@
 package com.leadboard.team;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,6 +27,10 @@ public class TeamEntity {
 
     @Column(name = "active", nullable = false)
     private Boolean active = true;
+
+    @Column(name = "planning_config", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String planningConfig;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -108,5 +115,13 @@ public class TeamEntity {
 
     public void setMembers(List<TeamMemberEntity> members) {
         this.members = members;
+    }
+
+    public String getPlanningConfig() {
+        return planningConfig;
+    }
+
+    public void setPlanningConfig(String planningConfig) {
+        this.planningConfig = planningConfig;
     }
 }

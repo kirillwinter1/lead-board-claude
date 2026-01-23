@@ -55,3 +55,15 @@ rough-estimate:
   step-days: 0.1
   min-days: 0.0
   max-days: 365
+
+# Автопланирование
+planning:
+  calendar:
+    # Источник данных: api, database, file
+    source: ${PLANNING_CALENDAR_SOURCE:api}
+    # Код страны по умолчанию
+    country: ${PLANNING_CALENDAR_COUNTRY:RU}
+    # TTL кэша в секундах (по умолчанию 24 часа)
+    cache-ttl: ${PLANNING_CALENDAR_CACHE_TTL:86400}
+    # Путь к файлу с праздниками (для source=file)
+    file-path: ${PLANNING_CALENDAR_FILE_PATH:}

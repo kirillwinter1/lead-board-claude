@@ -1,5 +1,7 @@
 package com.leadboard.team;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.team.dto.PlanningConfigDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,11 +25,13 @@ class TeamServiceTest {
     @Mock
     private TeamMemberRepository memberRepository;
 
+    private ObjectMapper objectMapper;
     private TeamService teamService;
 
     @BeforeEach
     void setUp() {
-        teamService = new TeamService(teamRepository, memberRepository);
+        objectMapper = new ObjectMapper();
+        teamService = new TeamService(teamRepository, memberRepository, objectMapper);
     }
 
     // ==================== Team Tests ====================
@@ -217,6 +221,118 @@ class TeamServiceTest {
 
         assertFalse(member.getActive());
         verify(memberRepository).save(member);
+    }
+
+    // ==================== Planning Config Tests ====================
+
+    @Test
+    void getPlanningConfigReturnsDefaultsWhenNull() {
+        TeamEntity team = createTeamEntity(1L, "Team");
+        team.setPlanningConfig(null);
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        PlanningConfigDto result = teamService.getPlanningConfig(1L);
+
+        assertEquals(new BigDecimal("0.8"), result.gradeCoefficients().senior());
+        assertEquals(new BigDecimal("1.0"), result.gradeCoefficients().middle());
+        assertEquals(new BigDecimal("1.5"), result.gradeCoefficients().junior());
+        assertEquals(new BigDecimal("0.2"), result.riskBuffer());
+        assertEquals(6, result.wipLimits().team());
+    }
+
+    @Test
+    void getPlanningConfigReturnsStoredConfig() throws Exception {
+        TeamEntity team = createTeamEntity(1L, "Team");
+        PlanningConfigDto config = new PlanningConfigDto(
+                new PlanningConfigDto.GradeCoefficients(
+                        new BigDecimal("0.7"),
+                        new BigDecimal("1.0"),
+                        new BigDecimal("1.8")
+                ),
+                new BigDecimal("0.3"),
+                new PlanningConfigDto.WipLimits(8, 3, 4, 3)
+        );
+        team.setPlanningConfig(objectMapper.writeValueAsString(config));
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        PlanningConfigDto result = teamService.getPlanningConfig(1L);
+
+        assertEquals(new BigDecimal("0.7"), result.gradeCoefficients().senior());
+        assertEquals(new BigDecimal("0.3"), result.riskBuffer());
+        assertEquals(8, result.wipLimits().team());
+    }
+
+    @Test
+    void updatePlanningConfigSavesConfig() {
+        TeamEntity team = createTeamEntity(1L, "Team");
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+        when(teamRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        PlanningConfigDto config = new PlanningConfigDto(
+                new PlanningConfigDto.GradeCoefficients(
+                        new BigDecimal("0.9"),
+                        new BigDecimal("1.0"),
+                        new BigDecimal("1.3")
+                ),
+                new BigDecimal("0.15"),
+                new PlanningConfigDto.WipLimits(5, 2, 3, 2)
+        );
+
+        PlanningConfigDto result = teamService.updatePlanningConfig(1L, config);
+
+        assertEquals(new BigDecimal("0.9"), result.gradeCoefficients().senior());
+        assertEquals(new BigDecimal("0.15"), result.riskBuffer());
+        verify(teamRepository).save(team);
+        assertNotNull(team.getPlanningConfig());
+    }
+
+    @Test
+    void updatePlanningConfigThrowsOnNegativeRiskBuffer() {
+        TeamEntity team = createTeamEntity(1L, "Team");
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        PlanningConfigDto config = new PlanningConfigDto(
+                PlanningConfigDto.GradeCoefficients.defaults(),
+                new BigDecimal("-0.1"),
+                PlanningConfigDto.WipLimits.defaults()
+        );
+
+        assertThrows(TeamService.InvalidPlanningConfigException.class,
+                () -> teamService.updatePlanningConfig(1L, config));
+    }
+
+    @Test
+    void updatePlanningConfigThrowsOnZeroGradeCoefficient() {
+        TeamEntity team = createTeamEntity(1L, "Team");
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        PlanningConfigDto config = new PlanningConfigDto(
+                new PlanningConfigDto.GradeCoefficients(
+                        BigDecimal.ZERO,
+                        new BigDecimal("1.0"),
+                        new BigDecimal("1.5")
+                ),
+                new BigDecimal("0.2"),
+                PlanningConfigDto.WipLimits.defaults()
+        );
+
+        assertThrows(TeamService.InvalidPlanningConfigException.class,
+                () -> teamService.updatePlanningConfig(1L, config));
+    }
+
+    @Test
+    void updatePlanningConfigThrowsOnInvalidWipLimit() {
+        TeamEntity team = createTeamEntity(1L, "Team");
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        PlanningConfigDto config = new PlanningConfigDto(
+                PlanningConfigDto.GradeCoefficients.defaults(),
+                new BigDecimal("0.2"),
+                new PlanningConfigDto.WipLimits(0, 2, 3, 2)
+        );
+
+        assertThrows(TeamService.InvalidPlanningConfigException.class,
+                () -> teamService.updatePlanningConfig(1L, config));
     }
 
     // ==================== Helper Methods ====================

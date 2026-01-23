@@ -1,6 +1,7 @@
 package com.leadboard.team;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.team.dto.PlanningConfigDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -105,6 +106,26 @@ public class TeamController {
         teamService.deactivateTeamMember(teamId, memberId);
     }
 
+    // ==================== Planning Config Endpoints ====================
+
+    /**
+     * Получить конфигурацию планирования команды.
+     */
+    @GetMapping("/{teamId}/planning-config")
+    public PlanningConfigDto getPlanningConfig(@PathVariable Long teamId) {
+        return teamService.getPlanningConfig(teamId);
+    }
+
+    /**
+     * Обновить конфигурацию планирования команды.
+     */
+    @PutMapping("/{teamId}/planning-config")
+    public PlanningConfigDto updatePlanningConfig(
+            @PathVariable Long teamId,
+            @RequestBody PlanningConfigDto config) {
+        return teamService.updatePlanningConfig(teamId, config);
+    }
+
     // ==================== Exception Handlers ====================
 
     @ExceptionHandler(TeamService.TeamNotFoundException.class)
@@ -128,6 +149,12 @@ public class TeamController {
     @ExceptionHandler(TeamService.TeamMemberAlreadyExistsException.class)
     public ResponseEntity<Map<String, String>> handleMemberAlreadyExists(TeamService.TeamMemberAlreadyExistsException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(TeamService.InvalidPlanningConfigException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidPlanningConfig(TeamService.InvalidPlanningConfigException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", e.getMessage()));
     }
 }

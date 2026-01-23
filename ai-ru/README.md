@@ -23,6 +23,8 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | [MAIN_PAGE.md](./MAIN_PAGE.md) | Описание главной страницы (Board) |
 | [FEATURES.md](./FEATURES.md) | Список фич с описанием и критериями готовности |
 | [RULES.md](./RULES.md) | Правила разработки, принципы, чеклисты |
+| [F13_AUTOPLANNING.md](./F13_AUTOPLANNING.md) | Спецификация фичи автопланирования |
+| [F13_PLAN.md](./F13_PLAN.md) | План реализации автопланирования |
 
 ---
 
@@ -40,6 +42,12 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | **F6. Team UI** | Страницы управления командами и участниками |
 | **F7. Team Sync** | Синхронизация команд и участников из Atlassian Teams API |
 | **F10. Epic-Team Mapping** | Синхронизация команды из Jira Team field, отображение на Board |
+
+### В разработке
+
+| Фича | Описание |
+|------|----------|
+| **F13. Автопланирование** | Прогнозирование даты закрытия эпиков на основе capacity команды |
 
 ### Текущий UI
 
@@ -84,6 +92,13 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | POST | /api/teams/{id}/members | Добавить участника |
 | PUT | /api/teams/{id}/members/{mid} | Обновить участника |
 | POST | /api/teams/{id}/members/{mid}/deactivate | Деактивировать |
+| GET | /api/teams/{id}/planning-config | Конфигурация планирования команды |
+| PUT | /api/teams/{id}/planning-config | Обновить конфигурацию планирования |
+| GET | /api/calendar/workdays | Рабочие дни за период |
+| GET | /api/calendar/is-workday | Проверка рабочего дня |
+| GET | /api/calendar/count-workdays | Подсчёт рабочих дней |
+| GET | /api/calendar/add-workdays | Дата через N рабочих дней |
+| POST | /api/calendar/refresh | Обновить кэш календаря |
 
 ---
 
