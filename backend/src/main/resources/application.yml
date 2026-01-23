@@ -34,3 +34,10 @@ jira:
     Development: DEVELOPMENT
     Testing: TESTING
     Sub-task: DEVELOPMENT
+
+atlassian:
+  oauth:
+    client-id: ${ATLASSIAN_CLIENT_ID:}
+    client-secret: ${ATLASSIAN_CLIENT_SECRET:}
+    redirect-uri: ${ATLASSIAN_REDIRECT_URI:http://localhost:8080/oauth/atlassian/callback}
+    site-base-url: ${ATLASSIAN_SITE_BASE_URL:}

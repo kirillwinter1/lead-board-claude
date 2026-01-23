@@ -66,6 +66,19 @@ interface SyncStatus {
   error: string | null
 }
 
+interface AuthUser {
+  id: number
+  accountId: string
+  displayName: string
+  email: string
+  avatarUrl: string | null
+}
+
+interface AuthStatus {
+  authenticated: boolean
+  user: AuthUser | null
+}
+
 function formatDays(seconds: number | null): string {
   if (!seconds) return '0 d'
   const days = seconds / 3600 / 8
@@ -341,6 +354,7 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
 
   // Filter state
   const [searchKey, setSearchKey] = useState('')
@@ -371,6 +385,30 @@ function App() {
       })
   }, [])
 
+  const fetchAuthStatus = useCallback(() => {
+    axios.get<AuthStatus>('/oauth/atlassian/status')
+      .then(response => {
+        setAuthStatus(response.data)
+      })
+      .catch(() => {
+        setAuthStatus({ authenticated: false, user: null })
+      })
+  }, [])
+
+  const handleLogin = () => {
+    window.location.href = '/oauth/atlassian/authorize'
+  }
+
+  const handleLogout = () => {
+    axios.post('/oauth/atlassian/logout')
+      .then(() => {
+        setAuthStatus({ authenticated: false, user: null })
+      })
+      .catch(err => {
+        console.error('Logout failed:', err)
+      })
+  }
+
   const triggerSync = () => {
     setSyncing(true)
     axios.post<SyncStatus>('/api/sync/trigger')
@@ -395,9 +433,10 @@ function App() {
   }
 
   useEffect(() => {
+    fetchAuthStatus()
     fetchBoard()
     fetchSyncStatus()
-  }, [fetchBoard, fetchSyncStatus])
+  }, [fetchAuthStatus, fetchBoard, fetchSyncStatus])
 
   // Extract unique statuses from epics
   const availableStatuses = useMemo(() => {
@@ -490,6 +529,23 @@ function App() {
             >
               {syncing ? 'Syncing...' : 'Refresh'}
             </button>
+          </div>
+          <div className="auth-status">
+            {authStatus?.authenticated && authStatus.user ? (
+              <div className="user-info">
+                {authStatus.user.avatarUrl && (
+                  <img src={authStatus.user.avatarUrl} alt="" className="user-avatar" />
+                )}
+                <span className="user-name">{authStatus.user.displayName}</span>
+                <button className="btn btn-link btn-logout" onClick={handleLogout}>
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <button className="btn btn-secondary" onClick={handleLogin}>
+                Login with Atlassian
+              </button>
+            )}
           </div>
         </div>
       </header>
