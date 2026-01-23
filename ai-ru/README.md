@@ -26,6 +26,39 @@ Lead Board — SaaS-продукт для управления IT-доставк
 
 ---
 
+## Текущий статус (Январь 2026)
+
+### Реализованные фичи
+
+| Фича | Описание |
+|------|----------|
+| **F1. Bootstrap** | Монорепозиторий: Java 21 + Spring Boot 3 backend, React + Vite + TypeScript frontend |
+| **F2. Jira Integration** | Интеграция с Jira REST API v3, иерархия Epic → Story → Sub-task |
+| **F3. Sync & Cache** | PostgreSQL кэш, периодическая синхронизация, кнопка Refresh |
+
+### Текущий UI
+
+**Главная страница (Board):**
+- Табличный вид с колонками: NAME, TEAM, ESTIMATE, LOGGED TIME, OVERALL PROGRESS, ROLE-BASED PROGRESS, STATUS, ALERTS
+- Раскрываемые строки (Epic → Story → Sub-task)
+- Иконки типов задач Jira
+- Прогресс-бары с процентами
+- Чипы ролей (SA/DEV/QA) с визуальным заполнением
+- Фильтры: поиск по ключу, выбор статусов
+- Кнопка Refresh для синхронизации с Jira
+- Статус последней синхронизации
+
+### API Endpoints
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | /api/health | Проверка работоспособности |
+| GET | /api/board | Получить доску (из кэша) |
+| GET | /api/sync/status | Статус синхронизации |
+| POST | /api/sync/trigger | Запустить синхронизацию |
+
+---
+
 ## Быстрый старт для разработчика
 
 ### 1. Прочитай правила

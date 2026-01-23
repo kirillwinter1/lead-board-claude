@@ -7,6 +7,21 @@
 lsof -ti:8080 -ti:5173 | xargs kill -9 2>/dev/null || true
 ```
 
+### База данных PostgreSQL
+
+**Вариант 1: Docker**
+```bash
+docker compose up -d
+```
+
+**Вариант 2: Локальный PostgreSQL**
+```bash
+psql -c "CREATE DATABASE leadboard"
+psql -c "CREATE USER leadboard WITH PASSWORD 'leadboard'"
+psql -c "GRANT ALL PRIVILEGES ON DATABASE leadboard TO leadboard"
+psql -d leadboard -c "ALTER DATABASE leadboard OWNER TO leadboard"
+```
+
 ### Запуск backend (порт 8080)
 ```bash
 cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/backend
@@ -38,9 +53,29 @@ curl http://localhost:8080/api/health   # Backend
 curl http://localhost:5173/api/health   # Frontend (через proxy)
 ```
 
+## Конфигурация (.env)
+
+Файл `backend/.env` (не коммитить!):
+```bash
+# Jira
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=your-email@example.com
+JIRA_API_TOKEN=your-api-token
+JIRA_PROJECT_KEY=YOUR_PROJECT
+JIRA_SYNC_INTERVAL_SECONDS=300
+
+# Database (опционально, есть дефолты)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=leadboard
+DB_USERNAME=leadboard
+DB_PASSWORD=leadboard
+```
+
 ## Важно
 
 - **Всегда убивать процессы на портах перед запуском** — не допускать запуск на альтернативных портах
+- **PostgreSQL должен быть запущен** перед стартом backend
 - Backend запускать из директории `backend/`
 - Frontend запускать из директории `frontend/`
 - Credentials хранятся в `backend/.env` (не коммитить!)
