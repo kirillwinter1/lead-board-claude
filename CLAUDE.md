@@ -85,10 +85,49 @@ DB_PASSWORD=leadboard
 ```
 lead-board-claude/
 ├── backend/          # Spring Boot (Java 21)
-│   ├── .env          # Jira credentials (gitignore)
+│   ├── .env          # Credentials (gitignore)
 │   └── src/
 ├── frontend/         # React + Vite + TypeScript
 │   └── src/
 ├── ai-ru/            # Документация на русском
 └── docker-compose.yml
+```
+
+## Atlassian OAuth 2.0
+
+### Настройка приложения в Atlassian Developer Console
+
+1. Открыть https://developer.atlassian.com/console/myapps/
+2. Создать или выбрать приложение
+3. В **Permissions** добавить scopes:
+   - **Jira API:** `read:jira-user`, `read:jira-work`
+   - **User identity API:** `read:me`
+4. В **Authorization** включить **Authorization code grants**
+5. Добавить **Callback URL:** `http://localhost:8080/oauth/atlassian/callback`
+
+### Важно
+- `offline_access` не добавляется как scope в консоли — работает автоматически при Authorization code grants
+- Scopes с пробелами в .env файле парсятся некорректно — лучше использовать дефолт из кода
+- После авторизации токен сохраняется в БД и автообновляется
+
+### Credentials в .env
+```bash
+ATLASSIAN_CLIENT_ID=your_client_id
+ATLASSIAN_CLIENT_SECRET=your_client_secret
+ATLASSIAN_REDIRECT_URI=http://localhost:8080/oauth/atlassian/callback
+ATLASSIAN_SITE_BASE_URL=https://your-domain.atlassian.net
+```
+
+## Решённые проблемы
+
+### Jira API 410 Gone
+Atlassian изменил endpoint: `/rest/api/3/search` → `/rest/api/3/search/jql`
+
+### Role mapping с кириллицей
+YAML с кириллическими ключами работает нестабильно — добавлен fallback в коде через `String.contains()`
+
+### Flyway PostgreSQL
+Нужна отдельная зависимость с версией:
+```kotlin
+implementation("org.flywaydb:flyway-database-postgresql:10.10.0")
 ```
