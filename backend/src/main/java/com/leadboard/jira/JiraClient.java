@@ -37,7 +37,7 @@ public class JiraClient {
                         .queryParam("jql", jql)
                         .queryParam("startAt", startAt)
                         .queryParam("maxResults", maxResults)
-                        .queryParam("fields", "summary,status,issuetype,parent,project")
+                        .queryParam("fields", "summary,status,issuetype,parent,project,timetracking")
                         .build())
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .retrieve()

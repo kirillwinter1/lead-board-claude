@@ -5,7 +5,10 @@ import com.leadboard.board.BoardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/board")
@@ -18,8 +21,12 @@ public class BoardController {
     }
 
     @GetMapping
-    public ResponseEntity<BoardResponse> getBoard() {
-        BoardResponse response = boardService.getBoard();
+    public ResponseEntity<BoardResponse> getBoard(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) List<String> statuses,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        BoardResponse response = boardService.getBoard(query, statuses, page, size);
         return ResponseEntity.ok(response);
     }
 }

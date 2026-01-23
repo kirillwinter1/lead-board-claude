@@ -49,6 +49,7 @@ public class JiraIssue {
         private JiraIssueType issuetype;
         private JiraParent parent;
         private JiraProject project;
+        private JiraTimeTracking timetracking;
 
         public String getSummary() {
             return summary;
@@ -88,6 +89,36 @@ public class JiraIssue {
 
         public void setProject(JiraProject project) {
             this.project = project;
+        }
+
+        public JiraTimeTracking getTimetracking() {
+            return timetracking;
+        }
+
+        public void setTimetracking(JiraTimeTracking timetracking) {
+            this.timetracking = timetracking;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraTimeTracking {
+        private Long originalEstimateSeconds;
+        private Long timeSpentSeconds;
+
+        public Long getOriginalEstimateSeconds() {
+            return originalEstimateSeconds;
+        }
+
+        public void setOriginalEstimateSeconds(Long originalEstimateSeconds) {
+            this.originalEstimateSeconds = originalEstimateSeconds;
+        }
+
+        public Long getTimeSpentSeconds() {
+            return timeSpentSeconds;
+        }
+
+        public void setTimeSpentSeconds(Long timeSpentSeconds) {
+            this.timeSpentSeconds = timeSpentSeconds;
         }
     }
 

@@ -10,3 +10,11 @@ jira:
   email: ${JIRA_EMAIL:}
   api-token: ${JIRA_API_TOKEN:}
   project-key: ${JIRA_PROJECT_KEY:}
+  subtask-roles:
+    Аналитика: ANALYTICS
+    Разработка: DEVELOPMENT
+    Тестирование: TESTING
+    Analytics: ANALYTICS
+    Development: DEVELOPMENT
+    Testing: TESTING
+    Sub-task: DEVELOPMENT
