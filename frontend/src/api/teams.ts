@@ -59,6 +59,32 @@ export interface TeamSyncStatus {
   error: string | null
 }
 
+export interface GradeCoefficients {
+  senior: number
+  middle: number
+  junior: number
+}
+
+export interface WipLimits {
+  team: number
+  sa: number
+  dev: number
+  qa: number
+}
+
+export interface StoryDuration {
+  sa: number
+  dev: number
+  qa: number
+}
+
+export interface PlanningConfig {
+  gradeCoefficients: GradeCoefficients
+  riskBuffer: number
+  wipLimits: WipLimits
+  storyDuration: StoryDuration
+}
+
 export const teamsApi = {
   getConfig: () => axios.get<TeamsConfig>('/api/teams/config').then(r => r.data),
 
@@ -89,4 +115,10 @@ export const teamsApi = {
 
   deactivateMember: (teamId: number, memberId: number) =>
     axios.post(`/api/teams/${teamId}/members/${memberId}/deactivate`),
+
+  getPlanningConfig: (teamId: number) =>
+    axios.get<PlanningConfig>(`/api/teams/${teamId}/planning-config`).then(r => r.data),
+
+  updatePlanningConfig: (teamId: number, config: PlanningConfig) =>
+    axios.put<PlanningConfig>(`/api/teams/${teamId}/planning-config`, config).then(r => r.data),
 }

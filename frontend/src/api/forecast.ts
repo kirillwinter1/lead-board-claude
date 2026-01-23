@@ -15,6 +15,7 @@ export interface PhaseInfo {
   startDate: string | null
   endDate: string | null
   workDays: number
+  noCapacity?: boolean  // true если нет ресурсов для этой роли
 }
 
 export interface PhaseSchedule {

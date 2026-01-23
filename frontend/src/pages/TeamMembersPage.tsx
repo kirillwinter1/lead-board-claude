@@ -1,10 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest } from '../api/teams'
+import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest, PlanningConfig } from '../api/teams'
 import { Modal } from '../components/Modal'
 
 const ROLES = ['SA', 'DEV', 'QA'] as const
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
+
+const DEFAULT_PLANNING_CONFIG: PlanningConfig = {
+  gradeCoefficients: { senior: 0.8, middle: 1.0, junior: 1.5 },
+  riskBuffer: 0.2,
+  wipLimits: { team: 6, sa: 2, dev: 3, qa: 2 },
+  storyDuration: { sa: 2, dev: 2, qa: 2 }
+}
 
 export function TeamMembersPage() {
   const { teamId } = useParams<{ teamId: string }>()
@@ -23,6 +30,11 @@ export function TeamMembersPage() {
   })
   const [saving, setSaving] = useState(false)
 
+  // Planning config state
+  const [planningConfig, setPlanningConfig] = useState<PlanningConfig>(DEFAULT_PLANNING_CONFIG)
+  const [showPlanningConfig, setShowPlanningConfig] = useState(false)
+  const [savingConfig, setSavingConfig] = useState(false)
+
   const fetchData = () => {
     if (!teamId) return
     setLoading(true)
@@ -30,10 +42,12 @@ export function TeamMembersPage() {
     Promise.all([
       teamsApi.getById(parseInt(teamId)),
       teamsApi.getMembers(parseInt(teamId)),
+      teamsApi.getPlanningConfig(parseInt(teamId)),
     ])
-      .then(([teamData, membersData]) => {
+      .then(([teamData, membersData, configData]) => {
         setTeam(teamData)
         setMembers(membersData)
+        setPlanningConfig(configData)
         setError(null)
       })
       .catch(err => {
@@ -126,6 +140,64 @@ export function TeamMembersPage() {
     }
   }
 
+  const handleSavePlanningConfig = () => {
+    if (!teamId) return
+    setSavingConfig(true)
+
+    teamsApi.updatePlanningConfig(parseInt(teamId), planningConfig)
+      .then(updatedConfig => {
+        setPlanningConfig(updatedConfig)
+      })
+      .catch(err => {
+        alert(err.response?.data?.error || 'Failed to save planning config')
+      })
+      .finally(() => setSavingConfig(false))
+  }
+
+  const updateGradeCoefficient = (grade: 'senior' | 'middle' | 'junior', value: number) => {
+    setPlanningConfig(prev => ({
+      ...prev,
+      gradeCoefficients: { ...prev.gradeCoefficients, [grade]: value }
+    }))
+  }
+
+  const updateWipLimit = (key: 'team' | 'sa' | 'dev' | 'qa', value: number) => {
+    setPlanningConfig(prev => ({
+      ...prev,
+      wipLimits: { ...prev.wipLimits, [key]: value }
+    }))
+  }
+
+  const updateStoryDuration = (role: 'sa' | 'dev' | 'qa', value: number) => {
+    setPlanningConfig(prev => ({
+      ...prev,
+      storyDuration: { ...(prev.storyDuration || { sa: 2, dev: 2, qa: 2 }), [role]: value }
+    }))
+  }
+
+  // Calculate recommended WIP limits based on team composition
+  const recommendedWip = useMemo(() => {
+    const saCount = members.filter(m => m.role === 'SA').length
+    const devCount = members.filter(m => m.role === 'DEV').length
+    const qaCount = members.filter(m => m.role === 'QA').length
+    const totalCount = members.length
+
+    return {
+      team: Math.ceil(totalCount / 3), // 1 epic per 3 people (SA+DEV+QA)
+      sa: Math.ceil(saCount * 1.5),    // 1.5 epics per SA
+      dev: Math.ceil(devCount * 1.5),  // 1.5 epics per DEV
+      qa: Math.ceil(qaCount * 1.5),    // 1.5 epics per QA
+    }
+  }, [members])
+
+  // Get WIP status color: green if <= recommended, yellow if <= 150%, red if > 150%
+  const getWipStatus = (value: number, recommended: number): 'good' | 'warning' | 'danger' => {
+    if (recommended === 0) return 'good' // No members of this role
+    if (value <= recommended) return 'good'
+    if (value <= recommended * 1.5) return 'warning'
+    return 'danger'
+  }
+
   if (loading) {
     return <main className="main-content"><div className="loading">Loading...</div></main>
   }
@@ -198,6 +270,223 @@ export function TeamMembersPage() {
           </table>
         </div>
       )}
+
+      {/* Planning Configuration Section */}
+      <div className="planning-config-section">
+        <div
+          className="planning-config-header"
+          onClick={() => setShowPlanningConfig(!showPlanningConfig)}
+        >
+          <span className={`chevron ${showPlanningConfig ? 'expanded' : ''}`}>›</span>
+          <h3>Настройки планирования</h3>
+        </div>
+
+        {showPlanningConfig && (
+          <div className="planning-config-content">
+            <div className="config-group">
+              <div className="config-title-row">
+                <h4>Коэффициенты грейдов</h4>
+                <span className="config-info" title="Влияют на расчёт скорости выполнения задач. Чем меньше коэффициент — тем быстрее работает специалист.">?</span>
+              </div>
+              <p className="config-hint">
+                Senior (0.8) выполняет 1 чел-день за 0.8 дня, Junior (1.5) — за 1.5 дня
+              </p>
+              <div className="config-row">
+                <div className="config-field">
+                  <label>Senior</label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="3"
+                    step="0.1"
+                    value={planningConfig.gradeCoefficients.senior}
+                    onChange={e => updateGradeCoefficient('senior', parseFloat(e.target.value) || 0.8)}
+                  />
+                </div>
+                <div className="config-field">
+                  <label>Middle</label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="3"
+                    step="0.1"
+                    value={planningConfig.gradeCoefficients.middle}
+                    onChange={e => updateGradeCoefficient('middle', parseFloat(e.target.value) || 1.0)}
+                  />
+                </div>
+                <div className="config-field">
+                  <label>Junior</label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    max="3"
+                    step="0.1"
+                    value={planningConfig.gradeCoefficients.junior}
+                    onChange={e => updateGradeCoefficient('junior', parseFloat(e.target.value) || 1.5)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="config-group">
+              <div className="config-title-row">
+                <h4>Буфер рисков</h4>
+                <span className="config-info" title="Запас времени на непредвиденные обстоятельства: болезни, блокеры, техдолг. Добавляется к прогнозным датам.">?</span>
+              </div>
+              <p className="config-hint">
+                Рекомендуется 15-25% для большинства команд
+              </p>
+              <div className="config-row">
+                <div className="config-field config-field-percent">
+                  <label>Буфер</label>
+                  <div className="input-with-suffix">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={Math.round(planningConfig.riskBuffer * 100)}
+                      onChange={e => setPlanningConfig(prev => ({
+                        ...prev,
+                        riskBuffer: (parseFloat(e.target.value) || 0) / 100
+                      }))}
+                    />
+                    <span className="input-suffix">%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="config-group">
+              <div className="config-title-row">
+                <h4>Длительность стори по ролям</h4>
+                <span className="config-info" title="Среднее время работы над одной сторёй для каждой роли. Используется для расчёта параллельной работы: DEV начинает после завершения первой стори SA, QA — после первой стори DEV.">?</span>
+              </div>
+              <p className="config-hint">
+                Влияет на перекрытие фаз в timeline. Меньше значение — больше параллелизм.
+              </p>
+              <div className="config-row">
+                <div className="config-field">
+                  <label>SA (дней)</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    value={planningConfig.storyDuration?.sa ?? 2}
+                    onChange={e => updateStoryDuration('sa', parseFloat(e.target.value) || 2)}
+                  />
+                </div>
+                <div className="config-field">
+                  <label>DEV (дней)</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    value={planningConfig.storyDuration?.dev ?? 2}
+                    onChange={e => updateStoryDuration('dev', parseFloat(e.target.value) || 2)}
+                  />
+                </div>
+                <div className="config-field">
+                  <label>QA (дней)</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    max="10"
+                    step="0.5"
+                    value={planningConfig.storyDuration?.qa ?? 2}
+                    onChange={e => updateStoryDuration('qa', parseFloat(e.target.value) || 2)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="config-group">
+              <div className="config-title-row">
+                <h4>WIP лимиты (Work In Progress)</h4>
+                <span className="config-info" title="Ограничивают количество эпиков в работе одновременно. Помогают избежать перегрузки команды и частого переключения контекста.">?</span>
+              </div>
+              <p className="config-hint">
+                Рекомендация: команда = участники ÷ 3, на роль = участников × 1.5
+              </p>
+              <div className="config-row wip-row">
+                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.team, recommendedWip.team)}`}>
+                  <label>Команда</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    step="1"
+                    value={planningConfig.wipLimits.team}
+                    onChange={e => updateWipLimit('team', parseInt(e.target.value) || 1)}
+                  />
+                  <span className="wip-recommendation">
+                    рек. {recommendedWip.team || 1}
+                  </span>
+                </div>
+                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.sa, recommendedWip.sa)}`}>
+                  <label>SA ({members.filter(m => m.role === 'SA').length})</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={planningConfig.wipLimits.sa}
+                    onChange={e => updateWipLimit('sa', parseInt(e.target.value) || 1)}
+                  />
+                  <span className="wip-recommendation">
+                    рек. {recommendedWip.sa || 1}
+                  </span>
+                </div>
+                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.dev, recommendedWip.dev)}`}>
+                  <label>DEV ({members.filter(m => m.role === 'DEV').length})</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={planningConfig.wipLimits.dev}
+                    onChange={e => updateWipLimit('dev', parseInt(e.target.value) || 1)}
+                  />
+                  <span className="wip-recommendation">
+                    рек. {recommendedWip.dev || 1}
+                  </span>
+                </div>
+                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.qa, recommendedWip.qa)}`}>
+                  <label>QA ({members.filter(m => m.role === 'QA').length})</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={planningConfig.wipLimits.qa}
+                    onChange={e => updateWipLimit('qa', parseInt(e.target.value) || 1)}
+                  />
+                  <span className="wip-recommendation">
+                    рек. {recommendedWip.qa || 1}
+                  </span>
+                </div>
+              </div>
+              <div className="wip-legend">
+                <span className="wip-legend-item good">● Оптимально</span>
+                <span className="wip-legend-item warning">● Допустимо</span>
+                <span className="wip-legend-item danger">● Перегрузка</span>
+              </div>
+            </div>
+
+            <div className="config-actions">
+              <button
+                className="btn btn-primary"
+                onClick={handleSavePlanningConfig}
+                disabled={savingConfig}
+              >
+                {savingConfig ? 'Сохранение...' : 'Сохранить настройки'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <Modal
         isOpen={isModalOpen}

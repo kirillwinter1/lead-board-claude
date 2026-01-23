@@ -3,6 +3,7 @@ import { Layout } from './components/Layout'
 import { BoardPage } from './pages/BoardPage'
 import { TeamsPage } from './pages/TeamsPage'
 import { TeamMembersPage } from './pages/TeamMembersPage'
+import { TimelinePage } from './pages/TimelinePage'
 import './App.css'
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<BoardPage />} />
+          <Route path="timeline" element={<TimelinePage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
         </Route>

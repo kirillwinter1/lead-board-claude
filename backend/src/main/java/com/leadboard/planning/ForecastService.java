@@ -27,7 +27,10 @@ import java.util.List;
  * Алгоритм:
  * 1. Получить эпики команды отсортированные по AutoScore
  * 2. Для каждого эпика рассчитать остаток работы по ролям
- * 3. Последовательно распределить capacity: SA → DEV → QA
+ * 3. Распределить capacity по конвейерной модели (pipeline):
+ *    - SA, DEV, QA работают параллельно над разными сторями
+ *    - DEV начинает после завершения первой стори SA (offset = storyDuration.sa)
+ *    - QA начинает после завершения первой стори DEV (offset = storyDuration.dev)
  * 4. Рассчитать даты завершения с учётом рабочего календаря
  * 5. Определить уровень уверенности
  */
@@ -69,6 +72,9 @@ public class ForecastService {
         // Получаем конфигурацию планирования
         PlanningConfigDto config = teamService.getPlanningConfig(teamId);
         BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : new BigDecimal("0.2");
+        PlanningConfigDto.StoryDuration storyDuration = config.storyDuration() != null
+                ? config.storyDuration()
+                : PlanningConfigDto.StoryDuration.defaults();
 
         // Рассчитываем capacity команды
         TeamCapacity teamCapacity = calculateTeamCapacity(teamId, config);
@@ -87,6 +93,7 @@ public class ForecastService {
                     epic,
                     teamCapacity,
                     riskBuffer,
+                    storyDuration,
                     currentSaEndDate,
                     currentDevEndDate,
                     currentQaEndDate
@@ -95,7 +102,6 @@ public class ForecastService {
             forecasts.add(calc.forecast);
 
             // Обновляем текущие даты окончания для следующего эпика
-            // (для упрощения MVP - последовательная обработка)
             if (calc.forecast.phaseSchedule() != null) {
                 PhaseSchedule schedule = calc.forecast.phaseSchedule();
                 if (schedule.sa() != null && schedule.sa().endDate() != null) {
@@ -165,6 +171,7 @@ public class ForecastService {
             JiraIssueEntity epic,
             TeamCapacity capacity,
             BigDecimal riskBuffer,
+            PlanningConfigDto.StoryDuration storyDuration,
             LocalDate saStartAfter,
             LocalDate devStartAfter,
             LocalDate qaStartAfter
@@ -172,10 +179,11 @@ public class ForecastService {
         // Получаем остаток работы
         RemainingByRole remaining = calculateRemaining(epic, riskBuffer);
 
-        // Рассчитываем расписание фаз: SA → DEV → QA
+        // Рассчитываем расписание фаз по конвейерной модели (pipeline)
         PhaseSchedule schedule = calculatePhaseSchedule(
                 remaining,
                 capacity,
+                storyDuration,
                 saStartAfter,
                 devStartAfter,
                 qaStartAfter
@@ -265,37 +273,60 @@ public class ForecastService {
     }
 
     /**
-     * Рассчитывает расписание фаз.
-     * Последовательность: SA → DEV → QA
+     * Рассчитывает расписание фаз по конвейерной модели (pipeline).
+     *
+     * В отличие от последовательной модели (SA весь эпик → DEV весь эпик → QA весь эпик),
+     * здесь работа идёт по сторям параллельно:
+     * - SA начинает работу над эпиком
+     * - DEV начинает после завершения первой стори SA (offset = storyDuration.sa)
+     * - QA начинает после завершения первой стори DEV (offset = storyDuration.dev)
+     *
+     * Это более реалистичная модель, так как команда работает над сторями,
+     * а не ждёт завершения всей аналитики перед началом разработки.
      */
     private PhaseSchedule calculatePhaseSchedule(
             RemainingByRole remaining,
             TeamCapacity capacity,
+            PlanningConfigDto.StoryDuration storyDuration,
             LocalDate saStartAfter,
             LocalDate devStartAfter,
             LocalDate qaStartAfter
     ) {
-        // SA фаза
+        // SA фаза - начинается сразу
         PhaseInfo saPhase = calculatePhase(
                 remaining.sa().days(),
                 capacity.saHoursPerDay(),
                 saStartAfter
         );
 
-        // DEV фаза начинается после SA
-        LocalDate devStart = saPhase != null && saPhase.endDate() != null
-                ? maxDate(devStartAfter, saPhase.endDate())
-                : devStartAfter;
+        // DEV фаза - начинается после завершения первой стори SA
+        // offset = время на одну сторю SA (storyDuration.sa) в календарных днях
+        LocalDate devStart;
+        if (saPhase != null && saPhase.startDate() != null && remaining.sa().days().compareTo(BigDecimal.ZERO) > 0) {
+            // DEV начинает через storyDuration.sa дней после начала SA
+            int offsetDays = calculateOffsetDays(storyDuration.sa(), capacity.saHoursPerDay());
+            LocalDate devStartByPipeline = calendarService.addWorkdays(saPhase.startDate(), offsetDays);
+            devStart = maxDate(devStartAfter, devStartByPipeline);
+        } else {
+            devStart = devStartAfter;
+        }
         PhaseInfo devPhase = calculatePhase(
                 remaining.dev().days(),
                 capacity.devHoursPerDay(),
                 devStart
         );
 
-        // QA фаза начинается после DEV
-        LocalDate qaStart = devPhase != null && devPhase.endDate() != null
-                ? maxDate(qaStartAfter, devPhase.endDate())
-                : qaStartAfter;
+        // QA фаза - начинается после завершения первой стори DEV
+        // offset = время на одну сторю DEV (storyDuration.dev) в календарных днях
+        LocalDate qaStart;
+        if (devPhase != null && devPhase.startDate() != null && remaining.dev().days().compareTo(BigDecimal.ZERO) > 0) {
+            // QA начинает через storyDuration.dev дней после начала DEV
+            int offsetDays = calculateOffsetDays(storyDuration.dev(), capacity.devHoursPerDay());
+            LocalDate qaStartByPipeline = calendarService.addWorkdays(devPhase.startDate(), offsetDays);
+            qaStart = maxDate(qaStartAfter, qaStartByPipeline);
+        } else {
+            qaStart = qaStartAfter;
+        }
         PhaseInfo qaPhase = calculatePhase(
                 remaining.qa().days(),
                 capacity.qaHoursPerDay(),
@@ -306,30 +337,47 @@ public class ForecastService {
     }
 
     /**
+     * Рассчитывает offset в календарных днях для pipeline.
+     * storyDuration - человеко-дни на одну сторю
+     * capacityPerDay - часов в день у команды для этой роли
+     */
+    private int calculateOffsetDays(BigDecimal storyDuration, BigDecimal capacityPerDay) {
+        if (storyDuration == null || storyDuration.compareTo(BigDecimal.ZERO) <= 0) {
+            return 0;
+        }
+        if (capacityPerDay == null || capacityPerDay.compareTo(BigDecimal.ZERO) <= 0) {
+            return storyDuration.intValue(); // Если нет capacity, используем как есть
+        }
+        // Конвертируем человеко-дни в календарные дни
+        BigDecimal hoursNeeded = storyDuration.multiply(HOURS_PER_DAY);
+        return hoursNeeded.divide(capacityPerDay, 0, RoundingMode.CEILING).intValue();
+    }
+
+    /**
      * Рассчитывает информацию о фазе.
      */
     private PhaseInfo calculatePhase(BigDecimal workDays, BigDecimal capacityPerDay, LocalDate startAfter) {
         if (workDays == null || workDays.compareTo(BigDecimal.ZERO) <= 0) {
-            return new PhaseInfo(startAfter, startAfter, BigDecimal.ZERO);
+            return new PhaseInfo(startAfter, startAfter, BigDecimal.ZERO, false);
         }
 
-        if (capacityPerDay == null || capacityPerDay.compareTo(BigDecimal.ZERO) <= 0) {
-            // Нет ресурсов - не можем рассчитать
-            return new PhaseInfo(startAfter, null, workDays);
-        }
+        boolean noCapacity = capacityPerDay == null || capacityPerDay.compareTo(BigDecimal.ZERO) <= 0;
+
+        // Если нет ресурсов, используем fallback: 8 часов/день (1 человек)
+        BigDecimal effectiveCapacity = noCapacity ? HOURS_PER_DAY : capacityPerDay;
 
         // Сколько рабочих дней нужно
         // workDays - это человеко-дни, capacityPerDay - часов в день
         // Конвертируем: дни * 8 часов / часов в день = календарных рабочих дней
         BigDecimal hoursNeeded = workDays.multiply(HOURS_PER_DAY);
         int calendarDaysNeeded = hoursNeeded
-                .divide(capacityPerDay, 0, RoundingMode.CEILING)
+                .divide(effectiveCapacity, 0, RoundingMode.CEILING)
                 .intValue();
 
         LocalDate startDate = calendarService.addWorkdays(startAfter, 1);
         LocalDate endDate = calendarService.addWorkdays(startDate, Math.max(0, calendarDaysNeeded - 1));
 
-        return new PhaseInfo(startDate, endDate, workDays);
+        return new PhaseInfo(startDate, endDate, workDays, noCapacity);
     }
 
     /**

@@ -8,7 +8,8 @@ import java.math.BigDecimal;
 public record PlanningConfigDto(
         GradeCoefficients gradeCoefficients,
         BigDecimal riskBuffer,
-        WipLimits wipLimits
+        WipLimits wipLimits,
+        StoryDuration storyDuration
 ) {
     /**
      * Коэффициенты производительности по грейдам.
@@ -47,13 +48,33 @@ public record PlanningConfigDto(
     }
 
     /**
+     * Средняя длительность работы над одной сторёй по ролям (в днях).
+     * Используется для расчёта pipeline offset — когда следующая роль может начать работу.
+     * Например, если SA тратит 2 дня на сторю, то DEV может начать через 2 дня после начала SA.
+     */
+    public record StoryDuration(
+            BigDecimal sa,   // Дней на сторю для SA
+            BigDecimal dev,  // Дней на сторю для DEV
+            BigDecimal qa    // Дней на сторю для QA
+    ) {
+        public static StoryDuration defaults() {
+            return new StoryDuration(
+                    new BigDecimal("2"),
+                    new BigDecimal("2"),
+                    new BigDecimal("2")
+            );
+        }
+    }
+
+    /**
      * Возвращает конфигурацию по умолчанию.
      */
     public static PlanningConfigDto defaults() {
         return new PlanningConfigDto(
                 GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
-                WipLimits.defaults()
+                WipLimits.defaults(),
+                StoryDuration.defaults()
         );
     }
 }

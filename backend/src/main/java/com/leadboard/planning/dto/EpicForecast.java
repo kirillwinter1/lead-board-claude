@@ -64,6 +64,12 @@ public record EpicForecast(
     public record PhaseInfo(
             LocalDate startDate,
             LocalDate endDate,
-            BigDecimal workDays
-    ) {}
+            BigDecimal workDays,
+            boolean noCapacity  // true если нет ресурсов для этой роли
+    ) {
+        // Конструктор для обратной совместимости
+        public PhaseInfo(LocalDate startDate, LocalDate endDate, BigDecimal workDays) {
+            this(startDate, endDate, workDays, false);
+        }
+    }
 }

@@ -58,6 +58,9 @@ export function Layout() {
             <NavLink to="/" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
               Board
             </NavLink>
+            <NavLink to="/timeline" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              Timeline
+            </NavLink>
             <NavLink to="/teams" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Teams
             </NavLink>
