@@ -15,7 +15,10 @@
 | F5. Team Management Backend | ✅ Готово | 2026-01-23 |
 | F6. Team Management UI | ✅ Готово | 2026-01-23 |
 | F7. Team Sync from Atlassian | ✅ Готово | 2026-01-23 |
+| F8. Board v2 (Epic как root) | ✅ Готово | 2026-01-23 |
+| F9. Sub-task Estimates | ✅ Готово | 2026-01-23 |
 | F10. Epic-Team Mapping | ✅ Готово | 2026-01-23 |
+| F11. Rough Estimates для Epics | ✅ Готово | 2026-01-23 |
 
 ---
 
@@ -294,38 +297,49 @@ JIRA_TEAM_FIELD_ID (e.g. customfield_12345)
 
 ---
 
-### F11. Rough Estimates для Epics
-**Цель:** Возможность вводить dirty estimates для Epic.
+### F11. Rough Estimates для Epics ✅
+**Цель:** Возможность вводить грубые оценки для Epic по ролям (SA/DEV/QA).
 
-**Поля Epic:**
-- roughEstimateDays (DECIMAL, шаг 0.1)
-- roughEstimateUpdatedAt
-- roughEstimateUpdatedBy
+**Поля Epic в БД:**
+- `rough_estimate_sa_days` (DECIMAL) — оценка для SA
+- `rough_estimate_dev_days` (DECIMAL) — оценка для DEV
+- `rough_estimate_qa_days` (DECIMAL) — оценка для QA
+- `rough_estimate_updated_at` — время последнего обновления
+- `rough_estimate_updated_by` — кто обновил
 
 **API:**
 ```
-PATCH /api/{companySlug}/{jiraKey}/epics/{epicKey}/rough-estimate
-{ "days": number }
+GET /api/epics/config/rough-estimate — конфигурация
+PATCH /api/epics/{epicKey}/rough-estimate/{role} — обновление (role: sa|dev|qa)
+{ "days": number | null }
 ```
 
-**Конфигурация (per JiraSpace):**
+**Конфигурация:**
 ```yaml
-roughEstimate:
+rough-estimate:
   enabled: true
-  allowedEpicStatuses: [status1, status2]
-  stepDays: 0.1
-  minDays: 0.0
+  allowed-epic-statuses: [Backlog, To Do, Бэклог, Сделать]
+  step-days: 0.5
+  min-days: 0.0
+  max-days: 365
 ```
+
+**UI поведение:**
+- Epic в TODO (Backlog/To Do): редактируемые чипы SA/DEV/QA с пунктирной рамкой
+- Epic в работе: прогресс-бары с залогированным/оценкой из сабтасков
+- ESTIMATE колонка для Epic в TODO = сумма SA + DEV + QA rough estimates
+- ESTIMATE для Epic в работе = агрегация из сабтасков
 
 **Валидация:**
-- Только COMPANY_ADMIN или JIRA_SPACE_ADMIN
-- Epic в разрешённом статусе
-- Значение кратно 0.1
+- Редактирование только для Epic в разрешённых статусах
+- Значение кратно stepDays
+- Диапазон: minDays - maxDays
 
 **Критерии готовности:**
-- Rough estimate сохраняется в БД
-- Редактирование только в разрешённых статусах
-- Значение переживает Jira sync
+- Rough estimates сохраняются в БД ✅
+- Редактирование только в разрешённых статусах ✅
+- Значения переживают Jira sync ✅
+- UI отображает разные состояния для TODO/в работе ✅
 
 ---
 

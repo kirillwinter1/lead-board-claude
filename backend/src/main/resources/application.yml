@@ -44,3 +44,14 @@ atlassian:
     client-secret: ${ATLASSIAN_CLIENT_SECRET:}
     redirect-uri: ${ATLASSIAN_REDIRECT_URI:http://localhost:8080/oauth/atlassian/callback}
     site-base-url: ${ATLASSIAN_SITE_BASE_URL:}
+
+rough-estimate:
+  enabled: true
+  allowed-epic-statuses:
+    - Backlog
+    - To Do
+    - Бэклог
+    - Сделать
+  step-days: 0.1
+  min-days: 0.0
+  max-days: 365

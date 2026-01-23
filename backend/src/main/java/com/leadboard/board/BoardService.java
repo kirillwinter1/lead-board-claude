@@ -1,14 +1,15 @@
 package com.leadboard.board;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.RoughEstimateProperties;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
-import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -16,15 +17,19 @@ import java.util.stream.Collectors;
 public class BoardService {
 
     private static final Logger log = LoggerFactory.getLogger(BoardService.class);
+    private static final long SECONDS_PER_DAY = 8 * 3600; // 8 hours per day
 
     private final JiraIssueRepository issueRepository;
     private final JiraProperties jiraProperties;
     private final TeamRepository teamRepository;
+    private final RoughEstimateProperties roughEstimateProperties;
 
-    public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties, TeamRepository teamRepository) {
+    public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties,
+                        TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties) {
         this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
         this.teamRepository = teamRepository;
+        this.roughEstimateProperties = roughEstimateProperties;
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, int page, int size) {
@@ -187,7 +192,47 @@ public class BoardService {
             node.setTeamName(entity.getTeamFieldValue());
         }
 
+        // Set Epic-specific fields
+        if (isEpic(entity.getIssueType())) {
+            boolean epicInTodo = roughEstimateProperties.isStatusAllowed(entity.getStatus());
+            node.setEpicInTodo(epicInTodo);
+
+            // Store rough estimates for frontend (used for editing in TODO status)
+            node.setRoughEstimateSaDays(entity.getRoughEstimateSaDays());
+            node.setRoughEstimateDevDays(entity.getRoughEstimateDevDays());
+            node.setRoughEstimateQaDays(entity.getRoughEstimateQaDays());
+
+            // For Epics in TODO: use rough estimates for display
+            if (epicInTodo) {
+                BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
+                roleProgress.setAnalytics(new BoardNode.RoleMetrics(0, 0, entity.getRoughEstimateSaDays()));
+                roleProgress.setDevelopment(new BoardNode.RoleMetrics(0, 0, entity.getRoughEstimateDevDays()));
+                roleProgress.setTesting(new BoardNode.RoleMetrics(0, 0, entity.getRoughEstimateQaDays()));
+                node.setRoleProgress(roleProgress);
+
+                // Calculate estimate as sum of rough estimates (converted to seconds)
+                long roughEstimateSeconds = 0;
+                if (entity.getRoughEstimateSaDays() != null) {
+                    roughEstimateSeconds += entity.getRoughEstimateSaDays().multiply(BigDecimal.valueOf(SECONDS_PER_DAY)).longValue();
+                }
+                if (entity.getRoughEstimateDevDays() != null) {
+                    roughEstimateSeconds += entity.getRoughEstimateDevDays().multiply(BigDecimal.valueOf(SECONDS_PER_DAY)).longValue();
+                }
+                if (entity.getRoughEstimateQaDays() != null) {
+                    roughEstimateSeconds += entity.getRoughEstimateQaDays().multiply(BigDecimal.valueOf(SECONDS_PER_DAY)).longValue();
+                }
+                if (roughEstimateSeconds > 0) {
+                    node.setEstimateSeconds(roughEstimateSeconds);
+                }
+            }
+            // For Epics in progress: RoleProgress will be set by aggregateProgress()
+        }
+
         return node;
+    }
+
+    private boolean isEpic(String issueType) {
+        return "Epic".equalsIgnoreCase(issueType) || "Эпик".equalsIgnoreCase(issueType);
     }
 
     private void aggregateProgress(BoardNode node) {
@@ -205,7 +250,6 @@ public class BoardService {
         }
 
         // Aggregate from children
-        long totalEstimate = 0;
         long totalLogged = 0;
         long analyticsEstimate = 0, analyticsLogged = 0;
         long developmentEstimate = 0, developmentLogged = 0;
@@ -215,8 +259,8 @@ public class BoardService {
             // Recursively aggregate children first
             aggregateProgress(child);
 
-            // If child has role progress, use it; otherwise use child's direct values
-            if (child.getRoleProgress() != null) {
+            // If child has role progress (Story/Bug), aggregate from it
+            if (child.getRoleProgress() != null && !isEpic(child.getIssueType())) {
                 BoardNode.RoleProgress rp = child.getRoleProgress();
                 analyticsEstimate += rp.getAnalytics().getEstimateSeconds();
                 analyticsLogged += rp.getAnalytics().getLoggedSeconds();
@@ -245,24 +289,65 @@ public class BoardService {
                 }
             }
 
-            // Total
-            if (child.getEstimateSeconds() != null) {
-                totalEstimate += child.getEstimateSeconds();
-            }
+            // Total logged
             if (child.getLoggedSeconds() != null) {
                 totalLogged += child.getLoggedSeconds();
             }
         }
 
-        node.setEstimateSeconds(totalEstimate);
-        node.setLoggedSeconds(totalLogged);
-        node.setProgress(totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0);
+        // For Epic in TODO: preserve rough estimates in roleProgress, just update logged time
+        if (isEpic(node.getIssueType()) && node.isEpicInTodo() && node.getRoleProgress() != null) {
+            BoardNode.RoleProgress existingRp = node.getRoleProgress();
 
-        // Set role progress
-        BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
-        roleProgress.setAnalytics(new BoardNode.RoleMetrics(analyticsEstimate, analyticsLogged));
-        roleProgress.setDevelopment(new BoardNode.RoleMetrics(developmentEstimate, developmentLogged));
-        roleProgress.setTesting(new BoardNode.RoleMetrics(testingEstimate, testingLogged));
-        node.setRoleProgress(roleProgress);
+            // Update RoleMetrics with aggregated logged time while preserving rough estimates
+            existingRp.getAnalytics().setEstimateSeconds(analyticsEstimate);
+            existingRp.getAnalytics().setLoggedSeconds(analyticsLogged);
+            existingRp.getAnalytics().setProgress(analyticsEstimate > 0
+                    ? (int) Math.min(100, (analyticsLogged * 100) / analyticsEstimate) : 0);
+
+            existingRp.getDevelopment().setEstimateSeconds(developmentEstimate);
+            existingRp.getDevelopment().setLoggedSeconds(developmentLogged);
+            existingRp.getDevelopment().setProgress(developmentEstimate > 0
+                    ? (int) Math.min(100, (developmentLogged * 100) / developmentEstimate) : 0);
+
+            existingRp.getTesting().setEstimateSeconds(testingEstimate);
+            existingRp.getTesting().setLoggedSeconds(testingLogged);
+            existingRp.getTesting().setProgress(testingEstimate > 0
+                    ? (int) Math.min(100, (testingLogged * 100) / testingEstimate) : 0);
+
+            node.setLoggedSeconds(totalLogged);
+
+            // Calculate overall progress based on rough estimate (already set in mapToNode)
+            Long estimate = node.getEstimateSeconds();
+            if (estimate != null && estimate > 0) {
+                node.setProgress((int) Math.min(100, (totalLogged * 100) / estimate));
+            } else {
+                node.setProgress(0);
+            }
+        } else if (isEpic(node.getIssueType()) && !node.isEpicInTodo()) {
+            // For Epic in progress: aggregate from children (same as Story/Bug)
+            long totalEstimate = analyticsEstimate + developmentEstimate + testingEstimate;
+            node.setEstimateSeconds(totalEstimate);
+            node.setLoggedSeconds(totalLogged);
+            node.setProgress(totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0);
+
+            BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
+            roleProgress.setAnalytics(new BoardNode.RoleMetrics(analyticsEstimate, analyticsLogged, node.getRoughEstimateSaDays()));
+            roleProgress.setDevelopment(new BoardNode.RoleMetrics(developmentEstimate, developmentLogged, node.getRoughEstimateDevDays()));
+            roleProgress.setTesting(new BoardNode.RoleMetrics(testingEstimate, testingLogged, node.getRoughEstimateQaDays()));
+            node.setRoleProgress(roleProgress);
+        } else {
+            // For Story/Bug: create new role progress
+            long totalEstimate = analyticsEstimate + developmentEstimate + testingEstimate;
+            node.setEstimateSeconds(totalEstimate);
+            node.setLoggedSeconds(totalLogged);
+            node.setProgress(totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0);
+
+            BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
+            roleProgress.setAnalytics(new BoardNode.RoleMetrics(analyticsEstimate, analyticsLogged));
+            roleProgress.setDevelopment(new BoardNode.RoleMetrics(developmentEstimate, developmentLogged));
+            roleProgress.setTesting(new BoardNode.RoleMetrics(testingEstimate, testingLogged));
+            node.setRoleProgress(roleProgress);
+        }
     }
 }

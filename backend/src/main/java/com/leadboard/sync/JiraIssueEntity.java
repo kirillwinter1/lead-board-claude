@@ -1,6 +1,7 @@
 package com.leadboard.sync;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -46,6 +47,21 @@ public class JiraIssueEntity {
 
     @Column(name = "team_id")
     private Long teamId;
+
+    @Column(name = "rough_estimate_sa_days", precision = 10, scale = 1)
+    private BigDecimal roughEstimateSaDays;
+
+    @Column(name = "rough_estimate_dev_days", precision = 10, scale = 1)
+    private BigDecimal roughEstimateDevDays;
+
+    @Column(name = "rough_estimate_qa_days", precision = 10, scale = 1)
+    private BigDecimal roughEstimateQaDays;
+
+    @Column(name = "rough_estimate_updated_at")
+    private OffsetDateTime roughEstimateUpdatedAt;
+
+    @Column(name = "rough_estimate_updated_by", length = 255)
+    private String roughEstimateUpdatedBy;
 
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
@@ -170,6 +186,46 @@ public class JiraIssueEntity {
 
     public void setTeamId(Long teamId) {
         this.teamId = teamId;
+    }
+
+    public BigDecimal getRoughEstimateSaDays() {
+        return roughEstimateSaDays;
+    }
+
+    public void setRoughEstimateSaDays(BigDecimal roughEstimateSaDays) {
+        this.roughEstimateSaDays = roughEstimateSaDays;
+    }
+
+    public BigDecimal getRoughEstimateDevDays() {
+        return roughEstimateDevDays;
+    }
+
+    public void setRoughEstimateDevDays(BigDecimal roughEstimateDevDays) {
+        this.roughEstimateDevDays = roughEstimateDevDays;
+    }
+
+    public BigDecimal getRoughEstimateQaDays() {
+        return roughEstimateQaDays;
+    }
+
+    public void setRoughEstimateQaDays(BigDecimal roughEstimateQaDays) {
+        this.roughEstimateQaDays = roughEstimateQaDays;
+    }
+
+    public OffsetDateTime getRoughEstimateUpdatedAt() {
+        return roughEstimateUpdatedAt;
+    }
+
+    public void setRoughEstimateUpdatedAt(OffsetDateTime roughEstimateUpdatedAt) {
+        this.roughEstimateUpdatedAt = roughEstimateUpdatedAt;
+    }
+
+    public String getRoughEstimateUpdatedBy() {
+        return roughEstimateUpdatedBy;
+    }
+
+    public void setRoughEstimateUpdatedBy(String roughEstimateUpdatedBy) {
+        this.roughEstimateUpdatedBy = roughEstimateUpdatedBy;
     }
 
     public OffsetDateTime getJiraUpdatedAt() {

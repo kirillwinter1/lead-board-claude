@@ -12,6 +12,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -167,6 +168,13 @@ public class SyncService {
         JiraIssueEntity entity = issueRepository.findByIssueKey(jiraIssue.getKey())
                 .orElse(new JiraIssueEntity());
 
+        // Preserve rough estimate fields (local Lead Board data that survives sync)
+        BigDecimal savedRoughEstimateSaDays = entity.getRoughEstimateSaDays();
+        BigDecimal savedRoughEstimateDevDays = entity.getRoughEstimateDevDays();
+        BigDecimal savedRoughEstimateQaDays = entity.getRoughEstimateQaDays();
+        OffsetDateTime savedRoughEstimateUpdatedAt = entity.getRoughEstimateUpdatedAt();
+        String savedRoughEstimateUpdatedBy = entity.getRoughEstimateUpdatedBy();
+
         entity.setIssueKey(jiraIssue.getKey());
         entity.setIssueId(jiraIssue.getId());
         entity.setProjectKey(projectKey);
@@ -191,6 +199,13 @@ public class SyncService {
         String teamFieldValue = extractTeamFieldValue(jiraIssue);
         entity.setTeamFieldValue(teamFieldValue);
         entity.setTeamId(findTeamIdByFieldValue(teamFieldValue));
+
+        // Restore rough estimate fields
+        entity.setRoughEstimateSaDays(savedRoughEstimateSaDays);
+        entity.setRoughEstimateDevDays(savedRoughEstimateDevDays);
+        entity.setRoughEstimateQaDays(savedRoughEstimateQaDays);
+        entity.setRoughEstimateUpdatedAt(savedRoughEstimateUpdatedAt);
+        entity.setRoughEstimateUpdatedBy(savedRoughEstimateUpdatedBy);
 
         issueRepository.save(entity);
     }

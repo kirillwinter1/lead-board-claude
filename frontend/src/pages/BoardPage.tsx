@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import axios from 'axios'
+import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
 
 import epicIcon from '../icons/epic.png'
 import storyIcon from '../icons/story.png'
@@ -32,6 +33,7 @@ interface RoleMetrics {
   estimateSeconds: number
   loggedSeconds: number
   progress: number
+  roughEstimateDays: number | null
 }
 
 interface RoleProgress {
@@ -53,6 +55,10 @@ interface BoardNode {
   loggedSeconds: number | null
   progress: number | null
   roleProgress: RoleProgress | null
+  epicInTodo: boolean
+  roughEstimateSaDays: number | null
+  roughEstimateDevDays: number | null
+  roughEstimateQaDays: number | null
   children: BoardNode[]
 }
 
@@ -72,7 +78,7 @@ interface SyncStatus {
 function formatDays(seconds: number | null): string {
   if (!seconds) return '0 d'
   const days = seconds / 3600 / 8
-  return `${days.toFixed(days % 1 === 0 ? 0 : 2)} d`
+  return `${days.toFixed(days % 1 === 0 ? 0 : 1)} d`
 }
 
 function ProgressBar({ progress }: { progress: number }) {
@@ -89,6 +95,155 @@ function ProgressBar({ progress }: { progress: number }) {
   )
 }
 
+function isEpic(issueType: string): boolean {
+  return issueType === 'Epic' || issueType === 'Эпик'
+}
+
+// Epic Role Chip - for editing rough estimates in TODO status or showing progress in work
+interface EpicRoleChipProps {
+  label: string
+  role: 'sa' | 'dev' | 'qa'
+  metrics: RoleMetrics
+  epicInTodo: boolean
+  epicKey: string
+  config: RoughEstimateConfig | null
+  onUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
+}
+
+function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpdate }: EpicRoleChipProps) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState<string>('')
+  const [saving, setSaving] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const roleClass = label.toLowerCase()
+
+  const roughEstimate = metrics.roughEstimateDays
+  const hasRoughEstimate = roughEstimate !== null && roughEstimate > 0
+  const hasLogged = metrics.loggedSeconds > 0
+
+  // Calculate remaining time
+  const estimateDays = metrics.estimateSeconds / 3600 / 8
+  const loggedDays = metrics.loggedSeconds / 3600 / 8
+  const remainingDays = Math.max(0, estimateDays - loggedDays)
+
+  const handleClick = () => {
+    if (!epicInTodo || !config?.enabled) return
+    setValue(roughEstimate?.toString() ?? '')
+    setEditing(true)
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const days = value.trim() === '' ? null : parseFloat(value)
+      if (days !== null && isNaN(days)) {
+        throw new Error('Invalid number')
+      }
+      await onUpdate(epicKey, role, days)
+      setEditing(false)
+    } catch (err) {
+      console.error('Failed to save rough estimate:', err)
+      alert('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSave()
+    } else if (e.key === 'Escape') {
+      setEditing(false)
+    }
+  }
+
+  const handleBlur = () => {
+    if (!saving) {
+      handleSave()
+    }
+  }
+
+  // Epic in TODO - editable chip
+  if (epicInTodo) {
+    if (editing) {
+      return (
+        <div className={`epic-role-chip ${roleClass} todo editing`}>
+          <span className="epic-role-label">{label}</span>
+          <input
+            ref={inputRef}
+            type="number"
+            step={config?.stepDays || 0.5}
+            min={config?.minDays || 0}
+            max={config?.maxDays || 365}
+            value={value}
+            onChange={e => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={handleBlur}
+            className="epic-role-input"
+            disabled={saving}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div
+        className={`epic-role-chip ${roleClass} todo ${hasRoughEstimate ? '' : 'needs-estimate'}`}
+        onClick={handleClick}
+        title="Click to set estimate"
+      >
+        <span className="epic-role-label">{label}</span>
+        <span className="epic-role-value">{hasRoughEstimate ? `${roughEstimate}d` : '✎'}</span>
+      </div>
+    )
+  }
+
+  // Epic in progress - show progress bar based on estimate from subtasks
+  const hasEstimate = metrics.estimateSeconds > 0
+  const progress = hasEstimate ? Math.min(100, (loggedDays / estimateDays) * 100) : 0
+  const remainingText = `${formatCompact(remainingDays)}d left`
+
+  // Format number: no decimal for >= 100, one decimal otherwise
+  function formatCompact(n: number): string {
+    if (n >= 100) return Math.round(n).toString()
+    return n.toFixed(1)
+  }
+
+  return (
+    <div
+      className={`epic-role-chip ${roleClass} in-progress ${!hasEstimate ? 'no-estimate' : ''}`}
+      title={hasEstimate ? remainingText : undefined}
+    >
+      <div className="epic-role-header">
+        <span className="epic-role-label">{label}</span>
+        <span className="epic-role-percent">{hasEstimate ? `${Math.round(progress)}%` : '--'}</span>
+      </div>
+      {hasEstimate && (
+        <>
+          <div className="epic-role-progress-bar">
+            <div
+              className={`epic-role-progress-fill ${progress >= 100 ? 'overburn' : ''}`}
+              style={{ width: `${Math.min(progress, 100)}%` }}
+            />
+          </div>
+          <div className="epic-role-times">
+            <span className="time-logged">{formatCompact(loggedDays)}</span>
+            <span className="arrow">→</span>
+            <span className="time-estimate">{formatCompact(estimateDays)}</span>
+          </div>
+        </>
+      )}
+      {!hasEstimate && hasLogged && (
+        <div className="epic-role-times warning">
+          {formatCompact(loggedDays)}d
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Standard Role Chip for non-Epic issues
 function RoleChip({ label, metrics }: { label: string; metrics: RoleMetrics | null }) {
   const hasEstimate = metrics && metrics.estimateSeconds > 0
   const progress = hasEstimate ? Math.min(metrics.progress, 100) : 0
@@ -103,7 +258,51 @@ function RoleChip({ label, metrics }: { label: string; metrics: RoleMetrics | nu
   )
 }
 
-function RoleChips({ roleProgress }: { roleProgress: RoleProgress | null }) {
+interface RoleChipsProps {
+  node: BoardNode
+  config: RoughEstimateConfig | null
+  onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
+}
+
+function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
+  const roleProgress = node.roleProgress
+
+  // For Epic - use special Epic chips
+  if (isEpic(node.issueType) && roleProgress) {
+    return (
+      <div className="epic-role-chips">
+        <EpicRoleChip
+          label="SA"
+          role="sa"
+          metrics={roleProgress.analytics}
+          epicInTodo={node.epicInTodo}
+          epicKey={node.issueKey}
+          config={config}
+          onUpdate={onRoughEstimateUpdate}
+        />
+        <EpicRoleChip
+          label="DEV"
+          role="dev"
+          metrics={roleProgress.development}
+          epicInTodo={node.epicInTodo}
+          epicKey={node.issueKey}
+          config={config}
+          onUpdate={onRoughEstimateUpdate}
+        />
+        <EpicRoleChip
+          label="QA"
+          role="qa"
+          metrics={roleProgress.testing}
+          epicInTodo={node.epicInTodo}
+          epicKey={node.issueKey}
+          config={config}
+          onUpdate={onRoughEstimateUpdate}
+        />
+      </div>
+    )
+  }
+
+  // For Story/Bug/Subtask - standard chips
   return (
     <div className="role-chips">
       <RoleChip label="SA" metrics={roleProgress?.analytics || null} />
@@ -135,9 +334,11 @@ interface BoardRowProps {
   expanded: boolean
   onToggle: () => void
   hasChildren: boolean
+  roughEstimateConfig: RoughEstimateConfig | null
+  onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate }: BoardRowProps) {
   return (
     <tr className={`board-row level-${level}`}>
       <td className="cell-expander">
@@ -159,13 +360,17 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren }: BoardRowProp
         </div>
       </td>
       <td className="cell-team">{node.teamName || '--'}</td>
-      <td className="cell-estimate">{formatDays(node.estimateSeconds)}</td>
       <td className="cell-logged">{formatDays(node.loggedSeconds)}</td>
+      <td className="cell-estimate">{formatDays(node.estimateSeconds)}</td>
       <td className="cell-progress">
         <ProgressBar progress={node.progress || 0} />
       </td>
       <td className="cell-roles">
-        <RoleChips roleProgress={node.roleProgress} />
+        <RoleChips
+          node={node}
+          config={roughEstimateConfig}
+          onRoughEstimateUpdate={onRoughEstimateUpdate}
+        />
       </td>
       <td className="cell-status">
         <StatusBadge status={node.status} />
@@ -177,7 +382,13 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren }: BoardRowProp
   )
 }
 
-function BoardTable({ items }: { items: BoardNode[] }) {
+interface BoardTableProps {
+  items: BoardNode[]
+  roughEstimateConfig: RoughEstimateConfig | null
+  onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
+}
+
+function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate }: BoardTableProps) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
   const toggleExpand = (key: string) => {
@@ -207,6 +418,8 @@ function BoardTable({ items }: { items: BoardNode[] }) {
           expanded={isExpanded}
           onToggle={() => toggleExpand(node.issueKey)}
           hasChildren={hasChildren}
+          roughEstimateConfig={roughEstimateConfig}
+          onRoughEstimateUpdate={onRoughEstimateUpdate}
         />
       )
 
@@ -226,8 +439,8 @@ function BoardTable({ items }: { items: BoardNode[] }) {
             <th className="th-expander"></th>
             <th className="th-name">NAME</th>
             <th className="th-team">TEAM</th>
-            <th className="th-estimate">ESTIMATE</th>
             <th className="th-logged">LOGGED TIME</th>
+            <th className="th-estimate">ESTIMATE</th>
             <th className="th-progress">OVERALL PROGRESS</th>
             <th className="th-roles">ROLE-BASED PROGRESS</th>
             <th className="th-status">STATUS</th>
@@ -365,22 +578,28 @@ export function BoardPage() {
   const [error, setError] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [roughEstimateConfig, setRoughEstimateConfig] = useState<RoughEstimateConfig | null>(null)
 
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
 
-  const fetchBoard = useCallback(() => {
+  const fetchBoard = useCallback(async () => {
     setLoading(true)
-    axios.get<BoardResponse>('/api/board')
-      .then(response => {
-        setBoard(response.data.items)
-        setLoading(false)
-      })
-      .catch(err => {
-        setError(err.message)
-        setLoading(false)
-      })
+    try {
+      const response = await axios.get<BoardResponse>('/api/board')
+      setBoard(response.data.items)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load board')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const fetchRoughEstimateConfig = useCallback(() => {
+    getRoughEstimateConfig()
+      .then(setRoughEstimateConfig)
+      .catch(() => {})
   }, [])
 
   const fetchSyncStatus = useCallback(() => {
@@ -417,7 +636,14 @@ export function BoardPage() {
   useEffect(() => {
     fetchBoard()
     fetchSyncStatus()
-  }, [fetchBoard, fetchSyncStatus])
+    fetchRoughEstimateConfig()
+  }, [fetchBoard, fetchSyncStatus, fetchRoughEstimateConfig])
+
+  const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => {
+    await updateRoughEstimate(epicKey, role, { days })
+    // Refetch board to get updated data
+    await fetchBoard()
+  }, [fetchBoard])
 
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
@@ -507,7 +733,11 @@ export function BoardPage() {
           <div className="empty">No epics found</div>
         )}
         {!loading && !error && filteredBoard.length > 0 && (
-          <BoardTable items={filteredBoard} />
+          <BoardTable
+            items={filteredBoard}
+            roughEstimateConfig={roughEstimateConfig}
+            onRoughEstimateUpdate={handleRoughEstimateUpdate}
+          />
         )}
       </main>
     </>

@@ -1,5 +1,6 @@
 package com.leadboard.board;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,6 +18,10 @@ public class BoardNode {
     private Long loggedSeconds;
     private Integer progress; // 0-100
     private RoleProgress roleProgress; // aggregated progress by role
+    private boolean epicInTodo; // true if Epic is in Backlog/To Do status (for UI styling)
+    private BigDecimal roughEstimateSaDays; // rough estimate for SA (Epic only, for editing)
+    private BigDecimal roughEstimateDevDays; // rough estimate for DEV (Epic only, for editing)
+    private BigDecimal roughEstimateQaDays; // rough estimate for QA (Epic only, for editing)
     private List<BoardNode> children = new ArrayList<>();
 
     public BoardNode() {
@@ -126,6 +131,38 @@ public class BoardNode {
         this.roleProgress = roleProgress;
     }
 
+    public boolean isEpicInTodo() {
+        return epicInTodo;
+    }
+
+    public void setEpicInTodo(boolean epicInTodo) {
+        this.epicInTodo = epicInTodo;
+    }
+
+    public BigDecimal getRoughEstimateSaDays() {
+        return roughEstimateSaDays;
+    }
+
+    public void setRoughEstimateSaDays(BigDecimal roughEstimateSaDays) {
+        this.roughEstimateSaDays = roughEstimateSaDays;
+    }
+
+    public BigDecimal getRoughEstimateDevDays() {
+        return roughEstimateDevDays;
+    }
+
+    public void setRoughEstimateDevDays(BigDecimal roughEstimateDevDays) {
+        this.roughEstimateDevDays = roughEstimateDevDays;
+    }
+
+    public BigDecimal getRoughEstimateQaDays() {
+        return roughEstimateQaDays;
+    }
+
+    public void setRoughEstimateQaDays(BigDecimal roughEstimateQaDays) {
+        this.roughEstimateQaDays = roughEstimateQaDays;
+    }
+
     public List<BoardNode> getChildren() {
         return children;
     }
@@ -178,6 +215,7 @@ public class BoardNode {
         private long estimateSeconds;
         private long loggedSeconds;
         private int progress;
+        private BigDecimal roughEstimateDays; // rough estimate for this role (Epic only)
 
         public RoleMetrics() {
         }
@@ -188,6 +226,11 @@ public class BoardNode {
             this.progress = estimateSeconds > 0
                 ? (int) Math.min(100, (loggedSeconds * 100) / estimateSeconds)
                 : 0;
+        }
+
+        public RoleMetrics(long estimateSeconds, long loggedSeconds, BigDecimal roughEstimateDays) {
+            this(estimateSeconds, loggedSeconds);
+            this.roughEstimateDays = roughEstimateDays;
         }
 
         public long getEstimateSeconds() {
@@ -212,6 +255,14 @@ public class BoardNode {
 
         public void setProgress(int progress) {
             this.progress = progress;
+        }
+
+        public BigDecimal getRoughEstimateDays() {
+            return roughEstimateDays;
+        }
+
+        public void setRoughEstimateDays(BigDecimal roughEstimateDays) {
+            this.roughEstimateDays = roughEstimateDays;
         }
     }
 }

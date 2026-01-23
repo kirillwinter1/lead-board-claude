@@ -288,7 +288,7 @@ body {
 }
 
 .th-roles {
-  width: 200px;
+  width: 260px;
 }
 
 .th-status {
@@ -457,7 +457,7 @@ body {
 
 /* Role Chips */
 .cell-roles {
-  width: 240px;
+  width: 260px;
 }
 
 .role-chips {
@@ -471,13 +471,15 @@ body {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: 70px;
+  width: 76px;
+  height: 48px;
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .role-chip-fill {
@@ -948,4 +950,187 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* Epic Role Chips */
+.epic-role-chips {
+  display: flex;
+  gap: 6px;
+}
+
+.epic-role-chip {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 76px;
+  height: 48px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: default;
+  box-sizing: border-box;
+}
+
+/* Epic in TODO - editable state */
+.epic-role-chip.todo {
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px dashed #dfe1e6;
+  background: #fafbfc;
+}
+
+.epic-role-chip.todo:hover {
+  border-color: #0052cc;
+  background: #f0f7ff;
+}
+
+.epic-role-chip.todo.needs-estimate {
+  border-color: #ffab00;
+  background: #fffae6;
+}
+
+.epic-role-chip.todo.needs-estimate:hover {
+  background: #fff3c4;
+}
+
+.epic-role-chip.todo .epic-role-label {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.epic-role-chip.todo .epic-role-value {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+}
+
+.epic-role-chip.todo.needs-estimate .epic-role-value {
+  color: #ff8b00;
+}
+
+.epic-role-chip.todo.editing {
+  border-style: solid;
+  border-color: #0052cc;
+  background: white;
+}
+
+.epic-role-input {
+  width: 50px;
+  padding: 2px 4px;
+  border: 1px solid #0052cc;
+  border-radius: 3px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  outline: none;
+}
+
+/* Epic role chip colors */
+.epic-role-chip.sa {
+  color: #0d47a1;
+}
+
+.epic-role-chip.sa.todo {
+  border-color: #bbdefb;
+}
+
+.epic-role-chip.dev {
+  color: #1b5e20;
+}
+
+.epic-role-chip.dev.todo {
+  border-color: #c8e6c9;
+}
+
+.epic-role-chip.qa {
+  color: #e65100;
+}
+
+.epic-role-chip.qa.todo {
+  border-color: #ffe0b2;
+}
+
+/* Epic in progress - with progress bar */
+.epic-role-chip.in-progress {
+  background: #f4f5f7;
+  border: 1px solid #dfe1e6;
+}
+
+.epic-role-chip.in-progress.no-estimate {
+  opacity: 0.6;
+}
+
+.epic-role-chip.in-progress .epic-role-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.epic-role-chip.in-progress .epic-role-label {
+  font-weight: 600;
+}
+
+.epic-role-chip.in-progress .epic-role-percent {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 10px;
+}
+
+.epic-role-progress-bar {
+  height: 3px;
+  background: #dfe1e6;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+
+.epic-role-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.epic-role-chip.sa .epic-role-progress-fill {
+  background: #0d47a1;
+}
+
+.epic-role-chip.dev .epic-role-progress-fill {
+  background: #1b5e20;
+}
+
+.epic-role-chip.qa .epic-role-progress-fill {
+  background: #e65100;
+}
+
+.epic-role-progress-fill.overburn {
+  background: #de350b;
+}
+
+.epic-role-times {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 9px;
+  color: #6b778c;
+}
+
+.epic-role-times .time-logged {
+  flex: 0 0 auto;
+  text-align: left;
+}
+
+.epic-role-times .arrow {
+  flex: 1 1 auto;
+  text-align: center;
+  opacity: 0.5;
+  font-size: 8px;
+}
+
+.epic-role-times .time-estimate {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.epic-role-times.warning {
+  justify-content: center;
+  color: #ff8b00;
 }
