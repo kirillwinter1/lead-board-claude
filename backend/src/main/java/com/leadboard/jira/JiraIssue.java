@@ -1,6 +1,10 @@
 package com.leadboard.jira;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JiraIssue {
@@ -50,6 +54,22 @@ public class JiraIssue {
         private JiraParent parent;
         private JiraProject project;
         private JiraTimeTracking timetracking;
+        private Map<String, Object> customFields = new HashMap<>();
+
+        @JsonAnySetter
+        public void setCustomField(String key, Object value) {
+            if (key.startsWith("customfield_")) {
+                customFields.put(key, value);
+            }
+        }
+
+        public Map<String, Object> getCustomFields() {
+            return customFields;
+        }
+
+        public Object getCustomField(String fieldId) {
+            return customFields.get(fieldId);
+        }
 
         public String getSummary() {
             return summary;

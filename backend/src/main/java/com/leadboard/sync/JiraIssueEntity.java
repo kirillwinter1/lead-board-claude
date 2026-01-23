@@ -41,6 +41,12 @@ public class JiraIssueEntity {
     @Column(name = "time_spent_seconds")
     private Long timeSpentSeconds;
 
+    @Column(name = "team_field_value", length = 255)
+    private String teamFieldValue;
+
+    @Column(name = "team_id")
+    private Long teamId;
+
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
 
@@ -148,6 +154,22 @@ public class JiraIssueEntity {
 
     public void setTimeSpentSeconds(Long timeSpentSeconds) {
         this.timeSpentSeconds = timeSpentSeconds;
+    }
+
+    public String getTeamFieldValue() {
+        return teamFieldValue;
+    }
+
+    public void setTeamFieldValue(String teamFieldValue) {
+        this.teamFieldValue = teamFieldValue;
+    }
+
+    public Long getTeamId() {
+        return teamId;
+    }
+
+    public void setTeamId(Long teamId) {
+        this.teamId = teamId;
     }
 
     public OffsetDateTime getJiraUpdatedAt() {

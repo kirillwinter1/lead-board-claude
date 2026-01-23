@@ -3,6 +3,8 @@ package com.leadboard.board;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.team.TeamEntity;
+import com.leadboard.team.TeamRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -17,10 +19,12 @@ public class BoardService {
 
     private final JiraIssueRepository issueRepository;
     private final JiraProperties jiraProperties;
+    private final TeamRepository teamRepository;
 
-    public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties) {
+    public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties, TeamRepository teamRepository) {
         this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
+        this.teamRepository = teamRepository;
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, int page, int size) {
@@ -39,6 +43,12 @@ public class BoardService {
                 log.warn("No cached issues found for project: {}. Run sync first.", projectKey);
                 return new BoardResponse(Collections.emptyList(), 0);
             }
+
+            // Load team names map
+            Map<Long, String> teamNames = new HashMap<>();
+            teamRepository.findByActiveTrue().forEach(team ->
+                teamNames.put(team.getId(), team.getName())
+            );
 
             // Separate by type
             Map<String, JiraIssueEntity> issueMap = allIssues.stream()
@@ -83,13 +93,13 @@ public class BoardService {
 
             // Create Epic nodes
             for (JiraIssueEntity epic : filteredEpics) {
-                BoardNode node = mapToNode(epic, baseUrl);
+                BoardNode node = mapToNode(epic, baseUrl, teamNames);
                 epicMap.put(epic.getIssueKey(), node);
             }
 
             // Create Story nodes and attach to Epics
             for (JiraIssueEntity story : stories) {
-                BoardNode storyNode = mapToNode(story, baseUrl);
+                BoardNode storyNode = mapToNode(story, baseUrl, teamNames);
                 storyMap.put(story.getIssueKey(), storyNode);
 
                 String parentKey = story.getParentKey();
@@ -100,7 +110,7 @@ public class BoardService {
 
             // Create Sub-task nodes and attach to Stories
             for (JiraIssueEntity subtask : subtasks) {
-                BoardNode subtaskNode = mapToNode(subtask, baseUrl);
+                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames);
 
                 // Map subtask type to role
                 String role = jiraProperties.getRoleForSubtaskType(subtask.getIssueType());
@@ -140,7 +150,7 @@ public class BoardService {
         return getBoard(null, null, 0, 50);
     }
 
-    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl) {
+    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames) {
         String jiraUrl = baseUrl + "/browse/" + entity.getIssueKey();
         BoardNode node = new BoardNode(
                 entity.getIssueKey(),
@@ -152,6 +162,15 @@ public class BoardService {
 
         node.setEstimateSeconds(entity.getOriginalEstimateSeconds());
         node.setLoggedSeconds(entity.getTimeSpentSeconds());
+
+        // Set team info
+        if (entity.getTeamId() != null) {
+            node.setTeamId(entity.getTeamId());
+            node.setTeamName(teamNames.get(entity.getTeamId()));
+        } else if (entity.getTeamFieldValue() != null) {
+            // Show raw field value if no team mapping exists
+            node.setTeamName(entity.getTeamFieldValue());
+        }
 
         return node;
     }

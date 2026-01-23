@@ -11,8 +11,10 @@
 | F1. Bootstrap проекта | ✅ Готово | 2026-01-22 |
 | F2. Jira Integration MVP | ✅ Готово | 2026-01-22 |
 | F3. Jira Sync & Cache | ✅ Готово | 2026-01-23 |
-| F4. OAuth 2.0 + RBAC | ⏳ Запланировано | — |
-| F5-F6. Team Management | ⏳ Запланировано | — |
+| F4. OAuth 2.0 + RBAC | ✅ Готово | 2026-01-23 |
+| F5. Team Management Backend | ✅ Готово | 2026-01-23 |
+| F6. Team Management UI | ✅ Готово | 2026-01-23 |
+| F10. Epic-Team Mapping | ✅ Готово | 2026-01-23 |
 
 ---
 

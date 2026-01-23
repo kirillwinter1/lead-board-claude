@@ -35,17 +35,29 @@ public class JiraClient {
         String accessToken = oauthService.getValidAccessToken();
         String cloudId = oauthService.getCloudIdForCurrentUser();
 
+        // Build fields list including team field if configured
+        String fields = buildFieldsList();
+
         if (accessToken != null && cloudId != null) {
             log.debug("Using OAuth for Jira API");
-            return searchWithOAuth(jql, startAt, maxResults, accessToken, cloudId);
+            return searchWithOAuth(jql, startAt, maxResults, accessToken, cloudId, fields);
         }
 
         // Fall back to Basic Auth
         log.debug("Using Basic Auth for Jira API");
-        return searchWithBasicAuth(jql, startAt, maxResults);
+        return searchWithBasicAuth(jql, startAt, maxResults, fields);
     }
 
-    private JiraSearchResponse searchWithOAuth(String jql, int startAt, int maxResults, String accessToken, String cloudId) {
+    private String buildFieldsList() {
+        String baseFields = "summary,status,issuetype,parent,project,timetracking";
+        String teamFieldId = jiraProperties.getTeamFieldId();
+        if (teamFieldId != null && !teamFieldId.isEmpty()) {
+            return baseFields + "," + teamFieldId;
+        }
+        return baseFields;
+    }
+
+    private JiraSearchResponse searchWithOAuth(String jql, int startAt, int maxResults, String accessToken, String cloudId, String fields) {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
 
         return webClient.get()
@@ -53,7 +65,7 @@ public class JiraClient {
                         .queryParam("jql", jql)
                         .queryParam("startAt", startAt)
                         .queryParam("maxResults", maxResults)
-                        .queryParam("fields", "summary,status,issuetype,parent,project,timetracking")
+                        .queryParam("fields", fields)
                         .build())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .retrieve()
@@ -61,7 +73,7 @@ public class JiraClient {
                 .block();
     }
 
-    private JiraSearchResponse searchWithBasicAuth(String jql, int startAt, int maxResults) {
+    private JiraSearchResponse searchWithBasicAuth(String jql, int startAt, int maxResults, String fields) {
         if (jiraProperties.getBaseUrl() == null || jiraProperties.getBaseUrl().isEmpty()) {
             throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
         }
@@ -74,7 +86,7 @@ public class JiraClient {
                         .queryParam("jql", jql)
                         .queryParam("startAt", startAt)
                         .queryParam("maxResults", maxResults)
-                        .queryParam("fields", "summary,status,issuetype,parent,project,timetracking")
+                        .queryParam("fields", fields)
                         .build())
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .retrieve()

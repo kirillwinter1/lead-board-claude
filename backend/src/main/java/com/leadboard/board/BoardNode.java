@@ -11,6 +11,8 @@ public class BoardNode {
     private String issueType;
     private String jiraUrl;
     private String role; // ANALYTICS, DEVELOPMENT, TESTING (for sub-tasks)
+    private Long teamId;
+    private String teamName;
     private Long estimateSeconds;
     private Long loggedSeconds;
     private Integer progress; // 0-100
@@ -74,6 +76,22 @@ public class BoardNode {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public Long getTeamId() {
+        return teamId;
+    }
+
+    public void setTeamId(Long teamId) {
+        this.teamId = teamId;
+    }
+
+    public String getTeamName() {
+        return teamName;
+    }
+
+    public void setTeamName(String teamName) {
+        this.teamName = teamName;
     }
 
     public Long getEstimateSeconds() {

@@ -1,0 +1,75 @@
+import axios from 'axios'
+
+export interface Team {
+  id: number
+  name: string
+  jiraTeamValue: string | null
+  active: boolean
+  memberCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TeamMember {
+  id: number
+  teamId: number
+  jiraAccountId: string
+  displayName: string | null
+  role: 'SA' | 'DEV' | 'QA'
+  grade: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
+  hoursPerDay: number
+  active: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateTeamRequest {
+  name: string
+  jiraTeamValue?: string
+}
+
+export interface UpdateTeamRequest {
+  name?: string
+  jiraTeamValue?: string
+}
+
+export interface CreateTeamMemberRequest {
+  jiraAccountId: string
+  displayName?: string
+  role?: 'SA' | 'DEV' | 'QA'
+  grade?: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
+  hoursPerDay?: number
+}
+
+export interface UpdateTeamMemberRequest {
+  displayName?: string
+  role?: 'SA' | 'DEV' | 'QA'
+  grade?: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
+  hoursPerDay?: number
+}
+
+export const teamsApi = {
+  getAll: () => axios.get<Team[]>('/api/teams').then(r => r.data),
+
+  getById: (id: number) => axios.get<Team>(`/api/teams/${id}`).then(r => r.data),
+
+  create: (data: CreateTeamRequest) =>
+    axios.post<Team>('/api/teams', data).then(r => r.data),
+
+  update: (id: number, data: UpdateTeamRequest) =>
+    axios.put<Team>(`/api/teams/${id}`, data).then(r => r.data),
+
+  delete: (id: number) => axios.delete(`/api/teams/${id}`),
+
+  getMembers: (teamId: number) =>
+    axios.get<TeamMember[]>(`/api/teams/${teamId}/members`).then(r => r.data),
+
+  addMember: (teamId: number, data: CreateTeamMemberRequest) =>
+    axios.post<TeamMember>(`/api/teams/${teamId}/members`, data).then(r => r.data),
+
+  updateMember: (teamId: number, memberId: number, data: UpdateTeamMemberRequest) =>
+    axios.put<TeamMember>(`/api/teams/${teamId}/members/${memberId}`, data).then(r => r.data),
+
+  deactivateMember: (teamId: number, memberId: number) =>
+    axios.post(`/api/teams/${teamId}/members/${memberId}/deactivate`),
+}

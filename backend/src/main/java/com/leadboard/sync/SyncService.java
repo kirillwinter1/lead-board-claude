@@ -4,6 +4,8 @@ import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
+import com.leadboard.team.TeamEntity;
+import com.leadboard.team.TeamRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -12,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @Service
 public class SyncService {
@@ -22,15 +26,18 @@ public class SyncService {
     private final JiraProperties jiraProperties;
     private final JiraIssueRepository issueRepository;
     private final JiraSyncStateRepository syncStateRepository;
+    private final TeamRepository teamRepository;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
                        JiraIssueRepository issueRepository,
-                       JiraSyncStateRepository syncStateRepository) {
+                       JiraSyncStateRepository syncStateRepository,
+                       TeamRepository teamRepository) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
         this.syncStateRepository = syncStateRepository;
+        this.teamRepository = teamRepository;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -166,7 +173,52 @@ public class SyncService {
             entity.setTimeSpentSeconds(timetracking.getTimeSpentSeconds());
         }
 
+        // Extract and map team field
+        String teamFieldValue = extractTeamFieldValue(jiraIssue);
+        entity.setTeamFieldValue(teamFieldValue);
+        entity.setTeamId(findTeamIdByFieldValue(teamFieldValue));
+
         issueRepository.save(entity);
+    }
+
+    private String extractTeamFieldValue(JiraIssue jiraIssue) {
+        String teamFieldId = jiraProperties.getTeamFieldId();
+        if (teamFieldId == null || teamFieldId.isEmpty()) {
+            return null;
+        }
+
+        Object fieldValue = jiraIssue.getFields().getCustomField(teamFieldId);
+        if (fieldValue == null) {
+            return null;
+        }
+
+        // Handle different team field formats
+        // Could be a simple string, or an object with "value" or "name" property
+        if (fieldValue instanceof String) {
+            return (String) fieldValue;
+        } else if (fieldValue instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> map = (Map<String, Object>) fieldValue;
+            // Try common Jira field patterns
+            if (map.containsKey("value")) {
+                return String.valueOf(map.get("value"));
+            } else if (map.containsKey("name")) {
+                return String.valueOf(map.get("name"));
+            } else if (map.containsKey("displayName")) {
+                return String.valueOf(map.get("displayName"));
+            }
+        }
+
+        return String.valueOf(fieldValue);
+    }
+
+    private Long findTeamIdByFieldValue(String teamFieldValue) {
+        if (teamFieldValue == null || teamFieldValue.isEmpty()) {
+            return null;
+        }
+
+        Optional<TeamEntity> team = teamRepository.findByJiraTeamValue(teamFieldValue);
+        return team.map(TeamEntity::getId).orElse(null);
     }
 
     private JiraSyncStateEntity getOrCreateSyncState(String projectKey) {

@@ -26,6 +26,7 @@ jira:
   api-token: ${JIRA_API_TOKEN:}
   project-key: ${JIRA_PROJECT_KEY:}
   sync-interval-seconds: ${JIRA_SYNC_INTERVAL_SECONDS:300}
+  team-field-id: ${JIRA_TEAM_FIELD_ID:}
   subtask-roles:
     Аналитика: ANALYTICS
     Разработка: DEVELOPMENT

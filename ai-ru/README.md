@@ -35,18 +35,32 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | **F1. Bootstrap** | Монорепозиторий: Java 21 + Spring Boot 3 backend, React + Vite + TypeScript frontend |
 | **F2. Jira Integration** | Интеграция с Jira REST API v3, иерархия Epic → Story → Sub-task |
 | **F3. Sync & Cache** | PostgreSQL кэш, периодическая синхронизация, кнопка Refresh |
+| **F4. OAuth 2.0** | Авторизация через Atlassian, хранение токенов, автообновление |
+| **F5. Team Backend** | CRUD API для команд и участников (/api/teams) |
+| **F6. Team UI** | Страницы управления командами и участниками |
+| **F10. Epic-Team Mapping** | Синхронизация команды из Jira Team field, отображение на Board |
 
 ### Текущий UI
 
-**Главная страница (Board):**
+**Главная страница (Board) — `/`:**
 - Табличный вид с колонками: NAME, TEAM, ESTIMATE, LOGGED TIME, OVERALL PROGRESS, ROLE-BASED PROGRESS, STATUS, ALERTS
 - Раскрываемые строки (Epic → Story → Sub-task)
+- Команда отображается из Jira Team field
 - Иконки типов задач Jira
 - Прогресс-бары с процентами
 - Чипы ролей (SA/DEV/QA) с визуальным заполнением
 - Фильтры: поиск по ключу, выбор статусов
 - Кнопка Refresh для синхронизации с Jira
-- Статус последней синхронизации
+
+**Страница команд — `/teams`:**
+- Список всех команд с количеством участников
+- Создание/редактирование/деактивация команд
+- Jira Team Value для маппинга с Epic
+
+**Страница участников — `/teams/:id`:**
+- Список участников команды
+- Роль (SA/DEV/QA), грейд (Junior/Middle/Senior), часы в день
+- Добавление/редактирование/деактивация участников
 
 ### API Endpoints
 
@@ -56,6 +70,15 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | GET | /api/board | Получить доску (из кэша) |
 | GET | /api/sync/status | Статус синхронизации |
 | POST | /api/sync/trigger | Запустить синхронизацию |
+| GET | /api/teams | Список команд |
+| POST | /api/teams | Создать команду |
+| GET | /api/teams/{id} | Получить команду |
+| PUT | /api/teams/{id} | Обновить команду |
+| DELETE | /api/teams/{id} | Деактивировать команду |
+| GET | /api/teams/{id}/members | Участники команды |
+| POST | /api/teams/{id}/members | Добавить участника |
+| PUT | /api/teams/{id}/members/{mid} | Обновить участника |
+| POST | /api/teams/{id}/members/{mid}/deactivate | Деактивировать |
 
 ---
 

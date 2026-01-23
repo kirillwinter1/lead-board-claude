@@ -63,6 +63,7 @@ JIRA_EMAIL=your-email@example.com
 JIRA_API_TOKEN=your-api-token
 JIRA_PROJECT_KEY=YOUR_PROJECT
 JIRA_SYNC_INTERVAL_SECONDS=300
+JIRA_TEAM_FIELD_ID=customfield_12345  # ID поля Team в Epic
 
 # Database (опционально, есть дефолты)
 DB_HOST=localhost

@@ -15,6 +15,7 @@ public class JiraProperties {
     private String apiToken;
     private String projectKey;
     private int syncIntervalSeconds = 300;
+    private String teamFieldId; // e.g. customfield_12345
     private Map<String, String> subtaskRoles = new HashMap<>();
 
     public String getBaseUrl() {
@@ -55,6 +56,14 @@ public class JiraProperties {
 
     public void setSyncIntervalSeconds(int syncIntervalSeconds) {
         this.syncIntervalSeconds = syncIntervalSeconds;
+    }
+
+    public String getTeamFieldId() {
+        return teamFieldId;
+    }
+
+    public void setTeamFieldId(String teamFieldId) {
+        this.teamFieldId = teamFieldId;
     }
 
     public Map<String, String> getSubtaskRoles() {
