@@ -1,25 +1,25 @@
 package com.leadboard.board;
 
 import com.leadboard.config.JiraProperties;
-import com.leadboard.jira.JiraClient;
-import com.leadboard.jira.JiraIssue;
-import com.leadboard.jira.JiraSearchResponse;
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class BoardService {
 
     private static final Logger log = LoggerFactory.getLogger(BoardService.class);
 
-    private final JiraClient jiraClient;
+    private final JiraIssueRepository issueRepository;
     private final JiraProperties jiraProperties;
 
-    public BoardService(JiraClient jiraClient, JiraProperties jiraProperties) {
-        this.jiraClient = jiraClient;
+    public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties) {
+        this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
     }
 
@@ -32,61 +32,83 @@ public class BoardService {
         }
 
         try {
-            // Build JQL for Epics with filters
-            StringBuilder epicJql = new StringBuilder();
-            epicJql.append(String.format("project = %s AND issuetype = Epic", projectKey));
+            // Get all issues from cache
+            List<JiraIssueEntity> allIssues = issueRepository.findByProjectKey(projectKey);
 
-            if (query != null && !query.isEmpty()) {
-                epicJql.append(String.format(" AND (key ~ \"%s\" OR summary ~ \"%s\")", query, query));
+            if (allIssues.isEmpty()) {
+                log.warn("No cached issues found for project: {}. Run sync first.", projectKey);
+                return new BoardResponse(Collections.emptyList(), 0);
             }
-            if (statuses != null && !statuses.isEmpty()) {
-                epicJql.append(" AND status IN (\"").append(String.join("\",\"", statuses)).append("\")");
-            }
-            epicJql.append(" ORDER BY created DESC");
 
-            JiraSearchResponse epicResponse = jiraClient.search(epicJql.toString(), page * size, size);
+            // Separate by type
+            Map<String, JiraIssueEntity> issueMap = allIssues.stream()
+                    .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, e -> e));
 
-            // Fetch all Stories for this project
-            String storyJql = String.format("project = %s AND issuetype = Story ORDER BY created DESC", projectKey);
-            JiraSearchResponse storyResponse = jiraClient.search(storyJql, 0, 500);
+            List<JiraIssueEntity> epics = allIssues.stream()
+                    .filter(e -> "Эпик".equals(e.getIssueType()) || "Epic".equals(e.getIssueType()))
+                    .collect(Collectors.toList());
 
-            // Fetch all Sub-tasks for this project
-            String subtaskJql = String.format("project = %s AND issuetype in subTaskIssueTypes() ORDER BY created DESC", projectKey);
-            JiraSearchResponse subtaskResponse = jiraClient.search(subtaskJql, 0, 1000);
+            List<JiraIssueEntity> stories = allIssues.stream()
+                    .filter(e -> "История".equals(e.getIssueType()) || "Story".equals(e.getIssueType()))
+                    .collect(Collectors.toList());
 
-            // Build maps for quick lookup
+            List<JiraIssueEntity> subtasks = allIssues.stream()
+                    .filter(JiraIssueEntity::isSubtask)
+                    .collect(Collectors.toList());
+
+            // Apply filters to epics
+            List<JiraIssueEntity> filteredEpics = epics.stream()
+                    .filter(epic -> {
+                        // Filter by query
+                        if (query != null && !query.isEmpty()) {
+                            String q = query.toLowerCase();
+                            if (!epic.getIssueKey().toLowerCase().contains(q) &&
+                                !epic.getSummary().toLowerCase().contains(q)) {
+                                return false;
+                            }
+                        }
+                        // Filter by status
+                        if (statuses != null && !statuses.isEmpty()) {
+                            if (!statuses.contains(epic.getStatus())) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    })
+                    .collect(Collectors.toList());
+
+            // Build hierarchy
             Map<String, BoardNode> epicMap = new LinkedHashMap<>();
             Map<String, BoardNode> storyMap = new LinkedHashMap<>();
 
             // Create Epic nodes
-            for (JiraIssue epic : epicResponse.getIssues()) {
+            for (JiraIssueEntity epic : filteredEpics) {
                 BoardNode node = mapToNode(epic, baseUrl);
-                epicMap.put(epic.getKey(), node);
+                epicMap.put(epic.getIssueKey(), node);
             }
 
             // Create Story nodes and attach to Epics
-            for (JiraIssue story : storyResponse.getIssues()) {
+            for (JiraIssueEntity story : stories) {
                 BoardNode storyNode = mapToNode(story, baseUrl);
-                storyMap.put(story.getKey(), storyNode);
+                storyMap.put(story.getIssueKey(), storyNode);
 
-                JiraIssue.JiraParent parent = story.getFields().getParent();
-                if (parent != null && epicMap.containsKey(parent.getKey())) {
-                    epicMap.get(parent.getKey()).addChild(storyNode);
+                String parentKey = story.getParentKey();
+                if (parentKey != null && epicMap.containsKey(parentKey)) {
+                    epicMap.get(parentKey).addChild(storyNode);
                 }
             }
 
             // Create Sub-task nodes and attach to Stories
-            for (JiraIssue subtask : subtaskResponse.getIssues()) {
+            for (JiraIssueEntity subtask : subtasks) {
                 BoardNode subtaskNode = mapToNode(subtask, baseUrl);
 
                 // Map subtask type to role
-                String subtaskType = subtask.getFields().getIssuetype().getName();
-                String role = jiraProperties.getRoleForSubtaskType(subtaskType);
+                String role = jiraProperties.getRoleForSubtaskType(subtask.getIssueType());
                 subtaskNode.setRole(role);
 
-                JiraIssue.JiraParent parent = subtask.getFields().getParent();
-                if (parent != null && storyMap.containsKey(parent.getKey())) {
-                    storyMap.get(parent.getKey()).addChild(subtaskNode);
+                String parentKey = subtask.getParentKey();
+                if (parentKey != null && storyMap.containsKey(parentKey)) {
+                    storyMap.get(parentKey).addChild(subtaskNode);
                 }
             }
 
@@ -100,10 +122,16 @@ public class BoardService {
                 aggregateProgress(epic);
             }
 
+            // Apply pagination
             List<BoardNode> items = new ArrayList<>(epicMap.values());
-            return new BoardResponse(items, items.size());
+            int total = items.size();
+            int fromIndex = Math.min(page * size, total);
+            int toIndex = Math.min(fromIndex + size, total);
+            List<BoardNode> pagedItems = items.subList(fromIndex, toIndex);
+
+            return new BoardResponse(pagedItems, total);
         } catch (Exception e) {
-            log.error("Failed to fetch board from Jira: {}", e.getMessage());
+            log.error("Failed to build board from cache: {}", e.getMessage(), e);
             return new BoardResponse(Collections.emptyList(), 0);
         }
     }
@@ -112,22 +140,18 @@ public class BoardService {
         return getBoard(null, null, 0, 50);
     }
 
-    private BoardNode mapToNode(JiraIssue issue, String baseUrl) {
-        String jiraUrl = baseUrl + "/browse/" + issue.getKey();
+    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl) {
+        String jiraUrl = baseUrl + "/browse/" + entity.getIssueKey();
         BoardNode node = new BoardNode(
-                issue.getKey(),
-                issue.getFields().getSummary(),
-                issue.getFields().getStatus().getName(),
-                issue.getFields().getIssuetype().getName(),
+                entity.getIssueKey(),
+                entity.getSummary(),
+                entity.getStatus(),
+                entity.getIssueType(),
                 jiraUrl
         );
 
-        // Set time tracking
-        JiraIssue.JiraTimeTracking timetracking = issue.getFields().getTimetracking();
-        if (timetracking != null) {
-            node.setEstimateSeconds(timetracking.getOriginalEstimateSeconds());
-            node.setLoggedSeconds(timetracking.getTimeSpentSeconds());
-        }
+        node.setEstimateSeconds(entity.getOriginalEstimateSeconds());
+        node.setLoggedSeconds(entity.getTimeSpentSeconds());
 
         return node;
     }

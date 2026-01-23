@@ -14,6 +14,7 @@ public class JiraProperties {
     private String email;
     private String apiToken;
     private String projectKey;
+    private int syncIntervalSeconds = 300;
     private Map<String, String> subtaskRoles = new HashMap<>();
 
     public String getBaseUrl() {
@@ -46,6 +47,14 @@ public class JiraProperties {
 
     public void setProjectKey(String projectKey) {
         this.projectKey = projectKey;
+    }
+
+    public int getSyncIntervalSeconds() {
+        return syncIntervalSeconds;
+    }
+
+    public void setSyncIntervalSeconds(int syncIntervalSeconds) {
+        this.syncIntervalSeconds = syncIntervalSeconds;
     }
 
     public Map<String, String> getSubtaskRoles() {

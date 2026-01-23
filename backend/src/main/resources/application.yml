@@ -4,12 +4,28 @@ server:
 spring:
   application:
     name: lead-board
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:leadboard}
+    username: ${DB_USERNAME:leadboard}
+    password: ${DB_PASSWORD:leadboard}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 jira:
   base-url: ${JIRA_BASE_URL:}
   email: ${JIRA_EMAIL:}
   api-token: ${JIRA_API_TOKEN:}
   project-key: ${JIRA_PROJECT_KEY:}
+  sync-interval-seconds: ${JIRA_SYNC_INTERVAL_SECONDS:300}
   subtask-roles:
     Аналитика: ANALYTICS
     Разработка: DEVELOPMENT

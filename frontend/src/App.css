@@ -18,13 +18,42 @@ body {
 
 /* Header */
 .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 24px;
 }
 
-.header h1 {
+.header-left h1 {
   font-size: 24px;
   font-weight: 600;
   color: #172b4d;
+  margin: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sync-info {
+  font-size: 13px;
+  color: #6b778c;
+}
+
+.btn-refresh {
+  min-width: 100px;
+}
+
+.btn-refresh.syncing {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* Filter Panel */

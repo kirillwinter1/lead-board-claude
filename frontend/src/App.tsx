@@ -58,6 +58,14 @@ interface BoardResponse {
   total: number
 }
 
+interface SyncStatus {
+  syncInProgress: boolean
+  lastSyncStartedAt: string | null
+  lastSyncCompletedAt: string | null
+  issuesCount: number
+  error: string | null
+}
+
 function formatDays(seconds: number | null): string {
   if (!seconds) return '0 d'
   const days = seconds / 3600 / 8
@@ -315,10 +323,24 @@ function FilterPanel({
   )
 }
 
+function formatSyncTime(isoString: string | null): string {
+  if (!isoString) return 'Never'
+  const date = new Date(isoString)
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function App() {
   const [board, setBoard] = useState<BoardNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
+  const [syncing, setSyncing] = useState(false)
 
   // Filter state
   const [searchKey, setSearchKey] = useState('')
@@ -338,9 +360,44 @@ function App() {
       })
   }, [])
 
+  const fetchSyncStatus = useCallback(() => {
+    axios.get<SyncStatus>('/api/sync/status')
+      .then(response => {
+        setSyncStatus(response.data)
+        setSyncing(response.data.syncInProgress)
+      })
+      .catch(() => {
+        // Ignore sync status errors
+      })
+  }, [])
+
+  const triggerSync = () => {
+    setSyncing(true)
+    axios.post<SyncStatus>('/api/sync/trigger')
+      .then(() => {
+        // Poll for sync completion
+        const pollInterval = setInterval(() => {
+          axios.get<SyncStatus>('/api/sync/status')
+            .then(response => {
+              setSyncStatus(response.data)
+              if (!response.data.syncInProgress) {
+                setSyncing(false)
+                clearInterval(pollInterval)
+                fetchBoard() // Refresh board after sync
+              }
+            })
+        }, 2000)
+      })
+      .catch(err => {
+        setSyncing(false)
+        alert('Sync failed: ' + err.message)
+      })
+  }
+
   useEffect(() => {
     fetchBoard()
-  }, [fetchBoard])
+    fetchSyncStatus()
+  }, [fetchBoard, fetchSyncStatus])
 
   // Extract unique statuses from epics
   const availableStatuses = useMemo(() => {
@@ -415,7 +472,26 @@ function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>Lead Board</h1>
+        <div className="header-left">
+          <h1>Lead Board</h1>
+        </div>
+        <div className="header-right">
+          <div className="sync-status">
+            {syncStatus && (
+              <span className="sync-info">
+                Last sync: {formatSyncTime(syncStatus.lastSyncCompletedAt)}
+                {syncStatus.issuesCount > 0 && ` (${syncStatus.issuesCount} issues)`}
+              </span>
+            )}
+            <button
+              className={`btn btn-primary btn-refresh ${syncing ? 'syncing' : ''}`}
+              onClick={triggerSync}
+              disabled={syncing}
+            >
+              {syncing ? 'Syncing...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
       </header>
 
       <FilterPanel
