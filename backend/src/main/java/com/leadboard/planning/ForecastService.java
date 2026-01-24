@@ -382,14 +382,63 @@ public class ForecastService {
 
     /**
      * Рассчитывает остаток работы по ролям.
+     * Приоритет источников данных:
+     * 1. Rough estimate на эпике (если есть)
+     * 2. Агрегация по child issues (stories/tasks) с учётом статусов и time spent
+     * 3. Original estimate на эпике (fallback)
      */
     private RemainingByRole calculateRemaining(JiraIssueEntity epic, BigDecimal riskBuffer) {
-        // Используем rough estimate если есть
+        // 1. Используем rough estimate если есть
         BigDecimal saDays = epic.getRoughEstimateSaDays();
         BigDecimal devDays = epic.getRoughEstimateDevDays();
         BigDecimal qaDays = epic.getRoughEstimateQaDays();
 
-        // Если нет rough estimate, пробуем использовать original estimate
+        // 2. Если нет rough estimate, агрегируем по child issues
+        if (saDays == null && devDays == null && qaDays == null) {
+            List<JiraIssueEntity> childIssues = issueRepository.findByParentKey(epic.getIssueKey());
+
+            if (!childIssues.isEmpty()) {
+                // Считаем remaining по каждой фазе из child issues
+                long saRemainingSeconds = 0;
+                long devRemainingSeconds = 0;
+                long qaRemainingSeconds = 0;
+
+                for (JiraIssueEntity child : childIssues) {
+                    // Пропускаем Done задачи - они уже выполнены
+                    if (isDone(child.getStatus())) {
+                        continue;
+                    }
+
+                    // Рассчитываем remaining для этой задачи
+                    long estimate = child.getOriginalEstimateSeconds() != null ? child.getOriginalEstimateSeconds() : 0;
+                    long spent = child.getTimeSpentSeconds() != null ? child.getTimeSpentSeconds() : 0;
+                    long remaining = Math.max(0, estimate - spent);
+
+                    // Если нет эстимейта, но есть залогированное время - оцениваем что осталось ещё столько же
+                    if (estimate == 0 && spent > 0 && !isInProgress(child.getStatus())) {
+                        remaining = spent; // Fallback: предполагаем что осталось примерно столько же
+                    }
+
+                    // Определяем фазу по типу задачи или статусу
+                    String phase = determinePhase(child.getStatus(), child.getIssueType());
+
+                    switch (phase) {
+                        case "SA" -> saRemainingSeconds += remaining;
+                        case "QA" -> qaRemainingSeconds += remaining;
+                        default -> devRemainingSeconds += remaining;
+                    }
+                }
+
+                // Конвертируем секунды в дни
+                if (saRemainingSeconds > 0 || devRemainingSeconds > 0 || qaRemainingSeconds > 0) {
+                    saDays = BigDecimal.valueOf(saRemainingSeconds / 3600.0).divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
+                    devDays = BigDecimal.valueOf(devRemainingSeconds / 3600.0).divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
+                    qaDays = BigDecimal.valueOf(qaRemainingSeconds / 3600.0).divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
+                }
+            }
+        }
+
+        // 3. Fallback: original estimate на эпике
         if (saDays == null && devDays == null && qaDays == null) {
             Long estimateSeconds = epic.getOriginalEstimateSeconds();
             Long spentSeconds = epic.getTimeSpentSeconds();
@@ -422,6 +471,54 @@ public class ForecastService {
                 new RoleRemaining(devFinal.multiply(HOURS_PER_DAY), devFinal),
                 new RoleRemaining(qaFinal.multiply(HOURS_PER_DAY), qaFinal)
         );
+    }
+
+    /**
+     * Проверяет, является ли статус "Done" (завершённым).
+     */
+    private boolean isDone(String status) {
+        if (status == null) return false;
+        String s = status.toLowerCase();
+        return s.contains("done") || s.contains("closed") || s.contains("resolved")
+                || s.contains("завершен") || s.contains("готов") || s.contains("выполнен");
+    }
+
+    /**
+     * Проверяет, является ли статус "In Progress".
+     */
+    private boolean isInProgress(String status) {
+        if (status == null) return false;
+        String s = status.toLowerCase();
+        return s.contains("progress") || s.contains("work") || s.contains("review")
+                || s.contains("test") || s.contains("в работе") || s.contains("ревью");
+    }
+
+    /**
+     * Определяет фазу (SA/DEV/QA) по статусу или типу задачи.
+     */
+    private String determinePhase(String status, String issueType) {
+        if (status == null && issueType == null) {
+            return "DEV";
+        }
+
+        String statusLower = status != null ? status.toLowerCase() : "";
+        String typeLower = issueType != null ? issueType.toLowerCase() : "";
+
+        // SA фаза
+        if (statusLower.contains("analysis") || statusLower.contains("анализ") ||
+            typeLower.contains("analysis") || typeLower.contains("анализ")) {
+            return "SA";
+        }
+
+        // QA фаза
+        if (statusLower.contains("test") || statusLower.contains("qa") ||
+            statusLower.contains("тест") || typeLower.contains("test") ||
+            typeLower.contains("qa") || typeLower.contains("bug") ||
+            typeLower.contains("баг") || typeLower.contains("дефект")) {
+            return "QA";
+        }
+
+        return "DEV";
     }
 
     private BigDecimal applyRiskBuffer(BigDecimal days, BigDecimal multiplier) {
