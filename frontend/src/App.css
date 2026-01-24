@@ -1872,6 +1872,50 @@ body {
   color: #6b7280;
 }
 
+/* Role-specific WIP badges */
+.summary-role-wip-group {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.summary-role-wip {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f0f5ff;
+  color: #0052cc;
+  font-weight: 500;
+}
+
+.summary-role-wip-exceeded {
+  background: #ffebe6;
+  color: #de350b;
+}
+
+/* Phase wait tooltip styles */
+.tooltip-phase-waiting {
+  border-left: 2px solid #eab308;
+  padding-left: 6px;
+}
+
+.tooltip-phase-wait {
+  font-size: 10px;
+  color: #eab308;
+  margin-left: 4px;
+}
+
+.tooltip-phase-queue-info {
+  background: #fffbeb;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+.tooltip-phase-queue-badge {
+  color: #92400e;
+  font-size: 11px;
+  font-weight: 500;
+}
+
 /* Hint text */
 .timeline-hint {
   margin-top: 12px;

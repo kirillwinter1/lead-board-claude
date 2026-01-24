@@ -91,16 +91,25 @@ PUT  /api/teams/{id}/planning-config
 - [x] Эпик за пределами WIP начинается после завершения предыдущего
 - [x] 5 unit-тестов для WIP функциональности
 
-### Этап 2: Роль-специфичные лимиты
+### Этап 2: Роль-специфичные лимиты ✅
 
 **Backend:**
-- [ ] Учёт WIP по ролям (SA/DEV/QA)
-- [ ] Эпик может ждать входа в фазу даже если предыдущая завершена
-- [ ] Моделирование "пробок" на фазах
+- [x] Учёт WIP по ролям (SA/DEV/QA)
+- [x] Эпик может ждать входа в фазу даже если предыдущая завершена
+- [x] Моделирование "пробок" на фазах
+- [x] RoleWipStatus в ForecastResponse (SA/DEV/QA current/limit/exceeded)
+- [x] PhaseWaitInfo в EpicForecast (информация об ожидании по фазам)
 
 **Frontend:**
-- [ ] Показ WIP по ролям: "SA: 2/2, DEV: 2/3, QA: 1/2"
-- [ ] Визуализация ожидания между фазами
+- [x] Показ WIP по ролям: "SA: 2/2, DEV: 2/3, QA: 1/2"
+- [x] Визуализация ожидания между фазами в tooltip
+
+**Тесты:**
+- [x] roleWipStatusIncludedInResponse
+- [x] phaseWaitInfoIncludedInEpicForecast
+- [x] epicWaitsForRoleWipSlot
+- [x] devWipLimitAffectsPhaseStart
+- [x] combinedTeamAndRoleWipLimits
 
 ### Этап 3: Подсветка и аналитика
 

@@ -26,6 +26,18 @@ export interface PhaseSchedule {
 
 export type Confidence = 'HIGH' | 'MEDIUM' | 'LOW'
 
+export interface RoleWaitInfo {
+  waiting: boolean              // Ожидает ли вход в фазу
+  waitingUntil: string | null   // До какой даты ждёт
+  queuePosition: number | null  // Позиция в очереди на эту фазу
+}
+
+export interface PhaseWaitInfo {
+  sa: RoleWaitInfo
+  dev: RoleWaitInfo
+  qa: RoleWaitInfo
+}
+
 export interface EpicForecast {
   epicKey: string
   summary: string
@@ -37,10 +49,12 @@ export interface EpicForecast {
   dueDate: string | null
   remainingByRole: RemainingByRole
   phaseSchedule: PhaseSchedule
-  // WIP fields
+  // WIP fields (team-level)
   queuePosition: number | null     // Позиция в очереди (null если в WIP)
   queuedUntil: string | null       // До какой даты в очереди
   isWithinWip: boolean             // Входит ли в активный WIP
+  // WIP fields (role-level)
+  phaseWaitInfo: PhaseWaitInfo | null  // Информация об ожидании по фазам
 }
 
 export interface TeamCapacity {
@@ -49,10 +63,19 @@ export interface TeamCapacity {
   qaHoursPerDay: number
 }
 
+export interface RoleWipStatus {
+  limit: number      // Лимит для роли
+  current: number    // Текущее количество эпиков на этой фазе
+  exceeded: boolean  // Превышен ли лимит
+}
+
 export interface WipStatus {
   limit: number      // WIP лимит команды
   current: number    // Текущее количество активных эпиков
   exceeded: boolean  // Превышен ли лимит
+  sa: RoleWipStatus | null   // WIP статус для SA
+  dev: RoleWipStatus | null  // WIP статус для DEV
+  qa: RoleWipStatus | null   // WIP статус для QA
 }
 
 export interface ForecastResponse {

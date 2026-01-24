@@ -17,10 +17,12 @@ public record EpicForecast(
         LocalDate dueDate,
         RemainingByRole remainingByRole,
         PhaseSchedule phaseSchedule,
-        // WIP fields
+        // WIP fields (team-level)
         Integer queuePosition,      // Позиция в очереди (null если в WIP)
         LocalDate queuedUntil,      // До какой даты в очереди
-        Boolean isWithinWip         // Входит ли в активный WIP
+        Boolean isWithinWip,        // Входит ли в активный WIP
+        // WIP fields (role-level) - ожидание на входе в фазу
+        PhaseWaitInfo phaseWaitInfo // Информация об ожидании входа в фазы
 ) {
     /**
      * Конструктор для обратной совместимости (без WIP полей).
@@ -39,7 +41,64 @@ public record EpicForecast(
     ) {
         this(epicKey, summary, autoScore, manualPriorityBoost, expectedDone,
              confidence, dueDateDeltaDays, dueDate, remainingByRole, phaseSchedule,
-             null, null, true);
+             null, null, true, null);
+    }
+
+    /**
+     * Конструктор для обратной совместимости (team-level WIP, без role-level).
+     */
+    public EpicForecast(
+            String epicKey,
+            String summary,
+            BigDecimal autoScore,
+            Integer manualPriorityBoost,
+            LocalDate expectedDone,
+            Confidence confidence,
+            Integer dueDateDeltaDays,
+            LocalDate dueDate,
+            RemainingByRole remainingByRole,
+            PhaseSchedule phaseSchedule,
+            Integer queuePosition,
+            LocalDate queuedUntil,
+            Boolean isWithinWip
+    ) {
+        this(epicKey, summary, autoScore, manualPriorityBoost, expectedDone,
+             confidence, dueDateDeltaDays, dueDate, remainingByRole, phaseSchedule,
+             queuePosition, queuedUntil, isWithinWip, null);
+    }
+
+    /**
+     * Информация об ожидании входа в фазы из-за роль-специфичных WIP лимитов.
+     */
+    public record PhaseWaitInfo(
+            RoleWaitInfo sa,
+            RoleWaitInfo dev,
+            RoleWaitInfo qa
+    ) {
+        public static PhaseWaitInfo none() {
+            return new PhaseWaitInfo(
+                    RoleWaitInfo.none(),
+                    RoleWaitInfo.none(),
+                    RoleWaitInfo.none()
+            );
+        }
+    }
+
+    /**
+     * Информация об ожидании для конкретной роли.
+     */
+    public record RoleWaitInfo(
+            Boolean waiting,           // Ожидает ли вход в фазу
+            LocalDate waitingUntil,    // До какой даты ждёт
+            Integer queuePosition      // Позиция в очереди на эту фазу
+    ) {
+        public static RoleWaitInfo none() {
+            return new RoleWaitInfo(false, null, null);
+        }
+
+        public static RoleWaitInfo waiting(LocalDate until, int position) {
+            return new RoleWaitInfo(true, until, position);
+        }
     }
     public enum Confidence {
         HIGH,    // Высокая уверенность: есть декомпозиция, команда полная

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, ForecastResponse, EpicForecast, PhaseInfo, WipStatus } from '../api/forecast'
+import { getForecast, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus } from '../api/forecast'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
@@ -210,22 +210,31 @@ interface TooltipProps {
 }
 
 function EpicTooltip({ epic, progress }: TooltipProps) {
-  const formatPhase = (phase: PhaseInfo, label: string) => {
+  const phaseWait = epic.phaseWaitInfo
+
+  const formatPhase = (phase: PhaseInfo, label: string, roleKey: 'sa' | 'dev' | 'qa') => {
     if (!phase.startDate || !phase.endDate) {
       return <div className="tooltip-phase tooltip-phase-na">{label}: Not scheduled</div>
     }
 
     const workDays = phase.workDays ?? 0
     const noCapacity = phase.noCapacity
+    const waitInfo = phaseWait?.[roleKey]
+    const isWaiting = waitInfo?.waiting
 
     return (
-      <div className={`tooltip-phase ${noCapacity ? 'tooltip-phase-warning' : ''}`}>
+      <div className={`tooltip-phase ${noCapacity ? 'tooltip-phase-warning' : ''} ${isWaiting ? 'tooltip-phase-waiting' : ''}`}>
         <span className="tooltip-phase-label">{label}:</span>
         <span className="tooltip-phase-dates">
           {formatDateShort(new Date(phase.startDate))} - {formatDateShort(new Date(phase.endDate))}
         </span>
         <span className="tooltip-phase-days">({workDays}d)</span>
         {noCapacity && <span className="tooltip-phase-alert">No resource!</span>}
+        {isWaiting && waitInfo.waitingUntil && (
+          <span className="tooltip-phase-wait">
+            ⏳ waited until {formatDateShort(new Date(waitInfo.waitingUntil))}
+          </span>
+        )}
       </div>
     )
   }
@@ -239,6 +248,7 @@ function EpicTooltip({ epic, progress }: TooltipProps) {
   }
 
   const isQueued = !epic.isWithinWip
+  const hasPhaseWaiting = phaseWait && (phaseWait.sa?.waiting || phaseWait.dev?.waiting || phaseWait.qa?.waiting)
 
   return (
     <div className="epic-tooltip">
@@ -259,6 +269,12 @@ function EpicTooltip({ epic, progress }: TooltipProps) {
         </div>
       )}
 
+      {hasPhaseWaiting && !isQueued && (
+        <div className="tooltip-section tooltip-phase-queue-info">
+          <div className="tooltip-phase-queue-badge">Phase WIP delays present</div>
+        </div>
+      )}
+
       <div className="tooltip-section">
         <div className="tooltip-row">
           <span>Expected:</span>
@@ -276,9 +292,9 @@ function EpicTooltip({ epic, progress }: TooltipProps) {
       </div>
 
       <div className="tooltip-section tooltip-phases">
-        {formatPhase(epic.phaseSchedule.sa, 'SA')}
-        {formatPhase(epic.phaseSchedule.dev, 'DEV')}
-        {formatPhase(epic.phaseSchedule.qa, 'QA')}
+        {formatPhase(epic.phaseSchedule.sa, 'SA', 'sa')}
+        {formatPhase(epic.phaseSchedule.dev, 'DEV', 'dev')}
+        {formatPhase(epic.phaseSchedule.qa, 'QA', 'qa')}
       </div>
     </div>
   )
@@ -454,6 +470,16 @@ interface SummaryPanelProps {
   wipStatus: WipStatus | null
 }
 
+function RoleWipBadge({ label, roleWip }: { label: string; roleWip: RoleWipStatus | null }) {
+  if (!roleWip) return null
+  const exceeded = roleWip.exceeded
+  return (
+    <span className={`summary-role-wip ${exceeded ? 'summary-role-wip-exceeded' : ''}`}>
+      {label}: {roleWip.current}/{roleWip.limit}
+    </span>
+  )
+}
+
 function SummaryPanel({ epics, wipStatus }: SummaryPanelProps) {
   const stats = useMemo(() => {
     let onTrack = 0
@@ -478,6 +504,8 @@ function SummaryPanel({ epics, wipStatus }: SummaryPanelProps) {
     return { onTrack, atRisk, late, noDueDate, inQueue, total: epics.length }
   }, [epics])
 
+  const hasRoleWip = wipStatus?.sa || wipStatus?.dev || wipStatus?.qa
+
   return (
     <div className="timeline-summary">
       <span className="summary-total">{stats.total} epics</span>
@@ -500,6 +528,16 @@ function SummaryPanel({ epics, wipStatus }: SummaryPanelProps) {
           <span className="summary-separator">·</span>
           <span className={`summary-stat summary-wip ${wipStatus.exceeded ? 'summary-wip-exceeded' : ''}`}>
             WIP {wipStatus.current}/{wipStatus.limit}
+          </span>
+        </>
+      )}
+      {hasRoleWip && (
+        <>
+          <span className="summary-separator">·</span>
+          <span className="summary-role-wip-group">
+            <RoleWipBadge label="SA" roleWip={wipStatus?.sa ?? null} />
+            <RoleWipBadge label="DEV" roleWip={wipStatus?.dev ?? null} />
+            <RoleWipBadge label="QA" roleWip={wipStatus?.qa ?? null} />
           </span>
         </>
       )}

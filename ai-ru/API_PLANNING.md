@@ -39,7 +39,10 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
   "wipStatus": {
     "limit": 6,
     "current": 3,
-    "exceeded": false
+    "exceeded": false,
+    "sa": { "limit": 2, "current": 1, "exceeded": false },
+    "dev": { "limit": 3, "current": 2, "exceeded": false },
+    "qa": { "limit": 2, "current": 1, "exceeded": false }
   },
   "epics": [
     {
@@ -78,7 +81,12 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
       },
       "queuePosition": null,
       "queuedUntil": null,
-      "isWithinWip": true
+      "isWithinWip": true,
+      "phaseWaitInfo": {
+        "sa": { "waiting": false, "waitingUntil": null, "queuePosition": null },
+        "dev": { "waiting": false, "waitingUntil": null, "queuePosition": null },
+        "qa": { "waiting": false, "waitingUntil": null, "queuePosition": null }
+      }
     }
   ]
 }
@@ -101,6 +109,17 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | limit | number | WIP лимит команды |
 | current | number | Текущее количество эпиков в WIP |
 | exceeded | boolean | Превышен ли лимит |
+| sa | RoleWipStatus | WIP статус для SA (null если не рассчитан) |
+| dev | RoleWipStatus | WIP статус для DEV (null если не рассчитан) |
+| qa | RoleWipStatus | WIP статус для QA (null если не рассчитан) |
+
+**Поля RoleWipStatus:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| limit | number | Лимит для роли |
+| current | number | Текущее количество эпиков на этой фазе |
+| exceeded | boolean | Превышен ли лимит |
 
 **Поля EpicForecast:**
 
@@ -119,6 +138,23 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | queuePosition | number/null | Позиция в очереди (null если в WIP) |
 | queuedUntil | string/null | До какой даты в очереди |
 | isWithinWip | boolean | Входит ли в активный WIP |
+| phaseWaitInfo | PhaseWaitInfo | Информация об ожидании по фазам (null если нет) |
+
+**Поля PhaseWaitInfo:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| sa | RoleWaitInfo | Информация об ожидании SA фазы |
+| dev | RoleWaitInfo | Информация об ожидании DEV фазы |
+| qa | RoleWaitInfo | Информация об ожидании QA фазы |
+
+**Поля RoleWaitInfo:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| waiting | boolean | Ожидает ли вход в фазу |
+| waitingUntil | string/null | До какой даты ждёт |
+| queuePosition | number/null | Позиция в очереди на эту фазу |
 
 **Уровни уверенности:**
 

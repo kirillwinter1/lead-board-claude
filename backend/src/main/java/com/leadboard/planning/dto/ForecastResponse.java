@@ -29,10 +29,30 @@ public record ForecastResponse(
     public record WipStatus(
             Integer limit,      // WIP лимит команды
             Integer current,    // Текущее количество активных эпиков
-            Boolean exceeded    // Превышен ли лимит
+            Boolean exceeded,   // Превышен ли лимит
+            RoleWipStatus sa,   // WIP статус для SA
+            RoleWipStatus dev,  // WIP статус для DEV
+            RoleWipStatus qa    // WIP статус для QA
     ) {
         public static WipStatus of(int limit, int current) {
-            return new WipStatus(limit, current, current > limit);
+            return new WipStatus(limit, current, current > limit, null, null, null);
+        }
+
+        public static WipStatus of(int limit, int current, RoleWipStatus sa, RoleWipStatus dev, RoleWipStatus qa) {
+            return new WipStatus(limit, current, current > limit, sa, dev, qa);
+        }
+    }
+
+    /**
+     * WIP статус для конкретной роли.
+     */
+    public record RoleWipStatus(
+            Integer limit,      // Лимит для роли
+            Integer current,    // Текущее количество эпиков на этой фазе
+            Boolean exceeded    // Превышен ли лимит
+    ) {
+        public static RoleWipStatus of(int limit, int current) {
+            return new RoleWipStatus(limit, current, current > limit);
         }
     }
 }

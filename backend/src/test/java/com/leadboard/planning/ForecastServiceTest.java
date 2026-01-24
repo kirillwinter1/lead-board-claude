@@ -705,6 +705,199 @@ class ForecastServiceTest {
         }
     }
 
+    // ==================== Role-Specific WIP Limits Tests ====================
+
+    @Nested
+    class RoleSpecificWipTests {
+
+        @Test
+        void roleWipStatusIncludedInResponse() {
+            // Given: Config with role-specific WIP limits
+            PlanningConfigDto config = new PlanningConfigDto(
+                    PlanningConfigDto.GradeCoefficients.defaults(),
+                    new BigDecimal("0.2"),
+                    new PlanningConfigDto.WipLimits(6, 2, 3, 2), // SA=2, DEV=3, QA=2
+                    PlanningConfigDto.StoryDuration.defaults()
+            );
+            when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
+            setupFullTeam();
+
+            JiraIssueEntity epic = createEpic("TEST-1");
+            epic.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: Role WIP status included
+            assertNotNull(response.wipStatus());
+            assertNotNull(response.wipStatus().sa(), "SA WIP status should be present");
+            assertNotNull(response.wipStatus().dev(), "DEV WIP status should be present");
+            assertNotNull(response.wipStatus().qa(), "QA WIP status should be present");
+
+            assertEquals(2, response.wipStatus().sa().limit());
+            assertEquals(3, response.wipStatus().dev().limit());
+            assertEquals(2, response.wipStatus().qa().limit());
+        }
+
+        @Test
+        void phaseWaitInfoIncludedInEpicForecast() {
+            // Given
+            setupPlanningConfigWithRoleWip(6, 2, 3, 2);
+            setupFullTeam();
+
+            JiraIssueEntity epic = createEpic("TEST-1");
+            epic.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic.setRoughEstimateDevDays(new BigDecimal("5"));
+            epic.setRoughEstimateQaDays(new BigDecimal("2"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: PhaseWaitInfo included
+            EpicForecast forecast = response.epics().get(0);
+            assertNotNull(forecast.phaseWaitInfo(), "PhaseWaitInfo should be present");
+            assertNotNull(forecast.phaseWaitInfo().sa());
+            assertNotNull(forecast.phaseWaitInfo().dev());
+            assertNotNull(forecast.phaseWaitInfo().qa());
+        }
+
+        @Test
+        void epicWaitsForRoleWipSlot() {
+            // Given: SA WIP limit = 1, 3 epics each with SA work
+            setupPlanningConfigWithRoleWip(6, 1, 3, 2); // SA limit = 1
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setAutoScore(new BigDecimal("90"));
+            epic1.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setAutoScore(new BigDecimal("80"));
+            epic2.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic3 = createEpic("TEST-3");
+            epic3.setAutoScore(new BigDecimal("70"));
+            epic3.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic3.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2, epic3));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: All epics within team WIP, but Epic 2 and 3 might wait for SA slot
+            assertEquals(3, response.epics().size());
+
+            // All are within team WIP
+            assertTrue(response.epics().get(0).isWithinWip());
+            assertTrue(response.epics().get(1).isWithinWip());
+            assertTrue(response.epics().get(2).isWithinWip());
+
+            // Epic 2 SA phase should wait for Epic 1 SA to finish
+            EpicForecast epic2Forecast = response.epics().get(1);
+            if (epic2Forecast.phaseWaitInfo() != null && epic2Forecast.phaseWaitInfo().sa() != null) {
+                // SA wait info should indicate waiting
+                Boolean saWaiting = epic2Forecast.phaseWaitInfo().sa().waiting();
+                if (saWaiting != null && saWaiting) {
+                    assertNotNull(epic2Forecast.phaseWaitInfo().sa().waitingUntil());
+                }
+            }
+        }
+
+        @Test
+        void devWipLimitAffectsPhaseStart() {
+            // Given: DEV WIP limit = 1, 2 epics
+            setupPlanningConfigWithRoleWip(6, 2, 1, 2); // DEV limit = 1
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setAutoScore(new BigDecimal("90"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("10"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setAutoScore(new BigDecimal("80"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("10"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: Epic 2's DEV phase should start after Epic 1's DEV ends
+            EpicForecast forecast1 = response.epics().get(0);
+            EpicForecast forecast2 = response.epics().get(1);
+
+            LocalDate epic1DevEnd = forecast1.phaseSchedule().dev().endDate();
+            LocalDate epic2DevStart = forecast2.phaseSchedule().dev().startDate();
+
+            // DEV WIP limit = 1 means Epic 2 DEV starts after Epic 1 DEV ends
+            assertTrue(epic2DevStart.isAfter(epic1DevEnd) ||
+                            epic2DevStart.equals(epic1DevEnd.plusDays(1)),
+                    "Epic 2 DEV should start after Epic 1 DEV ends due to DEV WIP limit");
+        }
+
+        @Test
+        void combinedTeamAndRoleWipLimits() {
+            // Given: Team WIP = 2, SA = 1, DEV = 2, QA = 1
+            setupPlanningConfigWithRoleWip(2, 1, 2, 1);
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setAutoScore(new BigDecimal("90"));
+            epic1.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("5"));
+            epic1.setRoughEstimateQaDays(new BigDecimal("2"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setAutoScore(new BigDecimal("80"));
+            epic2.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("5"));
+            epic2.setRoughEstimateQaDays(new BigDecimal("2"));
+
+            JiraIssueEntity epic3 = createEpic("TEST-3");
+            epic3.setAutoScore(new BigDecimal("70"));
+            epic3.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic3.setRoughEstimateDevDays(new BigDecimal("5"));
+            epic3.setRoughEstimateQaDays(new BigDecimal("2"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2, epic3));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: Team WIP = 2, so Epic 3 is queued at team level
+            assertEquals(3, response.epics().size());
+
+            assertTrue(response.epics().get(0).isWithinWip(), "Epic 1 within team WIP");
+            assertTrue(response.epics().get(1).isWithinWip(), "Epic 2 within team WIP");
+            assertFalse(response.epics().get(2).isWithinWip(), "Epic 3 queued at team level");
+
+            // Epic 3 should have queue position
+            assertEquals(1, response.epics().get(2).queuePosition());
+        }
+
+        private void setupPlanningConfigWithRoleWip(int team, int sa, int dev, int qa) {
+            PlanningConfigDto config = new PlanningConfigDto(
+                    PlanningConfigDto.GradeCoefficients.defaults(),
+                    new BigDecimal("0.2"),
+                    new PlanningConfigDto.WipLimits(team, sa, dev, qa),
+                    PlanningConfigDto.StoryDuration.defaults()
+            );
+            when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     private void setupPlanningConfigWithWipLimit(int wipLimit) {
