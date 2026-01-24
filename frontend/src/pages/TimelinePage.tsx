@@ -315,8 +315,7 @@ interface PhaseBarProps {
 }
 
 function PhaseBar({ phase, role, rangeStart, totalDays }: PhaseBarProps) {
-  // Don't render phases with no work
-  if (!phase.startDate || !phase.endDate || phase.workDays <= 0) return null
+  if (!phase.startDate || !phase.endDate) return null
 
   const startDate = new Date(phase.startDate)
   const endDate = new Date(phase.endDate)
@@ -328,6 +327,20 @@ function PhaseBar({ phase, role, rangeStart, totalDays }: PhaseBarProps) {
 
   const roleLabels = { sa: 'SA', dev: 'DEV', qa: 'QA' }
   const noCapacity = phase.noCapacity === true
+  const isEmpty = phase.workDays <= 0
+
+  // For empty phases, show a small marker
+  if (isEmpty) {
+    return (
+      <div
+        className={`gantt-phase-bar gantt-phase-${role} gantt-phase-empty`}
+        style={{ left: `${leftPercent}%`, width: '20px' }}
+        title={`${roleLabels[role]}: No work scheduled`}
+      >
+        <span className="gantt-phase-label">{roleLabels[role]}</span>
+      </div>
+    )
+  }
 
   return (
     <div

@@ -2331,6 +2331,11 @@ body {
   top: 28px;
 }
 
+.gantt-phase-empty {
+  opacity: 0.4;
+  min-width: 20px;
+}
+
 .gantt-phase-label {
   font-size: 8px;
   letter-spacing: 0.5px;
