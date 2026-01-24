@@ -32,7 +32,7 @@ public class BoardService {
         this.roughEstimateProperties = roughEstimateProperties;
     }
 
-    public BoardResponse getBoard(String query, List<String> statuses, int page, int size) {
+    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size) {
         String projectKey = jiraProperties.getProjectKey();
         String baseUrl = jiraProperties.getBaseUrl();
 
@@ -89,6 +89,12 @@ public class BoardService {
                         // Filter by status
                         if (statuses != null && !statuses.isEmpty()) {
                             if (!statuses.contains(epic.getStatus())) {
+                                return false;
+                            }
+                        }
+                        // Filter by team IDs
+                        if (teamIds != null && !teamIds.isEmpty()) {
+                            if (epic.getTeamId() == null || !teamIds.contains(epic.getTeamId())) {
                                 return false;
                             }
                         }
@@ -167,7 +173,7 @@ public class BoardService {
     }
 
     public BoardResponse getBoard() {
-        return getBoard(null, null, 0, 50);
+        return getBoard(null, null, null, 0, 50);
     }
 
     private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames) {

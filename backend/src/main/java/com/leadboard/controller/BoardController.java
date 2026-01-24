@@ -24,9 +24,10 @@ public class BoardController {
     public ResponseEntity<BoardResponse> getBoard(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) List<String> statuses,
+            @RequestParam(required = false) List<Long> teamIds,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
-        BoardResponse response = boardService.getBoard(query, statuses, page, size);
+        BoardResponse response = boardService.getBoard(query, statuses, teamIds, page, size);
         return ResponseEntity.ok(response);
     }
 }

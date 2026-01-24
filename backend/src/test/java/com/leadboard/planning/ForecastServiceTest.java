@@ -444,6 +444,38 @@ class ForecastServiceTest {
         }
 
         @Test
+        void expectedDoneTakesMaxEndDateFromPhasesWithWork() {
+            // Given: Epic with DEV work but no QA work
+            setupDefaultPlanningConfig();
+            setupFullTeam();
+
+            JiraIssueEntity epic = createEpic("TEST-1");
+            epic.setRoughEstimateDevDays(new BigDecimal("20")); // 20 days of DEV work
+            // No SA or QA work - they will have workDays = 0
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: expectedDone should be DEV endDate (not QA which has 0 workDays)
+            EpicForecast forecast = response.epics().get(0);
+            PhaseSchedule schedule = forecast.phaseSchedule();
+
+            // DEV has work, so its endDate should be set
+            assertNotNull(schedule.dev().endDate(), "DEV endDate should be set");
+            assertTrue(schedule.dev().workDays().compareTo(BigDecimal.ZERO) > 0, "DEV should have workDays > 0");
+
+            // QA has no work
+            assertEquals(0, schedule.qa().workDays().compareTo(BigDecimal.ZERO), "QA should have workDays = 0");
+
+            // expectedDone should equal DEV endDate (the max of phases with actual work)
+            assertEquals(schedule.dev().endDate(), forecast.expectedDone(),
+                    "expectedDone should be DEV endDate when QA has no work");
+        }
+
+        @Test
         void marksNoCapacityWhenRoleMissing() {
             // Given: No QA in team
             setupDefaultPlanningConfig();

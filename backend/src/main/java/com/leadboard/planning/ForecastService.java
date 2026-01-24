@@ -22,6 +22,8 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 /**
  * Сервис расчёта прогноза завершения эпиков.
@@ -206,9 +208,14 @@ public class ForecastService {
             // 2. Есть свободный слот в DEV WIP
             LocalDate devEarliestByPipeline = today;
             if (saPhase != null && saPhase.endDate() != null && remaining.sa().days().compareTo(BigDecimal.ZERO) > 0) {
-                // Pipeline offset: DEV может начать через storyDuration.sa после начала SA
+                // Pipeline offset: DEV может начать когда первая история SA готова
+                // offsetDays-1 потому что calculatePhase добавит +1 к startAfter
                 int offsetDays = calculateOffsetDays(storyDuration.sa(), teamCapacity.saHoursPerDay());
-                devEarliestByPipeline = calendarService.addWorkdays(saPhase.startDate(), offsetDays);
+                LocalDate afterFirstStory = calendarService.addWorkdays(saPhase.startDate(), Math.max(0, offsetDays - 1));
+                // Если SA короче storyDuration, DEV начинает сразу после SA
+                devEarliestByPipeline = afterFirstStory.isAfter(saPhase.endDate())
+                        ? saPhase.endDate()
+                        : afterFirstStory;
             }
 
             LocalDate devStartDate = devEarliestByPipeline;
@@ -237,9 +244,14 @@ public class ForecastService {
             // 2. Есть свободный слот в QA WIP
             LocalDate qaEarliestByPipeline = today;
             if (devPhase != null && devPhase.endDate() != null && remaining.dev().days().compareTo(BigDecimal.ZERO) > 0) {
-                // Pipeline offset: QA может начать через storyDuration.dev после начала DEV
+                // Pipeline offset: QA может начать когда первая история DEV готова
+                // offsetDays-1 потому что calculatePhase добавит +1 к startAfter
                 int offsetDays = calculateOffsetDays(storyDuration.dev(), teamCapacity.devHoursPerDay());
-                qaEarliestByPipeline = calendarService.addWorkdays(devPhase.startDate(), offsetDays);
+                LocalDate afterFirstStory = calendarService.addWorkdays(devPhase.startDate(), Math.max(0, offsetDays - 1));
+                // Если DEV короче storyDuration, QA начинает сразу после DEV
+                qaEarliestByPipeline = afterFirstStory.isAfter(devPhase.endDate())
+                        ? devPhase.endDate()
+                        : afterFirstStory;
             }
 
             LocalDate qaStartDate = qaEarliestByPipeline;
@@ -265,14 +277,22 @@ public class ForecastService {
             // Собираем расписание фаз
             PhaseSchedule schedule = new PhaseSchedule(saPhase, devPhase, qaPhase);
 
-            // Определяем Expected Done (конец последней фазы)
-            LocalDate expectedDone = null;
-            if (qaPhase != null && qaPhase.endDate() != null) {
-                expectedDone = qaPhase.endDate();
-            } else if (devPhase != null && devPhase.endDate() != null) {
-                expectedDone = devPhase.endDate();
-            } else if (saPhase != null && saPhase.endDate() != null) {
-                expectedDone = saPhase.endDate();
+            // Определяем Expected Done (максимальная дата окончания среди фаз с реальной работой)
+            LocalDate expectedDone = Stream.of(saPhase, devPhase, qaPhase)
+                    .filter(phase -> phase != null && phase.workDays() != null
+                            && phase.workDays().compareTo(BigDecimal.ZERO) > 0)
+                    .map(PhaseInfo::endDate)
+                    .filter(Objects::nonNull)
+                    .max(LocalDate::compareTo)
+                    .orElse(null);
+
+            // Fallback: если нет фаз с работой, берём любую ненулевую дату
+            if (expectedDone == null) {
+                expectedDone = Stream.of(qaPhase, devPhase, saPhase)
+                        .filter(phase -> phase != null && phase.endDate() != null)
+                        .map(PhaseInfo::endDate)
+                        .findFirst()
+                        .orElse(null);
             }
 
             // === Team WIP (опционально) ===

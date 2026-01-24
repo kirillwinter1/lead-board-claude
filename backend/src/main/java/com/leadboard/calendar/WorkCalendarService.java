@@ -108,24 +108,26 @@ public class WorkCalendarService {
 
         LocalDate current = startDate;
         int addedDays = 0;
+        int lastYear = current.getYear();
 
         // Если начальная дата - нерабочий день, переходим на следующий рабочий
-        Set<LocalDate> nonWorkingDays = getNonWorkingDays(current.getYear(), country);
+        Set<LocalDate> nonWorkingDays = getNonWorkingDays(lastYear, country);
         while (nonWorkingDays.contains(current)) {
             current = current.plusDays(1);
             // Проверяем переход года
-            if (current.getYear() != startDate.getYear()) {
-                nonWorkingDays = getNonWorkingDays(current.getYear(), country);
+            if (current.getYear() != lastYear) {
+                lastYear = current.getYear();
+                nonWorkingDays = getNonWorkingDays(lastYear, country);
             }
         }
 
         while (addedDays < workdays) {
             current = current.plusDays(1);
 
-            // Проверяем переход года для обновления кэша
-            int currentYear = current.getYear();
-            if (!nonWorkingDays.equals(getNonWorkingDays(currentYear, country))) {
-                nonWorkingDays = getNonWorkingDays(currentYear, country);
+            // Проверяем переход года для обновления кэша (простое сравнение int вместо equals на Set)
+            if (current.getYear() != lastYear) {
+                lastYear = current.getYear();
+                nonWorkingDays = getNonWorkingDays(lastYear, country);
             }
 
             if (!nonWorkingDays.contains(current)) {
