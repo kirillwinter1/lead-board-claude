@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getEpicStories, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, StoryInfo } from '../api/forecast'
 
@@ -469,31 +470,32 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
   }
 
   return (
-    <div className="story-segments">
-      {stories.map(story => {
-        // If has estimates, use proportional; otherwise equal
-        const widthPercent = hasEstimates
-          ? ((story.estimateSeconds || 0) / totalEstimate) * 100
-          : (1 / stories.length) * 100
+    <>
+      <div className="story-segments">
+        {stories.map(story => {
+          // If has estimates, use proportional; otherwise equal
+          const widthPercent = hasEstimates
+            ? ((story.estimateSeconds || 0) / totalEstimate) * 100
+            : (1 / stories.length) * 100
 
-        const statusCategory = getStoryStatusCategory(story.status)
-        const hasNoEstimate = !story.estimateSeconds || story.estimateSeconds === 0
+          const statusCategory = getStoryStatusCategory(story.status)
+          const hasNoEstimate = !story.estimateSeconds || story.estimateSeconds === 0
 
-        return (
-          <div
-            key={story.storyKey}
-            className={`story-segment story-segment-${statusCategory.toLowerCase()} ${hasNoEstimate ? 'story-segment-no-estimate' : ''}`}
-            style={{ width: `${Math.max(widthPercent, 2)}%` }}
-            onMouseEnter={(e) => handleMouseEnter(e, story)}
-            onMouseLeave={handleMouseLeave}
-            title={story.storyKey}
-          >
-            <span className="story-segment-label">{story.storyKey.split('-')[1]}</span>
-          </div>
-        )
-      })}
+          return (
+            <div
+              key={story.storyKey}
+              className={`story-segment story-segment-${statusCategory.toLowerCase()} ${hasNoEstimate ? 'story-segment-no-estimate' : ''}`}
+              style={{ width: `${Math.max(widthPercent, 2)}%` }}
+              onMouseEnter={(e) => handleMouseEnter(e, story)}
+              onMouseLeave={handleMouseLeave}
+            >
+              <span className="story-segment-label">{story.storyKey.split('-')[1]}</span>
+            </div>
+          )
+        })}
+      </div>
 
-      {hoveredStory && (
+      {hoveredStory && createPortal(
         <div
           className="gantt-tooltip-wrapper"
           style={{
@@ -503,9 +505,10 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
           }}
         >
           <StoryTooltip story={hoveredStory} />
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
 
