@@ -134,7 +134,7 @@ public class AutoScoreService {
      * Обновляет ручной boost приоритета.
      *
      * @param epicKey ключ эпика
-     * @param boost   новое значение (0-5)
+     * @param boost   новое значение (-10 до +10)
      * @return новый AutoScore или null если эпик не найден
      */
     @Transactional
@@ -145,11 +145,8 @@ public class AutoScoreService {
             return null;
         }
 
-        // Валидация
-        int validBoost = Math.max(0, Math.min(5, boost));
-
         JiraIssueEntity epic = epicOpt.get();
-        epic.setManualPriorityBoost(validBoost);
+        epic.setManualPriorityBoost(boost);
 
         // Пересчитываем AutoScore
         BigDecimal score = calculator.calculate(epic);
@@ -157,7 +154,7 @@ public class AutoScoreService {
         epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
         issueRepository.save(epic);
 
-        log.info("Updated manual boost for {}: {} -> AutoScore: {}", epicKey, validBoost, score);
+        log.info("Updated manual boost for {}: {} -> AutoScore: {}", epicKey, boost, score);
         return score;
     }
 

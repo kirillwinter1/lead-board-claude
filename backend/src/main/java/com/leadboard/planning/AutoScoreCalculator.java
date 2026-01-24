@@ -23,7 +23,7 @@ import java.util.Map;
  * - Priority (15): Highest=15, High=10, Medium=5, Low=0
  * - Размер (10): инверсия от estimate (меньше = больше)
  * - Возраст (10): логарифм от дней с создания
- * - Ручной boost (5): 0-5 баллов
+ * - Ручной boost: любое значение для ручной сортировки
  *
  * Итого: максимум 100 баллов
  */
@@ -231,14 +231,15 @@ public class AutoScoreCalculator {
     }
 
     /**
-     * Ручной boost: 0-5 баллов
+     * Ручной boost: любое значение.
+     * Позволяет вручную корректировать приоритет эпика.
      */
     private BigDecimal calculateManualBoostScore(JiraIssueEntity epic) {
         Integer boost = epic.getManualPriorityBoost();
-        if (boost == null || boost < 0) {
+        if (boost == null) {
             return BigDecimal.ZERO;
         }
-        return BigDecimal.valueOf(Math.min(boost, 5));
+        return BigDecimal.valueOf(boost);
     }
 
     /**

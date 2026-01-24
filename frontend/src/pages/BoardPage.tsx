@@ -3,6 +3,26 @@ import axios from 'axios'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
 import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '../api/forecast'
 
+// Sound effect for drag & drop - Pop sound
+const playDropSound = () => {
+  const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+  const oscillator = audioContext.createOscillator()
+  const gainNode = audioContext.createGain()
+
+  oscillator.connect(gainNode)
+  gainNode.connect(audioContext.destination)
+
+  // Pop: высокая частота с быстрым падением
+  oscillator.frequency.setValueAtTime(600, audioContext.currentTime)
+  oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.08)
+
+  gainNode.gain.setValueAtTime(0.4, audioContext.currentTime)
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.08)
+
+  oscillator.start(audioContext.currentTime)
+  oscillator.stop(audioContext.currentTime + 0.08)
+}
+
 import epicIcon from '../icons/epic.png'
 import storyIcon from '../icons/story.png'
 import bugIcon from '../icons/bug.png'
@@ -76,22 +96,47 @@ interface SyncStatus {
   error: string | null
 }
 
-function formatDays(seconds: number | null): string {
-  if (!seconds) return '0 d'
-  const days = seconds / 3600 / 8
-  return `${days.toFixed(days % 1 === 0 ? 0 : 1)} d`
+// Unified Progress Cell - combines logged, estimate, progress
+interface ProgressCellProps {
+  loggedSeconds: number | null
+  estimateSeconds: number | null
+  progress: number | null
 }
 
-function ProgressBar({ progress }: { progress: number }) {
+function ProgressCell({ loggedSeconds, estimateSeconds, progress }: ProgressCellProps) {
+  const loggedDays = (loggedSeconds || 0) / 3600 / 8
+  const estimateDays = (estimateSeconds || 0) / 3600 / 8
+  const remainingDays = Math.max(0, estimateDays - loggedDays)
+  const progressValue = progress || 0
+  const isComplete = progressValue >= 100
+
+  // Format number compactly
+  function formatCompact(n: number): string {
+    if (n >= 100) return Math.round(n).toString()
+    return n.toFixed(1)
+  }
+
   return (
-    <div className="progress-cell">
-      <div className="progress-bar">
+    <div className="unified-progress-cell">
+      <div className="unified-progress-header">
+        <span className={`unified-progress-percent ${isComplete ? 'complete' : ''}`}>
+          {Math.round(progressValue)}%
+        </span>
+        <span className="unified-progress-remaining">
+          {formatCompact(remainingDays)}d
+        </span>
+      </div>
+      <div className="unified-progress-bar">
         <div
-          className={`progress-fill ${progress >= 100 ? 'complete' : ''}`}
-          style={{ width: `${Math.min(progress, 100)}%` }}
+          className={`unified-progress-fill ${isComplete ? 'complete' : ''}`}
+          style={{ width: `${Math.min(progressValue, 100)}%` }}
         />
       </div>
-      <span className="progress-percent">{progress.toFixed(2)}%</span>
+      <div className="unified-progress-times">
+        <span className="time-logged">{formatCompact(loggedDays)}</span>
+        <span className="time-arrow">→</span>
+        <span className="time-estimate">{formatCompact(estimateDays)}</span>
+      </div>
     </div>
   )
 }
@@ -318,91 +363,41 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`status-badge ${statusClass}`}>{status}</span>
 }
 
-// Priority Boost Editor for Epics
-interface PriorityBoostProps {
-  epicKey: string
-  currentBoost: number
-  autoScore: number | null
-  onUpdate: (epicKey: string, boost: number) => Promise<void>
-}
 
-function PriorityBoost({ epicKey, currentBoost, autoScore, onUpdate }: PriorityBoostProps) {
-  const [saving, setSaving] = useState(false)
-  const [localBoost, setLocalBoost] = useState(currentBoost)
-
-  useEffect(() => {
-    setLocalBoost(currentBoost)
-  }, [currentBoost])
-
-  const handleChange = async (delta: number) => {
-    const newBoost = Math.max(0, Math.min(5, localBoost + delta))
-    if (newBoost === localBoost) return
-
-    setLocalBoost(newBoost)
-    setSaving(true)
-    try {
-      await onUpdate(epicKey, newBoost)
-    } catch (err) {
-      console.error('Failed to update boost:', err)
-      setLocalBoost(currentBoost) // Revert on error
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const hasBoost = localBoost > 0
-
-  return (
-    <div className={`priority-boost ${hasBoost ? 'boosted' : ''} ${saving ? 'saving' : ''}`}>
-      <button
-        className="boost-btn minus"
-        onClick={() => handleChange(-1)}
-        disabled={saving || localBoost <= 0}
-        title="Decrease priority"
-      >
-        −
-      </button>
-      <span className="boost-value" title={`AutoScore: ${autoScore?.toFixed(1) ?? '--'}`}>
-        {hasBoost ? `+${localBoost}` : '0'}
-      </span>
-      <button
-        className="boost-btn plus"
-        onClick={() => handleChange(1)}
-        disabled={saving || localBoost >= 5}
-        title="Increase priority"
-      >
-        +
-      </button>
-    </div>
-  )
-}
-
-// Expected Done cell with confidence indicator
+// Expected Done cell with confidence indicator and detailed tooltip
 interface ExpectedDoneCellProps {
   forecast: EpicForecast | null
 }
 
 function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
+  const [showTooltip, setShowTooltip] = useState(false)
+
   if (!forecast) {
     return <span className="expected-done-empty">--</span>
   }
 
-  const { expectedDone, confidence, dueDateDeltaDays, dueDate } = forecast
+  const { expectedDone, confidence, dueDateDeltaDays, dueDate, autoScore, remainingByRole, phaseSchedule } = forecast
 
-  // Format date as "15 мар" or "15.03"
+  // Format date as "15 мар"
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return '--'
     const date = new Date(dateStr)
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   }
 
+  // Format date range
+  const formatDateRange = (start: string | null, end: string | null): string => {
+    if (!start || !end) return '--'
+    return `${formatDate(start)} - ${formatDate(end)}`
+  }
+
   // Confidence colors
   const confidenceClass = confidence.toLowerCase()
-  const confidenceTitle = {
-    HIGH: 'Высокая уверенность',
-    MEDIUM: 'Средняя уверенность',
-    LOW: 'Низкая уверенность'
-  }[confidence]
+  const confidenceLabels = {
+    HIGH: 'Высокая',
+    MEDIUM: 'Средняя',
+    LOW: 'Низкая'
+  }
 
   // Delta indicator
   let deltaClass = ''
@@ -421,13 +416,59 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
   }
 
   return (
-    <div className="expected-done-cell">
-      <span className={`confidence-dot ${confidenceClass}`} title={confidenceTitle} />
+    <div
+      className="expected-done-cell"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <span className={`confidence-dot ${confidenceClass}`} />
       <span className="expected-done-date">{formatDate(expectedDone)}</span>
       {deltaText && (
-        <span className={`expected-done-delta ${deltaClass}`} title={`Due: ${formatDate(dueDate)}`}>
+        <span className={`expected-done-delta ${deltaClass}`}>
           {deltaText}
         </span>
+      )}
+
+      {showTooltip && (
+        <div className="forecast-tooltip">
+          <div className="forecast-tooltip-header">
+            <span>AutoScore: <strong>{autoScore.toFixed(1)}</strong></span>
+            <span className={`confidence-badge ${confidenceClass}`}>
+              {confidenceLabels[confidence]}
+            </span>
+          </div>
+
+          <div className="forecast-tooltip-section">
+            <div className="forecast-tooltip-title">Расписание фаз</div>
+            <div className="forecast-phase">
+              <span className="phase-label sa">SA</span>
+              <span className="phase-dates">{formatDateRange(phaseSchedule?.sa?.startDate, phaseSchedule?.sa?.endDate)}</span>
+            </div>
+            <div className="forecast-phase">
+              <span className="phase-label dev">DEV</span>
+              <span className="phase-dates">{formatDateRange(phaseSchedule?.dev?.startDate, phaseSchedule?.dev?.endDate)}</span>
+            </div>
+            <div className="forecast-phase">
+              <span className="phase-label qa">QA</span>
+              <span className="phase-dates">{formatDateRange(phaseSchedule?.qa?.startDate, phaseSchedule?.qa?.endDate)}</span>
+            </div>
+          </div>
+
+          <div className="forecast-tooltip-section">
+            <div className="forecast-tooltip-title">Остаток работы</div>
+            <div className="forecast-remaining">
+              <span>SA: {remainingByRole?.sa?.days?.toFixed(1) || 0}d</span>
+              <span>DEV: {remainingByRole?.dev?.days?.toFixed(1) || 0}d</span>
+              <span>QA: {remainingByRole?.qa?.days?.toFixed(1) || 0}d</span>
+            </div>
+          </div>
+
+          {dueDate && (
+            <div className="forecast-tooltip-footer">
+              Due date: {formatDate(dueDate)}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -453,13 +494,31 @@ interface BoardRowProps {
   roughEstimateConfig: RoughEstimateConfig | null
   onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
   forecast: EpicForecast | null
-  showForecast: boolean
-  onBoostUpdate: (epicKey: string, boost: number) => Promise<void>
+  canReorder: boolean
+  index: number
+  onDragStart: (e: React.DragEvent, index: number, epicKey: string) => void
+  onDragOver: (e: React.DragEvent, index: number) => void
+  onDrop: (e: React.DragEvent, index: number) => void
+  onDragEnd: () => void
+  isDragging: boolean
+  isDragOver: boolean
+  isJustDropped: boolean
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, showForecast, onBoostUpdate }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped }: BoardRowProps) {
+  const isEpicRow = isEpic(node.issueType) && level === 0
+  const autoScoreTooltip = forecast ? `AutoScore: ${forecast.autoScore.toFixed(1)}` : undefined
+
   return (
-    <tr className={`board-row level-${level}`}>
+    <tr
+      className={`board-row level-${level} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${isJustDropped ? 'just-dropped' : ''}`}
+      draggable={isEpicRow && canReorder}
+      onDragStart={isEpicRow && canReorder ? (e) => onDragStart(e, index, node.issueKey) : undefined}
+      onDragOver={isEpicRow && canReorder ? (e) => onDragOver(e, index) : undefined}
+      onDrop={isEpicRow && canReorder ? (e) => onDrop(e, index) : undefined}
+      onDragEnd={isEpicRow && canReorder ? onDragEnd : undefined}
+      title={isEpicRow ? autoScoreTooltip : undefined}
+    >
       <td className="cell-expander">
         {hasChildren ? (
           <button className="expander-btn" onClick={onToggle}>
@@ -471,6 +530,9 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
       </td>
       <td className="cell-name">
         <div className="name-content" style={{ paddingLeft: `${level * 20}px` }}>
+          {isEpicRow && canReorder && (
+            <span className="drag-handle" title="Drag to reorder">⋮⋮</span>
+          )}
           <img src={getIssueIcon(node.issueType)} alt={node.issueType} className="issue-type-icon" />
           <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
             {node.issueKey}
@@ -479,33 +541,19 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         </div>
       </td>
       <td className="cell-team">{node.teamName || '--'}</td>
-      {showForecast && (
-        <>
-          <td className="cell-priority">
-            {isEpic(node.issueType) && forecast ? (
-              <PriorityBoost
-                epicKey={node.issueKey}
-                currentBoost={forecast.manualPriorityBoost ?? 0}
-                autoScore={forecast.autoScore}
-                onUpdate={onBoostUpdate}
-              />
-            ) : (
-              <span className="priority-empty">--</span>
-            )}
-          </td>
-          <td className="cell-expected-done">
-            {isEpic(node.issueType) ? (
-              <ExpectedDoneCell forecast={forecast} />
-            ) : (
-              <span className="expected-done-empty">--</span>
-            )}
-          </td>
-        </>
-      )}
-      <td className="cell-logged">{formatDays(node.loggedSeconds)}</td>
-      <td className="cell-estimate">{formatDays(node.estimateSeconds)}</td>
+      <td className="cell-expected-done">
+        {isEpic(node.issueType) ? (
+          <ExpectedDoneCell forecast={forecast} />
+        ) : (
+          <span className="expected-done-empty">--</span>
+        )}
+      </td>
       <td className="cell-progress">
-        <ProgressBar progress={node.progress || 0} />
+        <ProgressCell
+          loggedSeconds={node.loggedSeconds}
+          estimateSeconds={node.estimateSeconds}
+          progress={node.progress}
+        />
       </td>
       <td className="cell-roles">
         <RoleChips
@@ -529,12 +577,16 @@ interface BoardTableProps {
   roughEstimateConfig: RoughEstimateConfig | null
   onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
   forecastMap: Map<string, EpicForecast>
-  showForecast: boolean
-  onBoostUpdate: (epicKey: string, boost: number) => Promise<void>
+  canReorder: boolean
+  onReorder: (epicKey: string, newIndex: number) => Promise<void>
 }
 
-function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, showForecast, onBoostUpdate }: BoardTableProps) {
+function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, canReorder, onReorder }: BoardTableProps) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [draggingEpicKey, setDraggingEpicKey] = useState<string | null>(null)
+  const [droppedEpicKey, setDroppedEpicKey] = useState<string | null>(null)
 
   const toggleExpand = (key: string) => {
     setExpandedKeys(prev => {
@@ -548,13 +600,64 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     })
   }
 
-  const renderRows = (nodes: BoardNode[], level: number): JSX.Element[] => {
+  const handleDragStart = (e: React.DragEvent, index: number, epicKey: string) => {
+    setDraggingIndex(index)
+    setDraggingEpicKey(epicKey)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', epicKey)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverIndex(index)
+  }
+
+  const handleDrop = async (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggingEpicKey && index !== draggingIndex) {
+      const epicKey = draggingEpicKey
+      await onReorder(epicKey, index)
+      playDropSound()
+      setDroppedEpicKey(epicKey)
+      setTimeout(() => setDroppedEpicKey(null), 400)
+    }
+    setDraggingIndex(null)
+    setDragOverIndex(null)
+    setDraggingEpicKey(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingIndex(null)
+    setDragOverIndex(null)
+    setDraggingEpicKey(null)
+  }
+
+  // Handle drop at the end of list
+  const handleDropAtEnd = async (e: React.DragEvent) => {
+    e.preventDefault()
+    const epicCount = items.filter(item => isEpic(item.issueType)).length
+    if (draggingEpicKey && draggingIndex !== epicCount - 1) {
+      const epicKey = draggingEpicKey
+      await onReorder(epicKey, epicCount - 1)
+      playDropSound()
+      setDroppedEpicKey(epicKey)
+      setTimeout(() => setDroppedEpicKey(null), 400)
+    }
+    setDraggingIndex(null)
+    setDragOverIndex(null)
+    setDraggingEpicKey(null)
+  }
+
+  const renderRows = (nodes: BoardNode[], level: number, startIndex: number = 0): JSX.Element[] => {
     const rows: JSX.Element[] = []
+    let currentIndex = startIndex
 
     for (const node of nodes) {
       const isExpanded = expandedKeys.has(node.issueKey)
       const hasChildren = node.children.length > 0
       const forecast = forecastMap.get(node.issueKey) || null
+      const nodeIndex = currentIndex
 
       rows.push(
         <BoardRow
@@ -567,18 +670,31 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
           roughEstimateConfig={roughEstimateConfig}
           onRoughEstimateUpdate={onRoughEstimateUpdate}
           forecast={forecast}
-          showForecast={showForecast}
-          onBoostUpdate={onBoostUpdate}
+          canReorder={canReorder}
+          index={nodeIndex}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onDragEnd={handleDragEnd}
+          isDragging={draggingIndex === nodeIndex && level === 0}
+          isDragOver={dragOverIndex === nodeIndex && level === 0}
+          isJustDropped={droppedEpicKey === node.issueKey}
         />
       )
 
+      if (level === 0) {
+        currentIndex++
+      }
+
       if (isExpanded && hasChildren) {
-        rows.push(...renderRows(node.children, level + 1))
+        rows.push(...renderRows(node.children, level + 1, currentIndex))
       }
     }
 
     return rows
   }
+
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
   return (
     <div className="board-table-container">
@@ -588,15 +704,42 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
             <th className="th-expander"></th>
             <th className="th-name">NAME</th>
             <th className="th-team">TEAM</th>
-            {showForecast && (
-              <>
-                <th className="th-priority">BOOST</th>
-                <th className="th-expected-done">EXPECTED DONE</th>
-              </>
-            )}
-            <th className="th-logged">LOGGED TIME</th>
-            <th className="th-estimate">ESTIMATE</th>
-            <th className="th-progress">OVERALL PROGRESS</th>
+            <th className="th-expected-done">
+              <span className="th-with-info">
+                EXPECTED DONE
+                <span
+                  className="info-icon"
+                  onMouseEnter={() => setShowInfoTooltip(true)}
+                  onMouseLeave={() => setShowInfoTooltip(false)}
+                >
+                  i
+                  {showInfoTooltip && (
+                    <div className="info-tooltip">
+                      <div className="info-tooltip-title">Прогноз завершения</div>
+                      <p>Дата рассчитывается на основе:</p>
+                      <ul>
+                        <li>Остатка работы по ролям (SA → DEV → QA)</li>
+                        <li>Производительности команды</li>
+                        <li>Производственного календаря</li>
+                      </ul>
+                      <div className="info-tooltip-section">
+                        <strong>Уверенность:</strong>
+                        <div className="confidence-legend">
+                          <span><span className="confidence-dot high"></span> Высокая — есть оценки</span>
+                          <span><span className="confidence-dot medium"></span> Средняя — частичные оценки</span>
+                          <span><span className="confidence-dot low"></span> Низкая — нет оценок</span>
+                        </div>
+                      </div>
+                      <div className="info-tooltip-section">
+                        <strong>Порядок эпиков:</strong>
+                        <p>Эпики отсортированы по AutoScore. Перетащите эпик для изменения приоритета.</p>
+                      </div>
+                    </div>
+                  )}
+                </span>
+              </span>
+            </th>
+            <th className="th-progress">PROGRESS</th>
             <th className="th-roles">ROLE-BASED PROGRESS</th>
             <th className="th-status">STATUS</th>
             <th className="th-alerts">ALERTS</th>
@@ -604,6 +747,17 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
         </thead>
         <tbody>
           {renderRows(items, 0)}
+          {canReorder && draggingIndex !== null && (
+            <tr
+              className={`board-row drop-zone-row ${dragOverIndex === items.length ? 'drag-over' : ''}`}
+              onDragOver={(e) => { e.preventDefault(); setDragOverIndex(items.length) }}
+              onDrop={handleDropAtEnd}
+            >
+              <td colSpan={8} className="drop-zone-cell">
+                <span>Переместить в конец списка</span>
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -734,7 +888,6 @@ export function BoardPage() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [roughEstimateConfig, setRoughEstimateConfig] = useState<RoughEstimateConfig | null>(null)
-  const [forecastData, setForecastData] = useState<ForecastResponse | null>(null)
 
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
@@ -795,41 +948,58 @@ export function BoardPage() {
     fetchRoughEstimateConfig()
   }, [fetchBoard, fetchSyncStatus, fetchRoughEstimateConfig])
 
-  // Load forecast when exactly one team is selected
+  // Get all unique team IDs from board
+  const allTeamIds = useMemo(() => {
+    const ids = new Set<number>()
+    board.forEach(epic => {
+      if (epic.teamId) ids.add(epic.teamId)
+    })
+    return Array.from(ids)
+  }, [board])
+
+  // Load forecasts for all teams
+  const [allForecasts, setAllForecasts] = useState<Map<number, ForecastResponse>>(new Map())
+
+  useEffect(() => {
+    if (allTeamIds.length === 0) return
+
+    // Load forecasts for all teams in parallel
+    Promise.all(
+      allTeamIds.map(teamId =>
+        getForecast(teamId)
+          .then(data => ({ teamId, data }))
+          .catch(() => null)
+      )
+    ).then(results => {
+      const newForecasts = new Map<number, ForecastResponse>()
+      results.forEach(result => {
+        if (result) {
+          newForecasts.set(result.teamId, result.data)
+        }
+      })
+      setAllForecasts(newForecasts)
+    })
+  }, [allTeamIds])
+
+  // Create forecast map for quick lookup (merged from all teams)
+  const forecastMap = useMemo(() => {
+    const map = new Map<string, EpicForecast>()
+    allForecasts.forEach(forecast => {
+      forecast.epics.forEach(f => map.set(f.epicKey, f))
+    })
+    return map
+  }, [allForecasts])
+
+  // Get selected team ID for reorder operations
   const selectedTeamId = useMemo(() => {
     if (selectedTeams.size !== 1) return null
     const teamName = Array.from(selectedTeams)[0]
-    // Find team ID from board data
     const epic = board.find(e => e.teamName === teamName)
     return epic?.teamId || null
   }, [selectedTeams, board])
 
-  useEffect(() => {
-    if (!selectedTeamId) {
-      setForecastData(null)
-      return
-    }
-
-    getForecast(selectedTeamId)
-      .then(data => {
-        setForecastData(data)
-      })
-      .catch(err => {
-        console.error('Failed to load forecast:', err)
-        setForecastData(null)
-      })
-  }, [selectedTeamId])
-
-  // Create forecast map for quick lookup
-  const forecastMap = useMemo(() => {
-    const map = new Map<string, EpicForecast>()
-    if (forecastData) {
-      forecastData.epics.forEach(f => map.set(f.epicKey, f))
-    }
-    return map
-  }, [forecastData])
-
-  const showForecast = selectedTeamId !== null && forecastData !== null
+  // For drag & drop, we need exactly one team selected
+  const canReorder = selectedTeamId !== null
 
   const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => {
     await updateRoughEstimate(epicKey, role, { days })
@@ -837,14 +1007,60 @@ export function BoardPage() {
     await fetchBoard()
   }, [fetchBoard])
 
-  const handleBoostUpdate = useCallback(async (epicKey: string, boost: number) => {
-    await updateManualBoost(epicKey, boost)
-    // Refetch forecast to get updated AutoScore
-    if (selectedTeamId) {
-      const data = await getForecast(selectedTeamId)
-      setForecastData(data)
+  // Handle reorder via drag & drop
+  const handleReorder = useCallback(async (epicKey: string, newIndex: number) => {
+    if (!selectedTeamId) return
+
+    const teamForecast = allForecasts.get(selectedTeamId)
+    if (!teamForecast) return
+
+    // Get epics sorted by autoScore (descending)
+    const sortedEpics = [...teamForecast.epics].sort((a, b) => b.autoScore - a.autoScore)
+    const currentIndex = sortedEpics.findIndex(e => e.epicKey === epicKey)
+
+    if (currentIndex === -1 || currentIndex === newIndex) return
+
+    const currentEpic = sortedEpics[currentIndex]
+    const currentBaseScore = currentEpic.autoScore - (currentEpic.manualPriorityBoost || 0)
+
+    let newBoost = 0
+
+    if (newIndex < currentIndex) {
+      // Moving UP - need to beat the epic at newIndex
+      const targetEpic = sortedEpics[newIndex]
+      const targetScore = targetEpic.autoScore
+      // Need: baseScore + newBoost > targetScore
+      newBoost = Math.ceil(targetScore - currentBaseScore + 0.5)
+    } else {
+      // Moving DOWN - need to be below the epic at newIndex
+      const targetEpic = sortedEpics[newIndex]
+      const targetScore = targetEpic.autoScore
+
+      // Need: baseScore + newBoost < targetScore
+      // If there's an epic below the target, we need to be above it
+      const epicBelow = sortedEpics[newIndex + 1]
+      const scoreBelow = epicBelow ? epicBelow.autoScore : 0
+
+      // Target: be between targetScore and scoreBelow
+      const targetMiddle = (targetScore + scoreBelow) / 2
+      newBoost = Math.floor(targetMiddle - currentBaseScore)
     }
-  }, [selectedTeamId])
+
+    // No clamping - boost can be any value needed to achieve the desired position
+
+    try {
+      await updateManualBoost(epicKey, newBoost)
+      // Refetch forecast for this team
+      const data = await getForecast(selectedTeamId)
+      setAllForecasts(prev => {
+        const newMap = new Map(prev)
+        newMap.set(selectedTeamId, data)
+        return newMap
+      })
+    } catch (err) {
+      console.error('Failed to reorder:', err)
+    }
+  }, [allForecasts, selectedTeamId])
 
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
@@ -863,7 +1079,7 @@ export function BoardPage() {
   }, [board])
 
   const filteredBoard = useMemo(() => {
-    return board.filter(epic => {
+    let filtered = board.filter(epic => {
       if (searchKey) {
         const keyLower = searchKey.toLowerCase()
         if (!epic.issueKey.toLowerCase().includes(keyLower)) {
@@ -878,7 +1094,20 @@ export function BoardPage() {
       }
       return true
     })
-  }, [board, searchKey, selectedStatuses, selectedTeams])
+
+    // Sort by AutoScore (descending) when forecasts are available
+    if (forecastMap.size > 0) {
+      filtered = filtered.sort((a, b) => {
+        const forecastA = forecastMap.get(a.issueKey)
+        const forecastB = forecastMap.get(b.issueKey)
+        const scoreA = forecastA?.autoScore ?? 0
+        const scoreB = forecastB?.autoScore ?? 0
+        return scoreB - scoreA
+      })
+    }
+
+    return filtered
+  }, [board, searchKey, selectedStatuses, selectedTeams, forecastMap])
 
   const handleStatusToggle = (status: string) => {
     setSelectedStatuses(prev => {
@@ -939,8 +1168,8 @@ export function BoardPage() {
             roughEstimateConfig={roughEstimateConfig}
             onRoughEstimateUpdate={handleRoughEstimateUpdate}
             forecastMap={forecastMap}
-            showForecast={showForecast}
-            onBoostUpdate={handleBoostUpdate}
+            canReorder={canReorder}
+            onReorder={handleReorder}
           />
         )}
       </main>
