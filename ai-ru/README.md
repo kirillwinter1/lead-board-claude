@@ -25,6 +25,7 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | [RULES.md](./RULES.md) | Правила разработки, принципы, чеклисты |
 | [F13_AUTOPLANNING.md](./F13_AUTOPLANNING.md) | Спецификация фичи автопланирования |
 | [F13_PLAN.md](./F13_PLAN.md) | План реализации автопланирования |
+| [F14_TIMELINE_GANTT.md](./F14_TIMELINE_GANTT.md) | Спецификация Timeline/Gantt |
 
 ---
 
@@ -42,12 +43,8 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | **F6. Team UI** | Страницы управления командами и участниками |
 | **F7. Team Sync** | Синхронизация команд и участников из Atlassian Teams API |
 | **F10. Epic-Team Mapping** | Синхронизация команды из Jira Team field, отображение на Board |
-
-### В разработке
-
-| Фича | Описание |
-|------|----------|
-| **F13. Автопланирование** | Прогнозирование даты закрытия эпиков на основе capacity команды |
+| **F13. Автопланирование** | AutoScore, Expected Done, drag & drop приоритетов, конвейерная модель SA→DEV→QA |
+| **F14. Timeline/Gantt** | Gantt-диаграмма с фазами, zoom уровни, индикаторы Today/Due Date |
 
 ### Текущий UI
 
