@@ -351,39 +351,57 @@ function StoryTooltip({ story }: StoryTooltipProps) {
     return `${hours}h`
   }
 
+  const getStatusLabel = () => {
+    switch (statusCategory) {
+      case 'DONE': return 'Done'
+      case 'IN_PROGRESS': return 'In Progress'
+      default: return 'To Do'
+    }
+  }
+
   return (
-    <div className="story-tooltip">
-      <div className="story-tooltip-header">
-        <span className="story-tooltip-key">{story.storyKey}</span>
-        <span className={`story-tooltip-status story-status-${statusCategory.toLowerCase()}`}>
-          {story.status}
-        </span>
+    <div className="epic-tooltip">
+      <div className="tooltip-header">
+        <span className="tooltip-key">{story.storyKey}</span>
+        <span className="tooltip-summary">{story.summary}</span>
       </div>
-      <div className="story-tooltip-summary">{story.summary}</div>
 
-      {!hasEstimate && (
-        <div className="story-tooltip-warning">
-          ⚠️ No estimate - segment width is approximate
+      <div className="tooltip-section">
+        <div className="tooltip-row">
+          <span>Status:</span>
+          <strong>{getStatusLabel()}</strong>
         </div>
-      )}
+        <div className="tooltip-row">
+          <span>Type:</span>
+          <strong>{story.issueType || 'Task'}</strong>
+        </div>
+        <div className="tooltip-row">
+          <span>Progress:</span>
+          <strong>{progressPercent}%</strong>
+        </div>
+      </div>
 
-      <div className="story-tooltip-details">
-        <div className="story-tooltip-row">
-          <span>Phase:</span>
+      <div className="tooltip-section tooltip-phases">
+        <div className="tooltip-phase">
+          <span className="tooltip-phase-label">Phase:</span>
           <span className={`story-phase-badge story-phase-${story.phase.toLowerCase()}`}>{story.phase}</span>
         </div>
-        <div className="story-tooltip-row">
-          <span>Estimate:</span>
-          <span className={!hasEstimate ? 'story-tooltip-missing' : ''}>{formatTime(story.estimateSeconds)}</span>
+        <div className="tooltip-phase">
+          <span className="tooltip-phase-label">Estimate:</span>
+          <span className={`tooltip-phase-dates ${!hasEstimate ? 'tooltip-phase-warning' : ''}`}>
+            {formatTime(story.estimateSeconds)}
+          </span>
+          {!hasEstimate && <span className="tooltip-phase-alert">No estimate!</span>}
         </div>
-        <div className="story-tooltip-row">
-          <span>Logged:</span>
-          <span>{formatTime(story.timeSpentSeconds)} {hasEstimate && `(${progressPercent}%)`}</span>
+        <div className="tooltip-phase">
+          <span className="tooltip-phase-label">Logged:</span>
+          <span className="tooltip-phase-dates">{formatTime(story.timeSpentSeconds)}</span>
+          {hasEstimate && <span className="tooltip-phase-days">({progressPercent}%)</span>}
         </div>
         {story.assignee && (
-          <div className="story-tooltip-row">
-            <span>Assignee:</span>
-            <span>{story.assignee}</span>
+          <div className="tooltip-phase">
+            <span className="tooltip-phase-label">Assignee:</span>
+            <span className="tooltip-phase-dates">{story.assignee}</span>
           </div>
         )}
       </div>
@@ -477,7 +495,7 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
 
       {hoveredStory && (
         <div
-          className="story-tooltip-wrapper"
+          className="gantt-tooltip-wrapper"
           style={{
             left: `${tooltipPos.x}px`,
             top: `${tooltipPos.y}px`,
