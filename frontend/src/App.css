@@ -2681,7 +2681,7 @@ body {
 /* Story Tooltip */
 .story-tooltip-wrapper {
   position: fixed;
-  z-index: 1000;
+  z-index: 9999;
   pointer-events: none;
 }
 
