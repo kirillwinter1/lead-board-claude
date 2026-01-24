@@ -87,13 +87,16 @@ function calculateDateRange(forecast: ForecastResponse): DateRange {
   for (const epic of forecast.epics) {
     const phases = [epic.phaseSchedule.sa, epic.phaseSchedule.dev, epic.phaseSchedule.qa]
     for (const phase of phases) {
-      if (phase.startDate) {
-        const start = new Date(phase.startDate)
-        if (!minDate || start < minDate) minDate = start
-      }
-      if (phase.endDate) {
-        const end = new Date(phase.endDate)
-        if (!maxDate || end > maxDate) maxDate = end
+      // Only consider phases with actual work
+      if (phase.workDays > 0) {
+        if (phase.startDate) {
+          const start = new Date(phase.startDate)
+          if (!minDate || start < minDate) minDate = start
+        }
+        if (phase.endDate) {
+          const end = new Date(phase.endDate)
+          if (!maxDate || end > maxDate) maxDate = end
+        }
       }
     }
     if (epic.dueDate) {
@@ -189,14 +192,17 @@ function getEpicDateRange(epic: EpicForecast): { start: Date | null; end: Date |
   let start: Date | null = null
   let end: Date | null = null
 
+  // Only consider phases with actual work (workDays > 0)
   for (const phase of [sa, dev, qa]) {
-    if (phase.startDate) {
-      const d = new Date(phase.startDate)
-      if (!start || d < start) start = d
-    }
-    if (phase.endDate) {
-      const d = new Date(phase.endDate)
-      if (!end || d > end) end = d
+    if (phase.workDays > 0) {
+      if (phase.startDate) {
+        const d = new Date(phase.startDate)
+        if (!start || d < start) start = d
+      }
+      if (phase.endDate) {
+        const d = new Date(phase.endDate)
+        if (!end || d > end) end = d
+      }
     }
   }
 
@@ -309,7 +315,8 @@ interface PhaseBarProps {
 }
 
 function PhaseBar({ phase, role, rangeStart, totalDays }: PhaseBarProps) {
-  if (!phase.startDate || !phase.endDate) return null
+  // Don't render phases with no work
+  if (!phase.startDate || !phase.endDate || phase.workDays <= 0) return null
 
   const startDate = new Date(phase.startDate)
   const endDate = new Date(phase.endDate)
