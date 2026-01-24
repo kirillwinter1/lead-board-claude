@@ -26,6 +26,7 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | [F13_AUTOPLANNING.md](./F13_AUTOPLANNING.md) | Спецификация фичи автопланирования |
 | [F13_PLAN.md](./F13_PLAN.md) | План реализации автопланирования |
 | [F14_TIMELINE_GANTT.md](./F14_TIMELINE_GANTT.md) | Спецификация Timeline/Gantt |
+| [API_PLANNING.md](./API_PLANNING.md) | Документация Planning API |
 
 ---
 
