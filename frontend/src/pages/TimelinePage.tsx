@@ -342,12 +342,17 @@ interface StoryTooltipProps {
 function StoryTooltip({ story }: StoryTooltipProps) {
   const statusCategory = getStoryStatusCategory(story.status)
   const hasEstimate = story.estimateSeconds && story.estimateSeconds > 0
-  const progressPercent = hasEstimate && story.timeSpentSeconds
-    ? Math.min(100, Math.round((story.timeSpentSeconds / story.estimateSeconds!) * 100))
+  const timeSpent = story.timeSpentSeconds || 0
+  const progressPercent = hasEstimate
+    ? Math.min(100, Math.round((timeSpent / story.estimateSeconds!) * 100))
     : 0
+  const remainingSeconds = hasEstimate
+    ? Math.max(0, story.estimateSeconds! - timeSpent)
+    : null
 
   const formatTime = (seconds: number | null) => {
-    if (!seconds) return '-'
+    if (seconds === null || seconds === undefined) return '-'
+    if (seconds === 0) return '0h'
     const hours = Math.round(seconds / 3600)
     return `${hours}h`
   }
@@ -382,27 +387,24 @@ function StoryTooltip({ story }: StoryTooltipProps) {
         </div>
       </div>
 
-      <div className="tooltip-section tooltip-phases">
-        <div className="tooltip-phase">
-          <span className="tooltip-phase-label">Phase:</span>
-          <span className={`story-phase-badge story-phase-${story.phase.toLowerCase()}`}>{story.phase}</span>
+      <div className="tooltip-section">
+        <div className="tooltip-row">
+          <span>Estimate:</span>
+          <strong className={!hasEstimate ? 'tooltip-warning' : ''}>{formatTime(story.estimateSeconds)}</strong>
+          {!hasEstimate && <span className="tooltip-alert">No estimate!</span>}
         </div>
-        <div className="tooltip-phase">
-          <span className="tooltip-phase-label">Estimate:</span>
-          <span className={`tooltip-phase-dates ${!hasEstimate ? 'tooltip-phase-warning' : ''}`}>
-            {formatTime(story.estimateSeconds)}
-          </span>
-          {!hasEstimate && <span className="tooltip-phase-alert">No estimate!</span>}
+        <div className="tooltip-row">
+          <span>Logged:</span>
+          <strong>{formatTime(story.timeSpentSeconds)}</strong>
         </div>
-        <div className="tooltip-phase">
-          <span className="tooltip-phase-label">Logged:</span>
-          <span className="tooltip-phase-dates">{formatTime(story.timeSpentSeconds)}</span>
-          {hasEstimate && <span className="tooltip-phase-days">({progressPercent}%)</span>}
+        <div className="tooltip-row">
+          <span>Remaining:</span>
+          <strong>{formatTime(remainingSeconds)}</strong>
         </div>
         {story.assignee && (
-          <div className="tooltip-phase">
-            <span className="tooltip-phase-label">Assignee:</span>
-            <span className="tooltip-phase-dates">{story.assignee}</span>
+          <div className="tooltip-row">
+            <span>Assignee:</span>
+            <strong>{story.assignee}</strong>
           </div>
         )}
       </div>
