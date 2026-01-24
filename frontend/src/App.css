@@ -1882,14 +1882,7 @@ body {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: #f0f5ff;
-  color: #0052cc;
   font-weight: 500;
-}
-
-.summary-role-wip-exceeded {
-  background: #ffebe6;
-  color: #de350b;
 }
 
 /* Phase wait tooltip styles */
@@ -1914,6 +1907,83 @@ body {
   color: #92400e;
   font-size: 11px;
   font-weight: 500;
+}
+
+/* Role WIP badge levels */
+.summary-role-wip-normal {
+  background: #f0f5ff;
+  color: #0052cc;
+}
+
+.summary-role-wip-warning {
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.summary-role-wip-exceeded {
+  background: #ffebe6;
+  color: #de350b;
+  border: 1px solid #ffbdad;
+}
+
+/* WIP Insights Panel */
+.wip-insights-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fafbfc;
+  border-radius: 8px;
+  border: 1px solid #dfe1e6;
+}
+
+.wip-insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  flex: 1 1 calc(50% - 4px);
+  min-width: 280px;
+}
+
+.wip-insight-info {
+  background: #e6f4ff;
+  border: 1px solid #91caff;
+}
+
+.wip-insight-warning {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+}
+
+.wip-insight-critical {
+  background: #ffebe6;
+  border: 1px solid #ffbdad;
+}
+
+.wip-insight-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.wip-insight-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wip-insight-message {
+  font-size: 13px;
+  font-weight: 500;
+  color: #172b4d;
+}
+
+.wip-insight-recommendation {
+  font-size: 11px;
+  color: #6b778c;
 }
 
 /* Hint text */

@@ -470,11 +470,18 @@ interface SummaryPanelProps {
   wipStatus: WipStatus | null
 }
 
+function getWipLevel(current: number, limit: number): 'normal' | 'warning' | 'exceeded' {
+  if (current > limit) return 'exceeded'
+  if (current >= limit) return 'warning'  // At limit
+  if (limit > 0 && current / limit >= 0.8) return 'warning'  // 80%+ of limit
+  return 'normal'
+}
+
 function RoleWipBadge({ label, roleWip }: { label: string; roleWip: RoleWipStatus | null }) {
   if (!roleWip) return null
-  const exceeded = roleWip.exceeded
+  const level = getWipLevel(roleWip.current, roleWip.limit)
   return (
-    <span className={`summary-role-wip ${exceeded ? 'summary-role-wip-exceeded' : ''}`}>
+    <span className={`summary-role-wip summary-role-wip-${level}`}>
       {label}: {roleWip.current}/{roleWip.limit}
     </span>
   )
@@ -547,6 +554,113 @@ function SummaryPanel({ epics, wipStatus }: SummaryPanelProps) {
           <span className="summary-stat summary-queue">⏳ {stats.inQueue} in queue</span>
         </>
       )}
+    </div>
+  )
+}
+
+interface WipInsight {
+  type: 'info' | 'warning' | 'critical'
+  message: string
+  recommendation?: string
+}
+
+interface WipInsightsPanelProps {
+  wipStatus: WipStatus | null
+  epics: EpicForecast[]
+}
+
+function WipInsightsPanel({ wipStatus, epics }: WipInsightsPanelProps) {
+  const insights = useMemo(() => {
+    const result: WipInsight[] = []
+
+    if (!wipStatus) return result
+
+    // Team WIP analysis
+    const teamUtilization = wipStatus.limit > 0 ? (wipStatus.current / wipStatus.limit) * 100 : 0
+
+    if (wipStatus.exceeded) {
+      result.push({
+        type: 'critical',
+        message: `Team WIP exceeded: ${wipStatus.current}/${wipStatus.limit} epics active`,
+        recommendation: 'Complete or pause some epics before starting new ones'
+      })
+    } else if (teamUtilization >= 100) {
+      result.push({
+        type: 'warning',
+        message: 'Team WIP at limit',
+        recommendation: 'New epics will wait in queue until active ones complete'
+      })
+    }
+
+    // Role-specific bottleneck detection
+    const roleAnalysis = [
+      { name: 'SA', status: wipStatus.sa },
+      { name: 'DEV', status: wipStatus.dev },
+      { name: 'QA', status: wipStatus.qa }
+    ]
+
+    const bottlenecks = roleAnalysis.filter(r => r.status && r.status.current >= r.status.limit)
+
+    if (bottlenecks.length > 0) {
+      const names = bottlenecks.map(b => b.name).join(', ')
+      result.push({
+        type: 'warning',
+        message: `Bottleneck detected: ${names} at capacity`,
+        recommendation: 'Consider adding resources or reducing parallel work in these phases'
+      })
+    }
+
+    // Queue analysis
+    const queuedEpics = epics.filter(e => !e.isWithinWip)
+    if (queuedEpics.length > 3) {
+      result.push({
+        type: 'info',
+        message: `${queuedEpics.length} epics waiting in queue`,
+        recommendation: 'Consider increasing WIP limit or focusing on completing active work'
+      })
+    }
+
+    // Phase wait analysis
+    const epicsWithPhaseWait = epics.filter(e =>
+      e.phaseWaitInfo && (e.phaseWaitInfo.sa?.waiting || e.phaseWaitInfo.dev?.waiting || e.phaseWaitInfo.qa?.waiting)
+    )
+    if (epicsWithPhaseWait.length > 0) {
+      result.push({
+        type: 'info',
+        message: `${epicsWithPhaseWait.length} epic(s) waiting for phase capacity`,
+        recommendation: 'Role WIP limits are creating delays between phases'
+      })
+    }
+
+    // Healthy state
+    if (result.length === 0 && wipStatus.current > 0) {
+      result.push({
+        type: 'info',
+        message: 'WIP is healthy',
+        recommendation: `Utilizing ${Math.round(teamUtilization)}% of team capacity`
+      })
+    }
+
+    return result
+  }, [wipStatus, epics])
+
+  if (insights.length === 0) return null
+
+  return (
+    <div className="wip-insights-panel">
+      {insights.map((insight, i) => (
+        <div key={i} className={`wip-insight wip-insight-${insight.type}`}>
+          <span className="wip-insight-icon">
+            {insight.type === 'critical' ? '🔴' : insight.type === 'warning' ? '⚠️' : 'ℹ️'}
+          </span>
+          <div className="wip-insight-content">
+            <span className="wip-insight-message">{insight.message}</span>
+            {insight.recommendation && (
+              <span className="wip-insight-recommendation">{insight.recommendation}</span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -701,6 +815,7 @@ export function TimelinePage() {
       {!loading && !error && forecast && scheduledEpics.length > 0 && dateRange && (
         <>
           <SummaryPanel epics={scheduledEpics} wipStatus={forecast?.wipStatus ?? null} />
+          <WipInsightsPanel wipStatus={forecast?.wipStatus ?? null} epics={scheduledEpics} />
 
           <div className="gantt-container">
             <div className="gantt-labels">
