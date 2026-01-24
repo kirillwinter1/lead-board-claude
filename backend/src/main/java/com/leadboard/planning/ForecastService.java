@@ -497,24 +497,20 @@ public class ForecastService {
      * Определяет фазу (SA/DEV/QA) по статусу или типу задачи.
      */
     private String determinePhase(String status, String issueType) {
-        if (status == null && issueType == null) {
-            return "DEV";
-        }
-
         String statusLower = status != null ? status.toLowerCase() : "";
         String typeLower = issueType != null ? issueType.toLowerCase() : "";
 
-        // SA фаза
-        if (statusLower.contains("analysis") || statusLower.contains("анализ") ||
-            typeLower.contains("analysis") || typeLower.contains("анализ")) {
+        // SA фаза: анализ, аналитика
+        if (statusLower.contains("analysis") || statusLower.contains("анализ") || statusLower.contains("аналитик") ||
+            typeLower.contains("analysis") || typeLower.contains("анализ") || typeLower.contains("аналитик")) {
             return "SA";
         }
 
-        // QA фаза
+        // QA фаза: тест, тестирование, qa, bug
         if (statusLower.contains("test") || statusLower.contains("qa") ||
-            statusLower.contains("тест") || typeLower.contains("test") ||
-            typeLower.contains("qa") || typeLower.contains("bug") ||
-            typeLower.contains("баг") || typeLower.contains("дефект")) {
+            statusLower.contains("тест") || statusLower.contains("review") ||
+            typeLower.contains("test") || typeLower.contains("qa") || typeLower.contains("тест") ||
+            typeLower.contains("bug") || typeLower.contains("баг") || typeLower.contains("дефект")) {
             return "QA";
         }
 
