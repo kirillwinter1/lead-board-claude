@@ -1,8 +1,11 @@
 package com.leadboard.planning;
 
 import com.leadboard.planning.dto.ForecastResponse;
+import com.leadboard.planning.dto.StoryInfo;
 import com.leadboard.planning.dto.WipHistoryResponse;
 import com.leadboard.planning.dto.WipHistoryResponse.WipDataPoint;
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,15 +23,18 @@ public class ForecastController {
     private final ForecastService forecastService;
     private final AutoScoreService autoScoreService;
     private final WipSnapshotService wipSnapshotService;
+    private final JiraIssueRepository issueRepository;
 
     public ForecastController(
             ForecastService forecastService,
             AutoScoreService autoScoreService,
-            WipSnapshotService wipSnapshotService
+            WipSnapshotService wipSnapshotService,
+            JiraIssueRepository issueRepository
     ) {
         this.forecastService = forecastService;
         this.autoScoreService = autoScoreService;
         this.wipSnapshotService = wipSnapshotService;
+        this.issueRepository = issueRepository;
     }
 
     /**
@@ -112,5 +118,31 @@ public class ForecastController {
                 "date", snapshot.getSnapshotDate().toString(),
                 "teamWip", snapshot.getTeamWipCurrent() + "/" + snapshot.getTeamWipLimit()
         ));
+    }
+
+    /**
+     * Получает child issues (stories) для эпика.
+     *
+     * @param epicKey ключ эпика (например, LB-123)
+     */
+    @GetMapping("/epics/{epicKey}/stories")
+    public ResponseEntity<List<StoryInfo>> getEpicStories(@PathVariable String epicKey) {
+        List<JiraIssueEntity> childIssues = issueRepository.findByParentKey(epicKey);
+
+        List<StoryInfo> stories = childIssues.stream()
+                .map(issue -> new StoryInfo(
+                        issue.getIssueKey(),
+                        issue.getSummary(),
+                        issue.getStatus(),
+                        issue.getIssueType(),
+                        null, // assignee - можно добавить позже
+                        null, // startDate - можно добавить позже
+                        issue.getOriginalEstimateSeconds(),
+                        issue.getTimeSpentSeconds(),
+                        StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType())
+                ))
+                .toList();
+
+        return ResponseEntity.ok(stories);
     }
 }
