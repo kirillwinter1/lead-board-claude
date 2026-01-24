@@ -4,6 +4,7 @@ import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
+import com.leadboard.planning.AutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import org.slf4j.Logger;
@@ -31,17 +32,20 @@ public class SyncService {
     private final JiraIssueRepository issueRepository;
     private final JiraSyncStateRepository syncStateRepository;
     private final TeamRepository teamRepository;
+    private final AutoScoreService autoScoreService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
                        JiraIssueRepository issueRepository,
                        JiraSyncStateRepository syncStateRepository,
-                       TeamRepository teamRepository) {
+                       TeamRepository teamRepository,
+                       AutoScoreService autoScoreService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
         this.syncStateRepository = syncStateRepository;
         this.teamRepository = teamRepository;
+        this.autoScoreService = autoScoreService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -158,6 +162,14 @@ public class SyncService {
 
             log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
                     lastSync != null ? "incremental" : "full");
+
+            // Recalculate AutoScore for all epics after sync
+            try {
+                int epicsUpdated = autoScoreService.recalculateAll();
+                log.info("AutoScore recalculated for {} epics after sync", epicsUpdated);
+            } catch (Exception e) {
+                log.error("Failed to recalculate AutoScore after sync", e);
+            }
 
         } catch (Exception e) {
             log.error("Sync failed for project: {}", projectKey, e);
