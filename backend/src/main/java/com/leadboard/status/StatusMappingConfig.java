@@ -20,8 +20,8 @@ public record StatusMappingConfig(
     public static StatusMappingConfig defaults() {
         return new StatusMappingConfig(
                 new WorkflowConfig(
-                        List.of("New", "Requirements", "Rough Estimate", "Ready for Dev", "Backlog", "To Do",
-                                "Новый", "Требования", "Оценка", "Готов к разработке", "Бэклог", "Сделать"),
+                        List.of("New", "Requirements", "Rough Estimate", "Backlog", "To Do",
+                                "Новый", "Требования", "Оценка", "Бэклог", "Сделать"),
                         List.of("Planned", "Developing", "E2E Testing", "Acceptance",
                                 "Запланировано", "В разработке", "E2E Тестирование", "Приёмка"),
                         List.of("Done", "Closed", "Resolved",

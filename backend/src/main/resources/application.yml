@@ -85,13 +85,11 @@ status-mapping:
       - New
       - Requirements
       - Rough Estimate
-      - Ready for Dev
       - Backlog
       - To Do
       - Новый
       - Требования
       - Оценка
-      - Готов к разработке
       - Бэклог
       - Сделать
     in-progress-statuses:
