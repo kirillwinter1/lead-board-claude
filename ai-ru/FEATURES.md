@@ -21,7 +21,19 @@
 | F11. Rough Estimates для Epics | ✅ Готово | 2026-01-23 |
 | F13. Автопланирование (MVP) | ✅ Готово | 2026-01-24 |
 | F14. Timeline/Gantt | ✅ Готово | 2026-01-24 |
-| F15. WIP Limits (Stage 1) | ✅ Готово | 2026-01-24 |
+| F15. WIP Limits | ✅ Готово | 2026-01-24 |
+| F16. Pipeline WIP + Stories | 📋 Planned | - |
+
+### Документация фич
+
+| Фича | Спецификация | Руководство |
+|------|--------------|-------------|
+| F15. WIP Limits | [F15_WIP_LIMITS.md](F15_WIP_LIMITS.md) | [F15_WIP_LIMITS_GUIDE.md](F15_WIP_LIMITS_GUIDE.md) |
+| F16. Pipeline WIP + Stories | [F16_PIPELINE_WIP_STORIES.md](F16_PIPELINE_WIP_STORIES.md) | - |
+
+### Будущие фичи
+
+См. [FUTURE_FEATURES.md](FUTURE_FEATURES.md) — backlog идей для будущей реализации.
 
 ---
 
