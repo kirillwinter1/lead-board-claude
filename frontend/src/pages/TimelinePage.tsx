@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getWipHistory, createWipSnapshot, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, WipHistoryResponse } from '../api/forecast'
+import { getForecast, getWipHistory, createWipSnapshot, getEpicStories, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, WipHistoryResponse, StoryInfo } from '../api/forecast'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
@@ -332,15 +332,140 @@ function PhaseBar({ phase, role, rangeStart, totalDays }: PhaseBarProps) {
   )
 }
 
+// --- Story Segments ---
+
+interface StoryTooltipProps {
+  story: StoryInfo
+}
+
+function StoryTooltip({ story }: StoryTooltipProps) {
+  const statusCategory = getStoryStatusCategory(story.status)
+  const progressPercent = story.estimateSeconds && story.timeSpentSeconds
+    ? Math.min(100, Math.round((story.timeSpentSeconds / story.estimateSeconds) * 100))
+    : 0
+
+  const formatTime = (seconds: number | null) => {
+    if (!seconds) return '-'
+    const hours = Math.round(seconds / 3600)
+    return `${hours}h`
+  }
+
+  return (
+    <div className="story-tooltip">
+      <div className="story-tooltip-header">
+        <span className="story-tooltip-key">{story.storyKey}</span>
+        <span className={`story-tooltip-status story-status-${statusCategory.toLowerCase()}`}>
+          {story.status}
+        </span>
+      </div>
+      <div className="story-tooltip-summary">{story.summary}</div>
+      <div className="story-tooltip-details">
+        <div className="story-tooltip-row">
+          <span>Phase:</span>
+          <span className={`story-phase-badge story-phase-${story.phase.toLowerCase()}`}>{story.phase}</span>
+        </div>
+        <div className="story-tooltip-row">
+          <span>Estimate:</span>
+          <span>{formatTime(story.estimateSeconds)}</span>
+        </div>
+        <div className="story-tooltip-row">
+          <span>Logged:</span>
+          <span>{formatTime(story.timeSpentSeconds)} ({progressPercent}%)</span>
+        </div>
+        {story.assignee && (
+          <div className="story-tooltip-row">
+            <span>Assignee:</span>
+            <span>{story.assignee}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface StorySegmentsProps {
+  epicKey: string
+}
+
+function StorySegments({ epicKey }: StorySegmentsProps) {
+  const [stories, setStories] = useState<StoryInfo[]>([])
+  const [loading, setLoading] = useState(true)
+  const [hoveredStory, setHoveredStory] = useState<StoryInfo | null>(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  useEffect(() => {
+    getEpicStories(epicKey)
+      .then(data => {
+        setStories(data)
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [epicKey])
+
+  if (loading || stories.length === 0) {
+    return null
+  }
+
+  // Calculate total estimate for proportional widths
+  const totalEstimate = stories.reduce((sum, s) => sum + (s.estimateSeconds || 3600), 0)
+
+  const handleMouseEnter = (e: React.MouseEvent, story: StoryInfo) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 })
+    setHoveredStory(story)
+  }
+
+  const handleMouseLeave = () => {
+    setHoveredStory(null)
+  }
+
+  return (
+    <div className="story-segments">
+      {stories.map(story => {
+        const estimate = story.estimateSeconds || 3600  // Default 1h if no estimate
+        const widthPercent = (estimate / totalEstimate) * 100
+        const statusCategory = getStoryStatusCategory(story.status)
+
+        return (
+          <div
+            key={story.storyKey}
+            className={`story-segment story-segment-${statusCategory.toLowerCase()}`}
+            style={{ width: `${widthPercent}%` }}
+            onMouseEnter={(e) => handleMouseEnter(e, story)}
+            onMouseLeave={handleMouseLeave}
+            title={story.storyKey}
+          >
+            <span className="story-segment-label">{story.storyKey.split('-')[1]}</span>
+          </div>
+        )
+      })}
+
+      {hoveredStory && (
+        <div
+          className="story-tooltip-wrapper"
+          style={{
+            left: `${tooltipPos.x}px`,
+            top: `${tooltipPos.y}px`,
+            transform: 'translate(-50%, -100%)'
+          }}
+        >
+          <StoryTooltip story={hoveredStory} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface GanttRowProps {
   epic: EpicForecast
   rangeStart: Date
   totalDays: number
   isExpanded: boolean
   onToggle: () => void
+  showStories: boolean
 }
 
-function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle }: GanttRowProps) {
+function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle, showStories }: GanttRowProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const tooltipTimeoutRef = useRef<number | null>(null)
@@ -410,25 +535,32 @@ function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle }: GanttRo
           {/* Unified epic bar */}
           {epicStart && epicEnd && (
             <div
-              className="gantt-unified-bar"
+              className={`gantt-unified-bar ${showStories ? 'gantt-unified-bar-with-stories' : ''}`}
               style={{
                 left: `${barLeft}%`,
                 width: `${Math.max(barWidth, 0.5)}%`,
-                backgroundColor: getStatusColor(status)
+                backgroundColor: showStories ? 'transparent' : getStatusColor(status)
               }}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
             >
-              {/* Progress fill */}
-              <div
-                className="gantt-unified-progress"
-                style={{ width: `${progress}%` }}
-              />
-              {/* Label */}
-              <span className="gantt-unified-label">
-                {progress > 0 && `${progress}%`}
-              </span>
+              {/* Story segments (when enabled) */}
+              {showStories ? (
+                <StorySegments epicKey={epic.epicKey} />
+              ) : (
+                <>
+                  {/* Progress fill */}
+                  <div
+                    className="gantt-unified-progress"
+                    style={{ width: `${progress}%` }}
+                  />
+                  {/* Label */}
+                  <span className="gantt-unified-label">
+                    {progress > 0 && `${progress}%`}
+                  </span>
+                </>
+              )}
             </div>
           )}
 
@@ -842,6 +974,7 @@ export function TimelinePage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedEpics, setExpandedEpics] = useState<Set<string>>(new Set())
+  const [showStories, setShowStories] = useState(false)
 
   const chartRef = useRef<HTMLDivElement>(null)
 
@@ -970,6 +1103,15 @@ export function TimelinePage() {
           <span className="legend-item legend-today">Today</span>
           <span className="legend-item legend-due">Due Date</span>
         </div>
+
+        <label className="timeline-toggle">
+          <input
+            type="checkbox"
+            checked={showStories}
+            onChange={e => setShowStories(e.target.checked)}
+          />
+          <span>Show Stories</span>
+        </label>
       </div>
 
       {loading && <div className="loading">Loading forecast...</div>}
@@ -1050,6 +1192,7 @@ export function TimelinePage() {
                     totalDays={totalDays}
                     isExpanded={expandedEpics.has(epic.epicKey)}
                     onToggle={() => toggleEpic(epic.epicKey)}
+                    showStories={showStories}
                   />
                 ))}
               </div>

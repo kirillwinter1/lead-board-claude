@@ -159,3 +159,46 @@ export async function createWipSnapshot(teamId: number): Promise<{ status: strin
   )
   return response.data
 }
+
+// Story types
+export type StoryStatusCategory = 'TO_DO' | 'IN_PROGRESS' | 'DONE'
+export type StoryPhase = 'SA' | 'DEV' | 'QA'
+
+export interface StoryInfo {
+  storyKey: string
+  summary: string
+  status: string
+  issueType: string
+  assignee: string | null
+  startDate: string | null
+  estimateSeconds: number | null
+  timeSpentSeconds: number | null
+  phase: StoryPhase
+}
+
+/**
+ * Получает stories (child issues) для эпика.
+ */
+export async function getEpicStories(epicKey: string): Promise<StoryInfo[]> {
+  const response = await axios.get<StoryInfo[]>(`/api/planning/epics/${epicKey}/stories`)
+  return response.data
+}
+
+/**
+ * Определяет категорию статуса сторя.
+ */
+export function getStoryStatusCategory(status: string): StoryStatusCategory {
+  const statusLower = status.toLowerCase()
+
+  if (statusLower.includes('done') || statusLower.includes('closed') ||
+      statusLower.includes('resolved') || statusLower.includes('завершен') ||
+      statusLower.includes('готов') || statusLower.includes('выполнен')) {
+    return 'DONE'
+  }
+  if (statusLower.includes('progress') || statusLower.includes('work') ||
+      statusLower.includes('review') || statusLower.includes('test') ||
+      statusLower.includes('в работе') || statusLower.includes('ревью')) {
+    return 'IN_PROGRESS'
+  }
+  return 'TO_DO'
+}
