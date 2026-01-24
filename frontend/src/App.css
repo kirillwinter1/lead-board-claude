@@ -2589,7 +2589,7 @@ body {
 .gantt-unified-bar-with-stories {
   border: 1px solid #dfe1e6;
   background: #f4f5f7 !important;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .story-segments {

@@ -439,12 +439,14 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
     : stories.length
 
   const handleMouseEnter = (e: React.MouseEvent, story: StoryInfo) => {
+    e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
     setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 })
     setHoveredStory(story)
   }
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (e: React.MouseEvent) => {
+    e.stopPropagation()
     setHoveredStory(null)
   }
 
@@ -574,9 +576,9 @@ function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle, showStori
                 width: `${Math.max(barWidth, 0.5)}%`,
                 backgroundColor: showStories ? 'transparent' : getStatusColor(status)
               }}
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
-              onMouseMove={handleMouseMove}
+              onMouseEnter={showStories ? undefined : handleMouseEnter}
+              onMouseLeave={showStories ? undefined : handleMouseLeave}
+              onMouseMove={showStories ? undefined : handleMouseMove}
             >
               {/* Story segments (when enabled) */}
               {showStories ? (
