@@ -1,5 +1,7 @@
 package com.leadboard.team.dto;
 
+import com.leadboard.status.StatusMappingConfig;
+
 import java.math.BigDecimal;
 
 /**
@@ -9,7 +11,8 @@ public record PlanningConfigDto(
         GradeCoefficients gradeCoefficients,
         BigDecimal riskBuffer,
         WipLimits wipLimits,
-        StoryDuration storyDuration
+        StoryDuration storyDuration,
+        StatusMappingConfig statusMapping
 ) {
     /**
      * Коэффициенты производительности по грейдам.
@@ -74,7 +77,8 @@ public record PlanningConfigDto(
                 GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 WipLimits.defaults(),
-                StoryDuration.defaults()
+                StoryDuration.defaults(),
+                null  // statusMapping берётся из StatusMappingService
         );
     }
 }

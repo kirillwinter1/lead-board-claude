@@ -23,6 +23,7 @@
 | F14. Timeline/Gantt | ✅ Готово | 2026-01-24 |
 | F15. WIP Limits | ✅ Готово | 2026-01-24 |
 | F16. Pipeline WIP + Stories | 📋 Planned | - |
+| F17. Configurable Status Mapping | ✅ Готово | 2026-01-24 |
 
 ### Документация фич
 
@@ -511,6 +512,87 @@ calculationRules:
 **Зависимости:**
 - F13 (AutoScore) — для приоритизации очереди
 - F5 (Team Backend) — WIP конфигурация уже хранится в planning_config
+
+---
+
+### F17. Configurable Status Mapping ✅
+
+**Цель:** Вынести хардкоженные статусы в конфигурацию для поддержки разных Jira-проектов с разными названиями статусов (русский, английский).
+
+**Проблема:** Статусы были захардкожены в коде (`isDone()`, `isInProgress()`, `determinePhase()`), что не позволяло поддерживать разные Jira-проекты.
+
+**Архитектура:**
+```
+application.yml (системные дефолты)
+       ↓
+teams.planning_config JSONB (переопределение на уровне команды)
+       ↓
+StatusMappingService (мержит и использует)
+```
+
+**Новые файлы:**
+- `status/StatusCategory.java` — enum: TODO, IN_PROGRESS, DONE
+- `status/WorkflowConfig.java` — списки статусов для каждой категории
+- `status/PhaseMapping.java` — маппинг статусов/типов на фазы SA/DEV/QA
+- `status/StatusMappingConfig.java` — объединяет workflow + phase mapping
+- `status/StatusMappingProperties.java` — читает из application.yml
+- `status/StatusMappingService.java` — основной сервис
+
+**Конфигурация application.yml:**
+```yaml
+status-mapping:
+  epic-workflow:
+    todo-statuses: [New, Backlog, Новый, Бэклог, ...]
+    in-progress-statuses: [Developing, В разработке, ...]
+    done-statuses: [Done, Closed, Готово, ...]
+  story-workflow:
+    todo-statuses: [New, Ready, Новый, ...]
+    in-progress-statuses: [Development, Testing, ...]
+    done-statuses: [Done, Готово]
+  subtask-workflow:
+    todo-statuses: [New, Новый]
+    in-progress-statuses: [In Progress, В работе, ...]
+    done-statuses: [Done, Готово]
+  phase-mapping:
+    sa-statuses: [Analysis, Анализ, ...]
+    dev-statuses: [Development, Разработка, ...]
+    qa-statuses: [Testing, Тестирование, ...]
+    sa-issue-types: [Аналитика, Analysis]
+    qa-issue-types: [Тестирование, Testing, Bug, ...]
+```
+
+**Переопределение для команды:**
+```json
+PUT /api/teams/{id}/planning-config
+{
+  "statusMapping": {
+    "epicWorkflow": {
+      "todoStatuses": ["Бэклог", "Новый"],
+      "doneStatuses": ["Завершено"]
+    },
+    "phaseMapping": {
+      "qaIssueTypes": ["QA", "Баг"]
+    }
+  }
+}
+```
+
+**Алгоритм определения статуса:**
+1. Точное совпадение (case-insensitive) из конфигурации
+2. Fallback на substring matching (для обратной совместимости)
+3. По умолчанию → TODO + warning в лог
+
+**Тесты:**
+- 30+ unit-тестов для StatusMappingService
+- Покрытие: категоризация, фазы, isDone/isInProgress, team override, merge
+
+**Критерии готовности:**
+- [x] Статусы читаются из конфигурации
+- [x] Команда может переопределить маппинг
+- [x] Обратная совместимость (substring matching)
+- [x] ForecastService использует StatusMappingService
+- [x] RoughEstimateProperties делегирует проверку статусов
+- [x] Все тесты проходят (159 тестов)
 
 ---
 

@@ -47,11 +47,7 @@ atlassian:
 
 rough-estimate:
   enabled: true
-  allowed-epic-statuses:
-    - Backlog
-    - To Do
-    - Бэклог
-    - Сделать
+  # allowed-epic-statuses теперь берутся из status-mapping.epic-workflow.todo-statuses
   step-days: 0.1
   min-days: 0.0
   max-days: 365
@@ -67,3 +63,108 @@ planning:
     cache-ttl: ${PLANNING_CALENDAR_CACHE_TTL:86400}
     # Путь к файлу с праздниками (для source=file)
     file-path: ${PLANNING_CALENDAR_FILE_PATH:}
+
+# Маппинг статусов Jira
+status-mapping:
+  epic-workflow:
+    todo-statuses:
+      - New
+      - Requirements
+      - Rough Estimate
+      - Ready for Dev
+      - Backlog
+      - To Do
+      - Новый
+      - Требования
+      - Оценка
+      - Готов к разработке
+      - Бэклог
+      - Сделать
+    in-progress-statuses:
+      - Planned
+      - Developing
+      - E2E Testing
+      - Acceptance
+      - Запланировано
+      - В разработке
+      - E2E Тестирование
+      - Приёмка
+    done-statuses:
+      - Done
+      - Closed
+      - Resolved
+      - Готово
+      - Закрыто
+      - Решено
+  story-workflow:
+    todo-statuses:
+      - New
+      - Ready
+      - Waiting Dev
+      - Waiting QA
+      - Ready to Release
+      - Новый
+      - Готов
+      - Ожидает разработки
+      - Ожидает тестирования
+      - Готов к релизу
+    in-progress-statuses:
+      - Analysis
+      - Analysis Review
+      - Development
+      - Dev Review
+      - Testing
+      - Test Review
+      - Анализ
+      - Ревью анализа
+      - Разработка
+      - Ревью разработки
+      - Тестирование
+      - Ревью тестирования
+    done-statuses:
+      - Done
+      - Готово
+  subtask-workflow:
+    todo-statuses:
+      - New
+      - Новый
+    in-progress-statuses:
+      - In Progress
+      - Review
+      - В работе
+      - Ревью
+    done-statuses:
+      - Done
+      - Готово
+  phase-mapping:
+    sa-statuses:
+      - Analysis
+      - Analysis Review
+      - Requirements
+      - Анализ
+      - Ревью анализа
+      - Требования
+    dev-statuses:
+      - Development
+      - Dev Review
+      - Developing
+      - Разработка
+      - Ревью разработки
+      - В разработке
+    qa-statuses:
+      - Testing
+      - Test Review
+      - E2E Testing
+      - Тестирование
+      - Ревью тестирования
+      - E2E Тестирование
+    sa-issue-types:
+      - Аналитика
+      - Analysis
+      - Analytics
+    qa-issue-types:
+      - Тестирование
+      - Testing
+      - Bug
+      - Баг
+      - Дефект

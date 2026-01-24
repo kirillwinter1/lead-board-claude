@@ -7,6 +7,8 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.ForecastResponse.TeamCapacity;
 import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.planning.dto.ForecastResponse.RoleWipStatus;
+import com.leadboard.status.StatusMappingConfig;
+import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -50,17 +52,20 @@ public class ForecastService {
     private final TeamService teamService;
     private final TeamMemberRepository memberRepository;
     private final WorkCalendarService calendarService;
+    private final StatusMappingService statusMappingService;
 
     public ForecastService(
             JiraIssueRepository issueRepository,
             TeamService teamService,
             TeamMemberRepository memberRepository,
-            WorkCalendarService calendarService
+            WorkCalendarService calendarService,
+            StatusMappingService statusMappingService
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
         this.memberRepository = memberRepository;
         this.calendarService = calendarService;
+        this.statusMappingService = statusMappingService;
     }
 
     /**
@@ -81,6 +86,9 @@ public class ForecastService {
                 ? config.storyDuration()
                 : PlanningConfigDto.StoryDuration.defaults();
 
+        // Получаем StatusMappingConfig (для определения статусов)
+        StatusMappingConfig statusMapping = config.statusMapping();
+
         // Получаем WIP лимиты
         PlanningConfigDto.WipLimits wipLimits = config.wipLimits() != null
                 ? config.wipLimits()
@@ -100,7 +108,7 @@ public class ForecastService {
         // Рассчитываем прогноз с учётом WIP лимитов (team + role-specific)
         WipCalculationResult wipResult = calculateForecastsWithWip(
                 epics, teamCapacity, riskBuffer, storyDuration,
-                teamWipLimit, saWipLimit, devWipLimit, qaWipLimit);
+                teamWipLimit, saWipLimit, devWipLimit, qaWipLimit, statusMapping);
 
         // Формируем WIP статус с информацией по ролям
         int currentTeamWip = Math.min(epics.size(), teamWipLimit);
@@ -155,7 +163,8 @@ public class ForecastService {
             int teamWipLimit,
             int saWipLimit,
             int devWipLimit,
-            int qaWipLimit
+            int qaWipLimit,
+            StatusMappingConfig statusMapping
     ) {
         if (epics.isEmpty()) {
             return new WipCalculationResult(new ArrayList<>(), 0, 0, 0);
@@ -195,7 +204,7 @@ public class ForecastService {
             }
 
             // Рассчитываем SA фазу
-            RemainingByRole remaining = calculateRemaining(epic, riskBuffer);
+            RemainingByRole remaining = calculateRemaining(epic, riskBuffer, statusMapping);
             PhaseInfo saPhase = calculatePhase(
                     remaining.sa().days(),
                     teamCapacity.saHoursPerDay(),
@@ -407,7 +416,7 @@ public class ForecastService {
      * 2. Агрегация по child issues (stories/tasks) с учётом статусов и time spent
      * 3. Original estimate на эпике (fallback)
      */
-    private RemainingByRole calculateRemaining(JiraIssueEntity epic, BigDecimal riskBuffer) {
+    private RemainingByRole calculateRemaining(JiraIssueEntity epic, BigDecimal riskBuffer, StatusMappingConfig statusMapping) {
         // 1. Используем rough estimate если есть
         BigDecimal saDays = epic.getRoughEstimateSaDays();
         BigDecimal devDays = epic.getRoughEstimateDevDays();
@@ -425,7 +434,7 @@ public class ForecastService {
 
                 for (JiraIssueEntity child : childIssues) {
                     // Пропускаем Done задачи - они уже выполнены
-                    if (isDone(child.getStatus())) {
+                    if (statusMappingService.isDone(child.getStatus(), statusMapping)) {
                         continue;
                     }
 
@@ -435,12 +444,12 @@ public class ForecastService {
                     long remaining = Math.max(0, estimate - spent);
 
                     // Если нет эстимейта, но есть залогированное время - оцениваем что осталось ещё столько же
-                    if (estimate == 0 && spent > 0 && !isInProgress(child.getStatus())) {
+                    if (estimate == 0 && spent > 0 && !statusMappingService.isInProgress(child.getStatus(), statusMapping)) {
                         remaining = spent; // Fallback: предполагаем что осталось примерно столько же
                     }
 
                     // Определяем фазу по типу задачи или статусу
-                    String phase = determinePhase(child.getStatus(), child.getIssueType());
+                    String phase = statusMappingService.determinePhase(child.getStatus(), child.getIssueType(), statusMapping);
 
                     switch (phase) {
                         case "SA" -> saRemainingSeconds += remaining;
@@ -491,50 +500,6 @@ public class ForecastService {
                 new RoleRemaining(devFinal.multiply(HOURS_PER_DAY), devFinal),
                 new RoleRemaining(qaFinal.multiply(HOURS_PER_DAY), qaFinal)
         );
-    }
-
-    /**
-     * Проверяет, является ли статус "Done" (завершённым).
-     */
-    private boolean isDone(String status) {
-        if (status == null) return false;
-        String s = status.toLowerCase();
-        return s.contains("done") || s.contains("closed") || s.contains("resolved")
-                || s.contains("завершен") || s.contains("готов") || s.contains("выполнен");
-    }
-
-    /**
-     * Проверяет, является ли статус "In Progress".
-     */
-    private boolean isInProgress(String status) {
-        if (status == null) return false;
-        String s = status.toLowerCase();
-        return s.contains("progress") || s.contains("work") || s.contains("review")
-                || s.contains("test") || s.contains("в работе") || s.contains("ревью");
-    }
-
-    /**
-     * Определяет фазу (SA/DEV/QA) по статусу или типу задачи.
-     */
-    private String determinePhase(String status, String issueType) {
-        String statusLower = status != null ? status.toLowerCase() : "";
-        String typeLower = issueType != null ? issueType.toLowerCase() : "";
-
-        // SA фаза: анализ, аналитика
-        if (statusLower.contains("analysis") || statusLower.contains("анализ") || statusLower.contains("аналитик") ||
-            typeLower.contains("analysis") || typeLower.contains("анализ") || typeLower.contains("аналитик")) {
-            return "SA";
-        }
-
-        // QA фаза: тест, тестирование, qa, bug
-        if (statusLower.contains("test") || statusLower.contains("qa") ||
-            statusLower.contains("тест") || statusLower.contains("review") ||
-            typeLower.contains("test") || typeLower.contains("qa") || typeLower.contains("тест") ||
-            typeLower.contains("bug") || typeLower.contains("баг") || typeLower.contains("дефект")) {
-            return "QA";
-        }
-
-        return "DEV";
     }
 
     private BigDecimal applyRiskBuffer(BigDecimal days, BigDecimal multiplier) {

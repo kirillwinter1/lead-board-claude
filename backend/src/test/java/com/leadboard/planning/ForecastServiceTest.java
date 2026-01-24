@@ -4,6 +4,8 @@ import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.planning.dto.EpicForecast;
 import com.leadboard.planning.dto.EpicForecast.*;
 import com.leadboard.planning.dto.ForecastResponse;
+import com.leadboard.status.StatusMappingProperties;
+import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -39,16 +41,21 @@ class ForecastServiceTest {
     private WorkCalendarService calendarService;
 
     private ForecastService forecastService;
+    private StatusMappingService statusMappingService;
 
     private static final Long TEAM_ID = 1L;
 
     @BeforeEach
     void setUp() {
+        // Create real StatusMappingService with defaults
+        statusMappingService = new StatusMappingService(new StatusMappingProperties());
+
         forecastService = new ForecastService(
                 issueRepository,
                 teamService,
                 memberRepository,
-                calendarService
+                calendarService,
+                statusMappingService
         );
 
         // Default calendar behavior: add N workdays returns date + N days
@@ -516,7 +523,8 @@ class ForecastServiceTest {
                     PlanningConfigDto.GradeCoefficients.defaults(),
                     new BigDecimal("0.2"),
                     new PlanningConfigDto.WipLimits(6, 2, 1, 2), // dev WIP = 1
-                    PlanningConfigDto.StoryDuration.defaults()
+                    PlanningConfigDto.StoryDuration.defaults(),
+                    null  // statusMapping
             );
             when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
             setupFullTeam();
@@ -653,7 +661,8 @@ class ForecastServiceTest {
                     PlanningConfigDto.GradeCoefficients.defaults(),
                     new BigDecimal("0.2"),
                     new PlanningConfigDto.WipLimits(6, 1, 1, 1), // All WIP = 1
-                    PlanningConfigDto.StoryDuration.defaults()
+                    PlanningConfigDto.StoryDuration.defaults(),
+                    null  // statusMapping
             );
             when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
             setupFullTeam();
@@ -711,7 +720,8 @@ class ForecastServiceTest {
                     PlanningConfigDto.GradeCoefficients.defaults(),
                     new BigDecimal("0.2"),
                     new PlanningConfigDto.WipLimits(6, 3, 3, 3), // Generous WIP limits
-                    PlanningConfigDto.StoryDuration.defaults()
+                    PlanningConfigDto.StoryDuration.defaults(),
+                    null  // statusMapping
             );
             when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
             setupFullTeam();
@@ -835,7 +845,8 @@ class ForecastServiceTest {
                     PlanningConfigDto.GradeCoefficients.defaults(),
                     new BigDecimal("0.2"),
                     new PlanningConfigDto.WipLimits(6, 2, 3, 2), // SA=2, DEV=3, QA=2
-                    PlanningConfigDto.StoryDuration.defaults()
+                    PlanningConfigDto.StoryDuration.defaults(),
+                    null  // statusMapping
             );
             when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
             setupFullTeam();
@@ -1010,7 +1021,8 @@ class ForecastServiceTest {
                     PlanningConfigDto.GradeCoefficients.defaults(),
                     new BigDecimal("0.2"),
                     new PlanningConfigDto.WipLimits(team, sa, dev, qa),
-                    PlanningConfigDto.StoryDuration.defaults()
+                    PlanningConfigDto.StoryDuration.defaults(),
+                    null  // statusMapping
             );
             when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
         }
@@ -1023,7 +1035,8 @@ class ForecastServiceTest {
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 new PlanningConfigDto.WipLimits(wipLimit, 2, 3, 2),
-                PlanningConfigDto.StoryDuration.defaults()
+                PlanningConfigDto.StoryDuration.defaults(),
+                null  // statusMapping
         );
         when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
     }
@@ -1033,7 +1046,8 @@ class ForecastServiceTest {
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 null, // WIP limits
-                PlanningConfigDto.StoryDuration.defaults()
+                PlanningConfigDto.StoryDuration.defaults(),
+                null  // statusMapping
         );
         when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
     }

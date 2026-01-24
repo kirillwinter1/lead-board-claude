@@ -1,20 +1,33 @@
 package com.leadboard.config;
 
+import com.leadboard.status.StatusMappingConfig;
+import com.leadboard.status.StatusMappingService;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Конфигурация функции rough estimate.
+ * Статусы для проверки делегируются в StatusMappingService.
+ */
 @Component
 @ConfigurationProperties(prefix = "rough-estimate")
 public class RoughEstimateProperties {
 
     private boolean enabled = true;
-    private List<String> allowedEpicStatuses = List.of("Backlog", "To Do", "Бэклог", "Сделать");
     private BigDecimal stepDays = new BigDecimal("0.1");
     private BigDecimal minDays = BigDecimal.ZERO;
     private BigDecimal maxDays = new BigDecimal("365");
+
+    private StatusMappingService statusMappingService;
+
+    // Setter injection to avoid circular dependency issues
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setStatusMappingService(StatusMappingService statusMappingService) {
+        this.statusMappingService = statusMappingService;
+    }
 
     public boolean isEnabled() {
         return enabled;
@@ -22,14 +35,6 @@ public class RoughEstimateProperties {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
-    }
-
-    public List<String> getAllowedEpicStatuses() {
-        return allowedEpicStatuses;
-    }
-
-    public void setAllowedEpicStatuses(List<String> allowedEpicStatuses) {
-        this.allowedEpicStatuses = allowedEpicStatuses;
     }
 
     public BigDecimal getStepDays() {
@@ -56,11 +61,36 @@ public class RoughEstimateProperties {
         this.maxDays = maxDays;
     }
 
+    /**
+     * Проверяет, допустим ли статус эпика для rough estimate.
+     * Использует системную конфигурацию (без override команды).
+     */
     public boolean isStatusAllowed(String status) {
-        if (allowedEpicStatuses == null || allowedEpicStatuses.isEmpty()) {
+        if (statusMappingService == null) {
+            // Fallback если сервис ещё не инжектирован
             return true;
         }
-        return allowedEpicStatuses.stream()
-                .anyMatch(allowed -> allowed.equalsIgnoreCase(status));
+        return statusMappingService.isAllowedForRoughEstimate(status, null);
+    }
+
+    /**
+     * Проверяет, допустим ли статус эпика для rough estimate с учётом конфигурации команды.
+     */
+    public boolean isStatusAllowed(String status, StatusMappingConfig teamOverride) {
+        if (statusMappingService == null) {
+            return true;
+        }
+        return statusMappingService.isAllowedForRoughEstimate(status, teamOverride);
+    }
+
+    /**
+     * Возвращает список допустимых статусов из системной конфигурации.
+     * Для отображения в UI.
+     */
+    public List<String> getAllowedEpicStatuses() {
+        if (statusMappingService == null) {
+            return List.of();
+        }
+        return statusMappingService.getDefaultConfig().epicWorkflow().todoStatuses();
     }
 }
