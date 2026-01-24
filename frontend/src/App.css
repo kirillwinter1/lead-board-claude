@@ -1767,7 +1767,7 @@ body {
   align-items: flex-end;
   gap: 24px;
   padding: 16px 20px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   background: white;
   border-radius: 8px;
   border: 1px solid #dfe1e6;
@@ -1796,23 +1796,22 @@ body {
   border-radius: 2px;
 }
 
-.legend-sa::before {
-  background: #0052cc;
+.legend-on-track::before {
+  background: #22c55e;
 }
 
-.legend-dev::before {
-  background: #36b37e;
+.legend-at-risk::before {
+  background: #eab308;
 }
 
-.legend-qa::before {
-  background: #ff991f;
+.legend-late::before {
+  background: #ef4444;
 }
 
 .legend-today::before {
   width: 2px;
   height: 12px;
   background: #0052cc;
-  border-style: dashed;
 }
 
 .legend-due::before {
@@ -1821,27 +1820,65 @@ body {
   background: #de350b;
 }
 
-.legend-no-capacity::before {
-  background: repeating-linear-gradient(
-    45deg,
-    #de350b,
-    #de350b 2px,
-    #ff5630 2px,
-    #ff5630 4px
-  );
+/* Summary Panel */
+.timeline-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  margin-bottom: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dfe1e6;
+  font-size: 14px;
 }
 
+.summary-total {
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.summary-separator {
+  color: #a5adba;
+}
+
+.summary-stat {
+  color: #42526e;
+}
+
+.summary-on-track {
+  color: #22c55e;
+}
+
+.summary-at-risk {
+  color: #eab308;
+}
+
+.summary-late {
+  color: #ef4444;
+}
+
+/* Hint text */
+.timeline-hint {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #6b778c;
+}
+
+/* Gantt Container */
 .gantt-container {
   display: flex;
   background: white;
   border-radius: 8px;
   border: 1px solid #dfe1e6;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 
 .gantt-labels {
   flex-shrink: 0;
-  width: 200px;
+  width: 240px;
   border-right: 1px solid #dfe1e6;
   background: #fafbfc;
 }
@@ -1862,10 +1899,36 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  height: 56px;
-  padding: 8px 16px;
+  height: 44px;
+  padding: 6px 12px;
   border-bottom: 1px solid #ebecf0;
   justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.gantt-label-row:hover {
+  background: #f4f5f7;
+}
+
+.gantt-label-row-expanded {
+  background: #e9f2ff;
+}
+
+.gantt-label-row-expanded:hover {
+  background: #deebff;
+}
+
+.gantt-label-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.gantt-expand-icon {
+  font-size: 8px;
+  color: #6b778c;
+  width: 12px;
 }
 
 .gantt-label-row .issue-key {
@@ -1880,18 +1943,59 @@ body {
   text-decoration: underline;
 }
 
-.gantt-label-title {
+.gantt-status-icon {
   font-size: 12px;
+  margin-left: 2px;
+}
+
+.gantt-label-title {
+  font-size: 11px;
   color: #42526e;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-left: 18px;
 }
 
+/* Phase labels in expanded row */
+.gantt-label-phases {
+  height: 40px;
+  background: #f4f5f7;
+  border-left: 3px solid #0052cc;
+}
+
+.gantt-phase-labels {
+  display: flex;
+  gap: 8px;
+  padding-left: 18px;
+}
+
+.gantt-phase-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: white;
+}
+
+.gantt-phase-tag-sa {
+  background: #0052cc;
+}
+
+.gantt-phase-tag-dev {
+  background: #36b37e;
+}
+
+.gantt-phase-tag-qa {
+  background: #ff991f;
+}
+
+/* Gantt Chart */
 .gantt-chart {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: visible;
 }
 
 .gantt-header {
@@ -1903,7 +2007,7 @@ body {
 
 .gantt-header-cell {
   flex: 1;
-  min-width: 0;
+  min-width: 40px;
   padding: 10px 4px;
   font-size: 10px;
   font-weight: 600;
@@ -1924,13 +2028,24 @@ body {
 }
 
 .gantt-row {
-  height: 56px;
+  height: 44px;
   border-bottom: 1px solid #ebecf0;
   position: relative;
+  cursor: pointer;
 }
 
 .gantt-row:hover {
   background: #fafbfc;
+}
+
+.gantt-row-expanded {
+  background: #e9f2ff;
+}
+
+.gantt-row-phases {
+  height: 40px;
+  background: #f4f5f7;
+  cursor: default;
 }
 
 .gantt-row-content {
@@ -1939,74 +2054,103 @@ body {
   width: 100%;
 }
 
-.gantt-bar {
+/* Unified bar (single bar per epic) */
+.gantt-unified-bar {
   position: absolute;
-  height: 14px;
-  border-radius: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 24px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  min-width: 4px;
+  overflow: hidden;
+}
+
+.gantt-unified-bar:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.gantt-unified-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px 0 0 4px;
+}
+
+.gantt-unified-label {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Phase bars (in expanded view) */
+.gantt-phase-bar {
+  position: absolute;
+  height: 12px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
   font-size: 9px;
   font-weight: 600;
   color: white;
-  cursor: default;
-  transition: opacity 0.15s;
   min-width: 4px;
 }
 
-.gantt-bar:hover {
-  opacity: 1 !important;
-  z-index: 10;
-}
-
-.gantt-bar-sa {
+.gantt-phase-sa {
   background: #0052cc;
-  top: 6px;
+  top: 4px;
 }
 
-.gantt-bar-dev {
+.gantt-phase-dev {
   background: #36b37e;
-  top: 22px;
+  top: 16px;
 }
 
-.gantt-bar-qa {
+.gantt-phase-qa {
   background: #ff991f;
-  top: 38px;
+  top: 28px;
 }
 
-.gantt-bar-label {
+.gantt-phase-label {
   font-size: 8px;
   letter-spacing: 0.5px;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
 }
 
-/* Warning style for bars with no capacity */
-.gantt-bar-no-capacity {
+.gantt-phase-days {
+  font-size: 8px;
+  opacity: 0.8;
+}
+
+.gantt-phase-no-capacity {
   background: repeating-linear-gradient(
     45deg,
     #de350b,
-    #de350b 4px,
-    #ff5630 4px,
-    #ff5630 8px
+    #de350b 3px,
+    #ff5630 3px,
+    #ff5630 6px
   ) !important;
-  border: 2px solid #de350b;
-  animation: pulse-warning 1.5s ease-in-out infinite;
 }
 
-@keyframes pulse-warning {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 1; }
-}
-
+/* Today line */
 .gantt-today-line {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 2px;
   background: #0052cc;
-  opacity: 0.5;
+  opacity: 0.6;
   z-index: 5;
   pointer-events: none;
 }
@@ -2022,6 +2166,7 @@ body {
   border-radius: 50%;
 }
 
+/* Due date line */
 .gantt-due-line {
   position: absolute;
   top: 0;
@@ -2042,4 +2187,131 @@ body {
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
   border-top: 8px solid #de350b;
+}
+
+/* Tooltip */
+.gantt-tooltip-wrapper {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.epic-tooltip {
+  background: #172b4d;
+  color: white;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 12px;
+  min-width: 280px;
+  max-width: 360px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.tooltip-header {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-key {
+  font-weight: 600;
+  color: #79e2f2;
+  margin-right: 8px;
+}
+
+.tooltip-summary {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tooltip-section {
+  margin-bottom: 10px;
+}
+
+.tooltip-section:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.tooltip-row span:first-child {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tooltip-delta {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: auto;
+}
+
+.tooltip-delta-early {
+  background: #22c55e;
+  color: white;
+}
+
+.tooltip-delta-ontime {
+  background: #22c55e;
+  color: white;
+}
+
+.tooltip-delta-late {
+  background: #ef4444;
+  color: white;
+}
+
+.tooltip-phases {
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tooltip-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.tooltip-phase-label {
+  font-weight: 600;
+  width: 30px;
+}
+
+.tooltip-phase-dates {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tooltip-phase-days {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tooltip-phase-alert {
+  color: #ef4444;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.tooltip-phase-na {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.tooltip-phase-warning {
+  color: #fbbf24;
+}
+
+.confidence-high {
+  color: #22c55e;
+}
+
+.confidence-medium {
+  color: #eab308;
+}
+
+.confidence-low {
+  color: #ef4444;
 }
