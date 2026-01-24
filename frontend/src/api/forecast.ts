@@ -117,3 +117,45 @@ export async function updateManualBoost(epicKey: string, boost: number): Promise
   )
   return response.data
 }
+
+// WIP History types
+export interface WipDataPoint {
+  date: string
+  teamLimit: number
+  teamCurrent: number
+  saLimit: number | null
+  saCurrent: number | null
+  devLimit: number | null
+  devCurrent: number | null
+  qaLimit: number | null
+  qaCurrent: number | null
+  inQueue: number | null
+  totalEpics: number | null
+}
+
+export interface WipHistoryResponse {
+  teamId: number
+  from: string
+  to: string
+  dataPoints: WipDataPoint[]
+}
+
+/**
+ * Получает историю WIP для графика.
+ */
+export async function getWipHistory(teamId: number, days: number = 30): Promise<WipHistoryResponse> {
+  const response = await axios.get<WipHistoryResponse>(
+    `/api/planning/wip-history?teamId=${teamId}&days=${days}`
+  )
+  return response.data
+}
+
+/**
+ * Создаёт снапшот WIP (для ручного запуска).
+ */
+export async function createWipSnapshot(teamId: number): Promise<{ status: string; date: string }> {
+  const response = await axios.post<{ status: string; date: string; teamWip: string }>(
+    `/api/planning/wip-snapshot?teamId=${teamId}`
+  )
+  return response.data
+}

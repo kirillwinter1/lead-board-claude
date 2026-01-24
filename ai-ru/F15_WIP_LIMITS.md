@@ -123,7 +123,12 @@ PUT  /api/teams/{id}/planning-config
   - Обнаружение bottlenecks по ролям
   - Анализ очереди
   - Анализ ожидания между фазами
-- [ ] График утилизации WIP во времени (требует backend изменений)
+- [x] График утилизации WIP во времени (WipHistoryChart)
+  - Ежедневные снапшоты WIP (9:00 AM)
+  - Хранение истории 90 дней
+  - SVG-график Current vs Limit
+  - API: GET /api/planning/wip-history
+  - API: POST /api/planning/wip-snapshot
 
 ---
 

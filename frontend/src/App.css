@@ -1986,6 +1986,68 @@ body {
   color: #6b778c;
 }
 
+/* WIP History Chart */
+.wip-history-collapsed {
+  margin-bottom: 16px;
+}
+
+.wip-history-toggle {
+  background: none;
+  border: 1px solid #dfe1e6;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #0052cc;
+}
+
+.wip-history-toggle:hover {
+  background: #f4f5f7;
+}
+
+.wip-history-panel {
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.wip-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.wip-history-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.wip-history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wip-history-loading,
+.wip-history-empty {
+  text-align: center;
+  padding: 24px;
+  color: #6b778c;
+  font-size: 13px;
+}
+
+.wip-history-empty button {
+  margin-top: 12px;
+}
+
+.wip-history-chart {
+  display: block;
+  margin: 0 auto;
+}
+
 /* Hint text */
 .timeline-hint {
   margin-top: 12px;

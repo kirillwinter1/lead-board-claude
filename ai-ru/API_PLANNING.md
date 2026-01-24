@@ -191,6 +191,69 @@ POST /api/planning/recalculate?teamId=1
 
 ---
 
+### GET /api/planning/wip-history
+
+Получает историю WIP для построения графика.
+
+**Параметры запроса:**
+
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| teamId | number | Да | ID команды |
+| days | number | Нет | Количество дней (по умолчанию 30) |
+
+**Пример запроса:**
+```
+GET /api/planning/wip-history?teamId=1&days=30
+```
+
+**Ответ:**
+```json
+{
+  "teamId": 1,
+  "from": "2025-12-25",
+  "to": "2026-01-24",
+  "dataPoints": [
+    {
+      "date": "2026-01-20",
+      "teamLimit": 6,
+      "teamCurrent": 4,
+      "saLimit": 2,
+      "saCurrent": 1,
+      "devLimit": 3,
+      "devCurrent": 2,
+      "qaLimit": 2,
+      "qaCurrent": 1,
+      "inQueue": 2,
+      "totalEpics": 6
+    }
+  ]
+}
+```
+
+---
+
+### POST /api/planning/wip-snapshot
+
+Создаёт снапшот WIP для команды (ручной запуск).
+
+**Параметры запроса:**
+
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| teamId | number | Да | ID команды |
+
+**Ответ:**
+```json
+{
+  "status": "created",
+  "date": "2026-01-24",
+  "teamWip": "4/6"
+}
+```
+
+---
+
 ### PATCH /api/planning/autoscore/epics/{epicKey}/boost
 
 Обновляет ручной boost приоритета для эпика.
