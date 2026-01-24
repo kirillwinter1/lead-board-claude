@@ -122,6 +122,7 @@ public class ForecastController {
 
     /**
      * Получает child issues (stories) для эпика.
+     * Агрегирует время из подзадач если у сторя нет собственного timeSpent.
      *
      * @param epicKey ключ эпика (например, LB-123)
      */
@@ -130,17 +131,43 @@ public class ForecastController {
         List<JiraIssueEntity> childIssues = issueRepository.findByParentKey(epicKey);
 
         List<StoryInfo> stories = childIssues.stream()
-                .map(issue -> new StoryInfo(
-                        issue.getIssueKey(),
-                        issue.getSummary(),
-                        issue.getStatus(),
-                        issue.getIssueType(),
-                        null, // assignee - можно добавить позже
-                        null, // startDate - можно добавить позже
-                        issue.getOriginalEstimateSeconds(),
-                        issue.getTimeSpentSeconds(),
-                        StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType())
-                ))
+                .map(issue -> {
+                    // Агрегируем время и эстимейты из подзадач
+                    List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(issue.getIssueKey());
+
+                    Long totalEstimate = issue.getOriginalEstimateSeconds();
+                    Long totalSpent = issue.getTimeSpentSeconds();
+
+                    if (!subtasks.isEmpty()) {
+                        // Суммируем из подзадач
+                        long subtaskEstimate = subtasks.stream()
+                                .mapToLong(st -> st.getOriginalEstimateSeconds() != null ? st.getOriginalEstimateSeconds() : 0)
+                                .sum();
+                        long subtaskSpent = subtasks.stream()
+                                .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
+                                .sum();
+
+                        // Используем сумму подзадач если она больше или у родителя нет данных
+                        if (subtaskEstimate > 0 && (totalEstimate == null || subtaskEstimate > totalEstimate)) {
+                            totalEstimate = subtaskEstimate;
+                        }
+                        if (subtaskSpent > 0) {
+                            totalSpent = (totalSpent != null ? totalSpent : 0) + subtaskSpent;
+                        }
+                    }
+
+                    return new StoryInfo(
+                            issue.getIssueKey(),
+                            issue.getSummary(),
+                            issue.getStatus(),
+                            issue.getIssueType(),
+                            null, // assignee - можно добавить позже
+                            null, // startDate - можно добавить позже
+                            totalEstimate,
+                            totalSpent,
+                            StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType())
+                    );
+                })
                 .toList();
 
         return ResponseEntity.ok(stories);
