@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getWipHistory, createWipSnapshot, getEpicStories, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, WipHistoryResponse, StoryInfo } from '../api/forecast'
+import { getForecast, getEpicStories, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, StoryInfo } from '../api/forecast'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
@@ -830,173 +830,6 @@ function WipInsightsPanel({ wipStatus, epics }: WipInsightsPanelProps) {
   )
 }
 
-// --- WIP History Chart ---
-
-interface WipHistoryChartProps {
-  teamId: number
-}
-
-function WipHistoryChart({ teamId }: WipHistoryChartProps) {
-  const [history, setHistory] = useState<WipHistoryResponse | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [expanded, setExpanded] = useState(false)
-
-  useEffect(() => {
-    if (!expanded) return
-
-    setLoading(true)
-    getWipHistory(teamId, 30)
-      .then(data => {
-        setHistory(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [teamId, expanded])
-
-  const handleCreateSnapshot = async () => {
-    try {
-      await createWipSnapshot(teamId)
-      // Refresh history
-      const data = await getWipHistory(teamId, 30)
-      setHistory(data)
-    } catch (e) {
-      console.error('Failed to create snapshot', e)
-    }
-  }
-
-  if (!expanded) {
-    return (
-      <div className="wip-history-collapsed">
-        <button className="wip-history-toggle" onClick={() => setExpanded(true)}>
-          📊 Show WIP History Chart
-        </button>
-      </div>
-    )
-  }
-
-  const dataPoints = history?.dataPoints || []
-  const chartWidth = 600
-  const chartHeight = 150
-  const padding = { top: 20, right: 20, bottom: 30, left: 40 }
-  const innerWidth = chartWidth - padding.left - padding.right
-  const innerHeight = chartHeight - padding.top - padding.bottom
-
-  // Calculate scales
-  const maxValue = Math.max(
-    ...dataPoints.map(d => Math.max(d.teamCurrent, d.teamLimit)),
-    1
-  )
-  const yScale = (value: number) => innerHeight - (value / maxValue) * innerHeight
-
-  return (
-    <div className="wip-history-panel">
-      <div className="wip-history-header">
-        <span className="wip-history-title">📊 WIP History (Last 30 Days)</span>
-        <div className="wip-history-actions">
-          <button className="btn-small" onClick={handleCreateSnapshot} title="Create snapshot for today">
-            + Snapshot
-          </button>
-          <button className="wip-history-toggle" onClick={() => setExpanded(false)}>
-            Hide
-          </button>
-        </div>
-      </div>
-
-      {loading && <div className="wip-history-loading">Loading...</div>}
-
-      {!loading && dataPoints.length === 0 && (
-        <div className="wip-history-empty">
-          No history data yet. Snapshots are created daily at 9:00 AM.
-          <br />
-          <button className="btn-small" onClick={handleCreateSnapshot}>
-            Create first snapshot now
-          </button>
-        </div>
-      )}
-
-      {!loading && dataPoints.length > 0 && (
-        <svg width={chartWidth} height={chartHeight} className="wip-history-chart">
-          <g transform={`translate(${padding.left}, ${padding.top})`}>
-            {/* Y-axis grid lines */}
-            {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
-              const y = yScale(maxValue * ratio)
-              return (
-                <g key={i}>
-                  <line x1={0} y1={y} x2={innerWidth} y2={y} stroke="#e5e7eb" strokeDasharray="4,4" />
-                  <text x={-8} y={y + 4} textAnchor="end" fontSize={10} fill="#6b7280">
-                    {Math.round(maxValue * ratio)}
-                  </text>
-                </g>
-              )
-            })}
-
-            {/* Limit line */}
-            {dataPoints.length > 0 && (
-              <line
-                x1={0}
-                y1={yScale(dataPoints[0].teamLimit)}
-                x2={innerWidth}
-                y2={yScale(dataPoints[dataPoints.length - 1].teamLimit)}
-                stroke="#ef4444"
-                strokeWidth={2}
-                strokeDasharray="6,3"
-              />
-            )}
-
-            {/* Current WIP line */}
-            <path
-              d={dataPoints.map((d, i) => {
-                const x = (i / (dataPoints.length - 1)) * innerWidth
-                const y = yScale(d.teamCurrent)
-                return `${i === 0 ? 'M' : 'L'} ${x} ${y}`
-              }).join(' ')}
-              fill="none"
-              stroke="#0052cc"
-              strokeWidth={2}
-            />
-
-            {/* Data points */}
-            {dataPoints.map((d, i) => {
-              const x = (i / (dataPoints.length - 1)) * innerWidth
-              const y = yScale(d.teamCurrent)
-              const isExceeded = d.teamCurrent > d.teamLimit
-              return (
-                <circle
-                  key={i}
-                  cx={x}
-                  cy={y}
-                  r={4}
-                  fill={isExceeded ? '#ef4444' : '#0052cc'}
-                />
-              )
-            })}
-
-            {/* X-axis labels (first and last date) */}
-            {dataPoints.length > 0 && (
-              <>
-                <text x={0} y={innerHeight + 20} textAnchor="start" fontSize={10} fill="#6b7280">
-                  {new Date(dataPoints[0].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </text>
-                <text x={innerWidth} y={innerHeight + 20} textAnchor="end" fontSize={10} fill="#6b7280">
-                  {new Date(dataPoints[dataPoints.length - 1].date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </text>
-              </>
-            )}
-          </g>
-
-          {/* Legend */}
-          <g transform={`translate(${chartWidth - 120}, 10)`}>
-            <line x1={0} y1={5} x2={20} y2={5} stroke="#0052cc" strokeWidth={2} />
-            <text x={25} y={9} fontSize={10} fill="#172b4d">Current</text>
-            <line x1={0} y1={20} x2={20} y2={20} stroke="#ef4444" strokeWidth={2} strokeDasharray="6,3" />
-            <text x={25} y={24} fontSize={10} fill="#172b4d">Limit</text>
-          </g>
-        </svg>
-      )}
-    </div>
-  )
-}
-
 // --- Main component ---
 
 export function TimelinePage() {
@@ -1168,7 +1001,6 @@ export function TimelinePage() {
         <>
           <SummaryPanel epics={scheduledEpics} wipStatus={forecast?.wipStatus ?? null} />
           <WipInsightsPanel wipStatus={forecast?.wipStatus ?? null} epics={scheduledEpics} />
-          <WipHistoryChart teamId={selectedTeamId!} />
 
           <div className="gantt-container">
             <div className="gantt-labels">
