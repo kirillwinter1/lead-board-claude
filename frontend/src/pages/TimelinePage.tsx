@@ -438,24 +438,27 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
     )
   }
 
-  // No stories found
-  if (stories.length === 0) {
+  // Filter out Done stories - they are completed and shouldn't be in planning
+  const activeStories = stories.filter(s => getStoryStatusCategory(s.status) !== 'DONE')
+
+  // No active stories found
+  if (activeStories.length === 0) {
     return (
       <div className="story-segments story-segments-empty">
-        <span className="story-empty-text">No stories</span>
+        <span className="story-empty-text">{stories.length > 0 ? 'All done' : 'No stories'}</span>
       </div>
     )
   }
 
   // Check how many have estimates
-  const storiesWithEstimates = stories.filter(s => s.estimateSeconds && s.estimateSeconds > 0)
+  const storiesWithEstimates = activeStories.filter(s => s.estimateSeconds && s.estimateSeconds > 0)
   const hasEstimates = storiesWithEstimates.length > 0
 
   // Calculate total estimate for proportional widths
   // If no estimates, use equal width for all
   const totalEstimate = hasEstimates
-    ? stories.reduce((sum, s) => sum + (s.estimateSeconds || 0), 0)
-    : stories.length
+    ? activeStories.reduce((sum, s) => sum + (s.estimateSeconds || 0), 0)
+    : activeStories.length
 
   const handleMouseEnter = (e: React.MouseEvent, story: StoryInfo) => {
     e.stopPropagation()
@@ -472,11 +475,11 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
   return (
     <>
       <div className="story-segments">
-        {stories.map(story => {
+        {activeStories.map(story => {
           // If has estimates, use proportional; otherwise equal
           const widthPercent = hasEstimates
             ? ((story.estimateSeconds || 0) / totalEstimate) * 100
-            : (1 / stories.length) * 100
+            : (1 / activeStories.length) * 100
 
           const statusCategory = getStoryStatusCategory(story.status)
           const hasNoEstimate = !story.estimateSeconds || story.estimateSeconds === 0
