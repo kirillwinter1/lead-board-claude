@@ -5,6 +5,7 @@ import com.leadboard.planning.dto.EpicForecast;
 import com.leadboard.planning.dto.EpicForecast.*;
 import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.ForecastResponse.TeamCapacity;
+import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -24,15 +25,16 @@ import java.util.List;
 /**
  * Сервис расчёта прогноза завершения эпиков.
  *
- * Алгоритм:
+ * Алгоритм (с учётом WIP лимитов):
  * 1. Получить эпики команды отсортированные по AutoScore
- * 2. Для каждого эпика рассчитать остаток работы по ролям
- * 3. Распределить capacity по конвейерной модели (pipeline):
- *    - SA, DEV, QA работают параллельно над разными сторями
- *    - DEV начинает после завершения первой стори SA (offset = storyDuration.sa)
- *    - QA начинает после завершения первой стори DEV (offset = storyDuration.dev)
- * 4. Рассчитать даты завершения с учётом рабочего календаря
- * 5. Определить уровень уверенности
+ * 2. Получить WIP лимит команды
+ * 3. Первые N эпиков (N = WIP лимит) начинают сразу, capacity делится между ними
+ * 4. Эпики за пределами WIP ждут в очереди пока не освободится слот
+ * 5. Для каждого эпика:
+ *    - Рассчитать остаток работы по ролям
+ *    - Распределить capacity по конвейерной модели (pipeline)
+ *    - Рассчитать даты завершения с учётом рабочего календаря
+ * 6. Определить уровень уверенности
  */
 @Service
 public class ForecastService {
@@ -76,19 +78,80 @@ public class ForecastService {
                 ? config.storyDuration()
                 : PlanningConfigDto.StoryDuration.defaults();
 
+        // Получаем WIP лимит
+        int wipLimit = config.wipLimits() != null && config.wipLimits().team() != null
+                ? config.wipLimits().team()
+                : 6; // default
+
         // Рассчитываем capacity команды
         TeamCapacity teamCapacity = calculateTeamCapacity(teamId, config);
 
         // Получаем эпики отсортированные по AutoScore
         List<JiraIssueEntity> epics = getEpicsSorted(teamId, statuses);
 
-        // Рассчитываем прогноз для каждого эпика
+        // Рассчитываем прогноз с учётом WIP лимитов
+        List<EpicForecast> forecasts = calculateForecastsWithWip(
+                epics, teamCapacity, riskBuffer, storyDuration, wipLimit);
+
+        // Считаем текущий WIP (эпики в работе)
+        int currentWip = Math.min(epics.size(), wipLimit);
+        WipStatus wipStatus = WipStatus.of(wipLimit, currentWip);
+
+        return new ForecastResponse(
+                OffsetDateTime.now(),
+                teamId,
+                teamCapacity,
+                wipStatus,
+                forecasts
+        );
+    }
+
+    /**
+     * Рассчитывает прогнозы с учётом WIP лимитов.
+     *
+     * Алгоритм:
+     * 1. Первые N эпиков (N = wipLimit) работаются параллельно
+     * 2. Эпики за пределами WIP ждут пока освободится слот
+     * 3. Когда эпик из WIP завершается, следующий из очереди занимает его место
+     */
+    private List<EpicForecast> calculateForecastsWithWip(
+            List<JiraIssueEntity> epics,
+            TeamCapacity teamCapacity,
+            BigDecimal riskBuffer,
+            PlanningConfigDto.StoryDuration storyDuration,
+            int wipLimit
+    ) {
+        if (epics.isEmpty()) {
+            return new ArrayList<>();
+        }
+
         List<EpicForecast> forecasts = new ArrayList<>();
+
+        // Трекер дат завершения активных эпиков (для определения когда освободится слот)
+        // Используем PriorityQueue для эффективного получения ближайшей даты завершения
+        java.util.PriorityQueue<LocalDate> activeEpicEndDates = new java.util.PriorityQueue<>();
+
         LocalDate currentSaEndDate = LocalDate.now();
         LocalDate currentDevEndDate = LocalDate.now();
         LocalDate currentQaEndDate = LocalDate.now();
 
-        for (JiraIssueEntity epic : epics) {
+        for (int i = 0; i < epics.size(); i++) {
+            JiraIssueEntity epic = epics.get(i);
+            boolean isWithinWip = i < wipLimit;
+            Integer queuePosition = isWithinWip ? null : (i - wipLimit + 1);
+            LocalDate queuedUntil = null;
+
+            // Если эпик за пределами WIP, нужно ждать освобождения слота
+            if (!isWithinWip && !activeEpicEndDates.isEmpty()) {
+                // Ждём пока освободится слот (ближайший эпик завершится)
+                queuedUntil = activeEpicEndDates.poll();
+
+                // Сдвигаем начальные даты на момент освобождения слота
+                currentSaEndDate = maxDate(currentSaEndDate, queuedUntil);
+                currentDevEndDate = maxDate(currentDevEndDate, queuedUntil);
+                currentQaEndDate = maxDate(currentQaEndDate, queuedUntil);
+            }
+
             EpicForecastCalculation calc = calculateEpicForecast(
                     epic,
                     teamCapacity,
@@ -99,7 +162,29 @@ public class ForecastService {
                     currentQaEndDate
             );
 
-            forecasts.add(calc.forecast);
+            // Создаём forecast с WIP информацией
+            EpicForecast forecastWithWip = new EpicForecast(
+                    calc.forecast.epicKey(),
+                    calc.forecast.summary(),
+                    calc.forecast.autoScore(),
+                    calc.forecast.manualPriorityBoost(),
+                    calc.forecast.expectedDone(),
+                    calc.forecast.confidence(),
+                    calc.forecast.dueDateDeltaDays(),
+                    calc.forecast.dueDate(),
+                    calc.forecast.remainingByRole(),
+                    calc.forecast.phaseSchedule(),
+                    queuePosition,
+                    queuedUntil,
+                    isWithinWip
+            );
+
+            forecasts.add(forecastWithWip);
+
+            // Добавляем дату завершения в очередь активных
+            if (forecastWithWip.expectedDone() != null) {
+                activeEpicEndDates.add(forecastWithWip.expectedDone());
+            }
 
             // Обновляем текущие даты окончания для следующего эпика
             if (calc.forecast.phaseSchedule() != null) {
@@ -116,12 +201,7 @@ public class ForecastService {
             }
         }
 
-        return new ForecastResponse(
-                OffsetDateTime.now(),
-                teamId,
-                teamCapacity,
-                forecasts
-        );
+        return forecasts;
     }
 
     /**

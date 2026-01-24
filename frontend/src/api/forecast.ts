@@ -37,6 +37,10 @@ export interface EpicForecast {
   dueDate: string | null
   remainingByRole: RemainingByRole
   phaseSchedule: PhaseSchedule
+  // WIP fields
+  queuePosition: number | null     // Позиция в очереди (null если в WIP)
+  queuedUntil: string | null       // До какой даты в очереди
+  isWithinWip: boolean             // Входит ли в активный WIP
 }
 
 export interface TeamCapacity {
@@ -45,10 +49,17 @@ export interface TeamCapacity {
   qaHoursPerDay: number
 }
 
+export interface WipStatus {
+  limit: number      // WIP лимит команды
+  current: number    // Текущее количество активных эпиков
+  exceeded: boolean  // Превышен ли лимит
+}
+
 export interface ForecastResponse {
   calculatedAt: string
   teamId: number
   teamCapacity: TeamCapacity
+  wipStatus: WipStatus
   epics: EpicForecast[]
 }
 

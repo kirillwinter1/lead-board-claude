@@ -527,7 +527,195 @@ class ForecastServiceTest {
         }
     }
 
+    // ==================== WIP Limits Tests ====================
+
+    @Nested
+    class WipLimitsTests {
+
+        @Test
+        void epicsWithinWipAreMarkedAsWithinWip() {
+            // Given: WIP limit = 3, 2 epics
+            setupPlanningConfigWithWipLimit(3);
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: Both epics are within WIP
+            assertEquals(2, response.epics().size());
+            assertTrue(response.epics().get(0).isWithinWip(), "Epic 1 should be within WIP");
+            assertTrue(response.epics().get(1).isWithinWip(), "Epic 2 should be within WIP");
+            assertNull(response.epics().get(0).queuePosition(), "Epic 1 should not have queue position");
+            assertNull(response.epics().get(1).queuePosition(), "Epic 2 should not have queue position");
+        }
+
+        @Test
+        void epicsBeyondWipAreQueued() {
+            // Given: WIP limit = 2, 4 epics
+            setupPlanningConfigWithWipLimit(2);
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setAutoScore(new BigDecimal("90"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setAutoScore(new BigDecimal("80"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic3 = createEpic("TEST-3");
+            epic3.setAutoScore(new BigDecimal("70"));
+            epic3.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic4 = createEpic("TEST-4");
+            epic4.setAutoScore(new BigDecimal("60"));
+            epic4.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2, epic3, epic4));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: First 2 are within WIP, last 2 are queued
+            assertEquals(4, response.epics().size());
+
+            // First 2 within WIP
+            assertTrue(response.epics().get(0).isWithinWip(), "Epic 1 should be within WIP");
+            assertTrue(response.epics().get(1).isWithinWip(), "Epic 2 should be within WIP");
+
+            // Last 2 queued
+            assertFalse(response.epics().get(2).isWithinWip(), "Epic 3 should be queued");
+            assertFalse(response.epics().get(3).isWithinWip(), "Epic 4 should be queued");
+
+            assertEquals(1, response.epics().get(2).queuePosition(), "Epic 3 queue position should be 1");
+            assertEquals(2, response.epics().get(3).queuePosition(), "Epic 4 queue position should be 2");
+        }
+
+        @Test
+        void queuedEpicsStartAfterWipEpicsFinish() {
+            // Given: WIP limit = 1, 2 epics
+            setupPlanningConfigWithWipLimit(1);
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setAutoScore(new BigDecimal("90"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setAutoScore(new BigDecimal("80"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("5"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: Epic 2 should wait for Epic 1 to finish
+            EpicForecast forecast1 = response.epics().get(0);
+            EpicForecast forecast2 = response.epics().get(1);
+
+            assertTrue(forecast1.isWithinWip());
+            assertFalse(forecast2.isWithinWip());
+
+            // Epic 2's queuedUntil should be Epic 1's expectedDone
+            assertNotNull(forecast2.queuedUntil());
+            assertEquals(forecast1.expectedDone(), forecast2.queuedUntil());
+
+            // Epic 2 starts after Epic 1 finishes
+            assertTrue(forecast2.phaseSchedule().dev().startDate().isAfter(forecast1.expectedDone()) ||
+                            forecast2.phaseSchedule().dev().startDate().equals(forecast1.expectedDone().plusDays(1)),
+                    "Epic 2 should start after Epic 1 finishes");
+        }
+
+        @Test
+        void wipStatusReturnsCorrectValues() {
+            // Given: WIP limit = 3, 5 epics
+            setupPlanningConfigWithWipLimit(3);
+            setupFullTeam();
+
+            List<JiraIssueEntity> epics = List.of(
+                    createEpicWithEstimate("TEST-1", 5),
+                    createEpicWithEstimate("TEST-2", 5),
+                    createEpicWithEstimate("TEST-3", 5),
+                    createEpicWithEstimate("TEST-4", 5),
+                    createEpicWithEstimate("TEST-5", 5)
+            );
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(epics);
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then
+            assertNotNull(response.wipStatus());
+            assertEquals(3, response.wipStatus().limit());
+            assertEquals(3, response.wipStatus().current()); // min(5, 3) = 3
+            assertFalse(response.wipStatus().exceeded());
+        }
+
+        @Test
+        void defaultWipLimitIsUsedWhenNotConfigured() {
+            // Given: No WIP limit configured (null)
+            setupDefaultPlanningConfig(); // Uses null for WIP limits
+            setupFullTeam();
+
+            // Create 7 epics (more than default limit of 6)
+            List<JiraIssueEntity> epics = List.of(
+                    createEpicWithEstimate("TEST-1", 5),
+                    createEpicWithEstimate("TEST-2", 5),
+                    createEpicWithEstimate("TEST-3", 5),
+                    createEpicWithEstimate("TEST-4", 5),
+                    createEpicWithEstimate("TEST-5", 5),
+                    createEpicWithEstimate("TEST-6", 5),
+                    createEpicWithEstimate("TEST-7", 5)
+            );
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(epics);
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: Default limit of 6 is used
+            assertEquals(6, response.wipStatus().limit());
+
+            // First 6 within WIP, 7th queued
+            for (int i = 0; i < 6; i++) {
+                assertTrue(response.epics().get(i).isWithinWip(), "Epic " + (i+1) + " should be within WIP");
+            }
+            assertFalse(response.epics().get(6).isWithinWip(), "Epic 7 should be queued");
+        }
+
+        private JiraIssueEntity createEpicWithEstimate(String key, int devDays) {
+            JiraIssueEntity epic = createEpic(key);
+            epic.setRoughEstimateDevDays(new BigDecimal(devDays));
+            return epic;
+        }
+    }
+
     // ==================== Helper Methods ====================
+
+    private void setupPlanningConfigWithWipLimit(int wipLimit) {
+        PlanningConfigDto config = new PlanningConfigDto(
+                PlanningConfigDto.GradeCoefficients.defaults(),
+                new BigDecimal("0.2"),
+                new PlanningConfigDto.WipLimits(wipLimit, 2, 3, 2),
+                PlanningConfigDto.StoryDuration.defaults()
+        );
+        when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
+    }
 
     private void setupDefaultPlanningConfig() {
         PlanningConfigDto config = new PlanningConfigDto(

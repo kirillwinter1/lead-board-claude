@@ -16,8 +16,31 @@ public record EpicForecast(
         Integer dueDateDeltaDays,
         LocalDate dueDate,
         RemainingByRole remainingByRole,
-        PhaseSchedule phaseSchedule
+        PhaseSchedule phaseSchedule,
+        // WIP fields
+        Integer queuePosition,      // Позиция в очереди (null если в WIP)
+        LocalDate queuedUntil,      // До какой даты в очереди
+        Boolean isWithinWip         // Входит ли в активный WIP
 ) {
+    /**
+     * Конструктор для обратной совместимости (без WIP полей).
+     */
+    public EpicForecast(
+            String epicKey,
+            String summary,
+            BigDecimal autoScore,
+            Integer manualPriorityBoost,
+            LocalDate expectedDone,
+            Confidence confidence,
+            Integer dueDateDeltaDays,
+            LocalDate dueDate,
+            RemainingByRole remainingByRole,
+            PhaseSchedule phaseSchedule
+    ) {
+        this(epicKey, summary, autoScore, manualPriorityBoost, expectedDone,
+             confidence, dueDateDeltaDays, dueDate, remainingByRole, phaseSchedule,
+             null, null, true);
+    }
     public enum Confidence {
         HIGH,    // Высокая уверенность: есть декомпозиция, команда полная
         MEDIUM,  // Средняя: есть оценки, но не полная декомпозиция

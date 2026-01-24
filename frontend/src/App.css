@@ -1858,6 +1858,20 @@ body {
   color: #ef4444;
 }
 
+.summary-wip {
+  color: #0052cc;
+  font-weight: 500;
+}
+
+.summary-wip-exceeded {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.summary-queue {
+  color: #6b7280;
+}
+
 /* Hint text */
 .timeline-hint {
   margin-top: 12px;
@@ -1917,6 +1931,24 @@ body {
 
 .gantt-label-row-expanded:hover {
   background: #deebff;
+}
+
+.gantt-label-row-queued {
+  opacity: 0.7;
+}
+
+.gantt-label-row-queued .issue-key {
+  color: #6b7280;
+}
+
+.gantt-queue-badge {
+  font-size: 9px;
+  font-weight: 600;
+  color: white;
+  background: #6b7280;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-right: 4px;
 }
 
 .gantt-label-header {
@@ -2302,6 +2334,20 @@ body {
 
 .tooltip-phase-warning {
   color: #fbbf24;
+}
+
+.tooltip-queue-info {
+  background: rgba(107, 114, 128, 0.2);
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+
+.tooltip-queue-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fbbf24;
+  margin-bottom: 4px;
 }
 
 .confidence-high {

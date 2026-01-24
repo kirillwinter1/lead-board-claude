@@ -36,6 +36,11 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
     "devHoursPerDay": 16.0,
     "qaHoursPerDay": 6.0
   },
+  "wipStatus": {
+    "limit": 6,
+    "current": 3,
+    "exceeded": false
+  },
   "epics": [
     {
       "epicKey": "LB-123",
@@ -70,7 +75,10 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
           "workDays": 3.0,
           "noCapacity": false
         }
-      }
+      },
+      "queuePosition": null,
+      "queuedUntil": null,
+      "isWithinWip": true
     }
   ]
 }
@@ -83,7 +91,16 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | calculatedAt | string | Время расчёта (ISO 8601) |
 | teamId | number | ID команды |
 | teamCapacity | object | Capacity команды по ролям (часов/день) |
+| wipStatus | object | Статус WIP лимитов |
 | epics | array | Список прогнозов по эпикам |
+
+**Поля WipStatus:**
+
+| Поле | Тип | Описание |
+|------|-----|----------|
+| limit | number | WIP лимит команды |
+| current | number | Текущее количество эпиков в WIP |
+| exceeded | boolean | Превышен ли лимит |
 
 **Поля EpicForecast:**
 
@@ -99,6 +116,9 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | dueDate | string | Due date из Jira |
 | remainingByRole | object | Остаток работы по ролям |
 | phaseSchedule | object | Расписание фаз SA/DEV/QA |
+| queuePosition | number/null | Позиция в очереди (null если в WIP) |
+| queuedUntil | string/null | До какой даты в очереди |
+| isWithinWip | boolean | Входит ли в активный WIP |
 
 **Уровни уверенности:**
 

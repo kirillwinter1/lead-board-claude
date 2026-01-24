@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, ForecastResponse, EpicForecast, PhaseInfo } from '../api/forecast'
+import { getForecast, ForecastResponse, EpicForecast, PhaseInfo, WipStatus } from '../api/forecast'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
@@ -238,12 +238,26 @@ function EpicTooltip({ epic, progress }: TooltipProps) {
     return <span className="tooltip-delta tooltip-delta-late">{delta} days late</span>
   }
 
+  const isQueued = !epic.isWithinWip
+
   return (
     <div className="epic-tooltip">
       <div className="tooltip-header">
         <span className="tooltip-key">{epic.epicKey}</span>
         <span className="tooltip-summary">{epic.summary}</span>
       </div>
+
+      {isQueued && (
+        <div className="tooltip-section tooltip-queue-info">
+          <div className="tooltip-queue-badge">⏳ In Queue #{epic.queuePosition}</div>
+          {epic.queuedUntil && (
+            <div className="tooltip-row">
+              <span>Waiting until:</span>
+              <strong>{formatDateFull(new Date(epic.queuedUntil))}</strong>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="tooltip-section">
         <div className="tooltip-row">
@@ -437,14 +451,16 @@ function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle }: GanttRo
 
 interface SummaryPanelProps {
   epics: EpicForecast[]
+  wipStatus: WipStatus | null
 }
 
-function SummaryPanel({ epics }: SummaryPanelProps) {
+function SummaryPanel({ epics, wipStatus }: SummaryPanelProps) {
   const stats = useMemo(() => {
     let onTrack = 0
     let atRisk = 0
     let late = 0
     let noDueDate = 0
+    let inQueue = 0
 
     for (const epic of epics) {
       const status = getEpicStatus(epic)
@@ -454,9 +470,12 @@ function SummaryPanel({ epics }: SummaryPanelProps) {
         case 'late': late++; break
         case 'no-due-date': noDueDate++; break
       }
+      if (!epic.isWithinWip) {
+        inQueue++
+      }
     }
 
-    return { onTrack, atRisk, late, noDueDate, total: epics.length }
+    return { onTrack, atRisk, late, noDueDate, inQueue, total: epics.length }
   }, [epics])
 
   return (
@@ -474,6 +493,20 @@ function SummaryPanel({ epics }: SummaryPanelProps) {
         <>
           <span className="summary-separator">·</span>
           <span className="summary-stat summary-late">🔴 {stats.late} late</span>
+        </>
+      )}
+      {wipStatus && (
+        <>
+          <span className="summary-separator">·</span>
+          <span className={`summary-stat summary-wip ${wipStatus.exceeded ? 'summary-wip-exceeded' : ''}`}>
+            WIP {wipStatus.current}/{wipStatus.limit}
+          </span>
+        </>
+      )}
+      {stats.inQueue > 0 && (
+        <>
+          <span className="summary-separator">·</span>
+          <span className="summary-stat summary-queue">⏳ {stats.inQueue} in queue</span>
         </>
       )}
     </div>
@@ -629,7 +662,7 @@ export function TimelinePage() {
 
       {!loading && !error && forecast && scheduledEpics.length > 0 && dateRange && (
         <>
-          <SummaryPanel epics={scheduledEpics} />
+          <SummaryPanel epics={scheduledEpics} wipStatus={forecast?.wipStatus ?? null} />
 
           <div className="gantt-container">
             <div className="gantt-labels">
@@ -638,15 +671,17 @@ export function TimelinePage() {
                 const status = getEpicStatus(epic)
                 const statusIcon = getStatusIcon(status)
                 const isExpanded = expandedEpics.has(epic.epicKey)
+                const isQueued = !epic.isWithinWip
 
                 return (
                   <div key={epic.epicKey}>
                     <div
-                      className={`gantt-label-row ${isExpanded ? 'gantt-label-row-expanded' : ''}`}
+                      className={`gantt-label-row ${isExpanded ? 'gantt-label-row-expanded' : ''} ${isQueued ? 'gantt-label-row-queued' : ''}`}
                       onClick={() => toggleEpic(epic.epicKey)}
                     >
                       <div className="gantt-label-header">
                         <span className="gantt-expand-icon">{isExpanded ? '▼' : '▶'}</span>
+                        {isQueued && <span className="gantt-queue-badge">#{epic.queuePosition}</span>}
                         <a
                           href={`${jiraBaseUrl}${epic.epicKey}`}
                           target="_blank"
