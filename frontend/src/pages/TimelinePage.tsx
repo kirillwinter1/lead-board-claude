@@ -484,6 +484,11 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
           const statusCategory = getStoryStatusCategory(story.status)
           const hasNoEstimate = !story.estimateSeconds || story.estimateSeconds === 0
 
+          // Calculate progress based on logged time
+          const progressPercent = story.estimateSeconds && story.estimateSeconds > 0 && story.timeSpentSeconds
+            ? Math.min(100, Math.round((story.timeSpentSeconds / story.estimateSeconds) * 100))
+            : 0
+
           return (
             <div
               key={story.storyKey}
@@ -492,6 +497,13 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
               onMouseEnter={(e) => handleMouseEnter(e, story)}
               onMouseLeave={handleMouseLeave}
             >
+              {/* Progress fill */}
+              {progressPercent > 0 && (
+                <div
+                  className="story-segment-progress"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              )}
               <span className="story-segment-label">{story.storyKey.split('-')[1]}</span>
             </div>
           )

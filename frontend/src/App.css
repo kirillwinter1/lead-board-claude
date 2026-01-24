@@ -2608,6 +2608,17 @@ body {
   transition: filter 0.15s;
   cursor: default;
   min-width: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.story-segment-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
 }
 
 .story-segment:hover {
@@ -2676,6 +2687,8 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  position: relative;
+  z-index: 1;
 }
 
 /* Story Tooltip */
