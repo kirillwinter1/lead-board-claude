@@ -250,7 +250,8 @@ class TeamServiceTest {
                         new BigDecimal("1.8")
                 ),
                 new BigDecimal("0.3"),
-                new PlanningConfigDto.WipLimits(8, 3, 4, 3)
+                new PlanningConfigDto.WipLimits(8, 3, 4, 3),
+                PlanningConfigDto.StoryDuration.defaults()
         );
         team.setPlanningConfig(objectMapper.writeValueAsString(config));
         when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
@@ -275,7 +276,8 @@ class TeamServiceTest {
                         new BigDecimal("1.3")
                 ),
                 new BigDecimal("0.15"),
-                new PlanningConfigDto.WipLimits(5, 2, 3, 2)
+                new PlanningConfigDto.WipLimits(5, 2, 3, 2),
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         PlanningConfigDto result = teamService.updatePlanningConfig(1L, config);
@@ -294,7 +296,8 @@ class TeamServiceTest {
         PlanningConfigDto config = new PlanningConfigDto(
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("-0.1"),
-                PlanningConfigDto.WipLimits.defaults()
+                PlanningConfigDto.WipLimits.defaults(),
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         assertThrows(TeamService.InvalidPlanningConfigException.class,
@@ -313,7 +316,8 @@ class TeamServiceTest {
                         new BigDecimal("1.5")
                 ),
                 new BigDecimal("0.2"),
-                PlanningConfigDto.WipLimits.defaults()
+                PlanningConfigDto.WipLimits.defaults(),
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         assertThrows(TeamService.InvalidPlanningConfigException.class,
@@ -328,7 +332,8 @@ class TeamServiceTest {
         PlanningConfigDto config = new PlanningConfigDto(
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
-                new PlanningConfigDto.WipLimits(0, 2, 3, 2)
+                new PlanningConfigDto.WipLimits(0, 2, 3, 2),
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         assertThrows(TeamService.InvalidPlanningConfigException.class,

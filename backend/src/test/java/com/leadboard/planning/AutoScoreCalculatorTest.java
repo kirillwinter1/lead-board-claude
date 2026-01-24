@@ -361,23 +361,23 @@ class AutoScoreCalculatorTest {
     }
 
     @Test
-    void manualBoostCappedAtFive() {
+    void manualBoostAllowsHighValues() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setManualPriorityBoost(10); // Превышает максимум
+        epic.setManualPriorityBoost(10); // No longer capped
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
-        assertEquals(new BigDecimal("5"), factors.get("manualBoost"));
+        assertEquals(new BigDecimal("10"), factors.get("manualBoost"));
     }
 
     @Test
-    void manualBoostNegativeGivesZero() {
+    void manualBoostAllowsNegativeValues() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setManualPriorityBoost(-2);
+        epic.setManualPriorityBoost(-2); // Negative allowed for drag-down
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
-        assertEquals(BigDecimal.ZERO, factors.get("manualBoost"));
+        assertEquals(new BigDecimal("-2"), factors.get("manualBoost"));
     }
 
     @Test
