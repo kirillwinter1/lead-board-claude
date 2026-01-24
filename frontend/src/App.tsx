@@ -4,6 +4,7 @@ import { BoardPage } from './pages/BoardPage'
 import { TeamsPage } from './pages/TeamsPage'
 import { TeamMembersPage } from './pages/TeamMembersPage'
 import { TimelinePage } from './pages/TimelinePage'
+import { TeamMetricsPage } from './pages/TeamMetricsPage'
 import './App.css'
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<BoardPage />} />
           <Route path="timeline" element={<TimelinePage />} />
+          <Route path="metrics" element={<TeamMetricsPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
         </Route>
