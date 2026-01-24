@@ -63,6 +63,12 @@ interface RoleProgress {
   testing: RoleMetrics
 }
 
+interface DataQualityViolation {
+  rule: string
+  severity: 'ERROR' | 'WARNING' | 'INFO'
+  message: string
+}
+
 interface BoardNode {
   issueKey: string
   title: string
@@ -80,6 +86,7 @@ interface BoardNode {
   roughEstimateSaDays: number | null
   roughEstimateDevDays: number | null
   roughEstimateQaDays: number | null
+  alerts: DataQualityViolation[]
   children: BoardNode[]
 }
 
@@ -475,14 +482,30 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
 }
 
 function AlertIcon({ node }: { node: BoardNode }) {
-  const hasAlert =
-    (node.loggedSeconds && node.loggedSeconds > 0 && (!node.estimateSeconds || node.estimateSeconds === 0)) ||
-    (node.estimateSeconds && node.loggedSeconds && node.loggedSeconds > node.estimateSeconds)
+  const alerts = node.alerts || []
 
-  if (hasAlert) {
-    return <span className="alert-icon" title="Data quality issue">!</span>
+  if (alerts.length === 0) {
+    return <span className="no-alert">--</span>
   }
-  return <span className="no-alert">--</span>
+
+  // Find the highest severity
+  const hasError = alerts.some(a => a.severity === 'ERROR')
+  const hasWarning = alerts.some(a => a.severity === 'WARNING')
+
+  const severityClass = hasError ? 'error' : hasWarning ? 'warning' : 'info'
+  const count = alerts.length
+
+  // Build tooltip message
+  const tooltipLines = alerts.map(a => `[${a.severity}] ${a.message}`).join('\n')
+
+  return (
+    <span
+      className={`alert-icon alert-${severityClass}`}
+      title={tooltipLines}
+    >
+      {count}
+    </span>
+  )
 }
 
 interface BoardRowProps {

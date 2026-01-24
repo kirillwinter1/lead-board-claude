@@ -1,5 +1,7 @@
 package com.leadboard.board;
 
+import com.leadboard.quality.DataQualityViolation;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +24,7 @@ public class BoardNode {
     private BigDecimal roughEstimateSaDays; // rough estimate for SA (Epic only, for editing)
     private BigDecimal roughEstimateDevDays; // rough estimate for DEV (Epic only, for editing)
     private BigDecimal roughEstimateQaDays; // rough estimate for QA (Epic only, for editing)
+    private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
     public BoardNode() {
@@ -161,6 +164,22 @@ public class BoardNode {
 
     public void setRoughEstimateQaDays(BigDecimal roughEstimateQaDays) {
         this.roughEstimateQaDays = roughEstimateQaDays;
+    }
+
+    public List<DataQualityViolation> getAlerts() {
+        return alerts;
+    }
+
+    public void setAlerts(List<DataQualityViolation> alerts) {
+        this.alerts = alerts;
+    }
+
+    public void addAlert(DataQualityViolation alert) {
+        this.alerts.add(alert);
+    }
+
+    public void addAlerts(List<DataQualityViolation> alerts) {
+        this.alerts.addAll(alerts);
     }
 
     public List<BoardNode> getChildren() {

@@ -183,6 +183,68 @@ public class StatusMappingService {
         return containsIgnoreCase(workflow.todoStatuses(), status);
     }
 
+    /**
+     * Проверяет, является ли статус эпика допустимым для планирования (Expected Done).
+     * Эпик должен быть в планируемых статусах (Planned, Developing, E2E Testing).
+     */
+    public boolean isPlanningAllowed(String status, StatusMappingConfig teamOverride) {
+        if (status == null) return false;
+
+        StatusMappingConfig config = getEffectiveConfig(teamOverride);
+        List<String> allowedStatuses = config.planningAllowedStatuses();
+
+        // Exact match first
+        if (containsIgnoreCase(allowedStatuses, status)) {
+            return true;
+        }
+
+        // Fallback: check against in-progress statuses from epic workflow
+        WorkflowConfig workflow = config.epicWorkflow();
+        return containsIgnoreCase(workflow.inProgressStatuses(), status);
+    }
+
+    /**
+     * Проверяет, является ли статус эпика допустимым для логирования времени.
+     * Время можно логировать только в детях эпиков в статусах Developing/E2E Testing.
+     */
+    public boolean isTimeLoggingAllowed(String status, StatusMappingConfig teamOverride) {
+        if (status == null) return false;
+
+        StatusMappingConfig config = getEffectiveConfig(teamOverride);
+        List<String> allowedStatuses = config.timeLoggingAllowedStatuses();
+
+        // Exact match first
+        if (containsIgnoreCase(allowedStatuses, status)) {
+            return true;
+        }
+
+        // Fallback: substring matching
+        String s = status.toLowerCase();
+        return s.contains("developing") || s.contains("e2e test")
+                || s.contains("в разработке") || s.contains("e2e тест");
+    }
+
+    /**
+     * Проверяет, является ли статус эпика "In Progress" для data quality checks.
+     * Используется для проверки CHILD_IN_PROGRESS_EPIC_NOT.
+     */
+    public boolean isEpicInProgress(String status, StatusMappingConfig teamOverride) {
+        if (status == null) return false;
+
+        StatusMappingConfig config = getEffectiveConfig(teamOverride);
+        List<String> timeLoggingStatuses = config.timeLoggingAllowedStatuses();
+
+        // Time logging allowed = epic is in active development phase
+        if (containsIgnoreCase(timeLoggingStatuses, status)) {
+            return true;
+        }
+
+        // Fallback
+        String s = status.toLowerCase();
+        return s.contains("developing") || s.contains("e2e test")
+                || s.contains("в разработке") || s.contains("e2e тест");
+    }
+
     private StatusCategory categorize(String status, WorkflowConfig workflow) {
         if (status == null) {
             log.warn("Status is null, defaulting to TODO");

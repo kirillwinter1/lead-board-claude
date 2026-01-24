@@ -4,6 +4,8 @@ import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.planning.dto.EpicForecast;
 import com.leadboard.planning.dto.EpicForecast.*;
 import com.leadboard.planning.dto.ForecastResponse;
+import com.leadboard.quality.DataQualityService;
+import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingProperties;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -40,6 +42,9 @@ class ForecastServiceTest {
     @Mock
     private WorkCalendarService calendarService;
 
+    @Mock
+    private DataQualityService dataQualityService;
+
     private ForecastService forecastService;
     private StatusMappingService statusMappingService;
 
@@ -55,7 +60,8 @@ class ForecastServiceTest {
                 teamService,
                 memberRepository,
                 calendarService,
-                statusMappingService
+                statusMappingService,
+                dataQualityService
         );
 
         // Default calendar behavior: add N workdays returns date + N days
@@ -65,6 +71,10 @@ class ForecastServiceTest {
                     int days = inv.getArgument(1);
                     return date.plusDays(days);
                 });
+
+        // Default: no blocking errors
+        lenient().when(dataQualityService.hasBlockingErrors(any(JiraIssueEntity.class), any(StatusMappingConfig.class)))
+                .thenReturn(false);
     }
 
     // ==================== Team Capacity Tests ====================
@@ -1078,7 +1088,7 @@ class ForecastServiceTest {
         epic.setIssueKey(key);
         epic.setIssueType("Epic");
         epic.setSummary("Test Epic " + key);
-        epic.setStatus("In Progress");
+        epic.setStatus("Developing"); // Status must be planning-allowed
         epic.setTeamId(TEAM_ID);
         epic.setAutoScore(new BigDecimal("50"));
         epic.setManualPriorityBoost(0);

@@ -24,6 +24,7 @@
 | F15. WIP Limits | ✅ Готово | 2026-01-24 |
 | F16. Pipeline WIP + Stories | 📋 Planned | - |
 | F17. Configurable Status Mapping | ✅ Готово | 2026-01-24 |
+| F18. Data Quality | ✅ Готово | 2026-01-24 |
 
 ### Документация фич
 
@@ -596,6 +597,122 @@ PUT /api/teams/{id}/planning-config
 
 ---
 
+### F18. Data Quality ✅
+
+**Цель:** Система проверки качества данных для выявления проблем в эпиках, историях и подзадачах.
+
+**Архитектура:**
+```
+quality/
+├── DataQualitySeverity.java      # Enum: ERROR, WARNING, INFO
+├── DataQualityRule.java          # Enum с правилами и сообщениями
+├── DataQualityViolation.java     # Record с информацией о нарушении
+├── DataQualityService.java       # Сервис проверки правил
+├── DataQualityController.java    # API /api/data-quality
+└── dto/
+    ├── DataQualityResponse.java  # Агрегированный ответ
+    └── IssueViolations.java      # Нарушения для одной issue
+```
+
+**Уровни серьёзности:**
+| Уровень | Цвет | Влияние |
+|---------|------|---------|
+| ERROR | Красный | Блокирует планирование (Expected Done не рассчитывается) |
+| WARNING | Жёлтый | Проблема, не блокирует |
+| INFO | Серый | Рекомендация |
+
+**Правила проверки:**
+
+| ID | Правило | Severity | Применяется к |
+|----|---------|----------|---------------|
+| `TIME_LOGGED_WRONG_EPIC_STATUS` | Время логируется когда Epic не в Developing/E2E Testing | WARNING | Epic |
+| `TIME_LOGGED_NOT_IN_SUBTASK` | Время залогировано не в подзадаче | ERROR | Epic/Story/Bug |
+| `CHILD_IN_PROGRESS_EPIC_NOT` | Дочерняя задача в работе, но Epic не в активной фазе | ERROR | Story/Subtask |
+| `SUBTASK_IN_PROGRESS_STORY_NOT` | Подзадача в работе, но Story не в работе | ERROR | Subtask |
+| `EPIC_NO_ESTIMATE` | Epic без rough estimate и без оценок в подзадачах | WARNING | Epic |
+| `SUBTASK_NO_ESTIMATE` | Подзадача без original estimate | WARNING | Subtask |
+| `SUBTASK_WORK_NO_ESTIMATE` | Подзадача с logged time, но без estimate | ERROR | Subtask |
+| `SUBTASK_OVERRUN` | Logged time > estimate * 1.5 | WARNING | Subtask |
+| `EPIC_NO_TEAM` | Epic без команды | ERROR | Epic |
+| `EPIC_TEAM_NO_MEMBERS` | Команда Epic без активных участников | WARNING | Epic |
+| `EPIC_NO_DUE_DATE` | Epic без Due Date | INFO | Epic |
+| `EPIC_OVERDUE` | Due Date в прошлом и Epic не Done | ERROR | Epic |
+| `EPIC_FORECAST_LATE` | Expected Done > Due Date | WARNING | Epic |
+| `EPIC_DONE_OPEN_CHILDREN` | Epic Done, но есть открытые Story | ERROR | Epic |
+| `STORY_DONE_OPEN_CHILDREN` | Story Done, но есть открытые подзадачи | ERROR | Story |
+| `EPIC_IN_PROGRESS_NO_STORIES` | Epic в работе без Story | WARNING | Epic |
+| `STORY_IN_PROGRESS_NO_SUBTASKS` | Story в работе без подзадач | WARNING | Story |
+
+**Интеграция с планированием:**
+- Эпики с ERROR не получают Expected Done (пропускаются ForecastService)
+- Эпики фильтруются по planning-allowed статусам (Planned, Developing, E2E Testing)
+
+**API:**
+```
+GET /api/data-quality?teamId=1
+Response:
+{
+  "generatedAt": "2026-01-24T...",
+  "teamId": 1,
+  "summary": {
+    "totalIssues": 150,
+    "issuesWithErrors": 12,
+    "issuesWithWarnings": 25,
+    "issuesWithInfo": 8,
+    "byRule": { "EPIC_NO_TEAM": 5, ... },
+    "bySeverity": { "ERROR": 20, "WARNING": 30, "INFO": 10 }
+  },
+  "violations": [
+    {
+      "issueKey": "PROJ-123",
+      "issueType": "Epic",
+      "summary": "...",
+      "status": "Developing",
+      "jiraUrl": "https://...",
+      "violations": [
+        { "rule": "EPIC_NO_TEAM", "severity": "ERROR", "message": "..." }
+      ]
+    }
+  ]
+}
+```
+
+**UI:**
+- Страница `/data-quality` с таблицей нарушений
+- Фильтры по severity, rule, team
+- Summary cards с количеством ошибок/предупреждений
+- Alert badges в колонке ALERTS на Board
+- Тултип с деталями нарушений
+
+**Конфигурация статусов:**
+```yaml
+status-mapping:
+  planning-allowed-statuses:
+    - Planned
+    - Developing
+    - E2E Testing
+  time-logging-allowed-statuses:
+    - Developing
+    - E2E Testing
+```
+
+**Тестовое покрытие:**
+- 25+ unit-тестов для DataQualityService
+- Покрытие всех правил для Epic, Story, Subtask
+- Тесты blocking errors
+
+**Критерии готовности:**
+- [x] Backend infrastructure (enums, records, service)
+- [x] Все 16 правил реализованы
+- [x] Alerts в BoardNode
+- [x] ForecastService фильтрует по quality
+- [x] API /api/data-quality
+- [x] UI страница Data Quality
+- [x] Alert badges на Board
+- [x] Unit-тесты (191 тест, все проходят)
+
+---
+
 ## Технический долг (TODO)
 
 ### Критические (CRITICAL)
@@ -638,7 +755,9 @@ F1 (Bootstrap)
   │           │                       │                       │
   │           │                       ├─► F14 (Timeline)      │
   │           │                       │                       │
-  │           │                       └─► F15 (WIP Limits)    │
+  │           │                       ├─► F15 (WIP Limits)    │
+  │           │                       │                       │
+  │           │                       └─► F18 (Data Quality)  │
   │           │                                               │
   │           └─► F4 (OAuth + RBAC)                           │
   │                 │                                         │

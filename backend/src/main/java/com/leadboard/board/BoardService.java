@@ -2,6 +2,10 @@ package com.leadboard.board;
 
 import com.leadboard.config.JiraProperties;
 import com.leadboard.config.RoughEstimateProperties;
+import com.leadboard.quality.DataQualityService;
+import com.leadboard.quality.DataQualityViolation;
+import com.leadboard.status.StatusMappingConfig;
+import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamRepository;
@@ -23,13 +27,18 @@ public class BoardService {
     private final JiraProperties jiraProperties;
     private final TeamRepository teamRepository;
     private final RoughEstimateProperties roughEstimateProperties;
+    private final DataQualityService dataQualityService;
+    private final StatusMappingService statusMappingService;
 
     public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties,
-                        TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties) {
+                        TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
+                        DataQualityService dataQualityService, StatusMappingService statusMappingService) {
         this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
         this.teamRepository = teamRepository;
         this.roughEstimateProperties = roughEstimateProperties;
+        this.dataQualityService = dataQualityService;
+        this.statusMappingService = statusMappingService;
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size) {
@@ -157,6 +166,10 @@ public class BoardService {
             for (BoardNode epic : epicMap.values()) {
                 aggregateProgress(epic);
             }
+
+            // Add data quality alerts
+            StatusMappingConfig statusMapping = statusMappingService.getDefaultConfig();
+            addDataQualityAlerts(filteredEpics, stories, bugs, subtasks, issueMap, epicMap, storyMap, statusMapping);
 
             // Apply pagination
             List<BoardNode> items = new ArrayList<>(epicMap.values());
@@ -354,6 +367,98 @@ public class BoardService {
             roleProgress.setDevelopment(new BoardNode.RoleMetrics(developmentEstimate, developmentLogged));
             roleProgress.setTesting(new BoardNode.RoleMetrics(testingEstimate, testingLogged));
             node.setRoleProgress(roleProgress);
+        }
+    }
+
+    /**
+     * Adds data quality alerts to all BoardNodes in the hierarchy.
+     */
+    private void addDataQualityAlerts(
+            List<JiraIssueEntity> epics,
+            List<JiraIssueEntity> stories,
+            List<JiraIssueEntity> bugs,
+            List<JiraIssueEntity> subtasks,
+            Map<String, JiraIssueEntity> issueMap,
+            Map<String, BoardNode> epicMap,
+            Map<String, BoardNode> storyMap,
+            StatusMappingConfig statusMapping
+    ) {
+        // Build parent-children relationships for quick lookup
+        Map<String, List<JiraIssueEntity>> childrenByParent = new HashMap<>();
+        Map<String, List<JiraIssueEntity>> subtasksByParent = new HashMap<>();
+
+        for (JiraIssueEntity story : stories) {
+            if (story.getParentKey() != null) {
+                childrenByParent.computeIfAbsent(story.getParentKey(), k -> new ArrayList<>()).add(story);
+            }
+        }
+        for (JiraIssueEntity bug : bugs) {
+            if (bug.getParentKey() != null) {
+                childrenByParent.computeIfAbsent(bug.getParentKey(), k -> new ArrayList<>()).add(bug);
+            }
+        }
+        for (JiraIssueEntity subtask : subtasks) {
+            if (subtask.getParentKey() != null) {
+                subtasksByParent.computeIfAbsent(subtask.getParentKey(), k -> new ArrayList<>()).add(subtask);
+            }
+        }
+
+        // Check epics
+        for (JiraIssueEntity epic : epics) {
+            BoardNode epicNode = epicMap.get(epic.getIssueKey());
+            if (epicNode == null) continue;
+
+            List<JiraIssueEntity> children = childrenByParent.getOrDefault(epic.getIssueKey(), List.of());
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, children, statusMapping);
+            epicNode.addAlerts(violations);
+        }
+
+        // Check stories and bugs
+        for (JiraIssueEntity story : stories) {
+            BoardNode storyNode = storyMap.get(story.getIssueKey());
+            if (storyNode == null) continue;
+
+            JiraIssueEntity epic = story.getParentKey() != null ? issueMap.get(story.getParentKey()) : null;
+            List<JiraIssueEntity> storySubtasks = subtasksByParent.getOrDefault(story.getIssueKey(), List.of());
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, storySubtasks, statusMapping);
+            storyNode.addAlerts(violations);
+
+            // Check subtasks
+            for (JiraIssueEntity subtask : storySubtasks) {
+                List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(
+                        subtask, story, epic, statusMapping);
+
+                // Find the subtask node and add violations
+                for (BoardNode child : storyNode.getChildren()) {
+                    if (child.getIssueKey().equals(subtask.getIssueKey())) {
+                        child.addAlerts(subtaskViolations);
+                        break;
+                    }
+                }
+            }
+        }
+
+        for (JiraIssueEntity bug : bugs) {
+            BoardNode bugNode = storyMap.get(bug.getIssueKey());
+            if (bugNode == null) continue;
+
+            JiraIssueEntity epic = bug.getParentKey() != null ? issueMap.get(bug.getParentKey()) : null;
+            List<JiraIssueEntity> bugSubtasks = subtasksByParent.getOrDefault(bug.getIssueKey(), List.of());
+            List<DataQualityViolation> violations = dataQualityService.checkStory(bug, epic, bugSubtasks, statusMapping);
+            bugNode.addAlerts(violations);
+
+            // Check subtasks
+            for (JiraIssueEntity subtask : bugSubtasks) {
+                List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(
+                        subtask, bug, epic, statusMapping);
+
+                for (BoardNode child : bugNode.getChildren()) {
+                    if (child.getIssueKey().equals(subtask.getIssueKey())) {
+                        child.addAlerts(subtaskViolations);
+                        break;
+                    }
+                }
+            }
         }
     }
 }

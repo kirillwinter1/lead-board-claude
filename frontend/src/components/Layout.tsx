@@ -64,6 +64,9 @@ export function Layout() {
             <NavLink to="/metrics" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Metrics
             </NavLink>
+            <NavLink to="/data-quality" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              Data Quality
+            </NavLink>
             <NavLink to="/teams" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Teams
             </NavLink>

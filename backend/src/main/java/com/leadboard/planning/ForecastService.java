@@ -7,6 +7,7 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.ForecastResponse.TeamCapacity;
 import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.planning.dto.ForecastResponse.RoleWipStatus;
+import com.leadboard.quality.DataQualityService;
 import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -53,19 +54,22 @@ public class ForecastService {
     private final TeamMemberRepository memberRepository;
     private final WorkCalendarService calendarService;
     private final StatusMappingService statusMappingService;
+    private final DataQualityService dataQualityService;
 
     public ForecastService(
             JiraIssueRepository issueRepository,
             TeamService teamService,
             TeamMemberRepository memberRepository,
             WorkCalendarService calendarService,
-            StatusMappingService statusMappingService
+            StatusMappingService statusMappingService,
+            DataQualityService dataQualityService
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
         this.memberRepository = memberRepository;
         this.calendarService = calendarService;
         this.statusMappingService = statusMappingService;
+        this.dataQualityService = dataQualityService;
     }
 
     /**
@@ -104,6 +108,12 @@ public class ForecastService {
 
         // Получаем эпики отсортированные по AutoScore
         List<JiraIssueEntity> epics = getEpicsSorted(teamId, statuses);
+
+        // Filter epics: only planning-allowed statuses and no blocking errors
+        epics = epics.stream()
+                .filter(e -> statusMappingService.isPlanningAllowed(e.getStatus(), statusMapping))
+                .filter(e -> !dataQualityService.hasBlockingErrors(e, statusMapping))
+                .toList();
 
         // Рассчитываем прогноз с учётом WIP лимитов (team + role-specific)
         WipCalculationResult wipResult = calculateForecastsWithWip(

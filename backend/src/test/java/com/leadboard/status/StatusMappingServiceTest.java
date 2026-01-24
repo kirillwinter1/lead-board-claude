@@ -249,7 +249,7 @@ class StatusMappingServiceTest {
                             List.of(),
                             List.of()
                     ),
-                    null, null, null
+                    null, null, null, null, null
             );
 
             assertTrue(service.isAllowedForRoughEstimate("Custom Backlog", override));
@@ -264,7 +264,7 @@ class StatusMappingServiceTest {
                             List.of(),
                             List.of()
                     ),
-                    null, null, null
+                    null, null, null, null, null
             );
 
             assertTrue(service.isAllowedForRoughEstimate("Only This Status", override));
@@ -281,7 +281,7 @@ class StatusMappingServiceTest {
                             List.of(),
                             List.of("Завершено", "Выполнено") // Custom done statuses
                     ),
-                    null, null, null
+                    null, null, null, null, null
             );
 
             assertEquals(StatusCategory.DONE, service.categorizeEpic("Завершено", override));
@@ -298,7 +298,8 @@ class StatusMappingServiceTest {
                             List.of("Custom QA"),
                             List.of("CustomSAType"),
                             List.of("CustomQAType")
-                    )
+                    ),
+                    null, null
             );
 
             assertEquals("SA", service.determinePhase("Custom Analysis", null, override));
@@ -324,7 +325,7 @@ class StatusMappingServiceTest {
         void getEffectiveConfigMergesOverride() {
             StatusMappingConfig override = new StatusMappingConfig(
                     new WorkflowConfig(List.of("Custom"), List.of(), List.of()),
-                    null, null, null
+                    null, null, null, null, null
             );
 
             StatusMappingConfig effective = service.getEffectiveConfig(override);

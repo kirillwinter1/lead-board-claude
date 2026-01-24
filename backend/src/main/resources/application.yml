@@ -66,6 +66,20 @@ planning:
 
 # Маппинг статусов Jira
 status-mapping:
+  # Statuses where planning (Expected Done calculation) is allowed for epics
+  planning-allowed-statuses:
+    - Planned
+    - Developing
+    - E2E Testing
+    - Запланировано
+    - В разработке
+    - E2E Тестирование
+  # Statuses where time logging is allowed on epic's children
+  time-logging-allowed-statuses:
+    - Developing
+    - E2E Testing
+    - В разработке
+    - E2E Тестирование
   epic-workflow:
     todo-statuses:
       - New

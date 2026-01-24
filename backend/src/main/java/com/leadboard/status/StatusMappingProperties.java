@@ -17,6 +17,8 @@ public class StatusMappingProperties {
     private WorkflowProps storyWorkflow;
     private WorkflowProps subtaskWorkflow;
     private PhaseMappingProps phaseMapping;
+    private List<String> planningAllowedStatuses;
+    private List<String> timeLoggingAllowedStatuses;
 
     public WorkflowProps getEpicWorkflow() {
         return epicWorkflow;
@@ -50,6 +52,22 @@ public class StatusMappingProperties {
         this.phaseMapping = phaseMapping;
     }
 
+    public List<String> getPlanningAllowedStatuses() {
+        return planningAllowedStatuses;
+    }
+
+    public void setPlanningAllowedStatuses(List<String> planningAllowedStatuses) {
+        this.planningAllowedStatuses = planningAllowedStatuses;
+    }
+
+    public List<String> getTimeLoggingAllowedStatuses() {
+        return timeLoggingAllowedStatuses;
+    }
+
+    public void setTimeLoggingAllowedStatuses(List<String> timeLoggingAllowedStatuses) {
+        this.timeLoggingAllowedStatuses = timeLoggingAllowedStatuses;
+    }
+
     /**
      * Конвертирует properties в immutable config record.
      */
@@ -58,7 +76,9 @@ public class StatusMappingProperties {
                 toWorkflowConfig(epicWorkflow),
                 toWorkflowConfig(storyWorkflow),
                 toWorkflowConfig(subtaskWorkflow),
-                toPhaseMappingConfig(phaseMapping)
+                toPhaseMappingConfig(phaseMapping),
+                planningAllowedStatuses != null ? planningAllowedStatuses : List.of(),
+                timeLoggingAllowedStatuses != null ? timeLoggingAllowedStatuses : List.of()
         );
     }
 

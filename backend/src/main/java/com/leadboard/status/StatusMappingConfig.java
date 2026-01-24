@@ -10,7 +10,9 @@ public record StatusMappingConfig(
         WorkflowConfig epicWorkflow,
         WorkflowConfig storyWorkflow,
         WorkflowConfig subtaskWorkflow,
-        PhaseMapping phaseMapping
+        PhaseMapping phaseMapping,
+        List<String> planningAllowedStatuses,
+        List<String> timeLoggingAllowedStatuses
 ) {
     /**
      * Возвращает конфигурацию по умолчанию для русских и английских Jira-проектов.
@@ -46,7 +48,13 @@ public record StatusMappingConfig(
                                 "Тестирование", "Ревью тестирования", "E2E Тестирование"),
                         List.of("Аналитика", "Analysis", "Analytics"),
                         List.of("Тестирование", "Testing", "Bug", "Баг", "Дефект")
-                )
+                ),
+                // Planning allowed statuses - epics in these statuses will get Expected Done
+                List.of("Planned", "Developing", "E2E Testing",
+                        "Запланировано", "В разработке", "E2E Тестирование"),
+                // Time logging allowed statuses - time can only be logged on children of epics in these statuses
+                List.of("Developing", "E2E Testing",
+                        "В разработке", "E2E Тестирование")
         );
     }
 
@@ -70,7 +78,16 @@ public record StatusMappingConfig(
                         : override.subtaskWorkflow(),
                 this.phaseMapping != null
                         ? this.phaseMapping.merge(override.phaseMapping())
-                        : override.phaseMapping()
+                        : override.phaseMapping(),
+                mergeList(this.planningAllowedStatuses, override.planningAllowedStatuses()),
+                mergeList(this.timeLoggingAllowedStatuses, override.timeLoggingAllowedStatuses())
         );
+    }
+
+    private static List<String> mergeList(List<String> base, List<String> override) {
+        if (override != null && !override.isEmpty()) {
+            return override;
+        }
+        return base != null ? base : List.of();
     }
 }

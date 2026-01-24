@@ -5,6 +5,7 @@ import { TeamsPage } from './pages/TeamsPage'
 import { TeamMembersPage } from './pages/TeamMembersPage'
 import { TimelinePage } from './pages/TimelinePage'
 import { TeamMetricsPage } from './pages/TeamMetricsPage'
+import { DataQualityPage } from './pages/DataQualityPage'
 import './App.css'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
           <Route index element={<BoardPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="metrics" element={<TeamMetricsPage />} />
+          <Route path="data-quality" element={<DataQualityPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
         </Route>
