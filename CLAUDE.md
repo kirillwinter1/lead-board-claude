@@ -119,6 +119,22 @@ ATLASSIAN_REDIRECT_URI=http://localhost:8080/oauth/atlassian/callback
 ATLASSIAN_SITE_BASE_URL=https://your-domain.atlassian.net
 ```
 
+## Обязательные требования к фичам
+
+### Тесты
+- Всегда писать тесты для нового функционала
+- Backend: JUnit5, покрывать основные сценарии и edge cases
+- Запускать `./gradlew test` перед коммитом
+- Не коммитить с падающими тестами
+
+### Документация
+- Обновлять `ai-ru/FEATURES.md` — статус фичи, дата завершения
+- Обновлять `ai-ru/README.md` — если добавлены новые API или UI
+- Для крупных фич — создавать спецификацию `ai-ru/F{N}_{NAME}.md`
+- Коммитить документацию вместе с кодом
+
+---
+
 ## Решённые проблемы
 
 ### Jira API 410 Gone
