@@ -340,8 +340,9 @@ interface StoryTooltipProps {
 
 function StoryTooltip({ story }: StoryTooltipProps) {
   const statusCategory = getStoryStatusCategory(story.status)
-  const progressPercent = story.estimateSeconds && story.timeSpentSeconds
-    ? Math.min(100, Math.round((story.timeSpentSeconds / story.estimateSeconds) * 100))
+  const hasEstimate = story.estimateSeconds && story.estimateSeconds > 0
+  const progressPercent = hasEstimate && story.timeSpentSeconds
+    ? Math.min(100, Math.round((story.timeSpentSeconds / story.estimateSeconds!) * 100))
     : 0
 
   const formatTime = (seconds: number | null) => {
@@ -359,6 +360,13 @@ function StoryTooltip({ story }: StoryTooltipProps) {
         </span>
       </div>
       <div className="story-tooltip-summary">{story.summary}</div>
+
+      {!hasEstimate && (
+        <div className="story-tooltip-warning">
+          ⚠️ No estimate - segment width is approximate
+        </div>
+      )}
+
       <div className="story-tooltip-details">
         <div className="story-tooltip-row">
           <span>Phase:</span>
@@ -366,11 +374,11 @@ function StoryTooltip({ story }: StoryTooltipProps) {
         </div>
         <div className="story-tooltip-row">
           <span>Estimate:</span>
-          <span>{formatTime(story.estimateSeconds)}</span>
+          <span className={!hasEstimate ? 'story-tooltip-missing' : ''}>{formatTime(story.estimateSeconds)}</span>
         </div>
         <div className="story-tooltip-row">
           <span>Logged:</span>
-          <span>{formatTime(story.timeSpentSeconds)} ({progressPercent}%)</span>
+          <span>{formatTime(story.timeSpentSeconds)} {hasEstimate && `(${progressPercent}%)`}</span>
         </div>
         {story.assignee && (
           <div className="story-tooltip-row">
@@ -402,12 +410,33 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
       .catch(() => setLoading(false))
   }, [epicKey])
 
-  if (loading || stories.length === 0) {
-    return null
+  // Show loading indicator
+  if (loading) {
+    return (
+      <div className="story-segments story-segments-loading">
+        <span className="story-loading-text">Loading...</span>
+      </div>
+    )
   }
 
+  // No stories found
+  if (stories.length === 0) {
+    return (
+      <div className="story-segments story-segments-empty">
+        <span className="story-empty-text">No stories</span>
+      </div>
+    )
+  }
+
+  // Check how many have estimates
+  const storiesWithEstimates = stories.filter(s => s.estimateSeconds && s.estimateSeconds > 0)
+  const hasEstimates = storiesWithEstimates.length > 0
+
   // Calculate total estimate for proportional widths
-  const totalEstimate = stories.reduce((sum, s) => sum + (s.estimateSeconds || 3600), 0)
+  // If no estimates, use equal width for all
+  const totalEstimate = hasEstimates
+    ? stories.reduce((sum, s) => sum + (s.estimateSeconds || 0), 0)
+    : stories.length
 
   const handleMouseEnter = (e: React.MouseEvent, story: StoryInfo) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -422,15 +451,19 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
   return (
     <div className="story-segments">
       {stories.map(story => {
-        const estimate = story.estimateSeconds || 3600  // Default 1h if no estimate
-        const widthPercent = (estimate / totalEstimate) * 100
+        // If has estimates, use proportional; otherwise equal
+        const widthPercent = hasEstimates
+          ? ((story.estimateSeconds || 0) / totalEstimate) * 100
+          : (1 / stories.length) * 100
+
         const statusCategory = getStoryStatusCategory(story.status)
+        const hasNoEstimate = !story.estimateSeconds || story.estimateSeconds === 0
 
         return (
           <div
             key={story.storyKey}
-            className={`story-segment story-segment-${statusCategory.toLowerCase()}`}
-            style={{ width: `${widthPercent}%` }}
+            className={`story-segment story-segment-${statusCategory.toLowerCase()} ${hasNoEstimate ? 'story-segment-no-estimate' : ''}`}
+            style={{ width: `${Math.max(widthPercent, 2)}%` }}
             onMouseEnter={(e) => handleMouseEnter(e, story)}
             onMouseLeave={handleMouseLeave}
             title={story.storyKey}
@@ -1097,21 +1130,31 @@ export function TimelinePage() {
         </div>
 
         <div className="timeline-legend">
-          <span className="legend-item legend-on-track">On Track</span>
-          <span className="legend-item legend-at-risk">At Risk</span>
-          <span className="legend-item legend-late">Late</span>
+          {showStories ? (
+            <>
+              <span className="legend-item legend-story-todo">To Do</span>
+              <span className="legend-item legend-story-progress">In Progress</span>
+              <span className="legend-item legend-story-done">Done</span>
+              <span className="legend-item legend-story-no-estimate">No Estimate</span>
+            </>
+          ) : (
+            <>
+              <span className="legend-item legend-on-track">On Track</span>
+              <span className="legend-item legend-at-risk">At Risk</span>
+              <span className="legend-item legend-late">Late</span>
+            </>
+          )}
           <span className="legend-item legend-today">Today</span>
           <span className="legend-item legend-due">Due Date</span>
         </div>
 
-        <label className="timeline-toggle">
-          <input
-            type="checkbox"
-            checked={showStories}
-            onChange={e => setShowStories(e.target.checked)}
-          />
-          <span>Show Stories</span>
-        </label>
+        <button
+          className={`timeline-stories-btn ${showStories ? 'timeline-stories-btn-active' : ''}`}
+          onClick={() => setShowStories(!showStories)}
+          title={showStories ? 'Hide story segments' : 'Show story segments inside epic bars'}
+        >
+          {showStories ? '📊 Stories ON' : '📊 Stories'}
+        </button>
       </div>
 
       {loading && <div className="loading">Loading forecast...</div>}
