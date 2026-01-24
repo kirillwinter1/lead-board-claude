@@ -477,9 +477,16 @@ class ForecastServiceTest {
     class MultipleEpicsTests {
 
         @Test
-        void queuesEpicsSequentiallyByAutoScore() {
-            // Given: Two epics, second has lower autoScore
-            setupDefaultPlanningConfig();
+        void pipelineWipQueuesDevPhasesByDevWipLimit() {
+            // Given: Two epics with DEV WIP = 1 (so they queue on DEV phase)
+            // Using default config where dev WIP = 3, but setting custom config with dev = 1
+            PlanningConfigDto config = new PlanningConfigDto(
+                    PlanningConfigDto.GradeCoefficients.defaults(),
+                    new BigDecimal("0.2"),
+                    new PlanningConfigDto.WipLimits(6, 2, 1, 2), // dev WIP = 1
+                    PlanningConfigDto.StoryDuration.defaults()
+            );
+            when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
             setupFullTeam();
 
             JiraIssueEntity epic1 = createEpic("TEST-1");
@@ -496,13 +503,18 @@ class ForecastServiceTest {
             // When
             ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
 
-            // Then: Second epic starts after first one's phase ends
+            // Then: With Pipeline WIP and DEV WIP = 1:
+            // Epic2 DEV should start after Epic1 DEV ends (DEV phase is queued)
             assertEquals(2, response.epics().size());
             LocalDate epic1DevEnd = response.epics().get(0).phaseSchedule().dev().endDate();
             LocalDate epic2DevStart = response.epics().get(1).phaseSchedule().dev().startDate();
 
             assertTrue(epic2DevStart.isAfter(epic1DevEnd) || epic2DevStart.equals(epic1DevEnd.plusDays(1)),
-                    "Epic2 DEV should start after Epic1 DEV ends");
+                    "Epic2 DEV should start after Epic1 DEV ends when DEV WIP = 1");
+
+            // But Epic2 DEV wait info should show waiting
+            assertTrue(response.epics().get(1).phaseWaitInfo().dev().waiting(),
+                    "Epic2 should be waiting on DEV phase");
         }
 
         @Test
@@ -602,18 +614,29 @@ class ForecastServiceTest {
         }
 
         @Test
-        void queuedEpicsStartAfterWipEpicsFinish() {
-            // Given: WIP limit = 1, 2 epics
-            setupPlanningConfigWithWipLimit(1);
+        void pipelineWipAllowsSaToStartNextEpicImmediately() {
+            // Given: SA WIP = 1, DEV WIP = 1 (Pipeline model)
+            // Epic2 SA should start after Epic1 SA ends, not after Epic1 finishes entirely
+            PlanningConfigDto config = new PlanningConfigDto(
+                    PlanningConfigDto.GradeCoefficients.defaults(),
+                    new BigDecimal("0.2"),
+                    new PlanningConfigDto.WipLimits(6, 1, 1, 1), // All WIP = 1
+                    PlanningConfigDto.StoryDuration.defaults()
+            );
+            when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
             setupFullTeam();
 
             JiraIssueEntity epic1 = createEpic("TEST-1");
             epic1.setAutoScore(new BigDecimal("90"));
-            epic1.setRoughEstimateDevDays(new BigDecimal("5"));
+            epic1.setRoughEstimateSaDays(new BigDecimal("3"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("10"));
+            epic1.setRoughEstimateQaDays(new BigDecimal("3"));
 
             JiraIssueEntity epic2 = createEpic("TEST-2");
             epic2.setAutoScore(new BigDecimal("80"));
-            epic2.setRoughEstimateDevDays(new BigDecimal("5"));
+            epic2.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("8"));
+            epic2.setRoughEstimateQaDays(new BigDecimal("2"));
 
             when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
                     .thenReturn(List.of(epic1, epic2));
@@ -621,21 +644,84 @@ class ForecastServiceTest {
             // When
             ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
 
-            // Then: Epic 2 should wait for Epic 1 to finish
+            // Then: Pipeline WIP allows overlapping phases between epics
             EpicForecast forecast1 = response.epics().get(0);
             EpicForecast forecast2 = response.epics().get(1);
 
+            // Epic1 is within team WIP
             assertTrue(forecast1.isWithinWip());
-            assertFalse(forecast2.isWithinWip());
 
-            // Epic 2's queuedUntil should be Epic 1's expectedDone
-            assertNotNull(forecast2.queuedUntil());
-            assertEquals(forecast1.expectedDone(), forecast2.queuedUntil());
+            // Epic2 SA waits for Epic1 SA (SA WIP = 1)
+            assertTrue(forecast2.phaseWaitInfo().sa().waiting(),
+                    "Epic2 SA should wait for SA slot");
+            assertEquals(forecast1.phaseSchedule().sa().endDate(),
+                    forecast2.phaseWaitInfo().sa().waitingUntil(),
+                    "Epic2 SA waits until Epic1 SA ends");
 
-            // Epic 2 starts after Epic 1 finishes
-            assertTrue(forecast2.phaseSchedule().dev().startDate().isAfter(forecast1.expectedDone()) ||
-                            forecast2.phaseSchedule().dev().startDate().equals(forecast1.expectedDone().plusDays(1)),
-                    "Epic 2 should start after Epic 1 finishes");
+            // Key Pipeline WIP assertion:
+            // Epic2 SA starts after Epic1 SA (not after Epic1 finishes!)
+            LocalDate epic1SaEnd = forecast1.phaseSchedule().sa().endDate();
+            LocalDate epic2SaStart = forecast2.phaseSchedule().sa().startDate();
+
+            assertTrue(epic2SaStart.isAfter(epic1SaEnd) || epic2SaStart.equals(epic1SaEnd.plusDays(1)),
+                    "Epic2 SA should start after Epic1 SA ends (Pipeline WIP)");
+
+            // Epic2 DEV waits for Epic1 DEV (DEV WIP = 1)
+            assertTrue(forecast2.phaseWaitInfo().dev().waiting(),
+                    "Epic2 DEV should wait for DEV slot");
+        }
+
+        @Test
+        void pipelineWipAllowsOverlappingPhasesBetweenEpics() {
+            // Given: High WIP limits allow parallel work
+            // Epic2 SA should overlap with Epic1 DEV
+            PlanningConfigDto config = new PlanningConfigDto(
+                    PlanningConfigDto.GradeCoefficients.defaults(),
+                    new BigDecimal("0.2"),
+                    new PlanningConfigDto.WipLimits(6, 3, 3, 3), // Generous WIP limits
+                    PlanningConfigDto.StoryDuration.defaults()
+            );
+            when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
+            setupFullTeam();
+
+            JiraIssueEntity epic1 = createEpic("TEST-1");
+            epic1.setAutoScore(new BigDecimal("90"));
+            epic1.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic1.setRoughEstimateDevDays(new BigDecimal("15")); // Long DEV phase
+            epic1.setRoughEstimateQaDays(new BigDecimal("3"));
+
+            JiraIssueEntity epic2 = createEpic("TEST-2");
+            epic2.setAutoScore(new BigDecimal("80"));
+            epic2.setRoughEstimateSaDays(new BigDecimal("2"));
+            epic2.setRoughEstimateDevDays(new BigDecimal("10"));
+            epic2.setRoughEstimateQaDays(new BigDecimal("2"));
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+                    .thenReturn(List.of(epic1, epic2));
+
+            // When
+            ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
+
+            // Then: With Pipeline WIP, phases can overlap
+            EpicForecast forecast1 = response.epics().get(0);
+            EpicForecast forecast2 = response.epics().get(1);
+
+            // Both epics are within WIP (generous limits)
+            assertTrue(forecast1.isWithinWip());
+            assertTrue(forecast2.isWithinWip());
+
+            // Key assertion: Epic2 SA can start while Epic1 DEV is ongoing
+            // (Epic1 DEV takes 15 days, Epic1 SA only 2 days)
+            LocalDate epic1DevEnd = forecast1.phaseSchedule().dev().endDate();
+            LocalDate epic2SaStart = forecast2.phaseSchedule().sa().startDate();
+
+            assertTrue(epic2SaStart.isBefore(epic1DevEnd),
+                    "Epic2 SA should start before Epic1 DEV ends (overlapping phases in Pipeline WIP)");
+
+            // No phase should be waiting (generous WIP limits)
+            assertFalse(forecast2.phaseWaitInfo().sa().waiting(), "SA should not be waiting");
+            assertFalse(forecast2.phaseWaitInfo().dev().waiting(), "DEV should not be waiting");
+            assertFalse(forecast2.phaseWaitInfo().qa().waiting(), "QA should not be waiting");
         }
 
         @Test
