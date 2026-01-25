@@ -212,3 +212,43 @@ export function getStoryStatusCategory(status: string): StoryStatusCategory {
   }
   return 'TO_DO'
 }
+
+// Story Forecast types (assignee-based capacity planning)
+export interface StorySchedule {
+  storyKey: string
+  storySummary: string | null
+  assigneeAccountId: string | null
+  assigneeDisplayName: string | null
+  startDate: string
+  endDate: string
+  workDays: number
+  isUnassigned: boolean
+  isBlocked: boolean
+  blockingStories: string[]
+  autoScore: number | null
+  status: string | null
+}
+
+export interface AssigneeUtilization {
+  displayName: string
+  role: 'SA' | 'DEV' | 'QA'
+  workDaysAssigned: number
+  effectiveHoursPerDay: number
+}
+
+export interface StoryForecastResponse {
+  epicKey: string
+  epicStartDate: string
+  stories: StorySchedule[]
+  assigneeUtilization: Record<string, AssigneeUtilization>
+}
+
+/**
+ * Получает story-level forecast для эпика с учетом assignee capacity.
+ */
+export async function getStoryForecast(epicKey: string, teamId: number): Promise<StoryForecastResponse> {
+  const response = await axios.get<StoryForecastResponse>(
+    `/api/planning/epics/${epicKey}/story-forecast?teamId=${teamId}`
+  )
+  return response.data
+}

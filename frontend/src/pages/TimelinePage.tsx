@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getEpicStories, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, StoryInfo } from '../api/forecast'
+import { getForecast, getEpicStories, getStoryForecast, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, StoryInfo, StoryForecastResponse, StorySchedule } from '../api/forecast'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
@@ -511,6 +511,136 @@ function StoryTooltip({ story }: StoryTooltipProps) {
   )
 }
 
+// Story Schedule Bars - shows stories as individual bars with assignee and dates
+interface StoryScheduleBarsProps {
+  epicKey: string
+  storyForecast: StoryForecastResponse | null
+  dateRange: DateRange
+  jiraBaseUrl: string
+}
+
+function StoryScheduleBars({ epicKey, storyForecast, dateRange, jiraBaseUrl }: StoryScheduleBarsProps) {
+  const [hoveredStory, setHoveredStory] = useState<StorySchedule | null>(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  if (!storyForecast || storyForecast.stories.length === 0) {
+    return (
+      <div className="story-schedule-empty">
+        <span className="story-empty-text">No stories</span>
+      </div>
+    )
+  }
+
+  const totalDays = daysBetween(dateRange.start, dateRange.end)
+
+  // Generate unique color per assignee
+  const assigneeColors = new Map<string, string>()
+  const colorPalette = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6']
+  let colorIndex = 0
+
+  storyForecast.stories.forEach(story => {
+    const assignee = story.assigneeDisplayName || story.assigneeAccountId || 'Unassigned'
+    if (!assigneeColors.has(assignee)) {
+      assigneeColors.set(assignee, colorPalette[colorIndex % colorPalette.length])
+      colorIndex++
+    }
+  })
+
+  const handleMouseEnter = (e: React.MouseEvent, story: StorySchedule) => {
+    e.stopPropagation()
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 })
+    setHoveredStory(story)
+  }
+
+  const handleMouseLeave = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setHoveredStory(null)
+  }
+
+  return (
+    <>
+      <div className="story-schedule-bars">
+        {storyForecast.stories.map(story => {
+          const startDate = new Date(story.startDate)
+          const endDate = new Date(story.endDate)
+
+          // Calculate position and width
+          const daysFromStart = daysBetween(dateRange.start, startDate)
+          const duration = daysBetween(startDate, endDate) + 1 // Include end day
+          const leftPercent = (daysFromStart / totalDays) * 100
+          const widthPercent = (duration / totalDays) * 100
+
+          const assignee = story.assigneeDisplayName || story.assigneeAccountId || 'Unassigned'
+          const color = assigneeColors.get(assignee) || '#6b7280'
+
+          return (
+            <div
+              key={story.storyKey}
+              className={`story-schedule-bar ${story.isUnassigned ? 'story-unassigned' : ''} ${story.isBlocked ? 'story-blocked' : ''}`}
+              style={{
+                left: `${leftPercent}%`,
+                width: `${widthPercent}%`,
+                backgroundColor: color,
+                opacity: story.isBlocked ? 0.5 : 1
+              }}
+              onMouseEnter={e => handleMouseEnter(e, story)}
+              onMouseLeave={handleMouseLeave}
+              title={`${story.storyKey}: ${story.storySummary || ''}`}
+            >
+              <span className="story-schedule-key">{story.storyKey}</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Tooltip */}
+      {hoveredStory && createPortal(
+        <div
+          className="gantt-unified-tooltip"
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 10000,
+            pointerEvents: 'none'
+          }}
+        >
+          <div className="tooltip-header">
+            <a
+              href={`${jiraBaseUrl}${hoveredStory.storyKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ pointerEvents: 'auto' }}
+            >
+              {hoveredStory.storyKey}
+            </a>
+            {hoveredStory.autoScore !== null && (
+              <span className="tooltip-score"> ({hoveredStory.autoScore.toFixed(0)})</span>
+            )}
+          </div>
+          <div className="tooltip-summary">{hoveredStory.storySummary || 'No summary'}</div>
+          <div className="tooltip-dates">
+            {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))} ({hoveredStory.workDays.toFixed(1)} days)
+          </div>
+          <div className="tooltip-assignee">
+            👤 {hoveredStory.assigneeDisplayName || 'Unassigned'}
+            {hoveredStory.isUnassigned && ' (auto-assigned)'}
+          </div>
+          {hoveredStory.isBlocked && (
+            <div className="tooltip-blocked">
+              🚫 Blocked by: {hoveredStory.blockingStories.join(', ')}
+            </div>
+          )}
+          <div className="tooltip-status">Status: {hoveredStory.status || 'Unknown'}</div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
 interface StorySegmentsProps {
   epicKey: string
 }
@@ -637,9 +767,12 @@ interface GanttRowProps {
   isExpanded: boolean
   onToggle: () => void
   showStories: boolean
+  storyForecast: StoryForecastResponse | null
+  dateRange: DateRange
+  jiraBaseUrl: string
 }
 
-function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle, showStories }: GanttRowProps) {
+function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle, showStories, storyForecast, dateRange, jiraBaseUrl }: GanttRowProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const tooltipTimeoutRef = useRef<number | null>(null)
@@ -721,7 +854,16 @@ function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle, showStori
             >
               {/* Story segments (when enabled) */}
               {showStories ? (
-                <StorySegments epicKey={epic.epicKey} />
+                storyForecast ? (
+                  <StoryScheduleBars
+                    epicKey={epic.epicKey}
+                    storyForecast={storyForecast}
+                    dateRange={dateRange}
+                    jiraBaseUrl={jiraBaseUrl}
+                  />
+                ) : (
+                  <StorySegments epicKey={epic.epicKey} />
+                )
               ) : (
                 <>
                   {/* Progress fill */}
@@ -982,6 +1124,7 @@ export function TimelinePage() {
   const [error, setError] = useState<string | null>(null)
   const [expandedEpics, setExpandedEpics] = useState<Set<string>>(new Set())
   const [showStories, setShowStories] = useState(false)
+  const [storyForecasts, setStoryForecasts] = useState<Map<string, StoryForecastResponse>>(new Map())
 
   const chartRef = useRef<HTMLDivElement>(null)
 
@@ -1014,6 +1157,32 @@ export function TimelinePage() {
         setLoading(false)
       })
   }, [selectedTeamId])
+
+  // Load story forecasts when showStories is enabled
+  useEffect(() => {
+    if (!showStories || !forecast || !selectedTeamId) {
+      setStoryForecasts(new Map())
+      return
+    }
+
+    // Load story forecast for all epics with team
+    const loadForecasts = async () => {
+      const newForecasts = new Map<string, StoryForecastResponse>()
+
+      for (const epic of forecast.epics) {
+        try {
+          const storyForecast = await getStoryForecast(epic.epicKey, selectedTeamId)
+          newForecasts.set(epic.epicKey, storyForecast)
+        } catch (err) {
+          console.warn(`Failed to load story forecast for ${epic.epicKey}:`, err)
+        }
+      }
+
+      setStoryForecasts(newForecasts)
+    }
+
+    loadForecasts()
+  }, [showStories, forecast, selectedTeamId])
 
   // Auto-scroll to today when data loads
   useEffect(() => {
@@ -1209,6 +1378,9 @@ export function TimelinePage() {
                     isExpanded={expandedEpics.has(epic.epicKey)}
                     onToggle={() => toggleEpic(epic.epicKey)}
                     showStories={showStories}
+                    storyForecast={storyForecasts.get(epic.epicKey) || null}
+                    dateRange={dateRange}
+                    jiraBaseUrl={jiraBaseUrl}
                   />
                 ))}
               </div>
