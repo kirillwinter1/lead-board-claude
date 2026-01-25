@@ -1190,17 +1190,16 @@ body {
 
 /* Forecast Tooltip */
 .forecast-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1000;
+  position: fixed;
+  z-index: 10000;
   background: white;
   border: 1px solid #dfe1e6;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(9, 30, 66, 0.15);
   padding: 12px;
   min-width: 220px;
-  margin-top: 4px;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .forecast-tooltip-header {

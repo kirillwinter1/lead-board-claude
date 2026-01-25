@@ -561,6 +561,8 @@ interface ExpectedDoneCellProps {
 
 function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
   const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
+  const cellRef = useRef<HTMLDivElement>(null)
 
   if (!forecast) {
     return <span className="expected-done-empty">--</span>
@@ -605,10 +607,55 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
     }
   }
 
+  const handleMouseEnter = () => {
+    setShowTooltip(true)
+
+    // Calculate tooltip position
+    if (cellRef.current) {
+      const rect = cellRef.current.getBoundingClientRect()
+      const tooltipWidth = 280
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const minSpaceNeeded = 200 // forecast tooltip is typically larger
+
+      let top: number
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2
+
+      // Decide if tooltip should be above or below
+      if (spaceBelow >= minSpaceNeeded) {
+        // Show below - enough space
+        top = rect.bottom + 8
+      } else if (spaceAbove >= minSpaceNeeded) {
+        // Show above - not enough space below
+        top = rect.top - 8
+      } else {
+        // Very little space - show below and let it scroll
+        top = rect.bottom + 8
+      }
+
+      // If tooltip would go off right edge, shift left
+      if (left + tooltipWidth > window.innerWidth) {
+        left = window.innerWidth - tooltipWidth - 16
+      }
+
+      // If tooltip would go off left edge, shift right
+      if (left < 16) {
+        left = 16
+      }
+
+      setTooltipPos({
+        top,
+        left,
+        showAbove: spaceBelow < minSpaceNeeded && spaceAbove >= minSpaceNeeded
+      })
+    }
+  }
+
   return (
     <div
+      ref={cellRef}
       className="expected-done-cell"
-      onMouseEnter={() => setShowTooltip(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span className={`confidence-dot ${confidenceClass}`} />
@@ -619,8 +666,15 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
         </span>
       )}
 
-      {showTooltip && (
-        <div className="forecast-tooltip">
+      {showTooltip && tooltipPos && (
+        <div
+          className="forecast-tooltip"
+          style={{
+            top: `${tooltipPos.top}px`,
+            left: `${tooltipPos.left}px`,
+            transform: tooltipPos.showAbove ? 'translateY(-100%)' : 'none'
+          }}
+        >
           <div className="forecast-tooltip-header">
             <span>AutoScore: <strong>{autoScore.toFixed(1)}</strong></span>
             <span className={`confidence-badge ${confidenceClass}`}>
