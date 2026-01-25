@@ -390,7 +390,7 @@ function PriorityCell({ node }: { node: BoardNode }) {
   // Icons
   const icons: string[] = []
   if (node.issueType?.toLowerCase().includes('bug') || node.issueType?.toLowerCase().includes('баг')) {
-    icons.push('🐛')
+    icons.push('🐞')
   }
   if (node.blockedBy && node.blockedBy.length > 0) {
     icons.push('🔒')
