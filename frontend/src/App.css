@@ -332,8 +332,9 @@ body {
 }
 
 .expander-btn {
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
   border: none;
   background: #ebecf0;
   border-radius: 4px;
@@ -1718,16 +1719,19 @@ body {
 .drag-handle {
   cursor: grab;
   color: #8993a4;
-  font-size: 12px;
-  letter-spacing: -2px;
-  margin-right: 4px;
+  font-size: 14px;
+  letter-spacing: -1px;
+  margin-right: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
   user-select: none;
-  transition: color 0.15s ease, transform 0.15s ease;
+  transition: color 0.15s ease, transform 0.15s ease, background 0.15s ease;
 }
 
 .drag-handle:hover {
   color: #0052cc;
-  transform: scale(1.2);
+  background: #f4f5f7;
+  transform: scale(1.15);
 }
 
 .board-row[draggable="true"] {
@@ -1746,11 +1750,23 @@ body {
   box-shadow: 0 8px 24px rgba(0, 82, 204, 0.25);
   z-index: 100;
   position: relative;
+  cursor: grabbing !important;
+}
+
+.board-row.dragging * {
+  cursor: grabbing !important;
 }
 
 .board-row.drag-over {
   border-top: 3px solid #0052cc !important;
   background: linear-gradient(180deg, rgba(0, 82, 204, 0.1) 0%, transparent 30%);
+}
+
+/* Invalid drag-over (trying to drop in different epic) */
+.board-row.drag-over-invalid {
+  border-top: 3px solid #de350b !important;
+  background: linear-gradient(180deg, rgba(222, 53, 11, 0.1) 0%, transparent 30%);
+  cursor: not-allowed !important;
 }
 
 /* Drop success animation */

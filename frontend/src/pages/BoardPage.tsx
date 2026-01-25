@@ -584,20 +584,34 @@ interface BoardRowProps {
   isStoryDragging?: boolean
   isStoryDragOver?: boolean
   isStoryJustDropped?: boolean
+  // Drag state for preventing accidental clicks
+  isAnyDragging?: boolean
+  isDragInvalid?: boolean
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped, parentEpicKey, onStoryDragStart, onStoryDragOver, onStoryDrop, onStoryDragEnd, isStoryDragging, isStoryDragOver, isStoryJustDropped }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped, parentEpicKey, onStoryDragStart, onStoryDragOver, onStoryDrop, onStoryDragEnd, isStoryDragging, isStoryDragOver, isStoryJustDropped, isAnyDragging, isDragInvalid }: BoardRowProps) {
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
   const autoScoreTooltip = forecast ? `AutoScore: ${forecast.autoScore.toFixed(1)}` : undefined
 
   const dragEffects = isStoryRow && isStoryDragging ? 'dragging' : (isDragging ? 'dragging' : '')
   const dragOverEffects = isStoryRow && isStoryDragOver ? 'drag-over' : (isDragOver ? 'drag-over' : '')
+  const dragInvalidEffects = isDragInvalid ? 'drag-over-invalid' : ''
   const justDroppedEffects = isStoryRow && isStoryJustDropped ? 'just-dropped' : (isJustDropped ? 'just-dropped' : '')
+
+  // Prevent expander toggle during drag operations
+  const handleExpanderClick = (e: React.MouseEvent) => {
+    if (isAnyDragging) {
+      e.preventDefault()
+      e.stopPropagation()
+      return
+    }
+    onToggle()
+  }
 
   return (
     <tr
-      className={`board-row level-${level} ${dragEffects} ${dragOverEffects} ${justDroppedEffects}`}
+      className={`board-row level-${level} ${dragEffects} ${dragOverEffects} ${dragInvalidEffects} ${justDroppedEffects}`}
       draggable={(isEpicRow || isStoryRow) && canReorder}
       onDragStart={
         isEpicRow && canReorder ? (e) => onDragStart(e, index, node.issueKey) :
@@ -623,7 +637,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
     >
       <td className="cell-expander">
         {hasChildren ? (
-          <button className="expander-btn" onClick={onToggle}>
+          <button className="expander-btn" onClick={handleExpanderClick}>
             <span className={`chevron ${expanded ? 'expanded' : ''}`}>›</span>
           </button>
         ) : (
@@ -633,7 +647,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
       <td className="cell-name">
         <div className="name-content" style={{ paddingLeft: `${level * 20}px` }}>
           {(isEpicRow || isStoryRow) && canReorder && (
-            <span className="drag-handle" title="Drag to reorder">⋮⋮</span>
+            <span className="drag-handle" title={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}>⋮⋮</span>
           )}
           <img src={getIssueIcon(node.issueType)} alt={node.issueType} className="issue-type-icon" />
           <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
@@ -703,6 +717,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
   const [draggingStoryParentKey, setDraggingStoryParentKey] = useState<string | null>(null)
   const [dragOverStoryKey, setDragOverStoryKey] = useState<string | null>(null)
   const [droppedStoryKey, setDroppedStoryKey] = useState<string | null>(null)
+  const [dragInvalidStoryKey, setDragInvalidStoryKey] = useState<string | null>(null)
 
   const toggleExpand = (key: string) => {
     setExpandedKeys(prev => {
@@ -776,10 +791,27 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
   const handleStoryDragOver = (e: React.DragEvent, storyKey: string, parentEpicKey: string) => {
     e.preventDefault()
     e.stopPropagation()
+
+    // Auto-scroll near edges
+    const threshold = 100
+    const scrollSpeed = 10
+
+    if (e.clientY < threshold) {
+      window.scrollBy(0, -scrollSpeed)
+    } else if (e.clientY > window.innerHeight - threshold) {
+      window.scrollBy(0, scrollSpeed)
+    }
+
     // Only allow drop if dragging within the same epic
     if (draggingStoryParentKey === parentEpicKey && draggingStoryKey !== storyKey) {
       e.dataTransfer.dropEffect = 'move'
       setDragOverStoryKey(storyKey)
+      setDragInvalidStoryKey(null)
+    } else if (draggingStoryParentKey && draggingStoryParentKey !== parentEpicKey) {
+      // Invalid drop - different epic
+      e.dataTransfer.dropEffect = 'none'
+      setDragOverStoryKey(null)
+      setDragInvalidStoryKey(storyKey)
     }
   }
 
@@ -809,12 +841,14 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     setDraggingStoryKey(null)
     setDraggingStoryParentKey(null)
     setDragOverStoryKey(null)
+    setDragInvalidStoryKey(null)
   }
 
   const handleStoryDragEnd = () => {
     setDraggingStoryKey(null)
     setDraggingStoryParentKey(null)
     setDragOverStoryKey(null)
+    setDragInvalidStoryKey(null)
   }
 
   const renderRows = (nodes: BoardNode[], level: number, startIndex: number = 0, parentEpicKey?: string): JSX.Element[] => {
@@ -855,6 +889,8 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
           isStoryDragging={draggingStoryKey === node.issueKey}
           isStoryDragOver={dragOverStoryKey === node.issueKey}
           isStoryJustDropped={droppedStoryKey === node.issueKey}
+          isAnyDragging={draggingEpicKey !== null || draggingStoryKey !== null}
+          isDragInvalid={dragInvalidStoryKey === node.issueKey}
         />
       )
 
