@@ -1327,21 +1327,27 @@ export function BoardPage() {
 
     if (newIndex < currentIndex) {
       // Moving UP - need to beat the story at newIndex
+      // IMPORTANT: Compare BASE scores only (exclude manualBoost) to prevent accumulation
       const targetStory = stories[newIndex]
-      const targetScore = targetStory.autoScore || 0
-      // Need: baseScore + newBoost > targetScore
-      newBoost = Math.ceil(targetScore - currentBaseScore + 0.5)
+      const targetBaseScore = (targetStory.autoScore || 0) - (targetStory.manualBoost || 0)
+
+      // We need: currentBaseScore + newBoost > targetBaseScore
+      // newBoost > targetBaseScore - currentBaseScore
+      newBoost = Math.max(0, Math.ceil(targetBaseScore - currentBaseScore + 0.5))
     } else {
       // Moving DOWN - need to be below the story at newIndex
+      // IMPORTANT: Compare BASE scores only (exclude manualBoost) to prevent accumulation
       const targetStory = stories[newIndex]
-      const targetScore = targetStory.autoScore || 0
+      const targetBaseScore = (targetStory.autoScore || 0) - (targetStory.manualBoost || 0)
 
       // If there's a story below the target, we need to be above it
       const storyBelow = stories[newIndex + 1]
-      const scoreBelow = storyBelow ? (storyBelow.autoScore || 0) : 0
+      const storyBelowBaseScore = storyBelow
+        ? ((storyBelow.autoScore || 0) - (storyBelow.manualBoost || 0))
+        : 0
 
-      // Target: be between targetScore and scoreBelow
-      const targetMiddle = (targetScore + scoreBelow) / 2
+      // Target: be between targetBaseScore and storyBelowBaseScore
+      const targetMiddle = (targetBaseScore + storyBelowBaseScore) / 2
       newBoost = Math.floor(targetMiddle - currentBaseScore)
     }
 
