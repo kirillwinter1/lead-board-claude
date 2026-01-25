@@ -376,6 +376,8 @@ function PriorityCell({ node }: { node: BoardNode }) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [breakdown, setBreakdown] = useState<ScoreBreakdown | null>(null)
   const [loading, setLoading] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
+  const cellRef = useRef<HTMLDivElement>(null)
 
   const score = node.autoScore || 0
 
@@ -408,6 +410,35 @@ function PriorityCell({ node }: { node: BoardNode }) {
   // Load breakdown on hover
   const handleMouseEnter = async () => {
     setShowTooltip(true)
+
+    // Calculate tooltip position
+    if (cellRef.current) {
+      const rect = cellRef.current.getBoundingClientRect()
+      const tooltipWidth = 260
+      const tooltipHeight = 300 // approximate max height
+
+      // Position below cell by default
+      let top = rect.bottom + 8
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2
+
+      // If tooltip would go off bottom of screen, show above
+      if (top + tooltipHeight > window.innerHeight) {
+        top = rect.top - tooltipHeight - 8
+      }
+
+      // If tooltip would go off right edge, shift left
+      if (left + tooltipWidth > window.innerWidth) {
+        left = window.innerWidth - tooltipWidth - 16
+      }
+
+      // If tooltip would go off left edge, shift right
+      if (left < 16) {
+        left = 16
+      }
+
+      setTooltipPos({ top, left })
+    }
+
     if (!breakdown && !loading) {
       setLoading(true)
       try {
@@ -441,6 +472,7 @@ function PriorityCell({ node }: { node: BoardNode }) {
 
   return (
     <div
+      ref={cellRef}
       className="priority-cell"
       style={{ color }}
       onMouseEnter={handleMouseEnter}
@@ -455,8 +487,11 @@ function PriorityCell({ node }: { node: BoardNode }) {
         </span>
       )}
 
-      {showTooltip && (
-        <div className="priority-tooltip">
+      {showTooltip && tooltipPos && (
+        <div
+          className="priority-tooltip"
+          style={{ top: `${tooltipPos.top}px`, left: `${tooltipPos.left}px` }}
+        >
           <div className="priority-tooltip-header">
             <strong>{node.issueKey}</strong>
             <span className="priority-tooltip-type">{node.issueType}</span>
@@ -614,6 +649,8 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
 
 function AlertIcon({ node }: { node: BoardNode }) {
   const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
+  const iconRef = useRef<HTMLDivElement>(null)
   const alerts = node.alerts || []
 
   if (alerts.length === 0) {
@@ -641,18 +678,54 @@ function AlertIcon({ node }: { node: BoardNode }) {
     INFO: '🔵'
   }
 
+  const handleMouseEnter = () => {
+    setShowTooltip(true)
+
+    // Calculate tooltip position
+    if (iconRef.current) {
+      const rect = iconRef.current.getBoundingClientRect()
+      const tooltipWidth = 320
+      const tooltipHeight = 300 // approximate max height
+
+      // Position below icon by default
+      let top = rect.bottom + 8
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2
+
+      // If tooltip would go off bottom of screen, show above
+      if (top + tooltipHeight > window.innerHeight) {
+        top = rect.top - tooltipHeight - 8
+      }
+
+      // If tooltip would go off right edge, shift left
+      if (left + tooltipWidth > window.innerWidth) {
+        left = window.innerWidth - tooltipWidth - 16
+      }
+
+      // If tooltip would go off left edge, shift right
+      if (left < 16) {
+        left = 16
+      }
+
+      setTooltipPos({ top, left })
+    }
+  }
+
   return (
     <div
+      ref={iconRef}
       className="alert-icon-wrapper"
-      onMouseEnter={() => setShowTooltip(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span className={`alert-icon alert-${severityClass}`}>
         {count}
       </span>
 
-      {showTooltip && (
-        <div className="alert-tooltip">
+      {showTooltip && tooltipPos && (
+        <div
+          className="alert-tooltip"
+          style={{ top: `${tooltipPos.top}px`, left: `${tooltipPos.left}px` }}
+        >
           <div className="alert-tooltip-header">
             <strong>Data Quality Issues ({count})</strong>
           </div>

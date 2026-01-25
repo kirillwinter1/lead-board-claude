@@ -1404,21 +1404,19 @@ body {
 }
 
 .priority-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
+  position: fixed;
+  z-index: 10000;
   background: white;
   border: 1px solid #dfe1e6;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(9, 30, 66, 0.15);
   padding: 12px;
   width: 260px;
-  margin-top: 8px;
   text-align: left;
   font-size: 12px;
   color: #172b4d;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .priority-tooltip-header {
@@ -1509,21 +1507,19 @@ body {
 }
 
 .alert-tooltip {
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
+  position: fixed;
+  z-index: 10000;
   background: white;
   border: 1px solid #dfe1e6;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(9, 30, 66, 0.15);
   padding: 12px;
   width: 320px;
-  margin-top: 8px;
   text-align: left;
   font-size: 12px;
   color: #172b4d;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .alert-tooltip-header {
