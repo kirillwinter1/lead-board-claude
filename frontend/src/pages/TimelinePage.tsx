@@ -540,7 +540,9 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
   }
 
   // Filter out Done stories - they are completed and shouldn't be in planning
-  const activeStories = stories.filter(s => getStoryStatusCategory(s.status) !== 'DONE')
+  const activeStories = stories
+    .filter(s => getStoryStatusCategory(s.status) !== 'DONE')
+    .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))  // Sort by priority (same as Board)
 
   // No active stories found
   if (activeStories.length === 0) {

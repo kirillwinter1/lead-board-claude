@@ -195,7 +195,8 @@ public class ForecastController {
                             StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType()),
                             saBreakdown,
                             devBreakdown,
-                            qaBreakdown
+                            qaBreakdown,
+                            issue.getAutoScore()
                     );
                 })
                 .toList();

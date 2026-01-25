@@ -183,6 +183,7 @@ export interface StoryInfo {
   saBreakdown: RoleBreakdown | null
   devBreakdown: RoleBreakdown | null
   qaBreakdown: RoleBreakdown | null
+  autoScore: number | null
 }
 
 /**

@@ -1,5 +1,6 @@
 package com.leadboard.planning.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -18,7 +19,8 @@ public record StoryInfo(
         String phase,                  // SA, DEV, QA (по label/component или статусу)
         RoleBreakdown saBreakdown,    // Breakdown по SA
         RoleBreakdown devBreakdown,   // Breakdown по DEV
-        RoleBreakdown qaBreakdown     // Breakdown по QA
+        RoleBreakdown qaBreakdown,    // Breakdown по QA
+        BigDecimal autoScore          // AutoScore для приоритизации
 ) {
     /**
      * Определяет фазу сторя по статусу или типу задачи.
