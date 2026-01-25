@@ -45,6 +45,12 @@ class ForecastServiceTest {
     @Mock
     private DataQualityService dataQualityService;
 
+    @Mock
+    private StoryAutoScoreService storyAutoScoreService;
+
+    @Mock
+    private StoryDependencyService storyDependencyService;
+
     private ForecastService forecastService;
     private StatusMappingService statusMappingService;
 
@@ -61,8 +67,14 @@ class ForecastServiceTest {
                 memberRepository,
                 calendarService,
                 statusMappingService,
-                dataQualityService
+                dataQualityService,
+                storyAutoScoreService,
+                storyDependencyService
         );
+
+        // Default behavior for story sorting (return stories as-is)
+        lenient().when(storyAutoScoreService.calculateAutoScore(any(), any())).thenReturn(BigDecimal.valueOf(50.0));
+        lenient().when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // Default calendar behavior: add N workdays returns date + N days
         lenient().when(calendarService.addWorkdays(any(LocalDate.class), anyInt()))

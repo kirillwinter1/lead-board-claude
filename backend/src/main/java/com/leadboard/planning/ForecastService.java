@@ -55,6 +55,8 @@ public class ForecastService {
     private final WorkCalendarService calendarService;
     private final StatusMappingService statusMappingService;
     private final DataQualityService dataQualityService;
+    private final StoryAutoScoreService storyAutoScoreService;
+    private final StoryDependencyService storyDependencyService;
 
     public ForecastService(
             JiraIssueRepository issueRepository,
@@ -62,7 +64,9 @@ public class ForecastService {
             TeamMemberRepository memberRepository,
             WorkCalendarService calendarService,
             StatusMappingService statusMappingService,
-            DataQualityService dataQualityService
+            DataQualityService dataQualityService,
+            StoryAutoScoreService storyAutoScoreService,
+            StoryDependencyService storyDependencyService
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
@@ -70,6 +74,8 @@ public class ForecastService {
         this.calendarService = calendarService;
         this.statusMappingService = statusMappingService;
         this.dataQualityService = dataQualityService;
+        this.storyAutoScoreService = storyAutoScoreService;
+        this.storyDependencyService = storyDependencyService;
     }
 
     /**
@@ -433,23 +439,38 @@ public class ForecastService {
         BigDecimal qaDays = epic.getRoughEstimateQaDays();
 
         // 2. Если нет rough estimate, агрегируем по subtasks (НЕ по stories)
+        // Stories планируются в порядке AutoScore (F19)
         if (saDays == null && devDays == null && qaDays == null) {
             List<JiraIssueEntity> childIssues = issueRepository.findByParentKey(epic.getIssueKey());
 
             if (!childIssues.isEmpty()) {
-                // Считаем remaining по каждой фазе из subtasks
+                // Фильтруем только stories (не subtasks)
+                List<JiraIssueEntity> stories = childIssues.stream()
+                        .filter(issue -> !issue.isSubtask())
+                        .toList();
+
+                // Сортируем stories по AutoScore с учётом dependencies
+                List<JiraIssueEntity> sortedStories = sortStoriesByAutoScore(stories, statusMapping);
+
+                // Считаем remaining по каждой фазе из subtasks в порядке AutoScore
                 long saRemainingSeconds = 0;
                 long devRemainingSeconds = 0;
                 long qaRemainingSeconds = 0;
 
-                for (JiraIssueEntity child : childIssues) {
+                for (JiraIssueEntity story : sortedStories) {
                     // Пропускаем Done stories - они уже выполнены
-                    if (statusMappingService.isDone(child.getStatus(), statusMapping)) {
+                    if (statusMappingService.isDone(story.getStatus(), statusMapping)) {
+                        continue;
+                    }
+
+                    // Пропускаем flagged stories (work paused)
+                    if (story.getFlagged() != null && story.getFlagged()) {
+                        log.debug("Skipping flagged story {} in forecast", story.getIssueKey());
                         continue;
                     }
 
                     // Получаем subtasks этой story
-                    List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(child.getIssueKey());
+                    List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
 
                     for (JiraIssueEntity subtask : subtasks) {
                         // Пропускаем Done subtasks
@@ -644,5 +665,26 @@ public class ForecastService {
         if (a == null) return b;
         if (b == null) return a;
         return a.isAfter(b) ? a : b;
+    }
+
+    /**
+     * Сортирует stories по AutoScore с учётом dependencies.
+     * Stories сортируются топологически (blocked stories после blocking),
+     * внутри каждого слоя - по AutoScore DESC.
+     */
+    private List<JiraIssueEntity> sortStoriesByAutoScore(List<JiraIssueEntity> stories, StatusMappingConfig statusMapping) {
+        if (stories.isEmpty()) {
+            return stories;
+        }
+
+        // Calculate AutoScore for each story
+        java.util.Map<String, Double> storyScores = new java.util.HashMap<>();
+        for (JiraIssueEntity story : stories) {
+            BigDecimal score = storyAutoScoreService.calculateAutoScore(story, statusMapping);
+            storyScores.put(story.getIssueKey(), score.doubleValue());
+        }
+
+        // Apply topological sort (respects dependencies)
+        return storyDependencyService.topologicalSort(stories, storyScores);
     }
 }

@@ -18,9 +18,11 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class SyncService {
@@ -228,6 +230,48 @@ public class SyncService {
 
         // Extract created date
         entity.setJiraCreatedAt(parseOffsetDateTime(jiraIssue.getFields().getCreated()));
+
+        // Extract flagged status (Impediment)
+        List<Object> flaggedList = jiraIssue.getFields().getFlagged();
+        entity.setFlagged(flaggedList != null && !flaggedList.isEmpty());
+
+        // Extract issue links (blocks / is blocked by)
+        List<JiraIssue.JiraIssueLink> issueLinks = jiraIssue.getFields().getIssuelinks();
+        if (issueLinks != null && !issueLinks.isEmpty()) {
+            List<String> blocks = new ArrayList<>();
+            List<String> isBlockedBy = new ArrayList<>();
+
+            for (JiraIssue.JiraIssueLink link : issueLinks) {
+                if (link.getType() == null) continue;
+
+                String linkType = link.getType().getName();
+                String outward = link.getType().getOutward();
+                String inward = link.getType().getInward();
+
+                // Check if this is a "Blocks" type link
+                boolean isBlocksLink = "Blocks".equalsIgnoreCase(linkType) ||
+                        (outward != null && outward.toLowerCase().contains("block")) ||
+                        (inward != null && inward.toLowerCase().contains("block"));
+
+                if (!isBlocksLink) continue;
+
+                // Outward link: this issue blocks another
+                if (link.getOutwardIssue() != null) {
+                    blocks.add(link.getOutwardIssue().getKey());
+                }
+
+                // Inward link: this issue is blocked by another
+                if (link.getInwardIssue() != null) {
+                    isBlockedBy.add(link.getInwardIssue().getKey());
+                }
+            }
+
+            entity.setBlocks(blocks.isEmpty() ? null : blocks);
+            entity.setIsBlockedBy(isBlockedBy.isEmpty() ? null : isBlockedBy);
+        } else {
+            entity.setBlocks(null);
+            entity.setIsBlockedBy(null);
+        }
 
         // Restore local Lead Board fields
         entity.setRoughEstimateSaDays(savedRoughEstimateSaDays);

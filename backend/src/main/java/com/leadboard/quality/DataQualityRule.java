@@ -101,6 +101,27 @@ public enum DataQualityRule {
     STORY_NO_SUBTASK_ESTIMATES(
             DataQualitySeverity.WARNING,
             "Story has no subtasks with estimates (cannot be planned)"
+    ),
+
+    // Story dependency rules
+    STORY_BLOCKED_BY_MISSING(
+            DataQualitySeverity.ERROR,
+            "Story is blocked by non-existent issue: %s"
+    ),
+
+    STORY_CIRCULAR_DEPENDENCY(
+            DataQualitySeverity.ERROR,
+            "Circular dependency detected: %s"
+    ),
+
+    STORY_BLOCKED_NO_PROGRESS(
+            DataQualitySeverity.WARNING,
+            "Story has been blocked for more than 30 days without progress on blocking issue: %s"
+    ),
+
+    SUBTASK_ACTIVE_STORY_NOT_INPROGRESS(
+            DataQualitySeverity.WARNING,
+            "Subtask is in active status but parent story is not in progress"
     );
 
     private final DataQualitySeverity severity;

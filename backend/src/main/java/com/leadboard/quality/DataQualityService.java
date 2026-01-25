@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -198,6 +200,56 @@ public class DataQualityService {
             }
         }
 
+        // STORY_BLOCKED_BY_MISSING - Story is blocked by non-existent issue
+        List<String> isBlockedBy = story.getIsBlockedBy();
+        if (isBlockedBy != null && !isBlockedBy.isEmpty()) {
+            for (String blockerKey : isBlockedBy) {
+                Optional<JiraIssueEntity> blocker = issueRepository.findByIssueKey(blockerKey);
+                if (blocker.isEmpty()) {
+                    violations.add(DataQualityViolation.of(
+                            DataQualityRule.STORY_BLOCKED_BY_MISSING,
+                            blockerKey
+                    ));
+                }
+            }
+        }
+
+        // STORY_CIRCULAR_DEPENDENCY - Circular dependency detected
+        Set<String> visited = new HashSet<>();
+        if (hasCircularDependency(story.getIssueKey(), visited, new HashSet<>())) {
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.STORY_CIRCULAR_DEPENDENCY,
+                    String.join(" → ", visited)
+            ));
+        }
+
+        // STORY_BLOCKED_NO_PROGRESS - Story blocked >30 days without progress
+        if (isBlockedBy != null && !isBlockedBy.isEmpty()) {
+            OffsetDateTime storyCreated = story.getJiraCreatedAt();
+            if (storyCreated != null) {
+                long daysSinceCreated = ChronoUnit.DAYS.between(storyCreated, OffsetDateTime.now());
+                if (daysSinceCreated > 30) {
+                    // Check if blocking stories have made progress
+                    for (String blockerKey : isBlockedBy) {
+                        Optional<JiraIssueEntity> blocker = issueRepository.findByIssueKey(blockerKey);
+                        if (blocker.isPresent()) {
+                            JiraIssueEntity blockerIssue = blocker.get();
+                            // If blocker is not done and has no time logged, no progress
+                            if (!statusMappingService.isDone(blockerIssue.getStatus(), statusMapping)) {
+                                Long blockerTimeSpent = blockerIssue.getTimeSpentSeconds();
+                                if (blockerTimeSpent == null || blockerTimeSpent == 0) {
+                                    violations.add(DataQualityViolation.of(
+                                            DataQualityRule.STORY_BLOCKED_NO_PROGRESS,
+                                            blockerKey
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return violations;
     }
 
@@ -253,6 +305,17 @@ public class DataQualityService {
         if (statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
             if (story != null && !statusMappingService.isInProgress(story.getStatus(), statusMapping)) {
                 violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_IN_PROGRESS_STORY_NOT));
+            }
+        }
+
+        // SUBTASK_ACTIVE_STORY_NOT_INPROGRESS - Subtask in active status but Story in TODO
+        if (statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
+            if (story != null) {
+                boolean storyIsTodo = !statusMappingService.isInProgress(story.getStatus(), statusMapping)
+                        && !statusMappingService.isDone(story.getStatus(), statusMapping);
+                if (storyIsTodo) {
+                    violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_ACTIVE_STORY_NOT_INPROGRESS));
+                }
             }
         }
 
@@ -339,5 +402,43 @@ public class DataQualityService {
             );
         }
         return null;
+    }
+
+    /**
+     * Checks for circular dependencies using DFS.
+     *
+     * @param storyKey The story to check
+     * @param visited Set of visited stories (for building path)
+     * @param recStack Recursion stack for cycle detection
+     * @return true if circular dependency detected
+     */
+    private boolean hasCircularDependency(String storyKey, Set<String> visited, Set<String> recStack) {
+        visited.add(storyKey);
+        recStack.add(storyKey);
+
+        Optional<JiraIssueEntity> storyOpt = issueRepository.findByIssueKey(storyKey);
+        if (storyOpt.isEmpty()) {
+            recStack.remove(storyKey);
+            return false;
+        }
+
+        JiraIssueEntity story = storyOpt.get();
+        List<String> isBlockedBy = story.getIsBlockedBy();
+
+        if (isBlockedBy != null) {
+            for (String blocker : isBlockedBy) {
+                if (!visited.contains(blocker)) {
+                    if (hasCircularDependency(blocker, visited, recStack)) {
+                        return true;
+                    }
+                } else if (recStack.contains(blocker)) {
+                    // Cycle detected
+                    return true;
+                }
+            }
+        }
+
+        recStack.remove(storyKey);
+        return false;
     }
 }

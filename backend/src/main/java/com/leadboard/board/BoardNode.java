@@ -24,6 +24,11 @@ public class BoardNode {
     private BigDecimal roughEstimateSaDays; // rough estimate for SA (Epic only, for editing)
     private BigDecimal roughEstimateDevDays; // rough estimate for DEV (Epic only, for editing)
     private BigDecimal roughEstimateQaDays; // rough estimate for QA (Epic only, for editing)
+    private BigDecimal autoScore; // AutoScore for story prioritization (Story only)
+    private BigDecimal manualBoost; // Manual priority boost for stories (Story only)
+    private Boolean flagged; // Impediment flag (Story only)
+    private List<String> blocks; // Stories blocked by this story (Story only)
+    private List<String> blockedBy; // Stories blocking this story (Story only)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
@@ -164,6 +169,46 @@ public class BoardNode {
 
     public void setRoughEstimateQaDays(BigDecimal roughEstimateQaDays) {
         this.roughEstimateQaDays = roughEstimateQaDays;
+    }
+
+    public BigDecimal getAutoScore() {
+        return autoScore;
+    }
+
+    public void setAutoScore(BigDecimal autoScore) {
+        this.autoScore = autoScore;
+    }
+
+    public BigDecimal getManualBoost() {
+        return manualBoost;
+    }
+
+    public void setManualBoost(BigDecimal manualBoost) {
+        this.manualBoost = manualBoost;
+    }
+
+    public Boolean getFlagged() {
+        return flagged;
+    }
+
+    public void setFlagged(Boolean flagged) {
+        this.flagged = flagged;
+    }
+
+    public List<String> getBlocks() {
+        return blocks;
+    }
+
+    public void setBlocks(List<String> blocks) {
+        this.blocks = blocks;
+    }
+
+    public List<String> getBlockedBy() {
+        return blockedBy;
+    }
+
+    public void setBlockedBy(List<String> blockedBy) {
+        this.blockedBy = blockedBy;
     }
 
     public List<DataQualityViolation> getAlerts() {

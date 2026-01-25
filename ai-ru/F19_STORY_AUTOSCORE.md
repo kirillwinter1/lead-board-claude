@@ -1,0 +1,481 @@
+# F19: Story AutoScore & Prioritization
+
+## Цель
+
+Автоматическая приоритизация и последовательность выполнения **Stories внутри Epic** на основе множества факторов.
+
+**Ключевая ценность:**
+- Команда всегда знает какую story брать следующей
+- Баги автоматически поднимаются наверх
+- Заблокированные stories откладываются
+- Автоматический учёт зависимостей через топологическую сортировку
+
+---
+
+## Scope
+
+**MVP (F19):**
+- ✅ Расчёт AutoScore для каждой story
+- ✅ Топологическая сортировка с учётом is blocked by / blocks
+- ✅ Приоритизация багов (высший приоритет)
+- ✅ Учёт статуса story (ближе к завершению = выше)
+- ✅ Учёт Jira Priority (Highest > High > Medium > Low)
+- ✅ Учёт прогресса (timeSpent/estimate)
+- ✅ Учёт наличия subtasks с estimates
+- ✅ Учёт флагов (flagged = низкий приоритет)
+- ✅ Manual priority boost (ручное управление)
+- ✅ Drag & Drop stories в Board для изменения порядка
+
+---
+
+## Формула AutoScore для Story
+
+```
+StoryAutoScore =
+  + IssueTypeWeight        // Bug=100, Story=0
+  + StatusWeight           // Analysis=60, Development=80, Testing=100 и т.д.
+  + ProgressWeight         // (timeSpent/estimate) * 30
+  + PriorityWeight         // Highest=40, High=30, Medium=20, Low=10
+  + DependencyWeight       // blocks N stories = +10*N, is blocked by M = -1000 (откладывается)
+  + DueDateWeight          // Дедлайн близко = +30, далеко = 0
+  + EstimateQualityPenalty // Нет subtasks с estimates = -100
+  + FlaggedPenalty         // Flagged = -200 (в конец)
+  + ManualBoost            // Ручное управление пользователем (от -100 до +100)
+```
+
+### Детальная разбивка факторов
+
+#### 1. IssueTypeWeight (0-100)
+
+| Issue Type | Вес | Комментарий |
+|------------|-----|-------------|
+| Bug, Баг, Дефект | 100 | Высший приоритет |
+| Story, История | 0 | Базовый |
+
+#### 2. StatusWeight (0-110)
+
+Статусы Story с весом (шаг 10):
+
+| Статус | Вес | Категория |
+|--------|-----|-----------|
+| New | 10 | TODO |
+| Ready | 20 | TODO |
+| Waiting Dev | 30 | TODO |
+| Waiting QA | 40 | TODO |
+| Ready to Release | 50 | TODO |
+| Analysis | 60 | IN_PROGRESS |
+| Analysis Review | 70 | IN_PROGRESS |
+| Development | 80 | IN_PROGRESS |
+| Dev Review | 90 | IN_PROGRESS |
+| Testing | 100 | IN_PROGRESS |
+| Test Review | 110 | IN_PROGRESS |
+| Done | 0 | DONE (не планируется) |
+
+**Правило:** Чем ближе к завершению, тем выше вес.
+
+#### 3. ProgressWeight (0-30)
+
+```
+ProgressWeight = (timeSpent / estimate) * 30
+
+Примеры:
+- 0% прогресс = 0
+- 50% прогресс = 15
+- 80% прогресс = 24
+- 100% прогресс = 30
+```
+
+**Важно:** Прогресс рассчитывается из subtasks (см. PROJECT_RULES.md).
+
+Если нет subtasks с estimates: ProgressWeight = 0
+
+#### 4. PriorityWeight (10-40)
+
+| Jira Priority | Вес |
+|---------------|-----|
+| Highest | 40 |
+| High | 30 |
+| Medium | 20 |
+| Low | 10 |
+| (не указан) | 15 |
+
+#### 5. DependencyWeight
+
+**Story blocks N других stories:**
+```
+DependencyWeight = +10 * N
+```
+
+Примеры:
+- Blocks 1 story = +10
+- Blocks 3 stories = +30
+- Не блокирует никого = 0
+
+**Story is blocked by M других stories:**
+```
+DependencyWeight = -1000 * M
+```
+
+**Важно:** Заблокированная story автоматически уходит в конец списка (огромный штраф).
+
+После выполнения блокирующих stories пересчитывается автоматически.
+
+#### 6. DueDateWeight (0-30)
+
+```
+Если есть Due Date:
+  - До дедлайна < 7 дней: +30
+  - До дедлайна < 14 дней: +20
+  - До дедлайна < 30 дней: +10
+  - Дедлайн > 30 дней: 0
+  - Дедлайн просрочен: +40
+Иначе: 0
+```
+
+#### 7. EstimateQualityPenalty
+
+```
+Если story БЕЗ subtasks с estimates: -100
+Иначе: 0
+```
+
+**Правило:** Story без subtasks с estimates НЕ МОЖЕТ быть запланирована (см. PROJECT_RULES.md).
+
+#### 8. FlaggedPenalty
+
+```
+Если story Flagged: -200
+Иначе: 0
+```
+
+**Правило:** Flagged = работа приостановлена (см. PROJECT_RULES.md).
+
+#### 9. ManualBoost (без ограничений)
+
+Пользователь может вручную повысить/понизить приоритет на любое значение:
+- Через API: `PATCH /api/stories/{storyKey}/priority { "boost": 20 }`
+- Через Drag & Drop в Board (автоматически пересчитывается boost)
+- Нет верхней/нижней границы - можно задать любое число
+
+---
+
+## Топологическая сортировка зависимостей
+
+### Алгоритм
+
+1. **Построение графа:**
+   - Вершины = stories внутри epic
+   - Рёбра = is blocked by / blocks
+
+2. **Топологическая сортировка:**
+   - Находим stories без блокировок (in-degree = 0)
+   - Помещаем их в "слой 0"
+   - Удаляем их из графа
+   - Повторяем для следующего слоя
+
+3. **Сортировка внутри слоя:**
+   - Stories в каждом слое сортируются по AutoScore (DESC)
+
+### Пример
+
+```
+Story A (blocks B, blocks C)
+Story B (blocked by A, blocks D)
+Story C (blocked by A)
+Story D (blocked by B)
+Story E (no dependencies)
+
+Граф:
+A → B → D
+A → C
+E (отдельно)
+
+Топологические слои:
+Слой 0: A (AutoScore=85), E (AutoScore=90)
+  → Порядок: E, A (по убыванию AutoScore)
+Слой 1: B (AutoScore=70), C (AutoScore=60)
+  → Порядок: B, C
+Слой 2: D (AutoScore=50)
+
+Итоговый порядок: E → A → B → C → D
+```
+
+### Data Quality проверки
+
+При построении графа:
+
+**STORY_BLOCKED_BY_MISSING** (ERROR):
+- Story is blocked by несуществующую story
+- Behaviour: Игнорируем эту связь при построении графа
+
+**STORY_CIRCULAR_DEPENDENCY** (ERROR):
+- Циклическая зависимость (A blocks B blocks A)
+- Behaviour: Разрываем цикл, подсвечиваем обе stories как проблемные
+
+**STORY_BLOCKED_NO_PROGRESS** (WARNING):
+- Story заблокирована более 30 дней без прогресса блокирующей
+- Behaviour: Подсвечиваем, но не влияет на планирование
+
+---
+
+## Влияние на Expected Done
+
+При расчёте Expected Done для epic:
+
+1. **Берём stories в порядке AutoScore** (после топологической сортировки)
+2. **Заблокированные stories откладываются** пока не выполнены блокирующие
+3. **Баги могут вклиниваться** в середину плана (если появились после начала работы)
+4. **Flagged stories исключаются** из активного планирования
+
+---
+
+## API
+
+### Получение stories с AutoScore
+
+```http
+GET /api/epics/{epicKey}/stories?sort=autoscore
+
+Response:
+{
+  "stories": [
+    {
+      "storyKey": "LB-234",
+      "summary": "Add user profile page",
+      "issueType": "Story",
+      "status": "Development",
+      "priority": "High",
+      "flagged": false,
+      "autoScore": 95.5,
+      "manualBoost": 10,
+      "blockedBy": [],
+      "blocks": ["LB-235", "LB-236"],
+      "canStart": true,
+      "estimateSeconds": 28800,  // Агрегировано из subtasks
+      "timeSpentSeconds": 14400, // Агрегировано из subtasks
+      "progress": 0.5,
+      "scoreBreakdown": {
+        "issueType": 0,
+        "status": 80,
+        "progress": 15,
+        "priority": 30,
+        "dependency": 20,  // blocks 2 stories
+        "dueDate": 0,
+        "estimateQuality": 0,
+        "flagged": 0,
+        "manual": 10
+      },
+      "subtasks": [
+        {
+          "subtaskKey": "LB-235",
+          "summary": "Implement profile API",
+          "issueType": "Разработка",
+          "status": "In Progress",
+          "assignee": "john.doe@example.com",
+          "estimateSeconds": 14400,
+          "timeSpentSeconds": 10800
+        },
+        {
+          "subtaskKey": "LB-236",
+          "summary": "Design profile UI",
+          "issueType": "Разработка",
+          "status": "New",
+          "assignee": null,
+          "estimateSeconds": 14400,
+          "timeSpentSeconds": 3600
+        }
+      ]
+    },
+    ...
+  ],
+  "dependencyGraph": {
+    "nodes": ["LB-234", "LB-235", "LB-236"],
+    "edges": [
+      { "from": "LB-234", "to": "LB-235", "type": "blocks" }
+    ]
+  }
+}
+```
+
+### Обновление manual boost
+
+```http
+PATCH /api/stories/{storyKey}/priority
+
+Request:
+{
+  "boost": 20  // Любое число, без ограничений
+}
+
+Response:
+{
+  "storyKey": "LB-234",
+  "autoScore": 115.5,  // Пересчитано
+  "manualBoost": 20
+}
+```
+
+### Пересчёт AutoScore
+
+```http
+POST /api/planning/recalculate-stories?epicKey=LB-100
+
+Response:
+{
+  "recalculated": 12,
+  "timestamp": "2026-01-25T10:00:00Z"
+}
+```
+
+---
+
+## UI Changes
+
+### Board Page
+
+**Колонка "Story Priority":**
+- Числовое значение AutoScore
+- Цветовая индикация:
+  - 🟢 High (>80)
+  - 🟡 Medium (40-80)
+  - 🔴 Low (<40)
+
+**Сортировка stories внутри epic:**
+- По умолчанию: по AutoScore DESC
+- Можно переключить на ручную сортировку (сохраняет manual boost)
+
+**Drag & Drop:**
+- Перетаскивание story внутри epic
+- При drop пересчитывается manual boost автоматически
+
+**Иконки:**
+- 🐛 Bug
+- 🔒 Blocked (с tooltip: "Blocked by LB-123, LB-124")
+- 🚩 Flagged
+- ⚠️ No subtask estimates
+- ⚡ High priority (AutoScore > 80)
+
+**Tooltip при наведении на AutoScore:**
+```
+AutoScore: 95.5
+
+Breakdown:
+  Issue Type: 0 (Story)
+  Status: 80 (Development)
+  Progress: 15 (50%)
+  Priority: 30 (High)
+  Dependency: +20 (blocks 2 stories)
+  Due Date: 0
+  Estimate Quality: 0
+  Flagged: 0
+  Manual Boost: +10
+```
+
+### Timeline Page
+
+**Stories в Timeline:**
+- Планируются в порядке AutoScore
+- Заблокированные stories показываются пунктиром
+- При наведении на story - показываем почему она запланирована в этот период
+
+---
+
+## Пересчёт AutoScore
+
+**Триггеры:**
+- После каждой Jira sync (автоматически)
+- При изменении manual boost (автоматически)
+- По кнопке "Recalculate" в UI (вручную)
+
+**Scope:**
+- Пересчитывается для всех stories всех epics команды
+- Сохраняется в БД (поле `autoScore`, `manualPriorityBoost`)
+
+---
+
+## Data Quality Rules
+
+Новые правила для F19:
+
+| Правило | Severity | Описание |
+|---------|----------|----------|
+| `STORY_BLOCKED_BY_MISSING` | ERROR | Story blocked by несуществующую story |
+| `STORY_CIRCULAR_DEPENDENCY` | ERROR | Циклическая зависимость (A blocks B blocks A) |
+| `STORY_BLOCKED_NO_PROGRESS` | WARNING | Story заблокирована >30 дней без прогресса |
+| `SUBTASK_ACTIVE_STORY_NOT_INPROGRESS` | WARNING | Subtask активна, но story не в работе |
+
+---
+
+## Database Schema
+
+### Изменения в `jira_issues`
+
+Добавить колонки:
+```sql
+ALTER TABLE jira_issues
+ADD COLUMN auto_score DECIMAL(10, 2),
+ADD COLUMN manual_priority_boost INTEGER DEFAULT 0,
+ADD COLUMN flagged BOOLEAN DEFAULT FALSE,
+ADD COLUMN blocks TEXT[], -- массив issue keys
+ADD COLUMN is_blocked_by TEXT[]; -- массив issue keys
+```
+
+**Примечание:** `blocks` и `is_blocked_by` заполняются при sync из Jira Issue Links.
+
+---
+
+## Tests
+
+### Unit Tests
+
+1. **AutoScore calculation:**
+   - Bug vs Story
+   - Статусы (все варианты)
+   - Прогресс (0%, 50%, 100%)
+   - Priority (Highest, High, Medium, Low)
+   - Dependencies (blocks, is blocked by)
+   - Due Date (близко, далеко, просрочен)
+   - Flagged
+   - Без subtasks с estimates
+
+2. **Топологическая сортировка:**
+   - Простой граф (A → B → C)
+   - Параллельные ветки (A → B, A → C)
+   - Циклы (должны обрабатываться)
+   - Отсутствующие блокировки
+
+### Integration Tests
+
+1. **API endpoints:**
+   - GET /api/epics/{epicKey}/stories
+   - PATCH /api/stories/{storyKey}/priority
+   - POST /api/planning/recalculate-stories
+
+2. **Jira sync:**
+   - Issue Links синхронизируются
+   - Flagged status синхронизируется
+
+---
+
+## Зависимости
+
+- F3 (Jira Sync) - синхронизация Issue Links и Flagged status
+- F8 (Board v2) - отображение stories внутри epic
+- F13 (AutoPlanning) - расчёт Expected Done с учётом порядка stories
+- F18 (Data Quality) - новые правила для dependencies
+
+---
+
+## Критерии готовности
+
+- [ ] AutoScore рассчитывается для всех stories
+- [ ] Топологическая сортировка работает корректно
+- [ ] Баги всегда наверху списка
+- [ ] Заблокированные stories в конце
+- [ ] Manual boost сохраняется и применяется
+- [ ] Drag & Drop работает в Board
+- [ ] UI показывает иконки и AutoScore breakdown
+- [ ] API endpoints реализованы
+- [ ] Data Quality правила работают
+- [ ] Тесты написаны и проходят
+- [ ] Документация обновлена

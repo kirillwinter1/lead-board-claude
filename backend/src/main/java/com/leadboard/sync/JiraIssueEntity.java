@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "jira_issues")
@@ -81,6 +82,15 @@ public class JiraIssueEntity {
 
     @Column(name = "auto_score_calculated_at")
     private OffsetDateTime autoScoreCalculatedAt;
+
+    @Column(name = "flagged")
+    private Boolean flagged = false;
+
+    @Column(name = "blocks", columnDefinition = "TEXT[]")
+    private List<String> blocks;
+
+    @Column(name = "is_blocked_by", columnDefinition = "TEXT[]")
+    private List<String> isBlockedBy;
 
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
@@ -317,5 +327,29 @@ public class JiraIssueEntity {
 
     public void setAutoScoreCalculatedAt(OffsetDateTime autoScoreCalculatedAt) {
         this.autoScoreCalculatedAt = autoScoreCalculatedAt;
+    }
+
+    public Boolean getFlagged() {
+        return flagged;
+    }
+
+    public void setFlagged(Boolean flagged) {
+        this.flagged = flagged;
+    }
+
+    public List<String> getBlocks() {
+        return blocks;
+    }
+
+    public void setBlocks(List<String> blocks) {
+        this.blocks = blocks;
+    }
+
+    public List<String> getIsBlockedBy() {
+        return isBlockedBy;
+    }
+
+    public void setIsBlockedBy(List<String> isBlockedBy) {
+        this.isBlockedBy = isBlockedBy;
     }
 }

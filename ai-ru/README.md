@@ -46,6 +46,9 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | **F10. Epic-Team Mapping** | Синхронизация команды из Jira Team field, отображение на Board |
 | **F13. Автопланирование** | AutoScore, Expected Done, drag & drop приоритетов, конвейерная модель SA→DEV→QA |
 | **F14. Timeline/Gantt** | Gantt-диаграмма с фазами, zoom уровни, индикаторы Today/Due Date |
+| **F17. Configurable Status Mapping** | Настраиваемый маппинг статусов Jira на категории (TODO/IN_PROGRESS/DONE) |
+| **F18. Data Quality** | 20 правил проверки качества данных (ERROR/WARNING/INFO) |
+| **F19. Story AutoScore** | Автоматическая приоритизация stories с учётом dependencies, топологическая сортировка |
 
 ### Текущий UI
 
@@ -97,6 +100,10 @@ Lead Board — SaaS-продукт для управления IT-доставк
 | GET | /api/calendar/count-workdays | Подсчёт рабочих дней |
 | GET | /api/calendar/add-workdays | Дата через N рабочих дней |
 | POST | /api/calendar/refresh | Обновить кэш календаря |
+| GET | /api/epics/{epicKey}/stories | Получить stories с AutoScore |
+| PATCH | /api/stories/{storyKey}/priority | Обновить ручной приоритет story |
+| POST | /api/planning/recalculate-stories | Пересчитать AutoScore для stories |
+| GET | /api/data-quality | Проверки качества данных |
 
 ---
 

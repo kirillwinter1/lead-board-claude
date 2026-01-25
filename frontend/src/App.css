@@ -278,7 +278,10 @@ body {
   width: 100px;
 }
 
-
+.th-priority {
+  width: 110px;
+  text-align: center;
+}
 
 .th-roles {
   width: 260px;
@@ -404,7 +407,34 @@ body {
   color: #6b778c;
 }
 
+/* Priority Cell */
+.cell-priority {
+  text-align: center;
+}
 
+.priority-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.priority-score {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.priority-icons {
+  display: flex;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.priority-empty {
+  color: #a5adba;
+  font-size: 12px;
+}
 
 /* Role Chips */
 .cell-roles {

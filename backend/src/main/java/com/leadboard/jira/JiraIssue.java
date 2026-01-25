@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -57,6 +58,8 @@ public class JiraIssue {
         private JiraPriority priority;
         private String duedate;
         private String created;
+        private List<Object> flagged; // Jira field for Impediment flag
+        private List<JiraIssueLink> issuelinks;
         private Map<String, Object> customFields = new HashMap<>();
 
         @JsonAnySetter
@@ -144,6 +147,22 @@ public class JiraIssue {
 
         public void setCreated(String created) {
             this.created = created;
+        }
+
+        public List<Object> getFlagged() {
+            return flagged;
+        }
+
+        public void setFlagged(List<Object> flagged) {
+            this.flagged = flagged;
+        }
+
+        public List<JiraIssueLink> getIssuelinks() {
+            return issuelinks;
+        }
+
+        public void setIssuelinks(List<JiraIssueLink> issuelinks) {
+            this.issuelinks = issuelinks;
         }
     }
 
@@ -267,6 +286,130 @@ public class JiraIssue {
 
         public void setId(String id) {
             this.id = id;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraIssueLink {
+        private String id;
+        private JiraIssueLinkType type;
+        private JiraLinkedIssue outwardIssue;
+        private JiraLinkedIssue inwardIssue;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public JiraIssueLinkType getType() {
+            return type;
+        }
+
+        public void setType(JiraIssueLinkType type) {
+            this.type = type;
+        }
+
+        public JiraLinkedIssue getOutwardIssue() {
+            return outwardIssue;
+        }
+
+        public void setOutwardIssue(JiraLinkedIssue outwardIssue) {
+            this.outwardIssue = outwardIssue;
+        }
+
+        public JiraLinkedIssue getInwardIssue() {
+            return inwardIssue;
+        }
+
+        public void setInwardIssue(JiraLinkedIssue inwardIssue) {
+            this.inwardIssue = inwardIssue;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraIssueLinkType {
+        private String name;
+        private String inward;  // e.g., "is blocked by"
+        private String outward; // e.g., "blocks"
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getInward() {
+            return inward;
+        }
+
+        public void setInward(String inward) {
+            this.inward = inward;
+        }
+
+        public String getOutward() {
+            return outward;
+        }
+
+        public void setOutward(String outward) {
+            this.outward = outward;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraLinkedIssue {
+        private String id;
+        private String key;
+        private JiraLinkedIssueFields fields;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getKey() {
+            return key;
+        }
+
+        public void setKey(String key) {
+            this.key = key;
+        }
+
+        public JiraLinkedIssueFields getFields() {
+            return fields;
+        }
+
+        public void setFields(JiraLinkedIssueFields fields) {
+            this.fields = fields;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraLinkedIssueFields {
+        private String summary;
+        private JiraStatus status;
+
+        public String getSummary() {
+            return summary;
+        }
+
+        public void setSummary(String summary) {
+            this.summary = summary;
+        }
+
+        public JiraStatus getStatus() {
+            return status;
+        }
+
+        public void setStatus(JiraStatus status) {
+            this.status = status;
         }
     }
 }

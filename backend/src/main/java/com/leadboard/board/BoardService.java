@@ -247,6 +247,18 @@ public class BoardService {
             // For Epics in progress: RoleProgress will be set by aggregateProgress()
         }
 
+        // Set Story-specific AutoScore fields
+        if ("Story".equalsIgnoreCase(entity.getIssueType()) || "История".equalsIgnoreCase(entity.getIssueType()) ||
+            "Bug".equalsIgnoreCase(entity.getIssueType()) || "Баг".equalsIgnoreCase(entity.getIssueType())) {
+            node.setAutoScore(entity.getAutoScore());
+            if (entity.getManualPriorityBoost() != null) {
+                node.setManualBoost(new BigDecimal(entity.getManualPriorityBoost()));
+            }
+            node.setFlagged(entity.getFlagged());
+            node.setBlocks(entity.getBlocks());
+            node.setBlockedBy(entity.getIsBlockedBy());
+        }
+
         return node;
     }
 

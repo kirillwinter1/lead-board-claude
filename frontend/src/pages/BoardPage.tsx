@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import axios from 'axios'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
 import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '../api/forecast'
+import { updateStoryPriority } from '../api/stories'
 
 // Sound effect for drag & drop - Pop sound
 const playDropSound = () => {
@@ -87,6 +88,11 @@ interface BoardNode {
   roughEstimateDevDays: number | null
   roughEstimateQaDays: number | null
   alerts: DataQualityViolation[]
+  autoScore: number | null
+  manualBoost: number | null
+  flagged: boolean | null
+  blockedBy: string[] | null
+  blocks: string[] | null
   children: BoardNode[]
 }
 
@@ -365,6 +371,49 @@ function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
   )
 }
 
+function PriorityCell({ node }: { node: BoardNode }) {
+  const score = node.autoScore || 0
+
+  // Color based on score
+  let color = '#888' // gray for low
+  if (score > 80) color = '#36b37e' // green for high
+  else if (score >= 40) color = '#ffab00' // yellow for medium
+  else if (score < 0) color = '#de350b' // red for negative (blocked)
+
+  // Icons
+  const icons: string[] = []
+  if (node.issueType?.toLowerCase().includes('bug') || node.issueType?.toLowerCase().includes('баг')) {
+    icons.push('🐛')
+  }
+  if (node.blockedBy && node.blockedBy.length > 0) {
+    icons.push('🔒')
+  }
+  if (node.flagged) {
+    icons.push('🚩')
+  }
+  if (score > 80) {
+    icons.push('⚡')
+  }
+
+  const hasNoEstimates = node.estimateSeconds === null || node.estimateSeconds === 0
+  if (hasNoEstimates && !node.issueType?.toLowerCase().includes('epic')) {
+    icons.push('⚠️')
+  }
+
+  return (
+    <div className="priority-cell" style={{ color }}>
+      <span className="priority-score" style={{ fontWeight: 600 }}>
+        {score.toFixed(0)}
+      </span>
+      {icons.length > 0 && (
+        <span className="priority-icons" style={{ marginLeft: '6px' }}>
+          {icons.join(' ')}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function StatusBadge({ status }: { status: string }) {
   const statusClass = status.toLowerCase().replace(/\s+/g, '-')
   return <span className={`status-badge ${statusClass}`}>{status}</span>
@@ -526,20 +575,50 @@ interface BoardRowProps {
   isDragging: boolean
   isDragOver: boolean
   isJustDropped: boolean
+  // Story drag & drop
+  parentEpicKey?: string
+  onStoryDragStart?: (e: React.DragEvent, storyKey: string, parentEpicKey: string) => void
+  onStoryDragOver?: (e: React.DragEvent, storyKey: string, parentEpicKey: string) => void
+  onStoryDrop?: (e: React.DragEvent, storyKey: string, parentEpicKey: string) => void
+  onStoryDragEnd?: () => void
+  isStoryDragging?: boolean
+  isStoryDragOver?: boolean
+  isStoryJustDropped?: boolean
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped, parentEpicKey, onStoryDragStart, onStoryDragOver, onStoryDrop, onStoryDragEnd, isStoryDragging, isStoryDragOver, isStoryJustDropped }: BoardRowProps) {
   const isEpicRow = isEpic(node.issueType) && level === 0
+  const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
   const autoScoreTooltip = forecast ? `AutoScore: ${forecast.autoScore.toFixed(1)}` : undefined
+
+  const dragEffects = isStoryRow && isStoryDragging ? 'dragging' : (isDragging ? 'dragging' : '')
+  const dragOverEffects = isStoryRow && isStoryDragOver ? 'drag-over' : (isDragOver ? 'drag-over' : '')
+  const justDroppedEffects = isStoryRow && isStoryJustDropped ? 'just-dropped' : (isJustDropped ? 'just-dropped' : '')
 
   return (
     <tr
-      className={`board-row level-${level} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${isJustDropped ? 'just-dropped' : ''}`}
-      draggable={isEpicRow && canReorder}
-      onDragStart={isEpicRow && canReorder ? (e) => onDragStart(e, index, node.issueKey) : undefined}
-      onDragOver={isEpicRow && canReorder ? (e) => onDragOver(e, index) : undefined}
-      onDrop={isEpicRow && canReorder ? (e) => onDrop(e, index) : undefined}
-      onDragEnd={isEpicRow && canReorder ? onDragEnd : undefined}
+      className={`board-row level-${level} ${dragEffects} ${dragOverEffects} ${justDroppedEffects}`}
+      draggable={(isEpicRow || isStoryRow) && canReorder}
+      onDragStart={
+        isEpicRow && canReorder ? (e) => onDragStart(e, index, node.issueKey) :
+        isStoryRow && canReorder && onStoryDragStart && parentEpicKey ? (e) => onStoryDragStart(e, node.issueKey, parentEpicKey) :
+        undefined
+      }
+      onDragOver={
+        isEpicRow && canReorder ? (e) => onDragOver(e, index) :
+        isStoryRow && canReorder && onStoryDragOver && parentEpicKey ? (e) => onStoryDragOver(e, node.issueKey, parentEpicKey) :
+        undefined
+      }
+      onDrop={
+        isEpicRow && canReorder ? (e) => onDrop(e, index) :
+        isStoryRow && canReorder && onStoryDrop && parentEpicKey ? (e) => onStoryDrop(e, node.issueKey, parentEpicKey) :
+        undefined
+      }
+      onDragEnd={
+        isEpicRow && canReorder ? onDragEnd :
+        isStoryRow && canReorder && onStoryDragEnd ? onStoryDragEnd :
+        undefined
+      }
       title={isEpicRow ? autoScoreTooltip : undefined}
     >
       <td className="cell-expander">
@@ -553,7 +632,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
       </td>
       <td className="cell-name">
         <div className="name-content" style={{ paddingLeft: `${level * 20}px` }}>
-          {isEpicRow && canReorder && (
+          {(isEpicRow || isStoryRow) && canReorder && (
             <span className="drag-handle" title="Drag to reorder">⋮⋮</span>
           )}
           <img src={getIssueIcon(node.issueType)} alt={node.issueType} className="issue-type-icon" />
@@ -564,6 +643,13 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         </div>
       </td>
       <td className="cell-team">{node.teamName || '--'}</td>
+      <td className="cell-priority">
+        {node.autoScore !== null && node.autoScore !== undefined ? (
+          <PriorityCell node={node} />
+        ) : (
+          <span className="priority-empty">--</span>
+        )}
+      </td>
       <td className="cell-expected-done">
         {isEpic(node.issueType) ? (
           <ExpectedDoneCell forecast={forecast} />
@@ -602,14 +688,21 @@ interface BoardTableProps {
   forecastMap: Map<string, EpicForecast>
   canReorder: boolean
   onReorder: (epicKey: string, newIndex: number) => Promise<void>
+  onStoryReorder: (storyKey: string, parentEpicKey: string, newIndex: number) => Promise<void>
 }
 
-function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, canReorder, onReorder }: BoardTableProps) {
+function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, canReorder, onReorder, onStoryReorder }: BoardTableProps) {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [draggingEpicKey, setDraggingEpicKey] = useState<string | null>(null)
   const [droppedEpicKey, setDroppedEpicKey] = useState<string | null>(null)
+
+  // Story drag & drop state
+  const [draggingStoryKey, setDraggingStoryKey] = useState<string | null>(null)
+  const [draggingStoryParentKey, setDraggingStoryParentKey] = useState<string | null>(null)
+  const [dragOverStoryKey, setDragOverStoryKey] = useState<string | null>(null)
+  const [droppedStoryKey, setDroppedStoryKey] = useState<string | null>(null)
 
   const toggleExpand = (key: string) => {
     setExpandedKeys(prev => {
@@ -672,7 +765,59 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     setDraggingEpicKey(null)
   }
 
-  const renderRows = (nodes: BoardNode[], level: number, startIndex: number = 0): JSX.Element[] => {
+  // Story drag & drop handlers
+  const handleStoryDragStart = (e: React.DragEvent, storyKey: string, parentEpicKey: string) => {
+    e.stopPropagation()
+    setDraggingStoryKey(storyKey)
+    setDraggingStoryParentKey(parentEpicKey)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleStoryDragOver = (e: React.DragEvent, storyKey: string, parentEpicKey: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Only allow drop if dragging within the same epic
+    if (draggingStoryParentKey === parentEpicKey && draggingStoryKey !== storyKey) {
+      e.dataTransfer.dropEffect = 'move'
+      setDragOverStoryKey(storyKey)
+    }
+  }
+
+  const handleStoryDrop = async (e: React.DragEvent, storyKey: string, parentEpicKey: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (draggingStoryKey && draggingStoryParentKey === parentEpicKey && draggingStoryKey !== storyKey) {
+      // Find parent epic and get sorted stories
+      const parentEpic = items.find(epic => epic.issueKey === parentEpicKey)
+      if (parentEpic) {
+        const stories = parentEpic.children.filter(child =>
+          child.issueType === 'Story' || child.issueType === 'История' ||
+          child.issueType === 'Bug' || child.issueType === 'Баг'
+        )
+        const newIndex = stories.findIndex(s => s.issueKey === storyKey)
+
+        if (newIndex !== -1) {
+          await onStoryReorder(draggingStoryKey, parentEpicKey, newIndex)
+          playDropSound()
+          setDroppedStoryKey(draggingStoryKey)
+          setTimeout(() => setDroppedStoryKey(null), 400)
+        }
+      }
+    }
+
+    setDraggingStoryKey(null)
+    setDraggingStoryParentKey(null)
+    setDragOverStoryKey(null)
+  }
+
+  const handleStoryDragEnd = () => {
+    setDraggingStoryKey(null)
+    setDraggingStoryParentKey(null)
+    setDragOverStoryKey(null)
+  }
+
+  const renderRows = (nodes: BoardNode[], level: number, startIndex: number = 0, parentEpicKey?: string): JSX.Element[] => {
     const rows: JSX.Element[] = []
     let currentIndex = startIndex
 
@@ -702,6 +847,14 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
           isDragging={draggingIndex === nodeIndex && level === 0}
           isDragOver={dragOverIndex === nodeIndex && level === 0}
           isJustDropped={droppedEpicKey === node.issueKey}
+          parentEpicKey={parentEpicKey}
+          onStoryDragStart={handleStoryDragStart}
+          onStoryDragOver={handleStoryDragOver}
+          onStoryDrop={handleStoryDrop}
+          onStoryDragEnd={handleStoryDragEnd}
+          isStoryDragging={draggingStoryKey === node.issueKey}
+          isStoryDragOver={dragOverStoryKey === node.issueKey}
+          isStoryJustDropped={droppedStoryKey === node.issueKey}
         />
       )
 
@@ -710,7 +863,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
       }
 
       if (isExpanded && hasChildren) {
-        rows.push(...renderRows(node.children, level + 1, currentIndex))
+        rows.push(...renderRows(node.children, level + 1, currentIndex, level === 0 ? node.issueKey : parentEpicKey))
       }
     }
 
@@ -727,6 +880,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
             <th className="th-expander"></th>
             <th className="th-name">NAME</th>
             <th className="th-team">TEAM</th>
+            <th className="th-priority">PRIORITY</th>
             <th className="th-expected-done">
               <span className="th-with-info">
                 EXPECTED DONE
@@ -1085,6 +1239,58 @@ export function BoardPage() {
     }
   }, [allForecasts, selectedTeamId])
 
+  // Handle story reorder via drag & drop
+  const handleStoryReorder = useCallback(async (storyKey: string, parentEpicKey: string, newIndex: number) => {
+    // Find parent epic in board
+    const parentEpic = board.find(epic => epic.issueKey === parentEpicKey)
+    if (!parentEpic) return
+
+    // Get stories (including bugs) sorted by autoScore (descending)
+    const stories = parentEpic.children
+      .filter(child =>
+        child.issueType === 'Story' || child.issueType === 'История' ||
+        child.issueType === 'Bug' || child.issueType === 'Баг'
+      )
+      .filter(s => s.autoScore !== null)
+      .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
+
+    const currentIndex = stories.findIndex(s => s.issueKey === storyKey)
+    if (currentIndex === -1 || currentIndex === newIndex) return
+
+    const currentStory = stories[currentIndex]
+    const currentBaseScore = (currentStory.autoScore || 0) - (currentStory.manualBoost || 0)
+
+    let newBoost = 0
+
+    if (newIndex < currentIndex) {
+      // Moving UP - need to beat the story at newIndex
+      const targetStory = stories[newIndex]
+      const targetScore = targetStory.autoScore || 0
+      // Need: baseScore + newBoost > targetScore
+      newBoost = Math.ceil(targetScore - currentBaseScore + 0.5)
+    } else {
+      // Moving DOWN - need to be below the story at newIndex
+      const targetStory = stories[newIndex]
+      const targetScore = targetStory.autoScore || 0
+
+      // If there's a story below the target, we need to be above it
+      const storyBelow = stories[newIndex + 1]
+      const scoreBelow = storyBelow ? (storyBelow.autoScore || 0) : 0
+
+      // Target: be between targetScore and scoreBelow
+      const targetMiddle = (targetScore + scoreBelow) / 2
+      newBoost = Math.floor(targetMiddle - currentBaseScore)
+    }
+
+    try {
+      await updateStoryPriority(storyKey, newBoost)
+      // Refetch board to get updated data
+      await fetchBoard()
+    } catch (err) {
+      console.error('Failed to reorder story:', err)
+    }
+  }, [board, fetchBoard])
+
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
     board.forEach(epic => statuses.add(epic.status))
@@ -1193,6 +1399,7 @@ export function BoardPage() {
             forecastMap={forecastMap}
             canReorder={canReorder}
             onReorder={handleReorder}
+            onStoryReorder={handleStoryReorder}
           />
         )}
       </main>
