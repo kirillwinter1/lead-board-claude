@@ -29,7 +29,9 @@ public record StoryForecastResponse(
             boolean isBlocked,
             List<String> blockingStories,
             BigDecimal autoScore,
-            String status
+            String status,
+            Long timeSpentSeconds,
+            Long originalEstimateSeconds
     ) {}
 
     public record AssigneeUtilizationDto(

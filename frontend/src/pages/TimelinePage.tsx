@@ -511,7 +511,101 @@ function StoryTooltip({ story }: StoryTooltipProps) {
   )
 }
 
-// Story Schedule Bars - shows stories as individual bars with assignee and dates
+// Utility functions for story phase and progress
+function getStoryPhase(status: string | null): 'analysis' | 'development' | 'qa' | 'done' | 'todo' {
+  if (!status) return 'todo'
+
+  const statusLower = status.toLowerCase()
+
+  // Analysis phase
+  if (statusLower.includes('analysis') || statusLower.includes('аналитик') ||
+      statusLower.includes('dev review') || statusLower.includes('ревью аналитик')) {
+    return 'analysis'
+  }
+
+  // Development phase
+  if (statusLower.includes('development') || statusLower.includes('разработк') ||
+      statusLower.includes('in progress') || statusLower.includes('в работе') ||
+      statusLower.includes('code review') || statusLower.includes('ревью кода')) {
+    return 'development'
+  }
+
+  // QA phase
+  if (statusLower.includes('test') || statusLower.includes('тест') ||
+      statusLower.includes('qa') || statusLower.includes('review') && !statusLower.includes('dev')) {
+    return 'qa'
+  }
+
+  // Done
+  if (statusLower.includes('done') || statusLower.includes('завершен') ||
+      statusLower.includes('closed') || statusLower.includes('готов')) {
+    return 'done'
+  }
+
+  return 'todo'
+}
+
+function getPhaseColor(phase: 'analysis' | 'development' | 'qa' | 'done' | 'todo'): string {
+  switch (phase) {
+    case 'analysis': return '#3b82f6'      // Blue
+    case 'development': return '#10b981'   // Green
+    case 'qa': return '#f59e0b'            // Orange
+    case 'done': return '#059669'          // Dark Green
+    case 'todo': return '#6b7280'          // Gray
+  }
+}
+
+function calculateProgress(timeSpentSeconds: number | null, estimateSeconds: number | null): number {
+  if (!estimateSeconds || estimateSeconds === 0) return 0
+  if (!timeSpentSeconds) return 0
+  return Math.min(Math.round((timeSpentSeconds / estimateSeconds) * 100), 100)
+}
+
+// Lane allocation - distribute stories vertically to avoid overlap
+interface Lane {
+  stories: StorySchedule[]
+  endDate: Date | null
+}
+
+function allocateLanes(stories: StorySchedule[]): Map<string, number> {
+  const lanes: Lane[] = []
+  const storyLanes = new Map<string, number>()
+
+  // Sort stories by start date
+  const sortedStories = [...stories].sort((a, b) =>
+    new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  )
+
+  for (const story of sortedStories) {
+    const storyStart = new Date(story.startDate)
+    const storyEnd = new Date(story.endDate)
+
+    // Find first available lane
+    let assignedLane = -1
+    for (let i = 0; i < lanes.length; i++) {
+      const lane = lanes[i]
+      if (!lane.endDate || storyStart > lane.endDate) {
+        // This lane is free
+        assignedLane = i
+        lane.stories.push(story)
+        lane.endDate = storyEnd
+        break
+      }
+    }
+
+    // No free lane found, create new one
+    if (assignedLane === -1) {
+      assignedLane = lanes.length
+      lanes.push({ stories: [story], endDate: storyEnd })
+    }
+
+    storyLanes.set(story.storyKey, assignedLane)
+  }
+
+  return storyLanes
+}
+
+// Story Schedule Bars - shows stories as individual bars with progress
 interface StoryScheduleBarsProps {
   epicKey: string
   storyForecast: StoryForecastResponse | null
@@ -531,20 +625,41 @@ function StoryScheduleBars({ epicKey, storyForecast, dateRange, jiraBaseUrl }: S
     )
   }
 
+  // Filter out completed stories and stories with no work
+  const activeStories = storyForecast.stories.filter(s => {
+    const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
+    const hasWork = s.workDays > 0
+    return !isDone && hasWork
+  })
+
+  if (activeStories.length === 0) {
+    return (
+      <div className="story-schedule-empty">
+        <span className="story-empty-text">All stories completed</span>
+      </div>
+    )
+  }
+
+  // Calculate total days from the timeline's dateRange
   const totalDays = daysBetween(dateRange.start, dateRange.end)
 
-  // Generate unique color per assignee
-  const assigneeColors = new Map<string, string>()
-  const colorPalette = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#6366f1', '#14b8a6']
-  let colorIndex = 0
+  // Allocate lanes for stories
+  const storyLanes = allocateLanes(activeStories)
+  const laneCount = Math.max(...Array.from(storyLanes.values())) + 1
 
-  storyForecast.stories.forEach(story => {
-    const assignee = story.assigneeDisplayName || story.assigneeAccountId || 'Unassigned'
-    if (!assigneeColors.has(assignee)) {
-      assigneeColors.set(assignee, colorPalette[colorIndex % colorPalette.length])
-      colorIndex++
-    }
-  })
+  // Calculate epic background span from actual story dates
+  const storyRangeStart = activeStories.reduce((min, s) => {
+    const d = new Date(s.startDate)
+    return d < min ? d : min
+  }, new Date(activeStories[0].startDate))
+
+  const storyRangeEnd = activeStories.reduce((max, s) => {
+    const d = new Date(s.endDate)
+    return d > max ? d : max
+  }, new Date(activeStories[0].endDate))
+
+  const epicLeftPercent = (daysBetween(dateRange.start, storyRangeStart) / totalDays) * 100
+  const epicWidthPercent = (daysBetween(storyRangeStart, storyRangeEnd) / totalDays) * 100
 
   const handleMouseEnter = (e: React.MouseEvent, story: StorySchedule) => {
     e.stopPropagation()
@@ -558,82 +673,161 @@ function StoryScheduleBars({ epicKey, storyForecast, dateRange, jiraBaseUrl }: S
     setHoveredStory(null)
   }
 
+  const BAR_HEIGHT = 28
+  const LANE_GAP = 6
+
   return (
     <>
-      <div className="story-schedule-bars">
-        {storyForecast.stories.map(story => {
+      <div className="story-schedule-container" style={{ height: `${laneCount * (BAR_HEIGHT + LANE_GAP)}px`, position: 'relative' }}>
+        {/* Epic background */}
+        <div
+          className="epic-background"
+          style={{
+            position: 'absolute',
+            left: `${epicLeftPercent}%`,
+            width: `${epicWidthPercent}%`,
+            height: '100%',
+            backgroundColor: '#d1d5db',
+            opacity: 0.25,
+            borderRadius: '4px',
+            border: '1px solid rgba(0,0,0,0.08)',
+            zIndex: 0
+          }}
+        />
+
+        {/* Story bars */}
+        {activeStories.map(story => {
           const startDate = new Date(story.startDate)
           const endDate = new Date(story.endDate)
+          const lane = storyLanes.get(story.storyKey) || 0
 
           // Calculate position and width
           const daysFromStart = daysBetween(dateRange.start, startDate)
-          const duration = daysBetween(startDate, endDate) + 1 // Include end day
+          const duration = daysBetween(startDate, endDate) + 1
           const leftPercent = (daysFromStart / totalDays) * 100
           const widthPercent = (duration / totalDays) * 100
 
-          const assignee = story.assigneeDisplayName || story.assigneeAccountId || 'Unassigned'
-          const color = assigneeColors.get(assignee) || '#6b7280'
+          // Calculate progress and phase
+          const progress = calculateProgress(story.timeSpentSeconds, story.originalEstimateSeconds)
+          const phase = getStoryPhase(story.status)
+          const phaseColor = getPhaseColor(phase)
+
+          // Extract story number (without "LB-" prefix)
+          const storyNumber = story.storyKey.split('-')[1] || story.storyKey
+
+          // Background: if no progress data, use medium opacity solid; otherwise use gradient
+          const hasProgressData = story.originalEstimateSeconds && story.originalEstimateSeconds > 0
+          const backgroundStyle = hasProgressData
+            ? `linear-gradient(to right, ${phaseColor} 0%, ${phaseColor} ${progress}%, ${phaseColor}4D ${progress}%, ${phaseColor}4D 100%)`
+            : phaseColor + 'B3' // 70% opacity for stories without estimate
+
+          // Border style
+          const borderStyle = story.isBlocked
+            ? '2px solid #ef4444'
+            : '1px solid rgba(0,0,0,0.15)'
 
           return (
             <div
               key={story.storyKey}
-              className={`story-schedule-bar ${story.isUnassigned ? 'story-unassigned' : ''} ${story.isBlocked ? 'story-blocked' : ''}`}
+              className="story-schedule-bar-v2"
               style={{
+                position: 'absolute',
                 left: `${leftPercent}%`,
                 width: `${widthPercent}%`,
-                backgroundColor: color,
-                opacity: story.isBlocked ? 0.5 : 1
+                top: `${lane * (BAR_HEIGHT + LANE_GAP)}px`,
+                height: `${BAR_HEIGHT}px`,
+                background: backgroundStyle,
+                borderRadius: '4px',
+                border: borderStyle,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+                zIndex: 1,
+                boxShadow: story.isBlocked ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : 'none'
               }}
               onMouseEnter={e => handleMouseEnter(e, story)}
               onMouseLeave={handleMouseLeave}
-              title={`${story.storyKey}: ${story.storySummary || ''}`}
             >
-              <span className="story-schedule-key">{story.storyKey}</span>
+              <span style={{
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'white',
+                textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                zIndex: 2,
+                letterSpacing: '0.3px'
+              }}>
+                {storyNumber}
+              </span>
             </div>
           )
         })}
       </div>
 
-      {/* Tooltip */}
+      {/* Improved Tooltip */}
       {hoveredStory && createPortal(
         <div
-          className="gantt-unified-tooltip"
+          className="gantt-unified-tooltip story-tooltip-v2"
           style={{
             position: 'fixed',
             left: tooltipPos.x,
             top: tooltipPos.y,
             transform: 'translate(-50%, -100%)',
             zIndex: 10000,
-            pointerEvents: 'none'
+            pointerEvents: 'none',
+            background: 'rgba(0,0,0,0.92)',
+            backdropFilter: 'blur(8px)',
+            borderRadius: '8px',
+            padding: '16px',
+            minWidth: '280px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
           }}
         >
-          <div className="tooltip-header">
-            <a
+          <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: 'white' }}>
+            📋 <a
               href={`${jiraBaseUrl}${hoveredStory.storyKey}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ pointerEvents: 'auto' }}
+              style={{ pointerEvents: 'auto', color: '#60a5fa', textDecoration: 'none' }}
             >
               {hoveredStory.storyKey}
             </a>
             {hoveredStory.autoScore !== null && (
-              <span className="tooltip-score"> ({hoveredStory.autoScore.toFixed(0)})</span>
+              <span style={{ color: '#9ca3af', marginLeft: '8px' }}>({hoveredStory.autoScore.toFixed(0)})</span>
             )}
           </div>
-          <div className="tooltip-summary">{hoveredStory.storySummary || 'No summary'}</div>
-          <div className="tooltip-dates">
-            {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))} ({hoveredStory.workDays.toFixed(1)} days)
+
+          <div style={{ fontSize: '14px', color: '#d1d5db', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+            {hoveredStory.storySummary || 'No summary'}
           </div>
-          <div className="tooltip-assignee">
-            👤 {hoveredStory.assigneeDisplayName || 'Unassigned'}
-            {hoveredStory.isUnassigned && ' (auto-assigned)'}
-          </div>
-          {hoveredStory.isBlocked && (
-            <div className="tooltip-blocked">
-              🚫 Blocked by: {hoveredStory.blockingStories.join(', ')}
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#e5e7eb' }}>
+            <div>
+              📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))} ({hoveredStory.workDays.toFixed(1)} days)
             </div>
-          )}
-          <div className="tooltip-status">Status: {hoveredStory.status || 'Unknown'}</div>
+
+            {hoveredStory.originalEstimateSeconds && hoveredStory.originalEstimateSeconds > 0 && (
+              <div>
+                ⏱️ Progress: {Math.round((hoveredStory.timeSpentSeconds || 0) / 3600)}h / {Math.round(hoveredStory.originalEstimateSeconds / 3600)}h ({calculateProgress(hoveredStory.timeSpentSeconds, hoveredStory.originalEstimateSeconds)}%)
+              </div>
+            )}
+
+            <div>
+              👤 {hoveredStory.assigneeDisplayName || 'Unassigned'}
+              {hoveredStory.isUnassigned && <span style={{ color: '#fbbf24' }}> (auto-assigned)</span>}
+            </div>
+
+            <div>
+              🏷️ Phase: {getStoryPhase(hoveredStory.status).toUpperCase()}
+            </div>
+
+            {hoveredStory.isBlocked && (
+              <div style={{ color: '#f87171', marginTop: '4px' }}>
+                🚫 Blocked by: {hoveredStory.blockingStories.join(', ')}
+              </div>
+            )}
+          </div>
         </div>,
         document.body
       )}
@@ -1201,10 +1395,35 @@ export function TimelinePage() {
     chartRef.current.scrollLeft = scrollTarget
   }, [forecast])
 
+  // Track story forecast keys for dependency
+  const storyForecastKeys = useMemo(() =>
+    Array.from(storyForecasts.keys()).join(','),
+    [storyForecasts]
+  )
+
   const dateRange = useMemo(() => {
     if (!forecast) return null
-    return calculateDateRange(forecast)
-  }, [forecast])
+    const epicRange = calculateDateRange(forecast)
+
+    // If showing stories, extend range to include all story dates
+    if (showStories && storyForecasts.size > 0) {
+      let minDate = epicRange.start
+      let maxDate = epicRange.end
+
+      storyForecasts.forEach(storyForecast => {
+        storyForecast.stories.forEach(story => {
+          const storyStart = new Date(story.startDate)
+          const storyEnd = new Date(story.endDate)
+          if (storyStart < minDate) minDate = storyStart
+          if (storyEnd > maxDate) maxDate = storyEnd
+        })
+      })
+
+      return { start: minDate, end: maxDate }
+    }
+
+    return epicRange
+  }, [forecast, showStories, storyForecastKeys, storyForecasts])
 
   const headers = useMemo(() => {
     if (!dateRange) return []

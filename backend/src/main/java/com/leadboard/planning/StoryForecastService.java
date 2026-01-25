@@ -323,14 +323,26 @@ public class StoryForecastService {
      * Calculate remaining work for a story.
      */
     private BigDecimal calculateRemainingWork(JiraIssueEntity story) {
-        Long estimateSeconds = story.getOriginalEstimateSeconds();
-        Long spentSeconds = story.getTimeSpentSeconds() != null ? story.getTimeSpentSeconds() : 0L;
+        // Aggregate estimate and time spent from subtasks (data quality rule: estimates only on subtasks)
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
 
-        if (estimateSeconds == null || estimateSeconds <= 0) {
+        long totalEstimateSeconds = 0;
+        long totalSpentSeconds = 0;
+
+        for (JiraIssueEntity subtask : subtasks) {
+            if (subtask.getOriginalEstimateSeconds() != null) {
+                totalEstimateSeconds += subtask.getOriginalEstimateSeconds();
+            }
+            if (subtask.getTimeSpentSeconds() != null) {
+                totalSpentSeconds += subtask.getTimeSpentSeconds();
+            }
+        }
+
+        if (totalEstimateSeconds <= 0) {
             return BigDecimal.ZERO;
         }
 
-        long remainingSeconds = Math.max(0, estimateSeconds - spentSeconds);
+        long remainingSeconds = Math.max(0, totalEstimateSeconds - totalSpentSeconds);
         return new BigDecimal(remainingSeconds).divide(new BigDecimal("3600"), 1, RoundingMode.HALF_UP);
     }
 

@@ -140,10 +140,40 @@ public class ForecastController {
 
         StoryForecastService.StoryForecast forecast = storyForecastService.calculateStoryForecast(epicKey, teamId);
 
-        // Convert to DTO
+        // Convert to DTO with subtask aggregation
         List<StoryForecastResponse.StoryScheduleDto> storyDtos = forecast.stories().stream()
                 .map(schedule -> {
                     JiraIssueEntity story = issueRepository.findByIssueKey(schedule.storyKey()).orElse(null);
+
+                    // Aggregate time and estimates from subtasks
+                    Long totalEstimate = null;
+                    Long totalSpent = null;
+
+                    if (story != null) {
+                        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
+
+                        if (!subtasks.isEmpty()) {
+                            long subtaskEstimate = 0;
+                            long subtaskSpent = 0;
+
+                            for (JiraIssueEntity subtask : subtasks) {
+                                if (subtask.getOriginalEstimateSeconds() != null) {
+                                    subtaskEstimate += subtask.getOriginalEstimateSeconds();
+                                }
+                                if (subtask.getTimeSpentSeconds() != null) {
+                                    subtaskSpent += subtask.getTimeSpentSeconds();
+                                }
+                            }
+
+                            if (subtaskEstimate > 0) {
+                                totalEstimate = subtaskEstimate;
+                            }
+                            if (subtaskSpent > 0) {
+                                totalSpent = subtaskSpent;
+                            }
+                        }
+                    }
+
                     return new StoryForecastResponse.StoryScheduleDto(
                             schedule.storyKey(),
                             story != null ? story.getSummary() : null,
@@ -156,7 +186,9 @@ public class ForecastController {
                             schedule.isBlocked(),
                             schedule.blockingStories(),
                             story != null ? story.getAutoScore() : null,
-                            story != null ? story.getStatus() : null
+                            story != null ? story.getStatus() : null,
+                            totalSpent,
+                            totalEstimate
                     );
                 })
                 .collect(Collectors.toList());

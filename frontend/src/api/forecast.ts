@@ -227,6 +227,8 @@ export interface StorySchedule {
   blockingStories: string[]
   autoScore: number | null
   status: string | null
+  timeSpentSeconds: number | null
+  originalEstimateSeconds: number | null
 }
 
 export interface AssigneeUtilization {

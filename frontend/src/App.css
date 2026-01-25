@@ -3679,6 +3679,33 @@ body {
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
 }
 
+/* Story Schedule V2 - New Design */
+.story-schedule-container {
+  position: relative;
+  width: 100%;
+}
+
+.story-schedule-bar-v2 {
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.story-schedule-bar-v2:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+  z-index: 10 !important;
+}
+
+.epic-background {
+  pointer-events: none;
+}
+
+/* Story Tooltip V2 */
+.story-tooltip-v2 {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
 .story-schedule-empty {
   display: flex;
   align-items: center;
