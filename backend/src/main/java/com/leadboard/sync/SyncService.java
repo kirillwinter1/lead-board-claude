@@ -231,6 +231,29 @@ public class SyncService {
         // Extract created date
         entity.setJiraCreatedAt(parseOffsetDateTime(jiraIssue.getFields().getCreated()));
 
+        // Extract assignee
+        if (jiraIssue.getFields().getAssignee() != null) {
+            String accountId = jiraIssue.getFields().getAssignee().getAccountId();
+            String displayName = jiraIssue.getFields().getAssignee().getDisplayName();
+            log.info("Issue {} has assignee: {} ({})", jiraIssue.getKey(), displayName, accountId);
+            entity.setAssigneeAccountId(accountId);
+            entity.setAssigneeDisplayName(displayName);
+        } else {
+            entity.setAssigneeAccountId(null);
+            entity.setAssigneeDisplayName(null);
+        }
+
+        // Detect "In Progress" status to set started_at
+        String status = jiraIssue.getFields().getStatus().getName();
+        if (isInProgressStatus(status) && entity.getStartedAt() == null) {
+            // Only set started_at if it's not already set (first time entering In Progress)
+            entity.setStartedAt(OffsetDateTime.now());
+        } else if (!isInProgressStatus(status) && entity.getStartedAt() != null) {
+            // Clear started_at if status is no longer In Progress (moved back to To Do or completed)
+            // Actually, let's keep it once set to track when work originally started
+            // entity.setStartedAt(null);
+        }
+
         // Extract flagged status (Impediment)
         List<Object> flaggedList = jiraIssue.getFields().getFlagged();
         entity.setFlagged(flaggedList != null && !flaggedList.isEmpty());
@@ -357,6 +380,19 @@ public class SyncService {
                     newState.setProjectKey(projectKey);
                     return syncStateRepository.save(newState);
                 });
+    }
+
+    private boolean isInProgressStatus(String status) {
+        if (status == null) {
+            return false;
+        }
+        String lowerStatus = status.toLowerCase();
+        return lowerStatus.contains("in progress") ||
+               lowerStatus.contains("in dev") ||
+               lowerStatus.contains("in development") ||
+               lowerStatus.contains("in review") ||
+               lowerStatus.contains("in qa") ||
+               lowerStatus.contains("in testing");
     }
 
     public record SyncStatus(

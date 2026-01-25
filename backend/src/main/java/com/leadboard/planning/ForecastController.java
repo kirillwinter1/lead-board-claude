@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.RoleBreakdown;
+import com.leadboard.planning.dto.StoryForecastResponse;
 import com.leadboard.planning.dto.StoryInfo;
 import com.leadboard.planning.dto.WipHistoryResponse;
 import com.leadboard.planning.dto.WipHistoryResponse.WipDataPoint;
@@ -10,9 +11,11 @@ import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * REST API для прогнозирования.
@@ -22,17 +25,20 @@ import java.util.Map;
 public class ForecastController {
 
     private final ForecastService forecastService;
+    private final StoryForecastService storyForecastService;
     private final AutoScoreService autoScoreService;
     private final WipSnapshotService wipSnapshotService;
     private final JiraIssueRepository issueRepository;
 
     public ForecastController(
             ForecastService forecastService,
+            StoryForecastService storyForecastService,
             AutoScoreService autoScoreService,
             WipSnapshotService wipSnapshotService,
             JiraIssueRepository issueRepository
     ) {
         this.forecastService = forecastService;
+        this.storyForecastService = storyForecastService;
         this.autoScoreService = autoScoreService;
         this.wipSnapshotService = wipSnapshotService;
         this.issueRepository = issueRepository;
@@ -119,6 +125,61 @@ public class ForecastController {
                 "date", snapshot.getSnapshotDate().toString(),
                 "teamWip", snapshot.getTeamWipCurrent() + "/" + snapshot.getTeamWipLimit()
         ));
+    }
+
+    /**
+     * Получает story-level forecast для эпика с учетом assignee и capacity.
+     *
+     * @param epicKey ключ эпика (например, LB-123)
+     * @param teamId ID команды
+     */
+    @GetMapping("/epics/{epicKey}/story-forecast")
+    public ResponseEntity<StoryForecastResponse> getStoryForecast(
+            @PathVariable String epicKey,
+            @RequestParam Long teamId) {
+
+        StoryForecastService.StoryForecast forecast = storyForecastService.calculateStoryForecast(epicKey, teamId);
+
+        // Convert to DTO
+        List<StoryForecastResponse.StoryScheduleDto> storyDtos = forecast.stories().stream()
+                .map(schedule -> {
+                    JiraIssueEntity story = issueRepository.findByIssueKey(schedule.storyKey()).orElse(null);
+                    return new StoryForecastResponse.StoryScheduleDto(
+                            schedule.storyKey(),
+                            story != null ? story.getSummary() : null,
+                            schedule.assigneeAccountId(),
+                            schedule.assigneeDisplayName(),
+                            schedule.startDate(),
+                            schedule.endDate(),
+                            schedule.workDays(),
+                            schedule.isUnassigned(),
+                            schedule.isBlocked(),
+                            schedule.blockingStories(),
+                            story != null ? story.getAutoScore() : null,
+                            story != null ? story.getStatus() : null
+                    );
+                })
+                .collect(Collectors.toList());
+
+        Map<String, StoryForecastResponse.AssigneeUtilizationDto> utilizationDtos = forecast.assigneeUtilization().entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        e -> new StoryForecastResponse.AssigneeUtilizationDto(
+                                e.getValue().displayName(),
+                                e.getValue().role(),
+                                e.getValue().workDaysAssigned(),
+                                e.getValue().effectiveHoursPerDay()
+                        )
+                ));
+
+        StoryForecastResponse response = new StoryForecastResponse(
+                forecast.epicKey(),
+                forecast.epicStartDate(),
+                storyDtos,
+                utilizationDtos
+        );
+
+        return ResponseEntity.ok(response);
     }
 
     /**

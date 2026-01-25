@@ -92,6 +92,15 @@ public class JiraIssueEntity {
     @Column(name = "is_blocked_by", columnDefinition = "TEXT[]")
     private List<String> isBlockedBy;
 
+    @Column(name = "assignee_account_id", length = 255)
+    private String assigneeAccountId;
+
+    @Column(name = "assignee_display_name", length = 255)
+    private String assigneeDisplayName;
+
+    @Column(name = "started_at")
+    private OffsetDateTime startedAt;
+
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
 
@@ -351,5 +360,29 @@ public class JiraIssueEntity {
 
     public void setIsBlockedBy(List<String> isBlockedBy) {
         this.isBlockedBy = isBlockedBy;
+    }
+
+    public String getAssigneeAccountId() {
+        return assigneeAccountId;
+    }
+
+    public void setAssigneeAccountId(String assigneeAccountId) {
+        this.assigneeAccountId = assigneeAccountId;
+    }
+
+    public String getAssigneeDisplayName() {
+        return assigneeDisplayName;
+    }
+
+    public void setAssigneeDisplayName(String assigneeDisplayName) {
+        this.assigneeDisplayName = assigneeDisplayName;
+    }
+
+    public OffsetDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    public void setStartedAt(OffsetDateTime startedAt) {
+        this.startedAt = startedAt;
     }
 }
