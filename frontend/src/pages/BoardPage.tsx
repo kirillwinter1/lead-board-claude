@@ -95,6 +95,8 @@ interface BoardNode {
   blockedBy: string[] | null
   blocks: string[] | null
   expectedDone: string | null
+  assigneeAccountId: string | null
+  assigneeDisplayName: string | null
   children: BoardNode[]
 }
 
@@ -576,7 +578,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // Simple Expected Done cell for stories (without forecast data)
-function StoryExpectedDoneCell({ endDate }: { endDate: string | null }) {
+function StoryExpectedDoneCell({ endDate, assignee }: { endDate: string | null, assignee: string | null }) {
   if (!endDate) {
     return <span className="expected-done-empty">--</span>
   }
@@ -587,8 +589,13 @@ function StoryExpectedDoneCell({ endDate }: { endDate: string | null }) {
   }
 
   return (
-    <div className="expected-done-cell">
+    <div className="expected-done-cell" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
       <span className="expected-done-date">{formatDate(endDate)}</span>
+      {assignee && (
+        <span style={{ fontSize: '0.75rem', color: '#666', fontStyle: 'italic' }}>
+          {assignee}
+        </span>
+      )}
     </div>
   )
 }
@@ -983,7 +990,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         {isEpic(node.issueType) ? (
           <ExpectedDoneCell forecast={forecast} />
         ) : (
-          <StoryExpectedDoneCell endDate={node.expectedDone} />
+          <StoryExpectedDoneCell endDate={node.expectedDone} assignee={node.assigneeDisplayName} />
         )}
       </td>
       <td className="cell-progress">
