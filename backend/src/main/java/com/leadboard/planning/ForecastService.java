@@ -432,39 +432,49 @@ public class ForecastService {
         BigDecimal devDays = epic.getRoughEstimateDevDays();
         BigDecimal qaDays = epic.getRoughEstimateQaDays();
 
-        // 2. Если нет rough estimate, агрегируем по child issues
+        // 2. Если нет rough estimate, агрегируем по subtasks (НЕ по stories)
         if (saDays == null && devDays == null && qaDays == null) {
             List<JiraIssueEntity> childIssues = issueRepository.findByParentKey(epic.getIssueKey());
 
             if (!childIssues.isEmpty()) {
-                // Считаем remaining по каждой фазе из child issues
+                // Считаем remaining по каждой фазе из subtasks
                 long saRemainingSeconds = 0;
                 long devRemainingSeconds = 0;
                 long qaRemainingSeconds = 0;
 
                 for (JiraIssueEntity child : childIssues) {
-                    // Пропускаем Done задачи - они уже выполнены
+                    // Пропускаем Done stories - они уже выполнены
                     if (statusMappingService.isDone(child.getStatus(), statusMapping)) {
                         continue;
                     }
 
-                    // Рассчитываем remaining для этой задачи
-                    long estimate = child.getOriginalEstimateSeconds() != null ? child.getOriginalEstimateSeconds() : 0;
-                    long spent = child.getTimeSpentSeconds() != null ? child.getTimeSpentSeconds() : 0;
-                    long remaining = Math.max(0, estimate - spent);
+                    // Получаем subtasks этой story
+                    List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(child.getIssueKey());
 
-                    // Если нет эстимейта, но есть залогированное время - оцениваем что осталось ещё столько же
-                    if (estimate == 0 && spent > 0 && !statusMappingService.isInProgress(child.getStatus(), statusMapping)) {
-                        remaining = spent; // Fallback: предполагаем что осталось примерно столько же
-                    }
+                    for (JiraIssueEntity subtask : subtasks) {
+                        // Пропускаем Done subtasks
+                        if (statusMappingService.isDone(subtask.getStatus(), statusMapping)) {
+                            continue;
+                        }
 
-                    // Определяем фазу по типу задачи или статусу
-                    String phase = statusMappingService.determinePhase(child.getStatus(), child.getIssueType(), statusMapping);
+                        // Рассчитываем remaining для subtask
+                        long estimate = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
+                        long spent = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+                        long remaining = Math.max(0, estimate - spent);
 
-                    switch (phase) {
-                        case "SA" -> saRemainingSeconds += remaining;
-                        case "QA" -> qaRemainingSeconds += remaining;
-                        default -> devRemainingSeconds += remaining;
+                        // Если нет эстимейта, но есть залогированное время - оцениваем что осталось ещё столько же
+                        if (estimate == 0 && spent > 0 && !statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
+                            remaining = spent; // Fallback: предполагаем что осталось примерно столько же
+                        }
+
+                        // Определяем фазу по типу subtask или статусу
+                        String phase = statusMappingService.determinePhase(subtask.getStatus(), subtask.getIssueType(), statusMapping);
+
+                        switch (phase) {
+                            case "SA" -> saRemainingSeconds += remaining;
+                            case "QA" -> qaRemainingSeconds += remaining;
+                            default -> devRemainingSeconds += remaining;
+                        }
                     }
                 }
 

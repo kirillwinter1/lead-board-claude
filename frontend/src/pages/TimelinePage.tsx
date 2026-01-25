@@ -370,7 +370,7 @@ function StoryTooltip({ story }: StoryTooltipProps) {
     ? Math.max(0, story.estimateSeconds! - timeSpent)
     : null
 
-  const formatTime = (seconds: number | null) => {
+  const formatTime = (seconds: number | null | undefined) => {
     if (seconds === null || seconds === undefined) return '-'
     if (seconds === 0) return '0h'
     const hours = Math.round(seconds / 3600)
@@ -383,6 +383,16 @@ function StoryTooltip({ story }: StoryTooltipProps) {
       case 'IN_PROGRESS': return 'In Progress'
       default: return 'To Do'
     }
+  }
+
+  // Check if we have any role breakdown data
+  const hasRoleBreakdown = story.saBreakdown || story.devBreakdown || story.qaBreakdown
+
+  // Calculate remaining for each role
+  const getRoleRemaining = (breakdown: { estimateSeconds: number | null; loggedSeconds: number | null } | null) => {
+    if (!breakdown || !breakdown.estimateSeconds) return null
+    const logged = breakdown.loggedSeconds || 0
+    return Math.max(0, breakdown.estimateSeconds - logged)
   }
 
   return (
@@ -407,27 +417,96 @@ function StoryTooltip({ story }: StoryTooltipProps) {
         </div>
       </div>
 
-      <div className="tooltip-section">
-        <div className="tooltip-row">
-          <span>Estimate:</span>
-          <strong className={!hasEstimate ? 'tooltip-warning' : ''}>{formatTime(story.estimateSeconds)}</strong>
-          {!hasEstimate && <span className="tooltip-alert">No estimate!</span>}
+      {/* Dates section */}
+      {(story.startDate || story.endDate) && (
+        <div className="tooltip-section">
+          {story.startDate && (
+            <div className="tooltip-row">
+              <span>Start:</span>
+              <strong>{formatDateShort(new Date(story.startDate))}</strong>
+            </div>
+          )}
+          {story.endDate && (
+            <div className="tooltip-row">
+              <span>End:</span>
+              <strong>{formatDateShort(new Date(story.endDate))}</strong>
+            </div>
+          )}
         </div>
-        <div className="tooltip-row">
-          <span>Logged:</span>
-          <strong>{formatTime(story.timeSpentSeconds)}</strong>
+      )}
+
+      {/* Role breakdown table */}
+      {hasRoleBreakdown ? (
+        <div className="tooltip-section tooltip-role-breakdown">
+          <table className="tooltip-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Est</th>
+                <th>Log</th>
+                <th>Rem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {story.saBreakdown && (
+                <tr>
+                  <td className="tooltip-role-label">SA</td>
+                  <td>{formatTime(story.saBreakdown.estimateSeconds)}</td>
+                  <td>{formatTime(story.saBreakdown.loggedSeconds)}</td>
+                  <td>{formatTime(getRoleRemaining(story.saBreakdown))}</td>
+                </tr>
+              )}
+              {story.devBreakdown && (
+                <tr>
+                  <td className="tooltip-role-label">DEV</td>
+                  <td>{formatTime(story.devBreakdown.estimateSeconds)}</td>
+                  <td>{formatTime(story.devBreakdown.loggedSeconds)}</td>
+                  <td>{formatTime(getRoleRemaining(story.devBreakdown))}</td>
+                </tr>
+              )}
+              {story.qaBreakdown && (
+                <tr>
+                  <td className="tooltip-role-label">QA</td>
+                  <td>{formatTime(story.qaBreakdown.estimateSeconds)}</td>
+                  <td>{formatTime(story.qaBreakdown.loggedSeconds)}</td>
+                  <td>{formatTime(getRoleRemaining(story.qaBreakdown))}</td>
+                </tr>
+              )}
+              <tr className="tooltip-table-total">
+                <td>Total</td>
+                <td>{formatTime(story.estimateSeconds)}</td>
+                <td>{formatTime(story.timeSpentSeconds)}</td>
+                <td>{formatTime(remainingSeconds)}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div className="tooltip-row">
-          <span>Remaining:</span>
-          <strong>{formatTime(remainingSeconds)}</strong>
+      ) : (
+        <div className="tooltip-section">
+          <div className="tooltip-row">
+            <span>Estimate:</span>
+            <strong className={!hasEstimate ? 'tooltip-warning' : ''}>{formatTime(story.estimateSeconds)}</strong>
+            {!hasEstimate && <span className="tooltip-alert">No estimate!</span>}
+          </div>
+          <div className="tooltip-row">
+            <span>Logged:</span>
+            <strong>{formatTime(story.timeSpentSeconds)}</strong>
+          </div>
+          <div className="tooltip-row">
+            <span>Remaining:</span>
+            <strong>{formatTime(remainingSeconds)}</strong>
+          </div>
         </div>
-        {story.assignee && (
+      )}
+
+      {story.assignee && (
+        <div className="tooltip-section">
           <div className="tooltip-row">
             <span>Assignee:</span>
             <strong>{story.assignee}</strong>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 package com.leadboard.planning;
 
 import com.leadboard.planning.dto.ForecastResponse;
+import com.leadboard.planning.dto.RoleBreakdown;
 import com.leadboard.planning.dto.StoryInfo;
 import com.leadboard.planning.dto.WipHistoryResponse;
 import com.leadboard.planning.dto.WipHistoryResponse.WipDataPoint;
@@ -123,6 +124,7 @@ public class ForecastController {
     /**
      * Получает child issues (stories) для эпика.
      * Агрегирует время из подзадач если у сторя нет собственного timeSpent.
+     * Включает breakdown по ролям (SA/DEV/QA).
      *
      * @param epicKey ключ эпика (например, LB-123)
      */
@@ -138,14 +140,27 @@ public class ForecastController {
                     Long totalEstimate = issue.getOriginalEstimateSeconds();
                     Long totalSpent = issue.getTimeSpentSeconds();
 
+                    // Role breakdown accumulators
+                    long saEstimate = 0, saLogged = 0;
+                    long devEstimate = 0, devLogged = 0;
+                    long qaEstimate = 0, qaLogged = 0;
+
                     if (!subtasks.isEmpty()) {
-                        // Суммируем из подзадач
-                        long subtaskEstimate = subtasks.stream()
-                                .mapToLong(st -> st.getOriginalEstimateSeconds() != null ? st.getOriginalEstimateSeconds() : 0)
-                                .sum();
-                        long subtaskSpent = subtasks.stream()
-                                .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
-                                .sum();
+                        // Группируем подзадачи по ролям и суммируем
+                        for (JiraIssueEntity subtask : subtasks) {
+                            String role = StoryInfo.determineRole(subtask.getIssueType());
+                            long est = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
+                            long spent = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+
+                            switch (role) {
+                                case "SA" -> { saEstimate += est; saLogged += spent; }
+                                case "QA" -> { qaEstimate += est; qaLogged += spent; }
+                                default -> { devEstimate += est; devLogged += spent; }
+                            }
+                        }
+
+                        long subtaskEstimate = saEstimate + devEstimate + qaEstimate;
+                        long subtaskSpent = saLogged + devLogged + qaLogged;
 
                         // Используем сумму подзадач если она больше или у родителя нет данных
                         if (subtaskEstimate > 0 && (totalEstimate == null || subtaskEstimate > totalEstimate)) {
@@ -156,16 +171,31 @@ public class ForecastController {
                         }
                     }
 
+                    // Build role breakdowns (null if no data)
+                    RoleBreakdown saBreakdown = (saEstimate > 0 || saLogged > 0)
+                            ? new RoleBreakdown(saEstimate > 0 ? saEstimate : null, saLogged > 0 ? saLogged : null)
+                            : null;
+                    RoleBreakdown devBreakdown = (devEstimate > 0 || devLogged > 0)
+                            ? new RoleBreakdown(devEstimate > 0 ? devEstimate : null, devLogged > 0 ? devLogged : null)
+                            : null;
+                    RoleBreakdown qaBreakdown = (qaEstimate > 0 || qaLogged > 0)
+                            ? new RoleBreakdown(qaEstimate > 0 ? qaEstimate : null, qaLogged > 0 ? qaLogged : null)
+                            : null;
+
                     return new StoryInfo(
                             issue.getIssueKey(),
                             issue.getSummary(),
                             issue.getStatus(),
                             issue.getIssueType(),
-                            null, // assignee - можно добавить позже
-                            null, // startDate - можно добавить позже
+                            null, // assignee - TODO: добавить когда будет синкаться
+                            null, // startDate - TODO: добавить когда будет синкаться
+                            null, // endDate - TODO: вычислять или брать из Jira
                             totalEstimate,
                             totalSpent,
-                            StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType())
+                            StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType()),
+                            saBreakdown,
+                            devBreakdown,
+                            qaBreakdown
                     );
                 })
                 .toList();

@@ -2527,6 +2527,54 @@ body {
   margin-left: 8px;
 }
 
+/* Role breakdown table in story tooltip */
+.tooltip-role-breakdown {
+  margin-top: 8px;
+}
+
+.tooltip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.tooltip-table th {
+  text-align: right;
+  padding: 2px 6px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+  font-size: 10px;
+}
+
+.tooltip-table th:first-child {
+  text-align: left;
+}
+
+.tooltip-table td {
+  text-align: right;
+  padding: 3px 6px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.tooltip-table td:first-child {
+  text-align: left;
+}
+
+.tooltip-role-label {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-weight: 500;
+}
+
+.tooltip-table-total {
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tooltip-table-total td {
+  padding-top: 5px;
+  font-weight: 600;
+  color: #fff;
+}
+
 .tooltip-queue-info {
   background: rgba(107, 114, 128, 0.2);
   border-radius: 4px;

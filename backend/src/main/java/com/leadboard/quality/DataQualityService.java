@@ -189,6 +189,15 @@ public class DataQualityService {
             }
         }
 
+        // STORY_NO_SUBTASK_ESTIMATES - Story has no subtasks with estimates (not Done stories only)
+        if (!statusMappingService.isDone(story.getStatus(), statusMapping)) {
+            boolean hasSubtaskEstimates = subtasks.stream()
+                    .anyMatch(s -> s.getOriginalEstimateSeconds() != null && s.getOriginalEstimateSeconds() > 0);
+            if (!hasSubtaskEstimates) {
+                violations.add(DataQualityViolation.of(DataQualityRule.STORY_NO_SUBTASK_ESTIMATES));
+            }
+        }
+
         return violations;
     }
 
@@ -301,14 +310,12 @@ public class DataQualityService {
     }
 
     /**
-     * Checks if any issues in the hierarchy have estimates.
+     * Checks if any subtasks in the hierarchy have estimates.
+     * Only subtask estimates count - story-level estimates are ignored.
      */
     private boolean hasEstimatesInHierarchy(List<JiraIssueEntity> children) {
         for (JiraIssueEntity child : children) {
-            if (child.getOriginalEstimateSeconds() != null && child.getOriginalEstimateSeconds() > 0) {
-                return true;
-            }
-            // Check subtasks of this child
+            // Check subtasks of this child - only subtask estimates count
             List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(child.getIssueKey());
             for (JiraIssueEntity subtask : subtasks) {
                 if (subtask.getOriginalEstimateSeconds() != null && subtask.getOriginalEstimateSeconds() > 0) {

@@ -164,6 +164,11 @@ export async function createWipSnapshot(teamId: number): Promise<{ status: strin
 export type StoryStatusCategory = 'TO_DO' | 'IN_PROGRESS' | 'DONE'
 export type StoryPhase = 'SA' | 'DEV' | 'QA'
 
+export interface RoleBreakdown {
+  estimateSeconds: number | null
+  loggedSeconds: number | null
+}
+
 export interface StoryInfo {
   storyKey: string
   summary: string
@@ -171,9 +176,13 @@ export interface StoryInfo {
   issueType: string
   assignee: string | null
   startDate: string | null
+  endDate: string | null
   estimateSeconds: number | null
   timeSpentSeconds: number | null
   phase: StoryPhase
+  saBreakdown: RoleBreakdown | null
+  devBreakdown: RoleBreakdown | null
+  qaBreakdown: RoleBreakdown | null
 }
 
 /**

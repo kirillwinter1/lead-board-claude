@@ -11,10 +11,14 @@ public record StoryInfo(
         String status,
         String issueType,
         String assignee,
-        LocalDate startDate,          // Когда перешла в In Progress (если есть)
+        LocalDate startDate,          // Когда перешла в In Progress
+        LocalDate endDate,            // Дата завершения или расчётная дата
         Long estimateSeconds,
         Long timeSpentSeconds,
-        String phase                   // SA, DEV, QA (по label/component или статусу)
+        String phase,                  // SA, DEV, QA (по label/component или статусу)
+        RoleBreakdown saBreakdown,    // Breakdown по SA
+        RoleBreakdown devBreakdown,   // Breakdown по DEV
+        RoleBreakdown qaBreakdown     // Breakdown по QA
 ) {
     /**
      * Определяет фазу сторя по статусу или типу задачи.
@@ -37,6 +41,24 @@ public record StoryInfo(
         }
 
         // По умолчанию DEV
+        return "DEV";
+    }
+
+    /**
+     * Определяет роль subtask по типу задачи.
+     */
+    public static String determineRole(String issueType) {
+        if (issueType == null) {
+            return "DEV";
+        }
+        String typeLower = issueType.toLowerCase();
+
+        if (typeLower.contains("аналитик") || typeLower.contains("analysis") || typeLower.contains("analytics")) {
+            return "SA";
+        }
+        if (typeLower.contains("тест") || typeLower.contains("test") || typeLower.contains("qa")) {
+            return "QA";
+        }
         return "DEV";
     }
 

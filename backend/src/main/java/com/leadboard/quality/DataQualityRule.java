@@ -95,6 +95,12 @@ public enum DataQualityRule {
     STORY_IN_PROGRESS_NO_SUBTASKS(
             DataQualitySeverity.WARNING,
             "Story is in progress but has no subtasks"
+    ),
+
+    // Story estimate rules
+    STORY_NO_SUBTASK_ESTIMATES(
+            DataQualitySeverity.WARNING,
+            "Story has no subtasks with estimates (cannot be planned)"
     );
 
     private final DataQualitySeverity severity;
