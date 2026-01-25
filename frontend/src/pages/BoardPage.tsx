@@ -376,7 +376,7 @@ function PriorityCell({ node }: { node: BoardNode }) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [breakdown, setBreakdown] = useState<ScoreBreakdown | null>(null)
   const [loading, setLoading] = useState(false)
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
   const cellRef = useRef<HTMLDivElement>(null)
 
   const score = node.autoScore || 0
@@ -415,15 +415,24 @@ function PriorityCell({ node }: { node: BoardNode }) {
     if (cellRef.current) {
       const rect = cellRef.current.getBoundingClientRect()
       const tooltipWidth = 260
-      const tooltipHeight = 300 // approximate max height
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const minSpaceNeeded = 150 // minimum space to show tooltip comfortably
 
-      // Position below cell by default
-      let top = rect.bottom + 8
+      let top: number
       let left = rect.left + rect.width / 2 - tooltipWidth / 2
 
-      // If tooltip would go off bottom of screen, show above
-      if (top + tooltipHeight > window.innerHeight) {
-        top = rect.top - tooltipHeight - 8
+      // Decide if tooltip should be above or below
+      if (spaceBelow >= minSpaceNeeded) {
+        // Show below - enough space
+        top = rect.bottom + 8
+      } else if (spaceAbove >= minSpaceNeeded) {
+        // Show above - not enough space below
+        top = rect.top - 8
+        // Will use CSS transform to position above
+      } else {
+        // Very little space - show below and let it scroll
+        top = rect.bottom + 8
       }
 
       // If tooltip would go off right edge, shift left
@@ -436,7 +445,11 @@ function PriorityCell({ node }: { node: BoardNode }) {
         left = 16
       }
 
-      setTooltipPos({ top, left })
+      setTooltipPos({
+        top,
+        left,
+        showAbove: spaceBelow < minSpaceNeeded && spaceAbove >= minSpaceNeeded
+      })
     }
 
     if (!breakdown && !loading) {
@@ -490,7 +503,11 @@ function PriorityCell({ node }: { node: BoardNode }) {
       {showTooltip && tooltipPos && (
         <div
           className="priority-tooltip"
-          style={{ top: `${tooltipPos.top}px`, left: `${tooltipPos.left}px` }}
+          style={{
+            top: `${tooltipPos.top}px`,
+            left: `${tooltipPos.left}px`,
+            transform: tooltipPos.showAbove ? 'translateY(-100%)' : 'none'
+          }}
         >
           <div className="priority-tooltip-header">
             <strong>{node.issueKey}</strong>
@@ -649,7 +666,7 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
 
 function AlertIcon({ node }: { node: BoardNode }) {
   const [showTooltip, setShowTooltip] = useState(false)
-  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
   const iconRef = useRef<HTMLDivElement>(null)
   const alerts = node.alerts || []
 
@@ -685,15 +702,23 @@ function AlertIcon({ node }: { node: BoardNode }) {
     if (iconRef.current) {
       const rect = iconRef.current.getBoundingClientRect()
       const tooltipWidth = 320
-      const tooltipHeight = 300 // approximate max height
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const minSpaceNeeded = 150 // minimum space to show tooltip comfortably
 
-      // Position below icon by default
-      let top = rect.bottom + 8
+      let top: number
       let left = rect.left + rect.width / 2 - tooltipWidth / 2
 
-      // If tooltip would go off bottom of screen, show above
-      if (top + tooltipHeight > window.innerHeight) {
-        top = rect.top - tooltipHeight - 8
+      // Decide if tooltip should be above or below
+      if (spaceBelow >= minSpaceNeeded) {
+        // Show below - enough space
+        top = rect.bottom + 8
+      } else if (spaceAbove >= minSpaceNeeded) {
+        // Show above - not enough space below
+        top = rect.top - 8
+      } else {
+        // Very little space - show below and let it scroll
+        top = rect.bottom + 8
       }
 
       // If tooltip would go off right edge, shift left
@@ -706,7 +731,11 @@ function AlertIcon({ node }: { node: BoardNode }) {
         left = 16
       }
 
-      setTooltipPos({ top, left })
+      setTooltipPos({
+        top,
+        left,
+        showAbove: spaceBelow < minSpaceNeeded && spaceAbove >= minSpaceNeeded
+      })
     }
   }
 
@@ -724,7 +753,11 @@ function AlertIcon({ node }: { node: BoardNode }) {
       {showTooltip && tooltipPos && (
         <div
           className="alert-tooltip"
-          style={{ top: `${tooltipPos.top}px`, left: `${tooltipPos.left}px` }}
+          style={{
+            top: `${tooltipPos.top}px`,
+            left: `${tooltipPos.left}px`,
+            transform: tooltipPos.showAbove ? 'translateY(-100%)' : 'none'
+          }}
         >
           <div className="alert-tooltip-header">
             <strong>Data Quality Issues ({count})</strong>
