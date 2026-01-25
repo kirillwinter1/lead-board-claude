@@ -2,6 +2,7 @@ package com.leadboard.board;
 
 import com.leadboard.config.JiraProperties;
 import com.leadboard.config.RoughEstimateProperties;
+import com.leadboard.planning.StoryForecastService;
 import com.leadboard.quality.DataQualityService;
 import com.leadboard.quality.DataQualityViolation;
 import com.leadboard.status.StatusMappingConfig;
@@ -30,16 +31,19 @@ public class BoardService {
     private final RoughEstimateProperties roughEstimateProperties;
     private final DataQualityService dataQualityService;
     private final StatusMappingService statusMappingService;
+    private final StoryForecastService storyForecastService;
 
     public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties,
                         TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
-                        DataQualityService dataQualityService, StatusMappingService statusMappingService) {
+                        DataQualityService dataQualityService, StatusMappingService statusMappingService,
+                        StoryForecastService storyForecastService) {
         this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
         this.teamRepository = teamRepository;
         this.roughEstimateProperties = roughEstimateProperties;
         this.dataQualityService = dataQualityService;
         this.statusMappingService = statusMappingService;
+        this.storyForecastService = storyForecastService;
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size) {
@@ -157,6 +161,9 @@ public class BoardService {
                     storyMap.get(parentKey).addChild(subtaskNode);
                 }
             }
+
+            // Enrich stories with forecast data (assignee-based capacity planning)
+            enrichStoriesWithForecast(epicMap);
 
             // Calculate progress for Stories (aggregate from sub-tasks)
             for (BoardNode story : storyMap.values()) {
@@ -288,6 +295,10 @@ public class BoardService {
             node.setFlagged(entity.getFlagged());
             node.setBlocks(entity.getBlocks());
             node.setBlockedBy(entity.getIsBlockedBy());
+
+            // Set assignee info
+            node.setAssigneeAccountId(entity.getAssigneeAccountId());
+            node.setAssigneeDisplayName(entity.getAssigneeDisplayName());
 
             // Calculate expected done date based on remaining work
             Long estimate = entity.getOriginalEstimateSeconds();
@@ -426,6 +437,48 @@ public class BoardService {
             roleProgress.setDevelopment(new BoardNode.RoleMetrics(developmentEstimate, developmentLogged));
             roleProgress.setTesting(new BoardNode.RoleMetrics(testingEstimate, testingLogged));
             node.setRoleProgress(roleProgress);
+        }
+    }
+
+    /**
+     * Enriches stories with forecast data using StoryForecastService.
+     * Updates expectedDone dates based on assignee capacity and dependencies.
+     */
+    private void enrichStoriesWithForecast(Map<String, BoardNode> epicMap) {
+        for (BoardNode epic : epicMap.values()) {
+            Long teamId = epic.getTeamId();
+            if (teamId == null || epic.getChildren().isEmpty()) {
+                continue; // Skip epics without team or children
+            }
+
+            try {
+                // Calculate story forecast for this epic
+                StoryForecastService.StoryForecast forecast =
+                    storyForecastService.calculateStoryForecast(epic.getIssueKey(), teamId);
+
+                // Build map of story key -> schedule for quick lookup
+                Map<String, StoryForecastService.StorySchedule> scheduleMap = forecast.stories().stream()
+                    .collect(Collectors.toMap(
+                        StoryForecastService.StorySchedule::storyKey,
+                        s -> s
+                    ));
+
+                // Update expectedDone for all children (stories/bugs)
+                for (BoardNode child : epic.getChildren()) {
+                    StoryForecastService.StorySchedule schedule = scheduleMap.get(child.getIssueKey());
+                    if (schedule != null) {
+                        child.setExpectedDone(schedule.endDate());
+                        // Update assignee if it was auto-assigned
+                        if (schedule.assigneeDisplayName() != null && child.getAssigneeDisplayName() == null) {
+                            child.setAssigneeAccountId(schedule.assigneeAccountId());
+                            child.setAssigneeDisplayName(schedule.assigneeDisplayName());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // Log error but don't fail the whole board
+                log.warn("Failed to calculate story forecast for epic {}: {}", epic.getIssueKey(), e.getMessage());
+            }
         }
     }
 

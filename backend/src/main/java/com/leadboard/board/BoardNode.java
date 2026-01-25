@@ -31,6 +31,8 @@ public class BoardNode {
     private List<String> blocks; // Stories blocked by this story (Story only)
     private List<String> blockedBy; // Stories blocking this story (Story only)
     private LocalDate expectedDone; // Expected completion date (Story only, calculated)
+    private String assigneeAccountId; // Assignee Jira account ID (Story only)
+    private String assigneeDisplayName; // Assignee display name (Story only)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
@@ -219,6 +221,22 @@ public class BoardNode {
 
     public void setExpectedDone(LocalDate expectedDone) {
         this.expectedDone = expectedDone;
+    }
+
+    public String getAssigneeAccountId() {
+        return assigneeAccountId;
+    }
+
+    public void setAssigneeAccountId(String assigneeAccountId) {
+        this.assigneeAccountId = assigneeAccountId;
+    }
+
+    public String getAssigneeDisplayName() {
+        return assigneeDisplayName;
+    }
+
+    public void setAssigneeDisplayName(String assigneeDisplayName) {
+        this.assigneeDisplayName = assigneeDisplayName;
     }
 
     public List<DataQualityViolation> getAlerts() {
