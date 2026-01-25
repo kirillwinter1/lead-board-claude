@@ -349,6 +349,11 @@ body {
   background: #dfe1e6;
 }
 
+.expander-btn.disabled-during-drag {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 .chevron {
   font-size: 16px;
   font-weight: bold;

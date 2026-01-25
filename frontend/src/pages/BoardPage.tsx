@@ -637,7 +637,11 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
     >
       <td className="cell-expander">
         {hasChildren ? (
-          <button className="expander-btn" onClick={handleExpanderClick}>
+          <button
+            className={`expander-btn ${isAnyDragging ? 'disabled-during-drag' : ''}`}
+            onClick={handleExpanderClick}
+            style={isAnyDragging ? { pointerEvents: 'none' } : undefined}
+          >
             <span className={`chevron ${expanded ? 'expanded' : ''}`}>›</span>
           </button>
         ) : (
@@ -706,7 +710,21 @@ interface BoardTableProps {
 }
 
 function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, canReorder, onReorder, onStoryReorder }: BoardTableProps) {
-  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
+  // Load expanded keys from localStorage
+  const loadExpandedKeys = (): Set<string> => {
+    try {
+      const saved = localStorage.getItem('boardExpandedEpics')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        return new Set(parsed)
+      }
+    } catch (err) {
+      console.error('Failed to load expanded epics from localStorage:', err)
+    }
+    return new Set()
+  }
+
+  const [expandedKeys, setExpandedKeys] = useState<Set<string>>(loadExpandedKeys)
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [draggingEpicKey, setDraggingEpicKey] = useState<string | null>(null)
@@ -718,6 +736,15 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
   const [dragOverStoryKey, setDragOverStoryKey] = useState<string | null>(null)
   const [droppedStoryKey, setDroppedStoryKey] = useState<string | null>(null)
   const [dragInvalidStoryKey, setDragInvalidStoryKey] = useState<string | null>(null)
+
+  // Save expanded keys to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('boardExpandedEpics', JSON.stringify(Array.from(expandedKeys)))
+    } catch (err) {
+      console.error('Failed to save expanded epics to localStorage:', err)
+    }
+  }, [expandedKeys])
 
   const toggleExpand = (key: string) => {
     setExpandedKeys(prev => {
