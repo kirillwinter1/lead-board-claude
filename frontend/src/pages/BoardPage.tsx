@@ -687,23 +687,17 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
             <div className="forecast-phase">
               <span className="phase-label sa">SA</span>
               <span className="phase-dates">{formatDateRange(phaseSchedule?.sa?.startDate, phaseSchedule?.sa?.endDate)}</span>
+              <span className="phase-remaining">({remainingByRole?.sa?.days?.toFixed(1) || 0}d)</span>
             </div>
             <div className="forecast-phase">
               <span className="phase-label dev">DEV</span>
               <span className="phase-dates">{formatDateRange(phaseSchedule?.dev?.startDate, phaseSchedule?.dev?.endDate)}</span>
+              <span className="phase-remaining">({remainingByRole?.dev?.days?.toFixed(1) || 0}d)</span>
             </div>
             <div className="forecast-phase">
               <span className="phase-label qa">QA</span>
               <span className="phase-dates">{formatDateRange(phaseSchedule?.qa?.startDate, phaseSchedule?.qa?.endDate)}</span>
-            </div>
-          </div>
-
-          <div className="forecast-tooltip-section">
-            <div className="forecast-tooltip-title">Остаток работы</div>
-            <div className="forecast-remaining">
-              <span>SA: {remainingByRole?.sa?.days?.toFixed(1) || 0}d</span>
-              <span>DEV: {remainingByRole?.dev?.days?.toFixed(1) || 0}d</span>
-              <span>QA: {remainingByRole?.qa?.days?.toFixed(1) || 0}d</span>
+              <span className="phase-remaining">({remainingByRole?.qa?.days?.toFixed(1) || 0}d)</span>
             </div>
           </div>
 

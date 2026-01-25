@@ -1248,8 +1248,8 @@ body {
 
 .forecast-phase {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 8px;
   font-size: 11px;
   margin-bottom: 3px;
 }
@@ -1277,17 +1277,17 @@ body {
 }
 
 .phase-dates {
+  flex: 1;
   color: #42526e;
   font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 11px;
 }
 
-.forecast-remaining {
-  display: flex;
-  gap: 12px;
-  font-size: 11px;
-  color: #42526e;
+.phase-remaining {
+  color: #6b778c;
+  font-size: 10px;
   font-family: 'SFMono-Regular', Consolas, monospace;
+  white-space: nowrap;
 }
 
 .forecast-tooltip-footer {
