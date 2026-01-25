@@ -43,6 +43,52 @@
 
 ## Технические исправления
 
+### 2026-01-25: Board UX improvements - tooltips and prioritization
+
+**Улучшения визуализации приоритета:**
+1. **Priority tooltips с breakdown** - детализация AutoScore
+   - Endpoint `GET /api/board/{issueKey}/score-breakdown`
+   - Показывает из чего складывается score (факторы: status, progress, priority, etc.)
+   - Работает для эпиков (7 факторов) и stories (9 факторов)
+   - Названия факторов на русском языке
+   - Цветовая кодировка: зелёный (+), красный (-)
+   - Сортировка факторов по значимости
+
+2. **Alerts tooltips с детализацией** - улучшенные подсказки Data Quality
+   - Вместо простого title attribute — богатый интерактивный tooltip
+   - Иконки severity: 🔴 ERROR, 🟡 WARNING, 🔵 INFO
+   - Отображение rule name и detailed message
+   - Цветовая группировка по severity
+   - Фоновая подсветка (красный/жёлтый/синий)
+
+3. **Epic autoScore в колонке PRIORITY**
+   - Ранее показывался только для Stories/Bugs
+   - Теперь autoScore отображается для всех типов задач
+   - BoardService.mapToNode() обновлён для установки autoScore эпикам
+
+4. **Умное позиционирование tooltips**
+   - `position: fixed` вместо `absolute` для предотвращения обрезания
+   - Динамический расчёт позиции с `getBoundingClientRect()`
+   - Автоматический выбор: показывать снизу или сверху от ячейки
+   - Проверка границ viewport (top, bottom, left, right)
+   - `max-height: 400px` + scroll для длинных tooltips
+   - Использование `spaceBelow`/`spaceAbove` вместо фиксированной высоты
+
+**Исправления bug'ов:**
+- Fix: AutoScore accumulation при drag & drop stories - сравнение base scores
+- Fix: Epic autoScore не отображался в PRIORITY column
+- Fix: Tooltips обрезались границами таблицы
+- Fix: Tooltips позиционировались слишком высоко при малом количестве факторов
+
+**Коммиты:**
+- `ab97edb` - fix: Prevent AutoScore accumulation when dragging stories
+- `958e7e1` - feat: Add AutoScore breakdown tooltips and improved alerts UI
+- `d83b183` - fix: Show Epic autoScore in PRIORITY column
+- `0566a03` - fix: Prevent tooltip clipping at table boundaries
+- `7238813` - fix: Improve tooltip positioning - use actual space instead of fixed height
+
+---
+
 ### 2026-01-23: Jira API cursor-based pagination
 
 **Проблема:** Jira REST API `/rest/api/3/search/jql` изменил формат пагинации с offset-based (`startAt`, `total`) на cursor-based (`nextPageToken`, `isLast`).
