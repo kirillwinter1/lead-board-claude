@@ -26,7 +26,7 @@
 | F17. Configurable Status Mapping | ✅ Готово | 2026-01-24 |
 | F18. Data Quality | ✅ Готово | 2026-01-24 |
 | F19. Story AutoScore & Prioritization | ✅ Готово | 2026-01-25 |
-| F20. Story-Level Planning (Assignee Capacity) | 🚧 В разработке (Phase 1-3/6) | 2026-01-25 |
+| F20. Story-Level Planning (Assignee Capacity) | ✅ Готово (Phase 1-5/6) | 2026-01-25 |
 
 ### Документация фич
 

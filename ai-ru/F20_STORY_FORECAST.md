@@ -1,7 +1,8 @@
 # F20. Story-Level Planning с Assignee-based Capacity Allocation
 
-**Статус:** 🚧 В разработке (Phase 1-3 из 6 завершены)
+**Статус:** ✅ Реализовано (Phase 1-5 из 6 завершены)
 **Дата начала:** 2026-01-25
+**Дата завершения основных фаз:** 2026-01-25
 
 ## Цель
 
@@ -12,7 +13,7 @@
 - Зависимостей между stories (blocks/is-blocked-by)
 - Приоритета (AutoScore)
 
-## Реализованные фазы (3/6)
+## Реализованные фазы (5/6)
 
 ### ✅ Phase 1: Database & Sync
 **Статус:** Завершена (2026-01-25)
@@ -116,23 +117,47 @@ GET /api/planning/epics/{epicKey}/story-forecast?teamId={teamId}
 - Возвращает расписание для всех stories epic'а
 - Включает utilization metrics для assignees
 
-## Оставшиеся фазы (3/6)
+### ✅ Phase 4: Board Integration
+**Статус:** Завершена (2026-01-25)
 
-### 📋 Phase 4: Board Integration
-**Задачи:**
-- Обновить BoardService - использовать story forecast для expectedDone
-- Добавить assignee в BoardNode DTO
-- Обновить StoryExpectedDoneCell - показывать assignee
-- Тестировать Board UI
+**Backend изменения:**
+- Добавлены поля `assigneeAccountId` и `assigneeDisplayName` в BoardNode
+- StoryForecastService интегрирован в BoardService
+- Метод `enrichStoriesWithForecast()` обновляет expectedDone для всех stories epic'а
+- expectedDone рассчитывается с учетом capacity и sequential scheduling
 
-### 📋 Phase 5: Timeline Integration
-**Задачи:**
-- Обновить forecast.ts - добавить getStoryForecast()
-- Добавить StorySchedule mode toggle
-- Создать StoryBar component с assignee coloring
-- Обновить StoryTooltip - показывать assignee и даты
-- Добавить unassigned indicator
-- Тестировать Timeline UI
+**Frontend изменения:**
+- BoardNode interface расширен полями assignee
+- StoryExpectedDoneCell показывает assignee под датой expectedDone
+- Assignee отображается серым italic шрифтом
+
+**Результат:**
+- Stories показывают точные даты завершения на основе capacity assignee
+- Видно кто работает над каждой story
+- Последовательное планирование: stories одного assignee не перекрываются
+
+### ✅ Phase 5: Timeline Integration
+**Статус:** Завершена (2026-01-25)
+
+**Компоненты:**
+- `getStoryForecast()` API client в forecast.ts
+- `StoryScheduleBars` компонент для визуализации stories
+- Автоматическая загрузка story forecasts при включении Stories toggle
+- Assignee coloring: unique color per team member (палитра из 7 цветов)
+
+**Визуальные возможности:**
+- Stories позиционируются по реальным датам (startDate/endDate)
+- Каждый assignee получает уникальный цвет
+- Unassigned stories: dashed border + striped background
+- Blocked stories: red border + glow effect
+- Tooltip показывает: key, summary, dates, assignee, status, blocking stories
+
+**Результат:**
+- Timeline показывает story-level schedule вместо epic bars
+- Видна загрузка каждого member (stories окрашены по assignee)
+- Легко идентифицировать bottlenecks и blocked stories
+
+## Оставшиеся фазы (1/6)
 
 ### 📋 Phase 6: Testing & Documentation
 **Задачи:**
