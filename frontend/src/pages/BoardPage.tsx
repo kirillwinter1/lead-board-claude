@@ -3,6 +3,7 @@ import axios from 'axios'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
 import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '../api/forecast'
 import { updateStoryPriority } from '../api/stories'
+import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
 
 // Sound effect for drag & drop - Pop sound
 const playDropSound = () => {
@@ -372,6 +373,10 @@ function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
 }
 
 function PriorityCell({ node }: { node: BoardNode }) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [breakdown, setBreakdown] = useState<ScoreBreakdown | null>(null)
+  const [loading, setLoading] = useState(false)
+
   const score = node.autoScore || 0
 
   // Color based on score
@@ -396,12 +401,51 @@ function PriorityCell({ node }: { node: BoardNode }) {
   }
 
   const hasNoEstimates = node.estimateSeconds === null || node.estimateSeconds === 0
-  if (hasNoEstimates && !node.issueType?.toLowerCase().includes('epic')) {
+  if (hasNoEstimates && !node.issueType?.toLowerCase().includes('epic') && !node.issueType?.toLowerCase().includes('эпик')) {
     icons.push('⚠️')
   }
 
+  // Load breakdown on hover
+  const handleMouseEnter = async () => {
+    setShowTooltip(true)
+    if (!breakdown && !loading) {
+      setLoading(true)
+      try {
+        const data = await getScoreBreakdown(node.issueKey)
+        setBreakdown(data)
+      } catch (err) {
+        console.error('Failed to load score breakdown:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  // Factor labels in Russian
+  const factorLabels: Record<string, string> = {
+    issueType: 'Тип задачи',
+    status: 'Статус',
+    progress: 'Прогресс',
+    priority: 'Приоритет',
+    dependency: 'Зависимости',
+    dueDate: 'Срок',
+    estimateQuality: 'Качество оценки',
+    flagged: 'Флаг',
+    manual: 'Ручная корректировка',
+    // Epic factors
+    statusWeight: 'Статус',
+    storyCompletion: 'Завершение историй',
+    dueDateWeight: 'Срок',
+    manualBoost: 'Ручная корректировка'
+  }
+
   return (
-    <div className="priority-cell" style={{ color }}>
+    <div
+      className="priority-cell"
+      style={{ color }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
       <span className="priority-score" style={{ fontWeight: 600 }}>
         {score.toFixed(0)}
       </span>
@@ -409,6 +453,44 @@ function PriorityCell({ node }: { node: BoardNode }) {
         <span className="priority-icons" style={{ marginLeft: '6px' }}>
           {icons.join(' ')}
         </span>
+      )}
+
+      {showTooltip && (
+        <div className="priority-tooltip">
+          <div className="priority-tooltip-header">
+            <strong>{node.issueKey}</strong>
+            <span className="priority-tooltip-type">{node.issueType}</span>
+          </div>
+          <div className="priority-tooltip-total">
+            Total Score: <strong>{score.toFixed(1)}</strong>
+            {node.manualBoost !== null && node.manualBoost !== 0 && (
+              <span className="manual-boost-badge">
+                {node.manualBoost > 0 ? '+' : ''}{node.manualBoost}
+              </span>
+            )}
+          </div>
+
+          {loading && (
+            <div className="priority-tooltip-loading">Загрузка...</div>
+          )}
+
+          {breakdown && breakdown.breakdown && (
+            <div className="priority-tooltip-breakdown">
+              <div className="priority-tooltip-title">Breakdown:</div>
+              {Object.entries(breakdown.breakdown)
+                .filter(([_, value]) => value !== 0)
+                .sort(([_a, a], [_b, b]) => Math.abs(b) - Math.abs(a))
+                .map(([factor, value]) => (
+                  <div key={factor} className="priority-breakdown-item">
+                    <span className="factor-name">{factorLabels[factor] || factor}</span>
+                    <span className={`factor-value ${value > 0 ? 'positive' : value < 0 ? 'negative' : ''}`}>
+                      {value > 0 ? '+' : ''}{value.toFixed(1)}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -531,6 +613,7 @@ function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
 }
 
 function AlertIcon({ node }: { node: BoardNode }) {
+  const [showTooltip, setShowTooltip] = useState(false)
   const alerts = node.alerts || []
 
   if (alerts.length === 0) {
@@ -544,16 +627,53 @@ function AlertIcon({ node }: { node: BoardNode }) {
   const severityClass = hasError ? 'error' : hasWarning ? 'warning' : 'info'
   const count = alerts.length
 
-  // Build tooltip message
-  const tooltipLines = alerts.map(a => `[${a.severity}] ${a.message}`).join('\n')
+  // Severity labels
+  const severityLabels: Record<string, string> = {
+    ERROR: 'Ошибка',
+    WARNING: 'Предупреждение',
+    INFO: 'Инфо'
+  }
+
+  // Severity icons
+  const severityIcons: Record<string, string> = {
+    ERROR: '🔴',
+    WARNING: '🟡',
+    INFO: '🔵'
+  }
 
   return (
-    <span
-      className={`alert-icon alert-${severityClass}`}
-      title={tooltipLines}
+    <div
+      className="alert-icon-wrapper"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
     >
-      {count}
-    </span>
+      <span className={`alert-icon alert-${severityClass}`}>
+        {count}
+      </span>
+
+      {showTooltip && (
+        <div className="alert-tooltip">
+          <div className="alert-tooltip-header">
+            <strong>Data Quality Issues ({count})</strong>
+          </div>
+          <div className="alert-tooltip-list">
+            {alerts.map((alert, idx) => (
+              <div key={idx} className={`alert-tooltip-item alert-${alert.severity.toLowerCase()}`}>
+                <div className="alert-item-header">
+                  <span className="alert-severity">
+                    {severityIcons[alert.severity]} {severityLabels[alert.severity] || alert.severity}
+                  </span>
+                  <span className="alert-rule">{alert.rule}</span>
+                </div>
+                <div className="alert-message">
+                  {alert.message}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
