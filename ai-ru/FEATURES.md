@@ -26,6 +26,7 @@
 | F17. Configurable Status Mapping | ✅ Готово | 2026-01-24 |
 | F18. Data Quality | ✅ Готово | 2026-01-24 |
 | F19. Story AutoScore & Prioritization | ✅ Готово | 2026-01-25 |
+| F20. Story-Level Planning (Assignee Capacity) | 🚧 В разработке (Phase 1-3/6) | 2026-01-25 |
 
 ### Документация фич
 
@@ -34,6 +35,7 @@
 | F15. WIP Limits | [F15_WIP_LIMITS.md](F15_WIP_LIMITS.md) | [F15_WIP_LIMITS_GUIDE.md](F15_WIP_LIMITS_GUIDE.md) |
 | F16. Pipeline WIP + Stories | [F16_PIPELINE_WIP_STORIES.md](F16_PIPELINE_WIP_STORIES.md) | - |
 | F19. Story AutoScore & Prioritization | [F19_STORY_AUTOSCORE.md](F19_STORY_AUTOSCORE.md) | - |
+| F20. Story-Level Planning | [F20_STORY_FORECAST.md](F20_STORY_FORECAST.md) | - |
 
 ### Будущие фичи
 
