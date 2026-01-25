@@ -1499,6 +1499,31 @@ body {
   color: #de350b;
 }
 
+.priority-tooltip-indicators {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid #ebecf0;
+}
+
+.priority-indicator-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 11px;
+}
+
+.indicator-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+}
+
+.indicator-description {
+  color: #42526e;
+  flex: 1;
+}
+
 /* Alert Tooltip */
 .alert-icon-wrapper {
   position: relative;

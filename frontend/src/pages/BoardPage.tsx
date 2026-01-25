@@ -542,6 +542,27 @@ function PriorityCell({ node }: { node: BoardNode }) {
                 ))}
             </div>
           )}
+
+          {icons.length > 0 && (
+            <div className="priority-tooltip-indicators">
+              <div className="priority-tooltip-title">Индикаторы:</div>
+              {icons.map((icon, idx) => {
+                let description = ''
+                if (icon === '🐞') description = 'Баг'
+                else if (icon === '🔒') description = 'Заблокировано другими задачами'
+                else if (icon === '🚩') description = 'Отмечено как impediment'
+                else if (icon === '⚡') description = 'Высокий приоритет (>80)'
+                else if (icon === '⚠️') description = 'Нет оценки времени'
+
+                return (
+                  <div key={idx} className="priority-indicator-item">
+                    <span className="indicator-icon">{icon}</span>
+                    <span className="indicator-description">{description}</span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
