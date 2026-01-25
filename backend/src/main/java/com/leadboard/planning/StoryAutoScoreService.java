@@ -20,7 +20,7 @@ import java.util.Map;
  *
  * AutoScore formula:
  * - IssueTypeWeight (Bug=100, Story=0)
- * - StatusWeight (by story workflow, step 10)
+ * - StatusWeight (New=0, Ready=10, Analysis=20, ..., Ready to Release=100, step 10)
  * - ProgressWeight (timeSpent/estimate * 30)
  * - PriorityWeight (Highest=40, High=30, Medium=20, Low=10)
  * - DependencyWeight (blocks N = +10*N, is blocked by = -1000)
@@ -117,32 +117,41 @@ public class StoryAutoScoreService {
         String status = story.getStatus();
 
         // Story workflow statuses with step 10
-        // TODO statuses
-        if (matchesStatus(status, "New", "Новый")) return BigDecimal.valueOf(10);
-        if (matchesStatus(status, "Ready", "Готов")) return BigDecimal.valueOf(20);
-        if (matchesStatus(status, "Waiting Dev", "Ожидает разработки")) return BigDecimal.valueOf(30);
-        if (matchesStatus(status, "Waiting QA", "Ожидает тестирования")) return BigDecimal.valueOf(40);
-        if (matchesStatus(status, "Ready to Release", "Готов к релизу")) return BigDecimal.valueOf(50);
+        // From 0 (New) to 100 (Ready to Release)
+        // Based on workflow: НОВОЕ → ГОТОВО → ANALYSIS → ... → READY TO RELEASE → ГОТОВО
 
-        // IN_PROGRESS statuses (closer to completion = higher weight)
-        if (matchesStatus(status, "Analysis", "Анализ")) return BigDecimal.valueOf(60);
-        if (matchesStatus(status, "Analysis Review", "Ревью анализа")) return BigDecimal.valueOf(70);
-        if (matchesStatus(status, "Development", "Разработка")) return BigDecimal.valueOf(80);
-        if (matchesStatus(status, "Dev Review", "Ревью разработки")) return BigDecimal.valueOf(90);
-        if (matchesStatus(status, "Testing", "Тестирование")) return BigDecimal.valueOf(100);
-        if (matchesStatus(status, "Test Review", "Ревью тестирования")) return BigDecimal.valueOf(110);
+        // Initial statuses
+        if (matchesStatus(status, "New", "Новое", "Новый")) return BigDecimal.ZERO;
+        if (matchesStatus(status, "Ready", "Готово (к работе)", "Готов")) return BigDecimal.valueOf(10);
 
-        // DONE statuses (not planned)
+        // Analysis phase
+        if (matchesStatus(status, "Analysis", "Анализ")) return BigDecimal.valueOf(20);
+        if (matchesStatus(status, "Analysis Review", "Ревью анализа")) return BigDecimal.valueOf(30);
+
+        // Development phase
+        if (matchesStatus(status, "Waiting Dev", "Ожидает разработки")) return BigDecimal.valueOf(40);
+        if (matchesStatus(status, "Development", "Разработка")) return BigDecimal.valueOf(50);
+        if (matchesStatus(status, "Dev Review", "Ревью разработки")) return BigDecimal.valueOf(60);
+
+        // Testing phase
+        if (matchesStatus(status, "Waiting QA", "Ожидает тестирования")) return BigDecimal.valueOf(70);
+        if (matchesStatus(status, "Testing", "Тестирование")) return BigDecimal.valueOf(80);
+        if (matchesStatus(status, "Test Review", "Ревью тестирования")) return BigDecimal.valueOf(90);
+
+        // Ready to release - maximum priority
+        if (matchesStatus(status, "Ready to Release", "Готов к релизу")) return BigDecimal.valueOf(100);
+
+        // Completed - not planned, zero priority
         if (matchesStatus(status, "Done", "Готово")) return BigDecimal.ZERO;
 
         // Fallback: check using StatusMappingService
         if (statusMappingService.isDone(status, teamConfig)) {
             return BigDecimal.ZERO;
         } else if (statusMappingService.isInProgress(status, teamConfig)) {
-            return BigDecimal.valueOf(80); // Default IN_PROGRESS weight
+            return BigDecimal.valueOf(50); // Default IN_PROGRESS weight
         }
 
-        return BigDecimal.valueOf(10); // Default TODO weight
+        return BigDecimal.ZERO; // Default for unknown statuses
     }
 
     private BigDecimal calculateProgressWeight(JiraIssueEntity story) {

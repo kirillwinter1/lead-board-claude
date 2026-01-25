@@ -33,14 +33,14 @@
 ```
 StoryAutoScore =
   + IssueTypeWeight        // Bug=100, Story=0
-  + StatusWeight           // Analysis=60, Development=80, Testing=100 и т.д.
+  + StatusWeight           // New=0, Ready=10, ..., Ready to Release=100 (шаг 10)
   + ProgressWeight         // (timeSpent/estimate) * 30
   + PriorityWeight         // Highest=40, High=30, Medium=20, Low=10
   + DependencyWeight       // blocks N stories = +10*N, is blocked by M = -1000 (откладывается)
   + DueDateWeight          // Дедлайн близко = +30, далеко = 0
   + EstimateQualityPenalty // Нет subtasks с estimates = -100
   + FlaggedPenalty         // Flagged = -200 (в конец)
-  + ManualBoost            // Ручное управление пользователем (от -100 до +100)
+  + ManualBoost            // Ручное управление пользователем (без ограничений)
 ```
 
 ### Детальная разбивка факторов
@@ -52,26 +52,26 @@ StoryAutoScore =
 | Bug, Баг, Дефект | 100 | Высший приоритет |
 | Story, История | 0 | Базовый |
 
-#### 2. StatusWeight (0-110)
+#### 2. StatusWeight (0-100)
 
 Статусы Story с весом (шаг 10):
 
-| Статус | Вес | Категория |
-|--------|-----|-----------|
-| New | 10 | TODO |
-| Ready | 20 | TODO |
-| Waiting Dev | 30 | TODO |
-| Waiting QA | 40 | TODO |
-| Ready to Release | 50 | TODO |
-| Analysis | 60 | IN_PROGRESS |
-| Analysis Review | 70 | IN_PROGRESS |
-| Development | 80 | IN_PROGRESS |
-| Dev Review | 90 | IN_PROGRESS |
-| Testing | 100 | IN_PROGRESS |
-| Test Review | 110 | IN_PROGRESS |
-| Done | 0 | DONE (не планируется) |
+| Статус | Вес | Описание |
+|--------|-----|----------|
+| **New / Новое** | **0** | Начальный статус |
+| Ready / Готово | 10 | Готово к работе |
+| Analysis / Анализ | 20 | Аналитика |
+| Analysis Review | 30 | Ревью аналитики |
+| Waiting Dev | 40 | Ожидает разработки |
+| Development / Разработка | 50 | В разработке |
+| Dev Review | 60 | Ревью кода |
+| Waiting QA | 70 | Ожидает тестирования |
+| Testing / Тестирование | 80 | В тестировании |
+| Test Review | 90 | Ревью тестов |
+| **Ready to Release** | **100** | **Максимальный приоритет** |
+| Done / Готово | 0 | Завершено, не планируется |
 
-**Правило:** Чем ближе к завершению, тем выше вес.
+**Правило:** Статусы идут в порядке workflow, чем ближе к релизу — тем выше вес. Ready to Release имеет максимальный приоритет (100).
 
 #### 3. ProgressWeight (0-30)
 

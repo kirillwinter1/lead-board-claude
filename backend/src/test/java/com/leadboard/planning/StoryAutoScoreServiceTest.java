@@ -73,9 +73,49 @@ class StoryAutoScoreServiceTest {
     // ==================== Status Factor Tests ====================
 
     @Test
-    void statusNewGivesLowestScore() {
+    void statusNewGivesZeroScore() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("New");
+
+        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
+
+        assertEquals(BigDecimal.ZERO, breakdown.get("status"));
+    }
+
+    @Test
+    void statusTestReviewGives90Score() {
+        JiraIssueEntity story = createBasicStory();
+        story.setStatus("Test Review");
+
+        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
+
+        assertEquals(new BigDecimal("90"), breakdown.get("status"));
+    }
+
+    @Test
+    void statusDevelopmentGives50Score() {
+        JiraIssueEntity story = createBasicStory();
+        story.setStatus("Development");
+
+        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
+
+        assertEquals(new BigDecimal("50"), breakdown.get("status"));
+    }
+
+    @Test
+    void statusReadyToReleaseGivesMaxScore() {
+        JiraIssueEntity story = createBasicStory();
+        story.setStatus("Ready to Release");
+
+        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
+
+        assertEquals(new BigDecimal("100"), breakdown.get("status"));
+    }
+
+    @Test
+    void statusReadyGives10Score() {
+        JiraIssueEntity story = createBasicStory();
+        story.setStatus("Ready");
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
 
@@ -83,23 +123,43 @@ class StoryAutoScoreServiceTest {
     }
 
     @Test
-    void statusTestReviewGivesHighestScore() {
+    void statusAnalysisGives20Score() {
         JiraIssueEntity story = createBasicStory();
-        story.setStatus("Test Review");
+        story.setStatus("Analysis");
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
 
-        assertEquals(new BigDecimal("110"), breakdown.get("status"));
+        assertEquals(new BigDecimal("20"), breakdown.get("status"));
     }
 
     @Test
-    void statusDevelopmentGivesMidScore() {
+    void statusWaitingDevGives40Score() {
         JiraIssueEntity story = createBasicStory();
-        story.setStatus("Development");
+        story.setStatus("Waiting Dev");
+
+        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
+
+        assertEquals(new BigDecimal("40"), breakdown.get("status"));
+    }
+
+    @Test
+    void statusTestingGives80Score() {
+        JiraIssueEntity story = createBasicStory();
+        story.setStatus("Testing");
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
 
         assertEquals(new BigDecimal("80"), breakdown.get("status"));
+    }
+
+    @Test
+    void statusDoneGivesZeroScore() {
+        JiraIssueEntity story = createBasicStory();
+        story.setStatus("Done");
+
+        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
+
+        assertEquals(BigDecimal.ZERO, breakdown.get("status"));
     }
 
     // ==================== Progress Factor Tests ====================
@@ -408,14 +468,14 @@ class StoryAutoScoreServiceTest {
     void calculateAutoScoreReturnsSumOfFactors() {
         JiraIssueEntity story = createStoryWithSubtasks(100L * 3600, 50L * 3600);
         story.setIssueType("Bug"); // +100
-        story.setStatus("Development"); // +80
+        story.setStatus("Development"); // +50
         story.setPriority("Highest"); // +40
         story.setManualPriorityBoost(10); // +10
 
         BigDecimal score = service.calculateAutoScore(story, testConfig);
 
-        // Bug(100) + Status(80) + Progress(15) + Priority(40) + Manual(10) = 245+
-        assertTrue(score.compareTo(new BigDecimal("240")) > 0);
+        // Bug(100) + Status(50) + Progress(15) + Priority(40) + Manual(10) = 215
+        assertTrue(score.compareTo(new BigDecimal("210")) > 0);
     }
 
     @Test
