@@ -270,9 +270,16 @@ public class BoardService {
             // For Epics in progress: RoleProgress will be set by aggregateProgress()
         }
 
-        // Set Story-specific AutoScore fields
-        if ("Story".equalsIgnoreCase(entity.getIssueType()) || "История".equalsIgnoreCase(entity.getIssueType()) ||
-            "Bug".equalsIgnoreCase(entity.getIssueType()) || "Баг".equalsIgnoreCase(entity.getIssueType())) {
+        // Set AutoScore for both Epics and Stories
+        if ("Epic".equalsIgnoreCase(entity.getIssueType()) || "Эпик".equalsIgnoreCase(entity.getIssueType())) {
+            // Epic AutoScore
+            node.setAutoScore(entity.getAutoScore());
+            if (entity.getManualPriorityBoost() != null) {
+                node.setManualBoost(new BigDecimal(entity.getManualPriorityBoost()));
+            }
+        } else if ("Story".equalsIgnoreCase(entity.getIssueType()) || "История".equalsIgnoreCase(entity.getIssueType()) ||
+                   "Bug".equalsIgnoreCase(entity.getIssueType()) || "Баг".equalsIgnoreCase(entity.getIssueType())) {
+            // Story/Bug AutoScore + additional fields
             node.setAutoScore(entity.getAutoScore());
             if (entity.getManualPriorityBoost() != null) {
                 node.setManualBoost(new BigDecimal(entity.getManualPriorityBoost()));
