@@ -36,14 +36,24 @@ public record PlanningConfigDto(
     }
 
     /**
-     * WIP (Work In Progress) лимиты.
-     * Ограничивают количество эпиков в работе.
+     * WIP (Work In Progress) лимиты — РЕКОМЕНДАТЕЛЬНЫЕ значения.
+     *
+     * ВАЖНО: С версии F21 (Unified Planning) WIP лимиты НЕ влияют на алгоритм планирования.
+     * UnifiedPlanningService планирует все эпики на основе реальной capacity команды
+     * без искусственных ограничений WIP.
+     *
+     * Эти значения сохраняются как рекомендации и используются для:
+     * - Отображения рекомендательных границ в UI
+     * - Исторического анализа (WIP snapshots)
+     * - Метрик и отчётов
+     *
+     * @deprecated для планирования. Используется только для информации.
      */
     public record WipLimits(
-            Integer team,  // Общий лимит на команду
-            Integer sa,    // Лимит эпиков на одного SA
-            Integer dev,   // Лимит эпиков на одного DEV
-            Integer qa     // Лимит эпиков на одного QA
+            Integer team,  // Рекомендуемый общий лимит на команду
+            Integer sa,    // Рекомендуемый лимит для SA
+            Integer dev,   // Рекомендуемый лимит для DEV
+            Integer qa     // Рекомендуемый лимит для QA
     ) {
         public static WipLimits defaults() {
             return new WipLimits(6, 2, 3, 2);

@@ -4,6 +4,7 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.RoleBreakdown;
 import com.leadboard.planning.dto.StoryForecastResponse;
 import com.leadboard.planning.dto.StoryInfo;
+import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.WipHistoryResponse;
 import com.leadboard.planning.dto.WipHistoryResponse.WipDataPoint;
 import com.leadboard.sync.JiraIssueEntity;
@@ -26,6 +27,7 @@ public class ForecastController {
 
     private final ForecastService forecastService;
     private final StoryForecastService storyForecastService;
+    private final UnifiedPlanningService unifiedPlanningService;
     private final AutoScoreService autoScoreService;
     private final WipSnapshotService wipSnapshotService;
     private final JiraIssueRepository issueRepository;
@@ -33,19 +35,21 @@ public class ForecastController {
     public ForecastController(
             ForecastService forecastService,
             StoryForecastService storyForecastService,
+            UnifiedPlanningService unifiedPlanningService,
             AutoScoreService autoScoreService,
             WipSnapshotService wipSnapshotService,
             JiraIssueRepository issueRepository
     ) {
         this.forecastService = forecastService;
         this.storyForecastService = storyForecastService;
+        this.unifiedPlanningService = unifiedPlanningService;
         this.autoScoreService = autoScoreService;
         this.wipSnapshotService = wipSnapshotService;
         this.issueRepository = issueRepository;
     }
 
     /**
-     * Получает прогноз для команды.
+     * Получает прогноз для команды (legacy endpoint).
      *
      * @param teamId ID команды
      * @param statuses фильтр по статусам (опционально)
@@ -57,6 +61,24 @@ public class ForecastController {
 
         ForecastResponse forecast = forecastService.calculateForecast(teamId, statuses);
         return ResponseEntity.ok(forecast);
+    }
+
+    /**
+     * Unified planning - единый алгоритм планирования.
+     *
+     * Планирует все эпики и стори команды с учётом:
+     * - Приоритета эпиков (AutoScore)
+     * - Pipeline SA→DEV→QA внутри каждой стори
+     * - Capacity и доступности членов команды
+     * - Dependencies между сторями
+     * - Рабочего календаря
+     *
+     * @param teamId ID команды
+     */
+    @GetMapping("/unified")
+    public ResponseEntity<UnifiedPlanningResult> getUnifiedPlan(@RequestParam Long teamId) {
+        UnifiedPlanningResult result = unifiedPlanningService.calculatePlan(teamId);
+        return ResponseEntity.ok(result);
     }
 
     /**

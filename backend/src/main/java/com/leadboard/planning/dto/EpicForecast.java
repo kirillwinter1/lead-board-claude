@@ -17,12 +17,16 @@ public record EpicForecast(
         LocalDate dueDate,
         RemainingByRole remainingByRole,
         PhaseSchedule phaseSchedule,
-        // WIP fields (team-level)
-        Integer queuePosition,      // Позиция в очереди (null если в WIP)
-        LocalDate queuedUntil,      // До какой даты в очереди
-        Boolean isWithinWip,        // Входит ли в активный WIP
-        // WIP fields (role-level) - ожидание на входе в фазу
-        PhaseWaitInfo phaseWaitInfo // Информация об ожидании входа в фазы
+
+        // ============ LEGACY WIP FIELDS ============
+        // С версии F21 (Unified Planning) эти поля НЕ влияют на планирование.
+        // Все эпики планируются на основе реальной capacity без WIP ограничений.
+        // Поля сохранены для обратной совместимости API.
+
+        Integer queuePosition,      // Всегда null (очередь не используется)
+        LocalDate queuedUntil,      // Всегда null (очередь не используется)
+        Boolean isWithinWip,        // Всегда true (все эпики "активны")
+        PhaseWaitInfo phaseWaitInfo // Всегда PhaseWaitInfo.none()
 ) {
     /**
      * Конструктор для обратной совместимости (без WIP полей).

@@ -2,7 +2,10 @@ package com.leadboard.board;
 
 import com.leadboard.config.JiraProperties;
 import com.leadboard.config.RoughEstimateProperties;
-import com.leadboard.planning.StoryForecastService;
+import com.leadboard.planning.UnifiedPlanningService;
+import com.leadboard.planning.dto.UnifiedPlanningResult;
+import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedEpic;
+import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedStory;
 import com.leadboard.quality.DataQualityService;
 import com.leadboard.quality.DataQualityViolation;
 import com.leadboard.status.StatusMappingConfig;
@@ -31,19 +34,19 @@ public class BoardService {
     private final RoughEstimateProperties roughEstimateProperties;
     private final DataQualityService dataQualityService;
     private final StatusMappingService statusMappingService;
-    private final StoryForecastService storyForecastService;
+    private final UnifiedPlanningService unifiedPlanningService;
 
     public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties,
                         TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
                         DataQualityService dataQualityService, StatusMappingService statusMappingService,
-                        StoryForecastService storyForecastService) {
+                        UnifiedPlanningService unifiedPlanningService) {
         this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
         this.teamRepository = teamRepository;
         this.roughEstimateProperties = roughEstimateProperties;
         this.dataQualityService = dataQualityService;
         this.statusMappingService = statusMappingService;
-        this.storyForecastService = storyForecastService;
+        this.unifiedPlanningService = unifiedPlanningService;
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size) {
@@ -230,7 +233,7 @@ public class BoardService {
                 jiraUrl
         );
 
-        node.setEstimateSeconds(entity.getOriginalEstimateSeconds());
+        node.setEstimateSeconds(getEffectiveEstimate(entity));
         node.setLoggedSeconds(entity.getTimeSpentSeconds());
 
         // Set team info
@@ -301,23 +304,47 @@ public class BoardService {
             node.setAssigneeDisplayName(entity.getAssigneeDisplayName());
 
             // Calculate expected done date based on remaining work
-            Long estimate = entity.getOriginalEstimateSeconds();
-            Long spent = entity.getTimeSpentSeconds();
-            if (estimate != null && estimate > 0) {
-                long remainingSeconds = estimate - (spent != null ? spent : 0);
-                if (remainingSeconds > 0) {
-                    // Simple calculation: remaining hours / 8 hours per day
-                    double remainingHours = remainingSeconds / 3600.0;
-                    int workDays = (int) Math.ceil(remainingHours / 8.0);
-                    node.setExpectedDone(LocalDate.now().plusDays(workDays));
-                } else {
-                    // Already completed
-                    node.setExpectedDone(LocalDate.now());
+            Long remaining = entity.getRemainingEstimateSeconds();
+            if (remaining != null && remaining > 0) {
+                // Use explicit remaining estimate from Jira
+                double remainingHours = remaining / 3600.0;
+                int workDays = (int) Math.ceil(remainingHours / 8.0);
+                node.setExpectedDone(LocalDate.now().plusDays(workDays));
+            } else {
+                // Fallback to original estimate - spent
+                Long estimate = entity.getOriginalEstimateSeconds();
+                Long spent = entity.getTimeSpentSeconds();
+                if (estimate != null && estimate > 0) {
+                    long remainingSeconds = estimate - (spent != null ? spent : 0);
+                    if (remainingSeconds > 0) {
+                        double remainingHours = remainingSeconds / 3600.0;
+                        int workDays = (int) Math.ceil(remainingHours / 8.0);
+                        node.setExpectedDone(LocalDate.now().plusDays(workDays));
+                    } else {
+                        // Already completed
+                        node.setExpectedDone(LocalDate.now());
+                    }
                 }
             }
         }
 
         return node;
+    }
+
+    /**
+     * Calculate effective estimate for an issue.
+     * If remainingEstimateSeconds is set, use (timeSpent + remaining) as the effective total.
+     * Otherwise fall back to originalEstimateSeconds.
+     */
+    private Long getEffectiveEstimate(JiraIssueEntity entity) {
+        Long remaining = entity.getRemainingEstimateSeconds();
+        if (remaining != null) {
+            // Effective estimate = spent + remaining
+            Long spent = entity.getTimeSpentSeconds();
+            return (spent != null ? spent : 0) + remaining;
+        }
+        // Fallback to original estimate
+        return entity.getOriginalEstimateSeconds();
     }
 
     private boolean isEpic(String issueType) {
@@ -441,43 +468,64 @@ public class BoardService {
     }
 
     /**
-     * Enriches stories with forecast data using StoryForecastService.
+     * Enriches stories with forecast data using UnifiedPlanningService.
      * Updates expectedDone dates based on assignee capacity and dependencies.
      */
     private void enrichStoriesWithForecast(Map<String, BoardNode> epicMap) {
-        for (BoardNode epic : epicMap.values()) {
-            Long teamId = epic.getTeamId();
-            if (teamId == null || epic.getChildren().isEmpty()) {
-                continue; // Skip epics without team or children
-            }
+        // Collect unique team IDs from epics
+        Set<Long> teamIds = epicMap.values().stream()
+                .map(BoardNode::getTeamId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
+        if (teamIds.isEmpty()) {
+            return;
+        }
+
+        // Calculate unified plan for each team (one call per team instead of per epic)
+        Map<String, PlannedStory> allPlannedStories = new HashMap<>();
+
+        for (Long teamId : teamIds) {
             try {
-                // Calculate story forecast for this epic
-                StoryForecastService.StoryForecast forecast =
-                    storyForecastService.calculateStoryForecast(epic.getIssueKey(), teamId);
+                UnifiedPlanningResult plan = unifiedPlanningService.calculatePlan(teamId);
 
-                // Build map of story key -> schedule for quick lookup
-                Map<String, StoryForecastService.StorySchedule> scheduleMap = forecast.stories().stream()
-                    .collect(Collectors.toMap(
-                        StoryForecastService.StorySchedule::storyKey,
-                        s -> s
-                    ));
-
-                // Update expectedDone for all children (stories/bugs)
-                for (BoardNode child : epic.getChildren()) {
-                    StoryForecastService.StorySchedule schedule = scheduleMap.get(child.getIssueKey());
-                    if (schedule != null) {
-                        child.setExpectedDone(schedule.endDate());
-                        // Update assignee if it was auto-assigned
-                        if (schedule.assigneeDisplayName() != null && child.getAssigneeDisplayName() == null) {
-                            child.setAssigneeAccountId(schedule.assigneeAccountId());
-                            child.setAssigneeDisplayName(schedule.assigneeDisplayName());
-                        }
+                // Collect all planned stories from all epics
+                for (PlannedEpic plannedEpic : plan.epics()) {
+                    for (PlannedStory plannedStory : plannedEpic.stories()) {
+                        allPlannedStories.put(plannedStory.storyKey(), plannedStory);
                     }
                 }
             } catch (Exception e) {
-                // Log error but don't fail the whole board
-                log.warn("Failed to calculate story forecast for epic {}: {}", epic.getIssueKey(), e.getMessage());
+                log.warn("Failed to calculate unified plan for team {}: {}", teamId, e.getMessage());
+            }
+        }
+
+        // Update stories in epicMap with planned data
+        for (BoardNode epic : epicMap.values()) {
+            if (epic.getTeamId() == null || epic.getChildren().isEmpty()) {
+                continue;
+            }
+
+            for (BoardNode child : epic.getChildren()) {
+                PlannedStory planned = allPlannedStories.get(child.getIssueKey());
+                if (planned != null) {
+                    child.setExpectedDone(planned.endDate());
+
+                    // Update assignee from first phase that has one (SA -> DEV -> QA)
+                    if (child.getAssigneeDisplayName() == null && planned.phases() != null) {
+                        var phases = planned.phases();
+                        if (phases.sa() != null && phases.sa().assigneeDisplayName() != null) {
+                            child.setAssigneeAccountId(phases.sa().assigneeAccountId());
+                            child.setAssigneeDisplayName(phases.sa().assigneeDisplayName());
+                        } else if (phases.dev() != null && phases.dev().assigneeDisplayName() != null) {
+                            child.setAssigneeAccountId(phases.dev().assigneeAccountId());
+                            child.setAssigneeDisplayName(phases.dev().assigneeDisplayName());
+                        } else if (phases.qa() != null && phases.qa().assigneeDisplayName() != null) {
+                            child.setAssigneeAccountId(phases.qa().assigneeAccountId());
+                            child.setAssigneeDisplayName(phases.qa().assigneeDisplayName());
+                        }
+                    }
+                }
             }
         }
     }

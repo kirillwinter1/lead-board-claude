@@ -404,9 +404,12 @@ export function TeamMembersPage() {
 
             <div className="config-group">
               <div className="config-title-row">
-                <h4>WIP лимиты (Work In Progress)</h4>
-                <span className="config-info" title="Ограничивают количество эпиков в работе одновременно. Помогают избежать перегрузки команды и частого переключения контекста.">?</span>
+                <h4>WIP лимиты (рекомендательные)</h4>
+                <span className="config-info" title="Рекомендуемые ограничения количества эпиков в работе. НЕ влияют на автопланирование — используются только для визуализации и метрик.">?</span>
               </div>
+              <p className="config-hint wip-notice">
+                ⚠️ Эти значения НЕ ограничивают планирование. Алгоритм планирует все эпики на основе реальной capacity команды.
+              </p>
               <p className="config-hint">
                 Рекомендация: команда = участники ÷ 3, на роль = участников × 1.5
               </p>

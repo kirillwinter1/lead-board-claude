@@ -33,6 +33,9 @@ class ForecastControllerTest {
     private StoryForecastService storyForecastService;
 
     @MockBean
+    private UnifiedPlanningService unifiedPlanningService;
+
+    @MockBean
     private AutoScoreService autoScoreService;
 
     @MockBean

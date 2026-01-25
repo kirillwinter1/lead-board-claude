@@ -3,6 +3,9 @@ package com.leadboard.controller;
 import com.leadboard.board.BoardNode;
 import com.leadboard.board.BoardResponse;
 import com.leadboard.board.BoardService;
+import com.leadboard.planning.*;
+import com.leadboard.status.StatusMappingService;
+import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -23,8 +26,27 @@ class BoardControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
+    // BoardController dependencies
     @MockBean
     private BoardService boardService;
+    @MockBean
+    private AutoScoreService autoScoreService;
+    @MockBean
+    private StoryAutoScoreService storyAutoScoreService;
+    @MockBean
+    private StatusMappingService statusMappingService;
+    @MockBean
+    private JiraIssueRepository jiraIssueRepository;
+
+    // ForecastController dependencies (loaded by WebMvcTest)
+    @MockBean
+    private ForecastService forecastService;
+    @MockBean
+    private StoryForecastService storyForecastService;
+    @MockBean
+    private UnifiedPlanningService unifiedPlanningService;
+    @MockBean
+    private WipSnapshotService wipSnapshotService;
 
     @Test
     void getBoardReturnsEmptyListWhenNoEpics() throws Exception {

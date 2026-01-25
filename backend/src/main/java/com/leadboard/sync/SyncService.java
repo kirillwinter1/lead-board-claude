@@ -5,6 +5,7 @@ import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
 import com.leadboard.planning.AutoScoreService;
+import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import org.slf4j.Logger;
@@ -35,19 +36,22 @@ public class SyncService {
     private final JiraSyncStateRepository syncStateRepository;
     private final TeamRepository teamRepository;
     private final AutoScoreService autoScoreService;
+    private final StoryAutoScoreService storyAutoScoreService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
                        JiraIssueRepository issueRepository,
                        JiraSyncStateRepository syncStateRepository,
                        TeamRepository teamRepository,
-                       AutoScoreService autoScoreService) {
+                       AutoScoreService autoScoreService,
+                       StoryAutoScoreService storyAutoScoreService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
         this.syncStateRepository = syncStateRepository;
         this.teamRepository = teamRepository;
         this.autoScoreService = autoScoreService;
+        this.storyAutoScoreService = storyAutoScoreService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -165,10 +169,13 @@ public class SyncService {
             log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
                     lastSync != null ? "incremental" : "full");
 
-            // Recalculate AutoScore for all epics after sync
+            // Recalculate AutoScore for all epics and stories after sync
             try {
                 int epicsUpdated = autoScoreService.recalculateAll();
                 log.info("AutoScore recalculated for {} epics after sync", epicsUpdated);
+
+                int storiesUpdated = storyAutoScoreService.recalculateAll();
+                log.info("AutoScore recalculated for {} stories after sync", storiesUpdated);
             } catch (Exception e) {
                 log.error("Failed to recalculate AutoScore after sync", e);
             }
@@ -212,6 +219,7 @@ public class SyncService {
         JiraIssue.JiraTimeTracking timetracking = jiraIssue.getFields().getTimetracking();
         if (timetracking != null) {
             entity.setOriginalEstimateSeconds(timetracking.getOriginalEstimateSeconds());
+            entity.setRemainingEstimateSeconds(timetracking.getRemainingEstimateSeconds());
             entity.setTimeSpentSeconds(timetracking.getTimeSpentSeconds());
         }
 

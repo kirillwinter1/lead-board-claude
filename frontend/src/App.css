@@ -1841,6 +1841,17 @@ body {
   color: #de350b;
 }
 
+/* WIP Notice - indicates WIP limits are recommendations only */
+.wip-notice {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  color: #92400e;
+  font-size: 12px;
+}
+
 .config-actions {
   padding-top: 16px;
   border-top: 1px solid #ebecf0;
@@ -2081,6 +2092,24 @@ body {
   width: 2px;
   height: 12px;
   background: #de350b;
+}
+
+/* Phase legend for story view */
+.legend-phase-sa::before {
+  background: #3b82f6;
+}
+
+.legend-phase-dev::before {
+  background: #22c55e;
+}
+
+.legend-phase-qa::before {
+  background: #8b5cf6;
+}
+
+.legend-blocked::before {
+  background: white;
+  border: 2px solid #ef4444;
 }
 
 /* Summary Panel */
@@ -2352,11 +2381,10 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  height: 44px;
+  min-height: 36px;
   padding: 6px 12px;
   border-bottom: 1px solid #ebecf0;
   justify-content: center;
-  cursor: pointer;
   transition: background 0.15s;
 }
 
@@ -2499,10 +2527,9 @@ body {
 }
 
 .gantt-row {
-  height: 44px;
+  min-height: 36px;
   border-bottom: 1px solid #ebecf0;
   position: relative;
-  cursor: pointer;
 }
 
 .gantt-row:hover {
@@ -3681,8 +3708,13 @@ body {
 
 /* Story Schedule V2 - New Design */
 .story-schedule-container {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   width: 100%;
+  height: 100%;
 }
 
 .story-schedule-bar-v2 {

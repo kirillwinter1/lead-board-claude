@@ -1,15 +1,13 @@
 package com.leadboard.planning;
 
-import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.planning.dto.EpicForecast;
 import com.leadboard.planning.dto.EpicForecast.*;
 import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.ForecastResponse.TeamCapacity;
 import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.planning.dto.ForecastResponse.RoleWipStatus;
-import com.leadboard.quality.DataQualityService;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
+import com.leadboard.planning.dto.UnifiedPlanningResult;
+import com.leadboard.planning.dto.UnifiedPlanningResult.*;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -21,61 +19,38 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.stream.Stream;
+import java.util.Optional;
 
 /**
  * Сервис расчёта прогноза завершения эпиков.
  *
- * Алгоритм (с учётом WIP лимитов):
- * 1. Получить эпики команды отсортированные по AutoScore
- * 2. Получить WIP лимит команды
- * 3. Первые N эпиков (N = WIP лимит) начинают сразу, capacity делится между ними
- * 4. Эпики за пределами WIP ждут в очереди пока не освободится слот
- * 5. Для каждого эпика:
- *    - Рассчитать остаток работы по ролям
- *    - Распределить capacity по конвейерной модели (pipeline)
- *    - Рассчитать даты завершения с учётом рабочего календаря
- * 6. Определить уровень уверенности
+ * Делегирует основную работу к UnifiedPlanningService и конвертирует
+ * результат в ForecastResponse для обратной совместимости API.
  */
 @Service
 public class ForecastService {
 
     private static final Logger log = LoggerFactory.getLogger(ForecastService.class);
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
-    private static final List<String> EPIC_TYPES = List.of("Epic", "Эпик");
 
     private final JiraIssueRepository issueRepository;
     private final TeamService teamService;
     private final TeamMemberRepository memberRepository;
-    private final WorkCalendarService calendarService;
-    private final StatusMappingService statusMappingService;
-    private final DataQualityService dataQualityService;
-    private final StoryAutoScoreService storyAutoScoreService;
-    private final StoryDependencyService storyDependencyService;
+    private final UnifiedPlanningService unifiedPlanningService;
 
     public ForecastService(
             JiraIssueRepository issueRepository,
             TeamService teamService,
             TeamMemberRepository memberRepository,
-            WorkCalendarService calendarService,
-            StatusMappingService statusMappingService,
-            DataQualityService dataQualityService,
-            StoryAutoScoreService storyAutoScoreService,
-            StoryDependencyService storyDependencyService
+            UnifiedPlanningService unifiedPlanningService
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
         this.memberRepository = memberRepository;
-        this.calendarService = calendarService;
-        this.statusMappingService = statusMappingService;
-        this.dataQualityService = dataQualityService;
-        this.storyAutoScoreService = storyAutoScoreService;
-        this.storyDependencyService = storyDependencyService;
+        this.unifiedPlanningService = unifiedPlanningService;
     }
 
     /**
@@ -87,302 +62,163 @@ public class ForecastService {
 
     /**
      * Рассчитывает прогноз для эпиков команды с фильтрацией по статусам.
+     * Делегирует к UnifiedPlanningService и конвертирует результат.
      */
     public ForecastResponse calculateForecast(Long teamId, List<String> statuses) {
-        // Получаем конфигурацию планирования
+        log.info("Calculating forecast for team {} with statuses {}", teamId, statuses);
+
+        // Get unified planning result
+        UnifiedPlanningResult unifiedResult = unifiedPlanningService.calculatePlan(teamId);
+
+        // Calculate team capacity for response
         PlanningConfigDto config = teamService.getPlanningConfig(teamId);
-        BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : new BigDecimal("0.2");
-        PlanningConfigDto.StoryDuration storyDuration = config.storyDuration() != null
-                ? config.storyDuration()
-                : PlanningConfigDto.StoryDuration.defaults();
-
-        // Получаем StatusMappingConfig (для определения статусов)
-        StatusMappingConfig statusMapping = config.statusMapping();
-
-        // Получаем WIP лимиты
-        PlanningConfigDto.WipLimits wipLimits = config.wipLimits() != null
-                ? config.wipLimits()
-                : PlanningConfigDto.WipLimits.defaults();
-
-        int teamWipLimit = wipLimits.team() != null ? wipLimits.team() : 6;
-        int saWipLimit = wipLimits.sa() != null ? wipLimits.sa() : 2;
-        int devWipLimit = wipLimits.dev() != null ? wipLimits.dev() : 3;
-        int qaWipLimit = wipLimits.qa() != null ? wipLimits.qa() : 2;
-
-        // Рассчитываем capacity команды
         TeamCapacity teamCapacity = calculateTeamCapacity(teamId, config);
 
-        // Получаем эпики отсортированные по AutoScore
-        List<JiraIssueEntity> epics = getEpicsSorted(teamId, statuses);
+        // Convert unified result to forecast response
+        return convertToForecastResponse(unifiedResult, teamCapacity, statuses);
+    }
 
-        // Filter epics: only planning-allowed statuses and no blocking errors
-        epics = epics.stream()
-                .filter(e -> statusMappingService.isPlanningAllowed(e.getStatus(), statusMapping))
-                .filter(e -> !dataQualityService.hasBlockingErrors(e, statusMapping))
-                .toList();
+    /**
+     * Converts UnifiedPlanningResult to ForecastResponse for backward compatibility.
+     */
+    private ForecastResponse convertToForecastResponse(
+            UnifiedPlanningResult unifiedResult,
+            TeamCapacity teamCapacity,
+            List<String> statusFilter
+    ) {
+        List<EpicForecast> forecasts = new ArrayList<>();
 
-        // Рассчитываем прогноз с учётом WIP лимитов (team + role-specific)
-        WipCalculationResult wipResult = calculateForecastsWithWip(
-                epics, teamCapacity, riskBuffer, storyDuration,
-                teamWipLimit, saWipLimit, devWipLimit, qaWipLimit, statusMapping);
+        for (PlannedEpic plannedEpic : unifiedResult.epics()) {
+            // Apply status filter if provided
+            if (statusFilter != null && !statusFilter.isEmpty()) {
+                Optional<JiraIssueEntity> epicEntity = issueRepository.findByIssueKey(plannedEpic.epicKey());
+                if (epicEntity.isPresent() && !statusFilter.contains(epicEntity.get().getStatus())) {
+                    continue;
+                }
+            }
 
-        // Формируем WIP статус с информацией по ролям
-        int currentTeamWip = Math.min(epics.size(), teamWipLimit);
+            EpicForecast forecast = convertPlannedEpicToForecast(plannedEpic, unifiedResult.warnings());
+            forecasts.add(forecast);
+        }
+
+        // Create default WIP status (unified planning doesn't use WIP limits)
         WipStatus wipStatus = WipStatus.of(
-                teamWipLimit, currentTeamWip,
-                RoleWipStatus.of(saWipLimit, wipResult.saActive),
-                RoleWipStatus.of(devWipLimit, wipResult.devActive),
-                RoleWipStatus.of(qaWipLimit, wipResult.qaActive)
+                forecasts.size(),  // No limit, all epics are "in WIP"
+                forecasts.size(),
+                RoleWipStatus.of(forecasts.size(), forecasts.size()),
+                RoleWipStatus.of(forecasts.size(), forecasts.size()),
+                RoleWipStatus.of(forecasts.size(), forecasts.size())
         );
 
         return new ForecastResponse(
-                OffsetDateTime.now(),
-                teamId,
+                unifiedResult.planningDate(),
+                unifiedResult.teamId(),
                 teamCapacity,
                 wipStatus,
-                wipResult.forecasts
+                forecasts
         );
     }
 
     /**
-     * Результат расчёта с WIP информацией.
+     * Converts a PlannedEpic to EpicForecast.
      */
-    private record WipCalculationResult(
-            List<EpicForecast> forecasts,
-            int saActive,      // Количество активных эпиков в SA фазе
-            int devActive,     // Количество активных эпиков в DEV фазе
-            int qaActive       // Количество активных эпиков в QA фазе
-    ) {}
+    private EpicForecast convertPlannedEpicToForecast(PlannedEpic plannedEpic, List<PlanningWarning> warnings) {
+        // Get epic entity for additional data
+        Optional<JiraIssueEntity> epicEntityOpt = issueRepository.findByIssueKey(plannedEpic.epicKey());
+
+        Integer manualPriorityBoost = null;
+        LocalDate dueDate = null;
+        if (epicEntityOpt.isPresent()) {
+            JiraIssueEntity epic = epicEntityOpt.get();
+            manualPriorityBoost = epic.getManualPriorityBoost();
+            dueDate = epic.getDueDate();
+        }
+
+        // Calculate confidence from warnings
+        Confidence confidence = calculateConfidence(plannedEpic, warnings);
+
+        // Calculate due date delta
+        Integer dueDateDeltaDays = calculateDueDateDelta(plannedEpic.endDate(), dueDate);
+
+        // Convert phase aggregation to remaining by role
+        PhaseAggregation agg = plannedEpic.phaseAggregation();
+        RemainingByRole remainingByRole = new RemainingByRole(
+                new RoleRemaining(agg.saHours(), hoursToDays(agg.saHours())),
+                new RoleRemaining(agg.devHours(), hoursToDays(agg.devHours())),
+                new RoleRemaining(agg.qaHours(), hoursToDays(agg.qaHours()))
+        );
+
+        // Convert phase aggregation to phase schedule
+        EpicForecast.PhaseSchedule phaseSchedule = new EpicForecast.PhaseSchedule(
+                new PhaseInfo(agg.saStartDate(), agg.saEndDate(), hoursToDays(agg.saHours()), false),
+                new PhaseInfo(agg.devStartDate(), agg.devEndDate(), hoursToDays(agg.devHours()), false),
+                new PhaseInfo(agg.qaStartDate(), agg.qaEndDate(), hoursToDays(agg.qaHours()), false)
+        );
+
+        return new EpicForecast(
+                plannedEpic.epicKey(),
+                plannedEpic.summary(),
+                plannedEpic.autoScore(),
+                manualPriorityBoost,
+                plannedEpic.endDate(),
+                confidence,
+                dueDateDeltaDays,
+                dueDate,
+                remainingByRole,
+                phaseSchedule,
+                null,  // queuePosition - not used in unified planning
+                null,  // queuedUntil - not used in unified planning
+                true,  // isWithinWip - all epics are "active" in unified planning
+                EpicForecast.PhaseWaitInfo.none()  // No wait info in unified planning
+        );
+    }
 
     /**
-     * Рассчитывает прогнозы с учётом Pipeline WIP модели.
-     *
-     * PIPELINE WIP АЛГОРИТМ:
-     * Каждая роль (SA/DEV/QA) работает независимо со своим WIP лимитом.
-     * SA может начать Epic 2 сразу после завершения SA Epic 1, не дожидаясь DEV/QA.
-     *
-     * Принцип:
-     * 1. SA имеет очередь эпиков ограниченную SA WIP
-     * 2. DEV имеет свою очередь, эпик входит когда:
-     *    - SA фаза этого эпика завершена (pipeline offset)
-     *    - Есть свободный слот в DEV WIP
-     * 3. QA аналогично - ждёт завершения DEV фазы эпика + слот в QA WIP
-     *
-     * Team WIP - это опциональное ограничение на общее количество "активных" эпиков
-     * (эпик активен если хотя бы одна его фаза в работе)
+     * Calculates confidence level based on epic data and warnings.
      */
-    private WipCalculationResult calculateForecastsWithWip(
-            List<JiraIssueEntity> epics,
-            TeamCapacity teamCapacity,
-            BigDecimal riskBuffer,
-            PlanningConfigDto.StoryDuration storyDuration,
-            int teamWipLimit,
-            int saWipLimit,
-            int devWipLimit,
-            int qaWipLimit,
-            StatusMappingConfig statusMapping
-    ) {
-        if (epics.isEmpty()) {
-            return new WipCalculationResult(new ArrayList<>(), 0, 0, 0);
+    private Confidence calculateConfidence(PlannedEpic plannedEpic, List<PlanningWarning> warnings) {
+        PhaseAggregation agg = plannedEpic.phaseAggregation();
+
+        // Check if epic has any estimates
+        boolean hasEstimates = agg.saHours().compareTo(BigDecimal.ZERO) > 0
+                || agg.devHours().compareTo(BigDecimal.ZERO) > 0
+                || agg.qaHours().compareTo(BigDecimal.ZERO) > 0;
+
+        if (!hasEstimates) {
+            return Confidence.LOW;
         }
 
-        List<EpicForecast> forecasts = new ArrayList<>();
+        // Count warnings for this epic's stories
+        long warningCount = warnings.stream()
+                .filter(w -> plannedEpic.stories().stream()
+                        .anyMatch(s -> s.storyKey().equals(w.issueKey())))
+                .count();
 
-        // Трекеры дат завершения для каждой роли (когда освободится слот)
-        // PriorityQueue хранит даты завершения фаз, самая ранняя первой
-        java.util.PriorityQueue<LocalDate> saPhaseEndDates = new java.util.PriorityQueue<>();
-        java.util.PriorityQueue<LocalDate> devPhaseEndDates = new java.util.PriorityQueue<>();
-        java.util.PriorityQueue<LocalDate> qaPhaseEndDates = new java.util.PriorityQueue<>();
+        // Count no-capacity warnings
+        long noCapacityWarnings = warnings.stream()
+                .filter(w -> w.type() == WarningType.NO_CAPACITY)
+                .filter(w -> plannedEpic.stories().stream()
+                        .anyMatch(s -> s.storyKey().equals(w.issueKey())))
+                .count();
 
-        // Счётчики текущего WIP по ролям (на момент "сейчас")
-        int saActive = 0;
-        int devActive = 0;
-        int qaActive = 0;
-
-        LocalDate today = LocalDate.now();
-
-        for (int i = 0; i < epics.size(); i++) {
-            JiraIssueEntity epic = epics.get(i);
-
-            // === SA ФАЗА (Pipeline независимый) ===
-            // SA начинает когда есть свободный слот в SA WIP
-            LocalDate saStartDate = today;
-            EpicForecast.RoleWaitInfo saWait = EpicForecast.RoleWaitInfo.none();
-
-            if (saPhaseEndDates.size() >= saWipLimit) {
-                // Нет свободного слота, ждём завершения самой ранней SA фазы
-                LocalDate saSlotAvailable = saPhaseEndDates.poll();
-                if (saSlotAvailable.isAfter(saStartDate)) {
-                    int saQueuePos = i - saWipLimit + 1;
-                    saWait = EpicForecast.RoleWaitInfo.waiting(saSlotAvailable, Math.max(1, saQueuePos));
-                    saStartDate = saSlotAvailable;
-                }
-            }
-
-            // Рассчитываем SA фазу
-            RemainingByRole remaining = calculateRemaining(epic, riskBuffer, statusMapping);
-            PhaseInfo saPhase = calculatePhase(
-                    remaining.sa().days(),
-                    teamCapacity.saHoursPerDay(),
-                    saStartDate
-            );
-
-            // === DEV ФАЗА (Pipeline от SA + DEV WIP) ===
-            // DEV начинает когда:
-            // 1. SA фаза этого эпика завершена (с pipeline offset)
-            // 2. Есть свободный слот в DEV WIP
-            LocalDate devEarliestByPipeline = today;
-            if (saPhase != null && saPhase.endDate() != null && remaining.sa().days().compareTo(BigDecimal.ZERO) > 0) {
-                // Pipeline offset: DEV может начать когда первая история SA готова
-                // offsetDays-1 потому что calculatePhase добавит +1 к startAfter
-                int offsetDays = calculateOffsetDays(storyDuration.sa(), teamCapacity.saHoursPerDay());
-                LocalDate afterFirstStory = calendarService.addWorkdays(saPhase.startDate(), Math.max(0, offsetDays - 1));
-                // Если SA короче storyDuration, DEV начинает сразу после SA
-                devEarliestByPipeline = afterFirstStory.isAfter(saPhase.endDate())
-                        ? saPhase.endDate()
-                        : afterFirstStory;
-            }
-
-            LocalDate devStartDate = devEarliestByPipeline;
-            EpicForecast.RoleWaitInfo devWait = EpicForecast.RoleWaitInfo.none();
-
-            if (devPhaseEndDates.size() >= devWipLimit) {
-                // Нет свободного слота, ждём завершения самой ранней DEV фазы
-                LocalDate devSlotAvailable = devPhaseEndDates.poll();
-                if (devSlotAvailable.isAfter(devStartDate)) {
-                    int devQueuePos = i - devWipLimit + 1;
-                    devWait = EpicForecast.RoleWaitInfo.waiting(devSlotAvailable, Math.max(1, devQueuePos));
-                    devStartDate = devSlotAvailable;
-                }
-            }
-
-            // Рассчитываем DEV фазу
-            PhaseInfo devPhase = calculatePhase(
-                    remaining.dev().days(),
-                    teamCapacity.devHoursPerDay(),
-                    devStartDate
-            );
-
-            // === QA ФАЗА (Pipeline от DEV + QA WIP) ===
-            // QA начинает когда:
-            // 1. DEV фаза этого эпика завершена (с pipeline offset)
-            // 2. Есть свободный слот в QA WIP
-            LocalDate qaEarliestByPipeline = today;
-            if (devPhase != null && devPhase.endDate() != null && remaining.dev().days().compareTo(BigDecimal.ZERO) > 0) {
-                // Pipeline offset: QA может начать когда первая история DEV готова
-                // offsetDays-1 потому что calculatePhase добавит +1 к startAfter
-                int offsetDays = calculateOffsetDays(storyDuration.dev(), teamCapacity.devHoursPerDay());
-                LocalDate afterFirstStory = calendarService.addWorkdays(devPhase.startDate(), Math.max(0, offsetDays - 1));
-                // Если DEV короче storyDuration, QA начинает сразу после DEV
-                qaEarliestByPipeline = afterFirstStory.isAfter(devPhase.endDate())
-                        ? devPhase.endDate()
-                        : afterFirstStory;
-            }
-
-            LocalDate qaStartDate = qaEarliestByPipeline;
-            EpicForecast.RoleWaitInfo qaWait = EpicForecast.RoleWaitInfo.none();
-
-            if (qaPhaseEndDates.size() >= qaWipLimit) {
-                // Нет свободного слота, ждём завершения самой ранней QA фазы
-                LocalDate qaSlotAvailable = qaPhaseEndDates.poll();
-                if (qaSlotAvailable.isAfter(qaStartDate)) {
-                    int qaQueuePos = i - qaWipLimit + 1;
-                    qaWait = EpicForecast.RoleWaitInfo.waiting(qaSlotAvailable, Math.max(1, qaQueuePos));
-                    qaStartDate = qaSlotAvailable;
-                }
-            }
-
-            // Рассчитываем QA фазу
-            PhaseInfo qaPhase = calculatePhase(
-                    remaining.qa().days(),
-                    teamCapacity.qaHoursPerDay(),
-                    qaStartDate
-            );
-
-            // Собираем расписание фаз
-            PhaseSchedule schedule = new PhaseSchedule(saPhase, devPhase, qaPhase);
-
-            // Определяем Expected Done (максимальная дата окончания среди фаз с реальной работой)
-            LocalDate expectedDone = Stream.of(saPhase, devPhase, qaPhase)
-                    .filter(phase -> phase != null && phase.workDays() != null
-                            && phase.workDays().compareTo(BigDecimal.ZERO) > 0)
-                    .map(PhaseInfo::endDate)
-                    .filter(Objects::nonNull)
-                    .max(LocalDate::compareTo)
-                    .orElse(null);
-
-            // Fallback: если нет фаз с работой, берём любую ненулевую дату
-            if (expectedDone == null) {
-                expectedDone = Stream.of(qaPhase, devPhase, saPhase)
-                        .filter(phase -> phase != null && phase.endDate() != null)
-                        .map(PhaseInfo::endDate)
-                        .findFirst()
-                        .orElse(null);
-            }
-
-            // === Team WIP (опционально) ===
-            // Эпик считается "в WIP" если SA фаза не ждёт (т.е. он уже начался или начнётся сразу)
-            boolean isWithinTeamWip = i < teamWipLimit;
-            Integer queuePosition = isWithinTeamWip ? null : (i - teamWipLimit + 1);
-            LocalDate queuedUntil = isWithinTeamWip ? null : (saWait.waiting() ? saWait.waitingUntil() : null);
-
-            // Рассчитываем дельту от due date
-            Integer dueDateDelta = calculateDueDateDelta(expectedDone, epic.getDueDate());
-
-            // Определяем уровень уверенности
-            Confidence confidence = calculateConfidence(epic, remaining, teamCapacity);
-
-            // Создаём PhaseWaitInfo
-            EpicForecast.PhaseWaitInfo phaseWaitInfo = new EpicForecast.PhaseWaitInfo(saWait, devWait, qaWait);
-
-            // Создаём forecast
-            EpicForecast forecast = new EpicForecast(
-                    epic.getIssueKey(),
-                    epic.getSummary(),
-                    epic.getAutoScore(),
-                    epic.getManualPriorityBoost(),
-                    expectedDone,
-                    confidence,
-                    dueDateDelta,
-                    epic.getDueDate(),
-                    remaining,
-                    schedule,
-                    queuePosition,
-                    queuedUntil,
-                    isWithinTeamWip,
-                    phaseWaitInfo
-            );
-
-            forecasts.add(forecast);
-
-            // === Обновляем трекеры для следующих эпиков ===
-            if (saPhase != null && saPhase.endDate() != null) {
-                saPhaseEndDates.add(saPhase.endDate());
-                // Считаем активных на сегодня
-                if (saPhase.startDate() != null && !saPhase.startDate().isAfter(today)
-                        && !saPhase.endDate().isBefore(today)) {
-                    saActive++;
-                }
-            }
-
-            if (devPhase != null && devPhase.endDate() != null) {
-                devPhaseEndDates.add(devPhase.endDate());
-                if (devPhase.startDate() != null && !devPhase.startDate().isAfter(today)
-                        && !devPhase.endDate().isBefore(today)) {
-                    devActive++;
-                }
-            }
-
-            if (qaPhase != null && qaPhase.endDate() != null) {
-                qaPhaseEndDates.add(qaPhase.endDate());
-                if (qaPhase.startDate() != null && !qaPhase.startDate().isAfter(today)
-                        && !qaPhase.endDate().isBefore(today)) {
-                    qaActive++;
-                }
-            }
+        if (noCapacityWarnings >= 2) {
+            return Confidence.LOW;
+        }
+        if (noCapacityWarnings == 1 || warningCount > plannedEpic.stories().size() / 2) {
+            return Confidence.MEDIUM;
         }
 
-        return new WipCalculationResult(forecasts, saActive, devActive, qaActive);
+        return Confidence.HIGH;
+    }
+
+    /**
+     * Helper method to convert hours to days.
+     */
+    private BigDecimal hoursToDays(BigDecimal hours) {
+        if (hours == null || hours.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        return hours.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
     }
 
     /**
@@ -426,175 +262,6 @@ public class ForecastService {
     }
 
     /**
-     * Рассчитывает остаток работы по ролям.
-     * Приоритет источников данных:
-     * 1. Rough estimate на эпике (если есть)
-     * 2. Агрегация по child issues (stories/tasks) с учётом статусов и time spent
-     * 3. Original estimate на эпике (fallback)
-     */
-    private RemainingByRole calculateRemaining(JiraIssueEntity epic, BigDecimal riskBuffer, StatusMappingConfig statusMapping) {
-        // 1. Используем rough estimate если есть
-        BigDecimal saDays = epic.getRoughEstimateSaDays();
-        BigDecimal devDays = epic.getRoughEstimateDevDays();
-        BigDecimal qaDays = epic.getRoughEstimateQaDays();
-
-        // 2. Если нет rough estimate, агрегируем по subtasks (НЕ по stories)
-        // Stories планируются в порядке AutoScore (F19)
-        if (saDays == null && devDays == null && qaDays == null) {
-            List<JiraIssueEntity> childIssues = issueRepository.findByParentKey(epic.getIssueKey());
-
-            if (!childIssues.isEmpty()) {
-                // Фильтруем только stories (не subtasks)
-                List<JiraIssueEntity> stories = childIssues.stream()
-                        .filter(issue -> !issue.isSubtask())
-                        .toList();
-
-                // Сортируем stories по AutoScore с учётом dependencies
-                List<JiraIssueEntity> sortedStories = sortStoriesByAutoScore(stories, statusMapping);
-
-                // Считаем remaining по каждой фазе из subtasks в порядке AutoScore
-                long saRemainingSeconds = 0;
-                long devRemainingSeconds = 0;
-                long qaRemainingSeconds = 0;
-
-                for (JiraIssueEntity story : sortedStories) {
-                    // Пропускаем Done stories - они уже выполнены
-                    if (statusMappingService.isDone(story.getStatus(), statusMapping)) {
-                        continue;
-                    }
-
-                    // Пропускаем flagged stories (work paused)
-                    if (story.getFlagged() != null && story.getFlagged()) {
-                        log.debug("Skipping flagged story {} in forecast", story.getIssueKey());
-                        continue;
-                    }
-
-                    // Получаем subtasks этой story
-                    List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
-
-                    for (JiraIssueEntity subtask : subtasks) {
-                        // Пропускаем Done subtasks
-                        if (statusMappingService.isDone(subtask.getStatus(), statusMapping)) {
-                            continue;
-                        }
-
-                        // Рассчитываем remaining для subtask
-                        long estimate = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
-                        long spent = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
-                        long remaining = Math.max(0, estimate - spent);
-
-                        // Если нет эстимейта, но есть залогированное время - оцениваем что осталось ещё столько же
-                        if (estimate == 0 && spent > 0 && !statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
-                            remaining = spent; // Fallback: предполагаем что осталось примерно столько же
-                        }
-
-                        // Определяем фазу по типу subtask или статусу
-                        String phase = statusMappingService.determinePhase(subtask.getStatus(), subtask.getIssueType(), statusMapping);
-
-                        switch (phase) {
-                            case "SA" -> saRemainingSeconds += remaining;
-                            case "QA" -> qaRemainingSeconds += remaining;
-                            default -> devRemainingSeconds += remaining;
-                        }
-                    }
-                }
-
-                // Конвертируем секунды в дни
-                if (saRemainingSeconds > 0 || devRemainingSeconds > 0 || qaRemainingSeconds > 0) {
-                    saDays = BigDecimal.valueOf(saRemainingSeconds / 3600.0).divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
-                    devDays = BigDecimal.valueOf(devRemainingSeconds / 3600.0).divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
-                    qaDays = BigDecimal.valueOf(qaRemainingSeconds / 3600.0).divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
-                }
-            }
-        }
-
-        // 3. Fallback: original estimate на эпике
-        if (saDays == null && devDays == null && qaDays == null) {
-            Long estimateSeconds = epic.getOriginalEstimateSeconds();
-            Long spentSeconds = epic.getTimeSpentSeconds();
-
-            if (estimateSeconds != null && estimateSeconds > 0) {
-                long remaining = estimateSeconds - (spentSeconds != null ? spentSeconds : 0);
-                if (remaining > 0) {
-                    // Распределяем по умолчанию: 10% SA, 70% DEV, 20% QA
-                    BigDecimal totalHours = BigDecimal.valueOf(remaining / 3600.0);
-                    BigDecimal saHours = totalHours.multiply(new BigDecimal("0.10"));
-                    BigDecimal devHours = totalHours.multiply(new BigDecimal("0.70"));
-                    BigDecimal qaHours = totalHours.multiply(new BigDecimal("0.20"));
-
-                    saDays = saHours.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
-                    devDays = devHours.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
-                    qaDays = qaHours.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
-                }
-            }
-        }
-
-        // Применяем буфер рисков
-        BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
-
-        BigDecimal saFinal = applyRiskBuffer(saDays, multiplier);
-        BigDecimal devFinal = applyRiskBuffer(devDays, multiplier);
-        BigDecimal qaFinal = applyRiskBuffer(qaDays, multiplier);
-
-        return new RemainingByRole(
-                new RoleRemaining(saFinal.multiply(HOURS_PER_DAY), saFinal),
-                new RoleRemaining(devFinal.multiply(HOURS_PER_DAY), devFinal),
-                new RoleRemaining(qaFinal.multiply(HOURS_PER_DAY), qaFinal)
-        );
-    }
-
-    private BigDecimal applyRiskBuffer(BigDecimal days, BigDecimal multiplier) {
-        if (days == null || days.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        return days.multiply(multiplier).setScale(1, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Рассчитывает offset в календарных днях для pipeline.
-     * storyDuration - человеко-дни на одну сторю
-     * capacityPerDay - часов в день у команды для этой роли
-     */
-    private int calculateOffsetDays(BigDecimal storyDuration, BigDecimal capacityPerDay) {
-        if (storyDuration == null || storyDuration.compareTo(BigDecimal.ZERO) <= 0) {
-            return 0;
-        }
-        if (capacityPerDay == null || capacityPerDay.compareTo(BigDecimal.ZERO) <= 0) {
-            return storyDuration.intValue(); // Если нет capacity, используем как есть
-        }
-        // Конвертируем человеко-дни в календарные дни
-        BigDecimal hoursNeeded = storyDuration.multiply(HOURS_PER_DAY);
-        return hoursNeeded.divide(capacityPerDay, 0, RoundingMode.CEILING).intValue();
-    }
-
-    /**
-     * Рассчитывает информацию о фазе.
-     */
-    private PhaseInfo calculatePhase(BigDecimal workDays, BigDecimal capacityPerDay, LocalDate startAfter) {
-        if (workDays == null || workDays.compareTo(BigDecimal.ZERO) <= 0) {
-            return new PhaseInfo(startAfter, startAfter, BigDecimal.ZERO, false);
-        }
-
-        boolean noCapacity = capacityPerDay == null || capacityPerDay.compareTo(BigDecimal.ZERO) <= 0;
-
-        // Если нет ресурсов, используем fallback: 8 часов/день (1 человек)
-        BigDecimal effectiveCapacity = noCapacity ? HOURS_PER_DAY : capacityPerDay;
-
-        // Сколько рабочих дней нужно
-        // workDays - это человеко-дни, capacityPerDay - часов в день
-        // Конвертируем: дни * 8 часов / часов в день = календарных рабочих дней
-        BigDecimal hoursNeeded = workDays.multiply(HOURS_PER_DAY);
-        int calendarDaysNeeded = hoursNeeded
-                .divide(effectiveCapacity, 0, RoundingMode.CEILING)
-                .intValue();
-
-        LocalDate startDate = calendarService.addWorkdays(startAfter, 1);
-        LocalDate endDate = calendarService.addWorkdays(startDate, Math.max(0, calendarDaysNeeded - 1));
-
-        return new PhaseInfo(startDate, endDate, workDays, noCapacity);
-    }
-
-    /**
      * Рассчитывает дельту между Expected Done и Due Date.
      * Положительное значение = опоздание, отрицательное = запас.
      */
@@ -603,88 +270,5 @@ public class ForecastService {
             return null;
         }
         return (int) ChronoUnit.DAYS.between(dueDate, expectedDone);
-    }
-
-    /**
-     * Определяет уровень уверенности в прогнозе.
-     */
-    private Confidence calculateConfidence(JiraIssueEntity epic, RemainingByRole remaining, TeamCapacity capacity) {
-        int issues = 0;
-
-        // Нет оценок
-        boolean hasEstimates = remaining.sa().days().compareTo(BigDecimal.ZERO) > 0
-                || remaining.dev().days().compareTo(BigDecimal.ZERO) > 0
-                || remaining.qa().days().compareTo(BigDecimal.ZERO) > 0;
-        if (!hasEstimates) {
-            return Confidence.LOW;
-        }
-
-        // Проверяем наличие ресурсов для каждой роли с работой
-        if (remaining.sa().days().compareTo(BigDecimal.ZERO) > 0
-                && (capacity.saHoursPerDay() == null || capacity.saHoursPerDay().compareTo(BigDecimal.ZERO) <= 0)) {
-            issues++;
-        }
-        if (remaining.dev().days().compareTo(BigDecimal.ZERO) > 0
-                && (capacity.devHoursPerDay() == null || capacity.devHoursPerDay().compareTo(BigDecimal.ZERO) <= 0)) {
-            issues++;
-        }
-        if (remaining.qa().days().compareTo(BigDecimal.ZERO) > 0
-                && (capacity.qaHoursPerDay() == null || capacity.qaHoursPerDay().compareTo(BigDecimal.ZERO) <= 0)) {
-            issues++;
-        }
-
-        if (issues >= 2) {
-            return Confidence.LOW;
-        }
-        if (issues == 1) {
-            return Confidence.MEDIUM;
-        }
-
-        // Есть rough estimate - высокая уверенность
-        if (epic.getRoughEstimateSaDays() != null
-                || epic.getRoughEstimateDevDays() != null
-                || epic.getRoughEstimateQaDays() != null) {
-            return Confidence.HIGH;
-        }
-
-        return Confidence.MEDIUM;
-    }
-
-    /**
-     * Получает эпики команды отсортированные по AutoScore.
-     */
-    private List<JiraIssueEntity> getEpicsSorted(Long teamId, List<String> statuses) {
-        if (statuses != null && !statuses.isEmpty()) {
-            return issueRepository.findByIssueTypeInAndTeamIdAndStatusInOrderByAutoScoreDesc(
-                    EPIC_TYPES, teamId, statuses);
-        }
-        return issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(EPIC_TYPES, teamId);
-    }
-
-    private LocalDate maxDate(LocalDate a, LocalDate b) {
-        if (a == null) return b;
-        if (b == null) return a;
-        return a.isAfter(b) ? a : b;
-    }
-
-    /**
-     * Сортирует stories по AutoScore с учётом dependencies.
-     * Stories сортируются топологически (blocked stories после blocking),
-     * внутри каждого слоя - по AutoScore DESC.
-     */
-    private List<JiraIssueEntity> sortStoriesByAutoScore(List<JiraIssueEntity> stories, StatusMappingConfig statusMapping) {
-        if (stories.isEmpty()) {
-            return stories;
-        }
-
-        // Calculate AutoScore for each story
-        java.util.Map<String, Double> storyScores = new java.util.HashMap<>();
-        for (JiraIssueEntity story : stories) {
-            BigDecimal score = storyAutoScoreService.calculateAutoScore(story, statusMapping);
-            storyScores.put(story.getIssueKey(), score.doubleValue());
-        }
-
-        // Apply topological sort (respects dependencies)
-        return storyDependencyService.topologicalSort(stories, storyScores);
     }
 }

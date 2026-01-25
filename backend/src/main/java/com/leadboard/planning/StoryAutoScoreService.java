@@ -10,10 +10,13 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Service for calculating AutoScore for Stories.
@@ -276,5 +279,114 @@ public class StoryAutoScoreService {
             }
         }
         return false;
+    }
+
+    // ==================== Batch Recalculation Methods ====================
+
+    private static final List<String> STORY_TYPES = List.of("Story", "История", "Task", "Задача");
+
+    /**
+     * Recalculate AutoScore for all stories.
+     *
+     * @return number of stories updated
+     */
+    public int recalculateAll() {
+        int count = 0;
+        StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
+
+        for (String storyType : STORY_TYPES) {
+            List<JiraIssueEntity> stories = issueRepository.findByIssueType(storyType);
+            for (JiraIssueEntity story : stories) {
+                BigDecimal score = calculateAutoScore(story, defaultConfig);
+                story.setAutoScore(score);
+                story.setAutoScoreCalculatedAt(OffsetDateTime.now());
+                issueRepository.save(story);
+                count++;
+            }
+        }
+
+        log.info("Recalculated AutoScore for {} stories", count);
+        return count;
+    }
+
+    /**
+     * Recalculate AutoScore for stories with given parent keys.
+     * Used after sync to update only affected stories.
+     *
+     * @param parentKeys set of parent issue keys whose children need recalculation
+     * @return number of stories updated
+     */
+    public int recalculateForParentKeys(Set<String> parentKeys) {
+        if (parentKeys == null || parentKeys.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
+
+        for (String parentKey : parentKeys) {
+            List<JiraIssueEntity> stories = issueRepository.findByParentKey(parentKey);
+            for (JiraIssueEntity story : stories) {
+                // Only recalculate for story types, not subtasks
+                if (isStoryType(story.getIssueType())) {
+                    BigDecimal score = calculateAutoScore(story, defaultConfig);
+                    story.setAutoScore(score);
+                    story.setAutoScoreCalculatedAt(OffsetDateTime.now());
+                    issueRepository.save(story);
+                    count++;
+                }
+            }
+        }
+
+        log.info("Recalculated AutoScore for {} stories (from {} parent keys)", count, parentKeys.size());
+        return count;
+    }
+
+    /**
+     * Recalculate AutoScore for stories whose subtasks changed.
+     * Finds stories that are parents of the given subtask keys.
+     *
+     * @param subtaskKeys set of subtask keys that were changed
+     * @return number of stories updated
+     */
+    public int recalculateForChangedSubtasks(Set<String> subtaskKeys) {
+        if (subtaskKeys == null || subtaskKeys.isEmpty()) {
+            return 0;
+        }
+
+        // Find parent stories for these subtasks
+        Set<String> storyKeys = subtaskKeys.stream()
+                .map(key -> issueRepository.findByIssueKey(key))
+                .filter(opt -> opt.isPresent())
+                .map(opt -> opt.get().getParentKey())
+                .filter(parentKey -> parentKey != null)
+                .collect(Collectors.toSet());
+
+        if (storyKeys.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
+
+        for (String storyKey : storyKeys) {
+            issueRepository.findByIssueKey(storyKey).ifPresent(story -> {
+                if (isStoryType(story.getIssueType())) {
+                    BigDecimal score = calculateAutoScore(story, defaultConfig);
+                    story.setAutoScore(score);
+                    story.setAutoScoreCalculatedAt(OffsetDateTime.now());
+                    issueRepository.save(story);
+                }
+            });
+            count++;
+        }
+
+        log.info("Recalculated AutoScore for {} stories (from {} changed subtasks)", count, subtaskKeys.size());
+        return count;
+    }
+
+    private boolean isStoryType(String issueType) {
+        if (issueType == null) return false;
+        return STORY_TYPES.stream().anyMatch(type -> type.equalsIgnoreCase(issueType));
     }
 }

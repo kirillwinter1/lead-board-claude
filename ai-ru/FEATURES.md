@@ -27,6 +27,7 @@
 | F18. Data Quality | ✅ Готово | 2026-01-24 |
 | F19. Story AutoScore & Prioritization | ✅ Готово | 2026-01-25 |
 | F20. Story-Level Planning (Assignee Capacity) | ✅ Готово | 2026-01-25 |
+| F21. Unified Planning Algorithm | 🚧 В работе (backend + frontend готов) | 2026-01-25 |
 
 ### Документация фич
 
@@ -36,6 +37,7 @@
 | F16. Pipeline WIP + Stories | [F16_PIPELINE_WIP_STORIES.md](F16_PIPELINE_WIP_STORIES.md) | - |
 | F19. Story AutoScore & Prioritization | [F19_STORY_AUTOSCORE.md](F19_STORY_AUTOSCORE.md) | - |
 | F20. Story-Level Planning | [F20_STORY_FORECAST.md](F20_STORY_FORECAST.md) | - |
+| F21. Unified Planning Algorithm | [F21_UNIFIED_PLANNING.md](F21_UNIFIED_PLANNING.md) | - |
 
 ### Будущие фичи
 

@@ -41,6 +41,9 @@ public class JiraIssueEntity {
     @Column(name = "original_estimate_seconds")
     private Long originalEstimateSeconds;
 
+    @Column(name = "remaining_estimate_seconds")
+    private Long remainingEstimateSeconds;
+
     @Column(name = "time_spent_seconds")
     private Long timeSpentSeconds;
 
@@ -200,6 +203,14 @@ public class JiraIssueEntity {
 
     public void setOriginalEstimateSeconds(Long originalEstimateSeconds) {
         this.originalEstimateSeconds = originalEstimateSeconds;
+    }
+
+    public Long getRemainingEstimateSeconds() {
+        return remainingEstimateSeconds;
+    }
+
+    public void setRemainingEstimateSeconds(Long remainingEstimateSeconds) {
+        this.remainingEstimateSeconds = remainingEstimateSeconds;
     }
 
     public Long getTimeSpentSeconds() {

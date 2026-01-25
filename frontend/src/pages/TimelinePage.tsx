@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getEpicStories, getStoryForecast, getStoryStatusCategory, ForecastResponse, EpicForecast, PhaseInfo, WipStatus, RoleWipStatus, StoryInfo, StoryForecastResponse, StorySchedule } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, UnifiedPhaseSchedule, PlanningWarning } from '../api/forecast'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
@@ -13,17 +13,8 @@ interface DateRange {
 
 // --- Utility functions ---
 
-function parseDate(dateStr: string | null): Date | null {
-  if (!dateStr) return null
-  return new Date(dateStr)
-}
-
 function formatDateShort(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function formatDateFull(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' })
 }
 
 function daysBetween(start: Date, end: Date): number {
@@ -53,21 +44,10 @@ function startOfMonth(date: Date): Date {
 
 function getEpicStatus(epic: EpicForecast): EpicStatus {
   if (!epic.dueDate) return 'no-due-date'
-
   const delta = epic.dueDateDeltaDays ?? 0
-
-  if (delta <= 0) return 'on-track'      // On time or early
-  if (delta <= 5) return 'at-risk'       // 1-5 days late
-  return 'late'                          // More than 5 days late
-}
-
-function getStatusColor(status: EpicStatus): string {
-  switch (status) {
-    case 'on-track': return '#22c55e'      // Green
-    case 'at-risk': return '#eab308'       // Yellow
-    case 'late': return '#ef4444'          // Red
-    case 'no-due-date': return '#6b7280'   // Gray
-  }
+  if (delta <= 0) return 'on-track'
+  if (delta <= 5) return 'at-risk'
+  return 'late'
 }
 
 function getStatusIcon(status: EpicStatus): string | null {
@@ -80,40 +60,42 @@ function getStatusIcon(status: EpicStatus): string | null {
 
 // --- Date range & timeline ---
 
-function calculateDateRange(forecast: ForecastResponse): DateRange {
-  let minDate: Date | null = null
-  let maxDate: Date | null = null
-
-  for (const epic of forecast.epics) {
-    const phases = [epic.phaseSchedule.sa, epic.phaseSchedule.dev, epic.phaseSchedule.qa]
-    for (const phase of phases) {
-      // Only consider phases with actual work
-      if (phase.workDays > 0) {
-        if (phase.startDate) {
-          const start = new Date(phase.startDate)
-          if (!minDate || start < minDate) minDate = start
-        }
-        if (phase.endDate) {
-          const end = new Date(phase.endDate)
-          if (!maxDate || end > maxDate) maxDate = end
-        }
-      }
-    }
-    if (epic.dueDate) {
-      const due = new Date(epic.dueDate)
-      if (!maxDate || due > maxDate) maxDate = due
-    }
-  }
-
+function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast: ForecastResponse | null): DateRange {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  if (!minDate) minDate = today
-  if (!maxDate) maxDate = addDays(today, 30)
+  let minDate: Date = today
+  let maxDate: Date = addDays(today, 30)
+
+  // Use unified plan dates if available
+  if (unifiedPlan) {
+    for (const epic of unifiedPlan.epics) {
+      for (const story of epic.stories) {
+        if (story.startDate) {
+          const d = new Date(story.startDate)
+          if (d < minDate) minDate = d
+        }
+        if (story.endDate) {
+          const d = new Date(story.endDate)
+          if (d > maxDate) maxDate = d
+        }
+      }
+    }
+  }
+
+  // Also consider forecast due dates
+  if (forecast) {
+    for (const epic of forecast.epics) {
+      if (epic.dueDate) {
+        const d = new Date(epic.dueDate)
+        if (d > maxDate) maxDate = d
+      }
+    }
+  }
 
   // Add padding
   minDate = addDays(minDate, -3)
-  maxDate = addDays(maxDate, 3)
+  maxDate = addDays(maxDate, 7)
 
   return { start: minDate, end: maxDate }
 }
@@ -138,7 +120,7 @@ function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): { date: Dat
     while (current <= range.end) {
       headers.push({
         date: new Date(current),
-        label: current.toLocaleDateString('en-US', { month: 'short' })
+        label: current.toLocaleDateString('ru-RU', { month: 'short' })
       })
       current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
     }
@@ -147,628 +129,189 @@ function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): { date: Dat
   return headers
 }
 
-// --- Progress calculation ---
-
-function calculateEpicProgress(epic: EpicForecast): number {
-  const { sa, dev, qa } = epic.phaseSchedule
-
-  const totalDays = (sa.workDays ?? 0) + (dev.workDays ?? 0) + (qa.workDays ?? 0)
-  if (totalDays === 0) return 0
-
-  // Calculate progress based on current date vs phase dates
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  let completedDays = 0
-
-  const phases = [sa, dev, qa]
-  for (const phase of phases) {
-    if (!phase.startDate || !phase.endDate) continue
-
-    const startDate = new Date(phase.startDate)
-    const endDate = new Date(phase.endDate)
-    const phaseDays = phase.workDays ?? 0
-
-    if (today >= endDate) {
-      // Phase complete
-      completedDays += phaseDays
-    } else if (today >= startDate) {
-      // Phase in progress
-      const totalPhaseDays = daysBetween(startDate, endDate)
-      const elapsedDays = daysBetween(startDate, today)
-      const fraction = Math.min(elapsedDays / totalPhaseDays, 1)
-      completedDays += phaseDays * fraction
-    }
-  }
-
-  return Math.round((completedDays / totalDays) * 100)
+// Phase colors
+const PHASE_COLORS = {
+  sa: '#3b82f6',
+  dev: '#22c55e',
+  qa: '#8b5cf6'
 }
 
-// --- Epic date range (unified bar) ---
+// Allocate lanes for stories to avoid overlap
+function allocateStoryLanes(stories: PlannedStory[]): Map<string, number> {
+  const lanes = new Map<string, number>()
+  const laneEndDates: Date[] = []
 
-function getEpicDateRange(epic: EpicForecast): { start: Date | null; end: Date | null } {
-  const { sa, dev, qa } = epic.phaseSchedule
+  // Sort by start date
+  const sorted = [...stories].filter(s => s.startDate && s.endDate)
+    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())
 
-  let start: Date | null = null
-  let end: Date | null = null
-
-  // Only consider phases with actual work (workDays > 0)
-  for (const phase of [sa, dev, qa]) {
-    if (phase.workDays > 0) {
-      if (phase.startDate) {
-        const d = new Date(phase.startDate)
-        if (!start || d < start) start = d
-      }
-      if (phase.endDate) {
-        const d = new Date(phase.endDate)
-        if (!end || d > end) end = d
-      }
-    }
-  }
-
-  return { start, end }
-}
-
-// --- Components ---
-
-interface TooltipProps {
-  epic: EpicForecast
-  progress: number
-}
-
-function EpicTooltip({ epic, progress }: TooltipProps) {
-  const phaseWait = epic.phaseWaitInfo
-
-  const formatPhase = (phase: PhaseInfo, label: string, roleKey: 'sa' | 'dev' | 'qa') => {
-    if (!phase.startDate || !phase.endDate) {
-      return <div className="tooltip-phase tooltip-phase-na">{label}: Not scheduled</div>
-    }
-
-    const workDays = phase.workDays ?? 0
-    const noCapacity = phase.noCapacity
-    const waitInfo = phaseWait?.[roleKey]
-    const isWaiting = waitInfo?.waiting
-
-    return (
-      <div className={`tooltip-phase ${noCapacity ? 'tooltip-phase-warning' : ''} ${isWaiting ? 'tooltip-phase-waiting' : ''}`}>
-        <span className="tooltip-phase-label">{label}:</span>
-        <span className="tooltip-phase-dates">
-          {formatDateShort(new Date(phase.startDate))} - {formatDateShort(new Date(phase.endDate))}
-        </span>
-        <span className="tooltip-phase-days">({workDays}d)</span>
-        {noCapacity && <span className="tooltip-phase-alert">No resource!</span>}
-        {isWaiting && waitInfo.waitingUntil && (
-          <span className="tooltip-phase-wait">
-            ⏳ waited until {formatDateShort(new Date(waitInfo.waitingUntil))}
-          </span>
-        )}
-      </div>
-    )
-  }
-
-  const deltaText = () => {
-    if (!epic.dueDate) return null
-    const delta = epic.dueDateDeltaDays ?? 0
-    if (delta < 0) return <span className="tooltip-delta tooltip-delta-early">{Math.abs(delta)} days early</span>
-    if (delta === 0) return <span className="tooltip-delta tooltip-delta-ontime">On time</span>
-    return <span className="tooltip-delta tooltip-delta-late">{delta} days late</span>
-  }
-
-  const isQueued = !epic.isWithinWip
-  const hasPhaseWaiting = phaseWait && (phaseWait.sa?.waiting || phaseWait.dev?.waiting || phaseWait.qa?.waiting)
-
-  return (
-    <div className="epic-tooltip">
-      <div className="tooltip-header">
-        <span className="tooltip-key">{epic.epicKey}</span>
-        <span className="tooltip-summary">{epic.summary}</span>
-      </div>
-
-      {isQueued && (
-        <div className="tooltip-section tooltip-queue-info">
-          <div className="tooltip-queue-badge">⏳ In Queue #{epic.queuePosition}</div>
-          {epic.queuedUntil && (
-            <div className="tooltip-row">
-              <span>Waiting until:</span>
-              <strong>{formatDateFull(new Date(epic.queuedUntil))}</strong>
-            </div>
-          )}
-        </div>
-      )}
-
-      {hasPhaseWaiting && !isQueued && (
-        <div className="tooltip-section tooltip-phase-queue-info">
-          <div className="tooltip-phase-queue-badge">Phase WIP delays present</div>
-        </div>
-      )}
-
-      <div className="tooltip-section">
-        <div className="tooltip-row">
-          <span>Expected:</span>
-          <strong>{epic.expectedDone ? formatDateFull(new Date(epic.expectedDone)) : 'Unknown'}</strong>
-          {deltaText()}
-        </div>
-        <div className="tooltip-row">
-          <span>Progress:</span>
-          <strong>{progress}%</strong>
-        </div>
-        <div className="tooltip-row">
-          <span>Confidence:</span>
-          <strong className={`confidence-${epic.confidence.toLowerCase()}`}>{epic.confidence}</strong>
-        </div>
-      </div>
-
-      <div className="tooltip-section tooltip-phases">
-        {formatPhase(epic.phaseSchedule.sa, 'SA', 'sa')}
-        {formatPhase(epic.phaseSchedule.dev, 'DEV', 'dev')}
-        {formatPhase(epic.phaseSchedule.qa, 'QA', 'qa')}
-      </div>
-    </div>
-  )
-}
-
-interface PhaseBarProps {
-  phase: PhaseInfo
-  role: 'sa' | 'dev' | 'qa'
-  rangeStart: Date
-  totalDays: number
-}
-
-function PhaseBar({ phase, role, rangeStart, totalDays }: PhaseBarProps) {
-  if (!phase.startDate || !phase.endDate) return null
-
-  const startDate = new Date(phase.startDate)
-  const endDate = new Date(phase.endDate)
-  const startOffset = daysBetween(rangeStart, startDate)
-  const duration = daysBetween(startDate, endDate) + 1
-
-  const leftPercent = (startOffset / totalDays) * 100
-  const widthPercent = (duration / totalDays) * 100
-
-  const roleLabels = { sa: 'SA', dev: 'DEV', qa: 'QA' }
-  const noCapacity = phase.noCapacity === true
-  const isEmpty = phase.workDays <= 0
-
-  // For empty phases, show a small marker
-  if (isEmpty) {
-    return (
-      <div
-        className={`gantt-phase-bar gantt-phase-${role} gantt-phase-empty`}
-        style={{ left: `${leftPercent}%`, width: '20px' }}
-        title={`${roleLabels[role]}: No work scheduled`}
-      >
-        <span className="gantt-phase-label">{roleLabels[role]}</span>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={`gantt-phase-bar gantt-phase-${role} ${noCapacity ? 'gantt-phase-no-capacity' : ''}`}
-      style={{ left: `${leftPercent}%`, width: `${Math.max(widthPercent, 0.5)}%` }}
-    >
-      <span className="gantt-phase-label">{roleLabels[role]}</span>
-      <span className="gantt-phase-days">{phase.workDays}d</span>
-    </div>
-  )
-}
-
-// --- Story Segments ---
-
-interface StoryTooltipProps {
-  story: StoryInfo
-}
-
-function StoryTooltip({ story }: StoryTooltipProps) {
-  const statusCategory = getStoryStatusCategory(story.status)
-  const hasEstimate = story.estimateSeconds && story.estimateSeconds > 0
-  const timeSpent = story.timeSpentSeconds || 0
-  const progressPercent = hasEstimate
-    ? Math.min(100, Math.round((timeSpent / story.estimateSeconds!) * 100))
-    : 0
-  const remainingSeconds = hasEstimate
-    ? Math.max(0, story.estimateSeconds! - timeSpent)
-    : null
-
-  const formatTime = (seconds: number | null | undefined) => {
-    if (seconds === null || seconds === undefined) return '-'
-    if (seconds === 0) return '0h'
-    const hours = Math.round(seconds / 3600)
-    return `${hours}h`
-  }
-
-  const getStatusLabel = () => {
-    switch (statusCategory) {
-      case 'DONE': return 'Done'
-      case 'IN_PROGRESS': return 'In Progress'
-      default: return 'To Do'
-    }
-  }
-
-  // Check if we have any role breakdown data
-  const hasRoleBreakdown = story.saBreakdown || story.devBreakdown || story.qaBreakdown
-
-  // Calculate remaining for each role
-  const getRoleRemaining = (breakdown: { estimateSeconds: number | null; loggedSeconds: number | null } | null) => {
-    if (!breakdown || !breakdown.estimateSeconds) return null
-    const logged = breakdown.loggedSeconds || 0
-    return Math.max(0, breakdown.estimateSeconds - logged)
-  }
-
-  return (
-    <div className="epic-tooltip">
-      <div className="tooltip-header">
-        <span className="tooltip-key">{story.storyKey}</span>
-        <span className="tooltip-summary">{story.summary}</span>
-      </div>
-
-      <div className="tooltip-section">
-        <div className="tooltip-row">
-          <span>Status:</span>
-          <strong>{getStatusLabel()}</strong>
-        </div>
-        <div className="tooltip-row">
-          <span>Type:</span>
-          <strong>{story.issueType || 'Task'}</strong>
-        </div>
-        <div className="tooltip-row">
-          <span>Progress:</span>
-          <strong>{progressPercent}%</strong>
-        </div>
-      </div>
-
-      {/* Dates section */}
-      {(story.startDate || story.endDate) && (
-        <div className="tooltip-section">
-          {story.startDate && (
-            <div className="tooltip-row">
-              <span>Start:</span>
-              <strong>{formatDateShort(new Date(story.startDate))}</strong>
-            </div>
-          )}
-          {story.endDate && (
-            <div className="tooltip-row">
-              <span>End:</span>
-              <strong>{formatDateShort(new Date(story.endDate))}</strong>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Role breakdown table */}
-      {hasRoleBreakdown ? (
-        <div className="tooltip-section tooltip-role-breakdown">
-          <table className="tooltip-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>Est</th>
-                <th>Log</th>
-                <th>Rem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {story.saBreakdown && (
-                <tr>
-                  <td className="tooltip-role-label">SA</td>
-                  <td>{formatTime(story.saBreakdown.estimateSeconds)}</td>
-                  <td>{formatTime(story.saBreakdown.loggedSeconds)}</td>
-                  <td>{formatTime(getRoleRemaining(story.saBreakdown))}</td>
-                </tr>
-              )}
-              {story.devBreakdown && (
-                <tr>
-                  <td className="tooltip-role-label">DEV</td>
-                  <td>{formatTime(story.devBreakdown.estimateSeconds)}</td>
-                  <td>{formatTime(story.devBreakdown.loggedSeconds)}</td>
-                  <td>{formatTime(getRoleRemaining(story.devBreakdown))}</td>
-                </tr>
-              )}
-              {story.qaBreakdown && (
-                <tr>
-                  <td className="tooltip-role-label">QA</td>
-                  <td>{formatTime(story.qaBreakdown.estimateSeconds)}</td>
-                  <td>{formatTime(story.qaBreakdown.loggedSeconds)}</td>
-                  <td>{formatTime(getRoleRemaining(story.qaBreakdown))}</td>
-                </tr>
-              )}
-              <tr className="tooltip-table-total">
-                <td>Total</td>
-                <td>{formatTime(story.estimateSeconds)}</td>
-                <td>{formatTime(story.timeSpentSeconds)}</td>
-                <td>{formatTime(remainingSeconds)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <div className="tooltip-section">
-          <div className="tooltip-row">
-            <span>Estimate:</span>
-            <strong className={!hasEstimate ? 'tooltip-warning' : ''}>{formatTime(story.estimateSeconds)}</strong>
-            {!hasEstimate && <span className="tooltip-alert">No estimate!</span>}
-          </div>
-          <div className="tooltip-row">
-            <span>Logged:</span>
-            <strong>{formatTime(story.timeSpentSeconds)}</strong>
-          </div>
-          <div className="tooltip-row">
-            <span>Remaining:</span>
-            <strong>{formatTime(remainingSeconds)}</strong>
-          </div>
-        </div>
-      )}
-
-      {story.assignee && (
-        <div className="tooltip-section">
-          <div className="tooltip-row">
-            <span>Assignee:</span>
-            <strong>{story.assignee}</strong>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Utility functions for story phase and progress
-function getStoryPhase(status: string | null): 'analysis' | 'development' | 'qa' | 'done' | 'todo' {
-  if (!status) return 'todo'
-
-  const statusLower = status.toLowerCase()
-
-  // Analysis phase
-  if (statusLower.includes('analysis') || statusLower.includes('аналитик') ||
-      statusLower.includes('dev review') || statusLower.includes('ревью аналитик')) {
-    return 'analysis'
-  }
-
-  // Development phase
-  if (statusLower.includes('development') || statusLower.includes('разработк') ||
-      statusLower.includes('in progress') || statusLower.includes('в работе') ||
-      statusLower.includes('code review') || statusLower.includes('ревью кода')) {
-    return 'development'
-  }
-
-  // QA phase
-  if (statusLower.includes('test') || statusLower.includes('тест') ||
-      statusLower.includes('qa') || statusLower.includes('review') && !statusLower.includes('dev')) {
-    return 'qa'
-  }
-
-  // Done
-  if (statusLower.includes('done') || statusLower.includes('завершен') ||
-      statusLower.includes('closed') || statusLower.includes('готов')) {
-    return 'done'
-  }
-
-  return 'todo'
-}
-
-function getPhaseColor(phase: 'analysis' | 'development' | 'qa' | 'done' | 'todo'): string {
-  switch (phase) {
-    case 'analysis': return '#3b82f6'      // Blue
-    case 'development': return '#10b981'   // Green
-    case 'qa': return '#f59e0b'            // Orange
-    case 'done': return '#059669'          // Dark Green
-    case 'todo': return '#6b7280'          // Gray
-  }
-}
-
-function calculateProgress(timeSpentSeconds: number | null, estimateSeconds: number | null): number {
-  if (!estimateSeconds || estimateSeconds === 0) return 0
-  if (!timeSpentSeconds) return 0
-  return Math.min(Math.round((timeSpentSeconds / estimateSeconds) * 100), 100)
-}
-
-// Lane allocation - distribute stories vertically to avoid overlap
-interface Lane {
-  stories: StorySchedule[]
-  endDate: Date | null
-}
-
-function allocateLanes(stories: StorySchedule[]): Map<string, number> {
-  const lanes: Lane[] = []
-  const storyLanes = new Map<string, number>()
-
-  // Sort stories by start date
-  const sortedStories = [...stories].sort((a, b) =>
-    new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-  )
-
-  for (const story of sortedStories) {
-    const storyStart = new Date(story.startDate)
-    const storyEnd = new Date(story.endDate)
+  for (const story of sorted) {
+    const storyStart = new Date(story.startDate!)
+    const storyEnd = new Date(story.endDate!)
 
     // Find first available lane
-    let assignedLane = -1
-    for (let i = 0; i < lanes.length; i++) {
-      const lane = lanes[i]
-      if (!lane.endDate || storyStart > lane.endDate) {
-        // This lane is free
-        assignedLane = i
-        lane.stories.push(story)
-        lane.endDate = storyEnd
+    let lane = 0
+    for (let i = 0; i < laneEndDates.length; i++) {
+      if (laneEndDates[i] < storyStart) {
+        lane = i
         break
       }
+      lane = i + 1
     }
 
-    // No free lane found, create new one
-    if (assignedLane === -1) {
-      assignedLane = lanes.length
-      lanes.push({ stories: [story], endDate: storyEnd })
-    }
-
-    storyLanes.set(story.storyKey, assignedLane)
+    lanes.set(story.storyKey, lane)
+    laneEndDates[lane] = storyEnd
   }
 
-  return storyLanes
+  return lanes
 }
 
-// Story Schedule Bars - shows stories as individual bars with progress
-interface StoryScheduleBarsProps {
-  epicKey: string
-  storyForecast: StoryForecastResponse | null
+// Constants for layout
+const BAR_HEIGHT = 22
+const LANE_GAP = 3
+const MIN_ROW_HEIGHT = 36
+
+// Calculate row height for an epic based on its stories
+function calculateRowHeight(stories: PlannedStory[]): number {
+  const activeStories = stories.filter(s => {
+    const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
+    const hasPhases = s.phases?.sa || s.phases?.dev || s.phases?.qa
+    return !isDone && hasPhases && s.startDate && s.endDate
+  })
+
+  if (activeStories.length === 0) return MIN_ROW_HEIGHT
+
+  const storyLanes = allocateStoryLanes(activeStories)
+  const maxLane = Math.max(0, ...Array.from(storyLanes.values())) + 1
+  return Math.max(MIN_ROW_HEIGHT, maxLane * (BAR_HEIGHT + LANE_GAP) + 8)
+}
+
+// --- Story Bars Component ---
+interface StoryBarsProps {
+  stories: PlannedStory[]
   dateRange: DateRange
   jiraBaseUrl: string
+  globalWarnings: PlanningWarning[]
 }
 
-function StoryScheduleBars({ epicKey, storyForecast, dateRange, jiraBaseUrl }: StoryScheduleBarsProps) {
-  const [hoveredStory, setHoveredStory] = useState<StorySchedule | null>(null)
+function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
+  const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
-  if (!storyForecast || storyForecast.stories.length === 0) {
-    return (
-      <div className="story-schedule-empty">
-        <span className="story-empty-text">No stories</span>
-      </div>
-    )
-  }
-
-  // Filter out completed stories and stories with no work
-  const activeStories = storyForecast.stories.filter(s => {
+  // Filter active stories with phases
+  const activeStories = stories.filter(s => {
     const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
-    const hasWork = s.workDays > 0
-    return !isDone && hasWork
+    const hasPhases = s.phases?.sa || s.phases?.dev || s.phases?.qa
+    return !isDone && hasPhases && s.startDate && s.endDate
   })
 
   if (activeStories.length === 0) {
-    return (
-      <div className="story-schedule-empty">
-        <span className="story-empty-text">All stories completed</span>
-      </div>
-    )
+    return <div className="story-empty-text">Нет активных сторей</div>
   }
 
-  // Calculate total days from the timeline's dateRange
   const totalDays = daysBetween(dateRange.start, dateRange.end)
+  const storyLanes = allocateStoryLanes(activeStories)
+  const maxLane = Math.max(0, ...Array.from(storyLanes.values())) + 1
+  const containerHeight = maxLane * (BAR_HEIGHT + LANE_GAP)
 
-  // Allocate lanes for stories
-  const storyLanes = allocateLanes(activeStories)
-  const laneCount = Math.max(...Array.from(storyLanes.values())) + 1
-
-  // Calculate epic background span from actual story dates
-  const storyRangeStart = activeStories.reduce((min, s) => {
-    const d = new Date(s.startDate)
-    return d < min ? d : min
-  }, new Date(activeStories[0].startDate))
-
-  const storyRangeEnd = activeStories.reduce((max, s) => {
-    const d = new Date(s.endDate)
-    return d > max ? d : max
-  }, new Date(activeStories[0].endDate))
-
-  const epicLeftPercent = (daysBetween(dateRange.start, storyRangeStart) / totalDays) * 100
-  const epicWidthPercent = (daysBetween(storyRangeStart, storyRangeEnd) / totalDays) * 100
-
-  const handleMouseEnter = (e: React.MouseEvent, story: StorySchedule) => {
+  const handleMouseEnter = (e: React.MouseEvent, story: PlannedStory) => {
     e.stopPropagation()
     const rect = e.currentTarget.getBoundingClientRect()
     setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 })
     setHoveredStory(story)
   }
 
-  const handleMouseLeave = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setHoveredStory(null)
-  }
+  const renderPhaseSegment = (
+    phase: UnifiedPhaseSchedule | null,
+    phaseType: 'sa' | 'dev' | 'qa',
+    storyStart: Date,
+    storyDuration: number
+  ) => {
+    if (!phase || !phase.startDate || !phase.endDate || phase.hours <= 0) return null
 
-  const BAR_HEIGHT = 28
-  const LANE_GAP = 6
+    const phaseStart = new Date(phase.startDate)
+    const phaseEnd = new Date(phase.endDate)
+    const phaseStartOffset = daysBetween(storyStart, phaseStart)
+    const phaseDuration = daysBetween(phaseStart, phaseEnd) + 1
+    const leftPercent = Math.max(0, (phaseStartOffset / storyDuration) * 100)
+    const widthPercent = Math.min(100 - leftPercent, (phaseDuration / storyDuration) * 100)
+
+    return (
+      <div
+        key={phaseType}
+        style={{
+          position: 'absolute',
+          left: `${leftPercent}%`,
+          width: `${widthPercent}%`,
+          height: '100%',
+          backgroundColor: PHASE_COLORS[phaseType],
+          opacity: phase.noCapacity ? 0.4 : 1
+        }}
+      />
+    )
+  }
 
   return (
     <>
-      <div className="story-schedule-container" style={{ height: `${laneCount * (BAR_HEIGHT + LANE_GAP)}px`, position: 'relative' }}>
-        {/* Epic background */}
-        <div
-          className="epic-background"
-          style={{
-            position: 'absolute',
-            left: `${epicLeftPercent}%`,
-            width: `${epicWidthPercent}%`,
-            height: '100%',
-            backgroundColor: '#d1d5db',
-            opacity: 0.25,
-            borderRadius: '4px',
-            border: '1px solid rgba(0,0,0,0.08)',
-            zIndex: 0
-          }}
-        />
-
-        {/* Story bars */}
+      <div style={{ height: `${containerHeight}px`, position: 'relative', width: '100%' }}>
         {activeStories.map(story => {
-          const startDate = new Date(story.startDate)
-          const endDate = new Date(story.endDate)
+          const startDate = new Date(story.startDate!)
+          const endDate = new Date(story.endDate!)
           const lane = storyLanes.get(story.storyKey) || 0
 
-          // Calculate position and width
           const daysFromStart = daysBetween(dateRange.start, startDate)
           const duration = daysBetween(startDate, endDate) + 1
           const leftPercent = (daysFromStart / totalDays) * 100
           const widthPercent = (duration / totalDays) * 100
 
-          // Calculate progress and phase
-          const progress = calculateProgress(story.timeSpentSeconds, story.originalEstimateSeconds)
-          const phase = getStoryPhase(story.status)
-          const phaseColor = getPhaseColor(phase)
-
-          // Extract story number (without "LB-" prefix)
           const storyNumber = story.storyKey.split('-')[1] || story.storyKey
-
-          // Background: if no progress data, use medium opacity solid; otherwise use gradient
-          const hasProgressData = story.originalEstimateSeconds && story.originalEstimateSeconds > 0
-          const backgroundStyle = hasProgressData
-            ? `linear-gradient(to right, ${phaseColor} 0%, ${phaseColor} ${progress}%, ${phaseColor}4D ${progress}%, ${phaseColor}4D 100%)`
-            : phaseColor + 'B3' // 70% opacity for stories without estimate
-
-          // Border style
-          const borderStyle = story.isBlocked
-            ? '2px solid #ef4444'
-            : '1px solid rgba(0,0,0,0.15)'
+          const isBlocked = story.blockedBy && story.blockedBy.length > 0
+          const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
 
           return (
             <div
               key={story.storyKey}
-              className="story-schedule-bar-v2"
               style={{
                 position: 'absolute',
                 left: `${leftPercent}%`,
-                width: `${widthPercent}%`,
+                width: `${Math.max(widthPercent, 1)}%`,
                 top: `${lane * (BAR_HEIGHT + LANE_GAP)}px`,
                 height: `${BAR_HEIGHT}px`,
-                background: backgroundStyle,
-                borderRadius: '4px',
-                border: borderStyle,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                borderRadius: '3px',
+                border: isBlocked ? '2px solid #ef4444' : '1px solid rgba(0,0,0,0.12)',
+                overflow: 'hidden',
                 cursor: 'pointer',
-                transition: 'transform 0.15s, box-shadow 0.15s',
-                zIndex: 1,
-                boxShadow: story.isBlocked ? '0 0 0 2px rgba(239, 68, 68, 0.2)' : 'none'
+                background: '#e5e7eb',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
               }}
               onMouseEnter={e => handleMouseEnter(e, story)}
-              onMouseLeave={handleMouseLeave}
+              onMouseLeave={() => setHoveredStory(null)}
             >
+              {renderPhaseSegment(story.phases?.sa ?? null, 'sa', startDate, duration)}
+              {renderPhaseSegment(story.phases?.dev ?? null, 'dev', startDate, duration)}
+              {renderPhaseSegment(story.phases?.qa ?? null, 'qa', startDate, duration)}
+
               <span style={{
-                fontSize: '13px',
-                fontWeight: 700,
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+                fontSize: '11px',
+                fontWeight: 600,
                 color: 'white',
-                textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
                 zIndex: 2,
-                letterSpacing: '0.3px'
+                pointerEvents: 'none'
               }}>
-                {storyNumber}
+                {storyNumber}{hasWarning ? ' ⚠' : ''}
               </span>
             </div>
           )
         })}
       </div>
 
-      {/* Improved Tooltip */}
       {hoveredStory && createPortal(
         <div
-          className="gantt-unified-tooltip story-tooltip-v2"
           style={{
             position: 'fixed',
             left: tooltipPos.x,
@@ -776,16 +319,18 @@ function StoryScheduleBars({ epicKey, storyForecast, dateRange, jiraBaseUrl }: S
             transform: 'translate(-50%, -100%)',
             zIndex: 10000,
             pointerEvents: 'none',
-            background: 'rgba(0,0,0,0.92)',
-            backdropFilter: 'blur(8px)',
-            borderRadius: '8px',
-            padding: '16px',
+            background: 'rgba(0,0,0,0.9)',
+            borderRadius: '6px',
+            padding: '12px',
             minWidth: '280px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.4)'
+            maxWidth: '400px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            color: 'white',
+            fontSize: '13px'
           }}
         >
-          <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: 'white' }}>
-            📋 <a
+          <div style={{ fontWeight: 600, marginBottom: '8px' }}>
+            <a
               href={`${jiraBaseUrl}${hoveredStory.storyKey}`}
               target="_blank"
               rel="noopener noreferrer"
@@ -794,159 +339,51 @@ function StoryScheduleBars({ epicKey, storyForecast, dateRange, jiraBaseUrl }: S
               {hoveredStory.storyKey}
             </a>
             {hoveredStory.autoScore !== null && (
-              <span style={{ color: '#9ca3af', marginLeft: '8px' }}>({hoveredStory.autoScore.toFixed(0)})</span>
+              <span style={{ color: '#9ca3af', marginLeft: '8px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
             )}
           </div>
 
-          <div style={{ fontSize: '14px', color: '#d1d5db', marginBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
-            {hoveredStory.storySummary || 'No summary'}
+          <div style={{ color: '#d1d5db', marginBottom: '8px', fontSize: '12px' }}>
+            {hoveredStory.summary || 'No summary'}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', color: '#e5e7eb' }}>
-            <div>
-              📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))} ({hoveredStory.workDays.toFixed(1)} days)
+          {hoveredStory.startDate && hoveredStory.endDate && (
+            <div style={{ marginBottom: '8px', color: '#9ca3af' }}>
+              📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))}
             </div>
+          )}
 
-            {hoveredStory.originalEstimateSeconds && hoveredStory.originalEstimateSeconds > 0 && (
-              <div>
-                ⏱️ Progress: {Math.round((hoveredStory.timeSpentSeconds || 0) / 3600)}h / {Math.round(hoveredStory.originalEstimateSeconds / 3600)}h ({calculateProgress(hoveredStory.timeSpentSeconds, hoveredStory.originalEstimateSeconds)}%)
-              </div>
-            )}
-
-            <div>
-              👤 {hoveredStory.assigneeDisplayName || 'Unassigned'}
-              {hoveredStory.isUnassigned && <span style={{ color: '#fbbf24' }}> (auto-assigned)</span>}
-            </div>
-
-            <div>
-              🏷️ Phase: {getStoryPhase(hoveredStory.status).toUpperCase()}
-            </div>
-
-            {hoveredStory.isBlocked && (
-              <div style={{ color: '#f87171', marginTop: '4px' }}>
-                🚫 Blocked by: {hoveredStory.blockingStories.join(', ')}
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  )
-}
-
-interface StorySegmentsProps {
-  epicKey: string
-}
-
-function StorySegments({ epicKey }: StorySegmentsProps) {
-  const [stories, setStories] = useState<StoryInfo[]>([])
-  const [loading, setLoading] = useState(true)
-  const [hoveredStory, setHoveredStory] = useState<StoryInfo | null>(null)
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
-
-  useEffect(() => {
-    getEpicStories(epicKey)
-      .then(data => {
-        setStories(data)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [epicKey])
-
-  // Show loading indicator
-  if (loading) {
-    return (
-      <div className="story-segments story-segments-loading">
-        <span className="story-loading-text">Loading...</span>
-      </div>
-    )
-  }
-
-  // Filter out Done stories - they are completed and shouldn't be in planning
-  const activeStories = stories
-    .filter(s => getStoryStatusCategory(s.status) !== 'DONE')
-    .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))  // Sort by priority (same as Board)
-
-  // No active stories found
-  if (activeStories.length === 0) {
-    return (
-      <div className="story-segments story-segments-empty">
-        <span className="story-empty-text">{stories.length > 0 ? 'All done' : 'No stories'}</span>
-      </div>
-    )
-  }
-
-  // Check how many have estimates
-  const storiesWithEstimates = activeStories.filter(s => s.estimateSeconds && s.estimateSeconds > 0)
-  const hasEstimates = storiesWithEstimates.length > 0
-
-  // Calculate total estimate for proportional widths
-  // If no estimates, use equal width for all
-  const totalEstimate = hasEstimates
-    ? activeStories.reduce((sum, s) => sum + (s.estimateSeconds || 0), 0)
-    : activeStories.length
-
-  const handleMouseEnter = (e: React.MouseEvent, story: StoryInfo) => {
-    e.stopPropagation()
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 })
-    setHoveredStory(story)
-  }
-
-  const handleMouseLeave = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setHoveredStory(null)
-  }
-
-  return (
-    <>
-      <div className="story-segments">
-        {activeStories.map(story => {
-          // If has estimates, use proportional; otherwise equal
-          const widthPercent = hasEstimates
-            ? ((story.estimateSeconds || 0) / totalEstimate) * 100
-            : (1 / activeStories.length) * 100
-
-          const statusCategory = getStoryStatusCategory(story.status)
-          const hasNoEstimate = !story.estimateSeconds || story.estimateSeconds === 0
-
-          // Calculate progress based on logged time
-          const progressPercent = story.estimateSeconds && story.estimateSeconds > 0 && story.timeSpentSeconds
-            ? Math.min(100, Math.round((story.timeSpentSeconds / story.estimateSeconds) * 100))
-            : 0
-
-          return (
-            <div
-              key={story.storyKey}
-              className={`story-segment story-segment-${statusCategory.toLowerCase()} ${hasNoEstimate ? 'story-segment-no-estimate' : ''}`}
-              style={{ width: `${Math.max(widthPercent, 2)}%` }}
-              onMouseEnter={(e) => handleMouseEnter(e, story)}
-              onMouseLeave={handleMouseLeave}
-            >
-              {/* Progress fill */}
-              {progressPercent > 0 && (
-                <div
-                  className="story-segment-progress"
-                  style={{ width: `${progressPercent}%` }}
-                />
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+            <tbody>
+              {hoveredStory.phases?.sa && hoveredStory.phases.sa.hours > 0 && (
+                <tr>
+                  <td style={{ padding: '2px 4px' }}><span style={{ color: PHASE_COLORS.sa }}>●</span> SA</td>
+                  <td style={{ padding: '2px 4px' }}>{hoveredStory.phases.sa.assigneeDisplayName || '-'}</td>
+                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>{hoveredStory.phases.sa.hours.toFixed(0)}ч</td>
+                </tr>
               )}
-              <span className="story-segment-label">{story.storyKey.split('-')[1]}</span>
-            </div>
-          )
-        })}
-      </div>
+              {hoveredStory.phases?.dev && hoveredStory.phases.dev.hours > 0 && (
+                <tr>
+                  <td style={{ padding: '2px 4px' }}><span style={{ color: PHASE_COLORS.dev }}>●</span> DEV</td>
+                  <td style={{ padding: '2px 4px' }}>{hoveredStory.phases.dev.assigneeDisplayName || '-'}</td>
+                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>{hoveredStory.phases.dev.hours.toFixed(0)}ч</td>
+                </tr>
+              )}
+              {hoveredStory.phases?.qa && hoveredStory.phases.qa.hours > 0 && (
+                <tr>
+                  <td style={{ padding: '2px 4px' }}><span style={{ color: PHASE_COLORS.qa }}>●</span> QA</td>
+                  <td style={{ padding: '2px 4px' }}>{hoveredStory.phases.qa.assigneeDisplayName || '-'}</td>
+                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>{hoveredStory.phases.qa.hours.toFixed(0)}ч</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
 
-      {hoveredStory && createPortal(
-        <div
-          className="gantt-tooltip-wrapper"
-          style={{
-            left: `${tooltipPos.x}px`,
-            top: `${tooltipPos.y}px`,
-            transform: 'translate(-50%, -100%)'
-          }}
-        >
-          <StoryTooltip story={hoveredStory} />
+          {hoveredStory.blockedBy && hoveredStory.blockedBy.length > 0 && (
+            <div style={{ color: '#f87171', marginTop: '8px', fontSize: '12px' }}>
+              🚫 Blocked by: {hoveredStory.blockedBy.join(', ')}
+            </div>
+          )}
         </div>,
         document.body
       )}
@@ -954,355 +391,49 @@ function StorySegments({ epicKey }: StorySegmentsProps) {
   )
 }
 
+// --- Gantt Row ---
 interface GanttRowProps {
-  epic: EpicForecast
-  rangeStart: Date
-  totalDays: number
-  isExpanded: boolean
-  onToggle: () => void
-  showStories: boolean
-  storyForecast: StoryForecastResponse | null
+  epic: EpicForecast | undefined
+  stories: PlannedStory[]
+  globalWarnings: PlanningWarning[]
   dateRange: DateRange
   jiraBaseUrl: string
+  rowHeight: number
 }
 
-function GanttRow({ epic, rangeStart, totalDays, isExpanded, onToggle, showStories, storyForecast, dateRange, jiraBaseUrl }: GanttRowProps) {
-  const [showTooltip, setShowTooltip] = useState(false)
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
-  const tooltipTimeoutRef = useRef<number | null>(null)
-
-  const status = getEpicStatus(epic)
-  const progress = calculateEpicProgress(epic)
-  const { start: epicStart, end: epicEnd } = getEpicDateRange(epic)
+function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight }: GanttRowProps) {
+  const totalDays = daysBetween(dateRange.start, dateRange.end)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const todayOffset = daysBetween(rangeStart, today)
+  const todayOffset = daysBetween(dateRange.start, today)
   const todayPercent = (todayOffset / totalDays) * 100
 
-  const dueDate = parseDate(epic.dueDate)
-  const dueDateOffset = dueDate ? daysBetween(rangeStart, dueDate) : null
+  const dueDate = epic?.dueDate ? new Date(epic.dueDate) : null
+  const dueDateOffset = dueDate ? daysBetween(dateRange.start, dueDate) : null
   const dueDatePercent = dueDateOffset !== null ? (dueDateOffset / totalDays) * 100 : null
 
-  // Unified bar position
-  let barLeft = 0
-  let barWidth = 0
-  if (epicStart && epicEnd) {
-    const startOffset = daysBetween(rangeStart, epicStart)
-    const duration = daysBetween(epicStart, epicEnd) + 1
-    barLeft = (startOffset / totalDays) * 100
-    barWidth = (duration / totalDays) * 100
-  }
-
-  const handleMouseEnter = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltipPos({ x: rect.left, y: rect.top - 8 })
-    tooltipTimeoutRef.current = window.setTimeout(() => setShowTooltip(true), 300)
-  }
-
-  const handleMouseLeave = () => {
-    if (tooltipTimeoutRef.current) {
-      clearTimeout(tooltipTimeoutRef.current)
-    }
-    setShowTooltip(false)
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltipPos({ x: rect.left, y: rect.top - 8 })
-  }
-
   return (
-    <>
-      <div
-        className={`gantt-row ${isExpanded ? 'gantt-row-expanded' : ''}`}
-        onClick={onToggle}
-      >
-        <div className="gantt-row-content">
-          {/* Today line */}
-          {todayPercent >= 0 && todayPercent <= 100 && (
-            <div className="gantt-today-line" style={{ left: `${todayPercent}%` }} />
-          )}
+    <div className="gantt-row" style={{ height: `${rowHeight}px` }}>
+      <div className="gantt-row-content" style={{ position: 'relative', padding: '4px 0' }}>
+        {/* Today line */}
+        {todayPercent >= 0 && todayPercent <= 100 && (
+          <div className="gantt-today-line" style={{ left: `${todayPercent}%` }} />
+        )}
 
-          {/* Due date line */}
-          {dueDatePercent !== null && dueDatePercent >= 0 && dueDatePercent <= 100 && (
-            <div
-              className="gantt-due-line"
-              style={{ left: `${dueDatePercent}%` }}
-              title={`Due: ${formatDateFull(dueDate!)}`}
-            />
-          )}
+        {/* Due date line */}
+        {dueDatePercent !== null && dueDatePercent >= 0 && dueDatePercent <= 100 && (
+          <div className="gantt-due-line" style={{ left: `${dueDatePercent}%` }} />
+        )}
 
-          {/* Unified epic bar */}
-          {epicStart && epicEnd && (
-            <div
-              className={`gantt-unified-bar ${showStories ? 'gantt-unified-bar-with-stories' : ''}`}
-              style={{
-                left: `${barLeft}%`,
-                width: `${Math.max(barWidth, 0.5)}%`,
-                backgroundColor: showStories ? 'transparent' : getStatusColor(status)
-              }}
-              onMouseEnter={showStories ? undefined : handleMouseEnter}
-              onMouseLeave={showStories ? undefined : handleMouseLeave}
-              onMouseMove={showStories ? undefined : handleMouseMove}
-            >
-              {/* Story segments (when enabled) */}
-              {showStories ? (
-                storyForecast ? (
-                  <StoryScheduleBars
-                    epicKey={epic.epicKey}
-                    storyForecast={storyForecast}
-                    dateRange={dateRange}
-                    jiraBaseUrl={jiraBaseUrl}
-                  />
-                ) : (
-                  <StorySegments epicKey={epic.epicKey} />
-                )
-              ) : (
-                <>
-                  {/* Progress fill */}
-                  <div
-                    className="gantt-unified-progress"
-                    style={{ width: `${progress}%` }}
-                  />
-                  {/* Label */}
-                  <span className="gantt-unified-label">
-                    {progress > 0 && `${progress}%`}
-                  </span>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Tooltip */}
-          {showTooltip && (
-            <div
-              className="gantt-tooltip-wrapper"
-              style={{
-                left: `${tooltipPos.x}px`,
-                top: `${tooltipPos.y}px`,
-                transform: 'translateY(-100%)'
-              }}
-            >
-              <EpicTooltip epic={epic} progress={progress} />
-            </div>
-          )}
-        </div>
+        {/* Story bars */}
+        <StoryBars
+          stories={stories}
+          dateRange={dateRange}
+          jiraBaseUrl={jiraBaseUrl}
+          globalWarnings={globalWarnings}
+        />
       </div>
-
-      {/* Expanded phase bars */}
-      {isExpanded && (
-        <div className="gantt-row gantt-row-phases">
-          <div className="gantt-row-content">
-            {todayPercent >= 0 && todayPercent <= 100 && (
-              <div className="gantt-today-line" style={{ left: `${todayPercent}%` }} />
-            )}
-            <PhaseBar phase={epic.phaseSchedule.sa} role="sa" rangeStart={rangeStart} totalDays={totalDays} />
-            <PhaseBar phase={epic.phaseSchedule.dev} role="dev" rangeStart={rangeStart} totalDays={totalDays} />
-            <PhaseBar phase={epic.phaseSchedule.qa} role="qa" rangeStart={rangeStart} totalDays={totalDays} />
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-interface SummaryPanelProps {
-  epics: EpicForecast[]
-  wipStatus: WipStatus | null
-}
-
-function getWipLevel(current: number, limit: number): 'normal' | 'warning' | 'exceeded' {
-  if (current > limit) return 'exceeded'
-  if (current >= limit) return 'warning'  // At limit
-  if (limit > 0 && current / limit >= 0.8) return 'warning'  // 80%+ of limit
-  return 'normal'
-}
-
-function RoleWipBadge({ label, roleWip }: { label: string; roleWip: RoleWipStatus | null }) {
-  if (!roleWip) return null
-  const level = getWipLevel(roleWip.current, roleWip.limit)
-  return (
-    <span className={`summary-role-wip summary-role-wip-${level}`}>
-      {label}: {roleWip.current}/{roleWip.limit}
-    </span>
-  )
-}
-
-function SummaryPanel({ epics, wipStatus }: SummaryPanelProps) {
-  const stats = useMemo(() => {
-    let onTrack = 0
-    let atRisk = 0
-    let late = 0
-    let noDueDate = 0
-    let inQueue = 0
-
-    for (const epic of epics) {
-      const status = getEpicStatus(epic)
-      switch (status) {
-        case 'on-track': onTrack++; break
-        case 'at-risk': atRisk++; break
-        case 'late': late++; break
-        case 'no-due-date': noDueDate++; break
-      }
-      if (!epic.isWithinWip) {
-        inQueue++
-      }
-    }
-
-    return { onTrack, atRisk, late, noDueDate, inQueue, total: epics.length }
-  }, [epics])
-
-  const hasRoleWip = wipStatus?.sa || wipStatus?.dev || wipStatus?.qa
-
-  return (
-    <div className="timeline-summary">
-      <span className="summary-total">{stats.total} epics</span>
-      <span className="summary-separator">·</span>
-      <span className="summary-stat summary-on-track">{stats.onTrack} on track</span>
-      {stats.atRisk > 0 && (
-        <>
-          <span className="summary-separator">·</span>
-          <span className="summary-stat summary-at-risk">⚠️ {stats.atRisk} at risk</span>
-        </>
-      )}
-      {stats.late > 0 && (
-        <>
-          <span className="summary-separator">·</span>
-          <span className="summary-stat summary-late">🔴 {stats.late} late</span>
-        </>
-      )}
-      {wipStatus && (
-        <>
-          <span className="summary-separator">·</span>
-          <span className={`summary-stat summary-wip ${wipStatus.exceeded ? 'summary-wip-exceeded' : ''}`}>
-            WIP {wipStatus.current}/{wipStatus.limit}
-          </span>
-        </>
-      )}
-      {hasRoleWip && (
-        <>
-          <span className="summary-separator">·</span>
-          <span className="summary-role-wip-group">
-            <RoleWipBadge label="SA" roleWip={wipStatus?.sa ?? null} />
-            <RoleWipBadge label="DEV" roleWip={wipStatus?.dev ?? null} />
-            <RoleWipBadge label="QA" roleWip={wipStatus?.qa ?? null} />
-          </span>
-        </>
-      )}
-      {stats.inQueue > 0 && (
-        <>
-          <span className="summary-separator">·</span>
-          <span className="summary-stat summary-queue">⏳ {stats.inQueue} in queue</span>
-        </>
-      )}
-    </div>
-  )
-}
-
-interface WipInsight {
-  type: 'info' | 'warning' | 'critical'
-  message: string
-  recommendation?: string
-}
-
-interface WipInsightsPanelProps {
-  wipStatus: WipStatus | null
-  epics: EpicForecast[]
-}
-
-function WipInsightsPanel({ wipStatus, epics }: WipInsightsPanelProps) {
-  const insights = useMemo(() => {
-    const result: WipInsight[] = []
-
-    if (!wipStatus) return result
-
-    // Team WIP analysis
-    const teamUtilization = wipStatus.limit > 0 ? (wipStatus.current / wipStatus.limit) * 100 : 0
-
-    if (wipStatus.exceeded) {
-      result.push({
-        type: 'critical',
-        message: `Team WIP exceeded: ${wipStatus.current}/${wipStatus.limit} epics active`,
-        recommendation: 'Complete or pause some epics before starting new ones'
-      })
-    } else if (teamUtilization >= 100) {
-      result.push({
-        type: 'warning',
-        message: 'Team WIP at limit',
-        recommendation: 'New epics will wait in queue until active ones complete'
-      })
-    }
-
-    // Role-specific bottleneck detection
-    const roleAnalysis = [
-      { name: 'SA', status: wipStatus.sa },
-      { name: 'DEV', status: wipStatus.dev },
-      { name: 'QA', status: wipStatus.qa }
-    ]
-
-    const bottlenecks = roleAnalysis.filter(r => r.status && r.status.current >= r.status.limit)
-
-    if (bottlenecks.length > 0) {
-      const names = bottlenecks.map(b => b.name).join(', ')
-      result.push({
-        type: 'warning',
-        message: `Bottleneck detected: ${names} at capacity`,
-        recommendation: 'Consider adding resources or reducing parallel work in these phases'
-      })
-    }
-
-    // Queue analysis
-    const queuedEpics = epics.filter(e => !e.isWithinWip)
-    if (queuedEpics.length > 3) {
-      result.push({
-        type: 'info',
-        message: `${queuedEpics.length} epics waiting in queue`,
-        recommendation: 'Consider increasing WIP limit or focusing on completing active work'
-      })
-    }
-
-    // Phase wait analysis
-    const epicsWithPhaseWait = epics.filter(e =>
-      e.phaseWaitInfo && (e.phaseWaitInfo.sa?.waiting || e.phaseWaitInfo.dev?.waiting || e.phaseWaitInfo.qa?.waiting)
-    )
-    if (epicsWithPhaseWait.length > 0) {
-      result.push({
-        type: 'info',
-        message: `${epicsWithPhaseWait.length} epic(s) waiting for phase capacity`,
-        recommendation: 'Role WIP limits are creating delays between phases'
-      })
-    }
-
-    // Healthy state
-    if (result.length === 0 && wipStatus.current > 0) {
-      result.push({
-        type: 'info',
-        message: 'WIP is healthy',
-        recommendation: `Utilizing ${Math.round(teamUtilization)}% of team capacity`
-      })
-    }
-
-    return result
-  }, [wipStatus, epics])
-
-  if (insights.length === 0) return null
-
-  return (
-    <div className="wip-insights-panel">
-      {insights.map((insight, i) => (
-        <div key={i} className={`wip-insight wip-insight-${insight.type}`}>
-          <span className="wip-insight-icon">
-            {insight.type === 'critical' ? '🔴' : insight.type === 'warning' ? '⚠️' : 'ℹ️'}
-          </span>
-          <div className="wip-insight-content">
-            <span className="wip-insight-message">{insight.message}</span>
-            {insight.recommendation && (
-              <span className="wip-insight-recommendation">{insight.recommendation}</span>
-            )}
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -1313,15 +444,14 @@ export function TimelinePage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
+  const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [expandedEpics, setExpandedEpics] = useState<Set<string>>(new Set())
-  const [showStories, setShowStories] = useState(false)
-  const [storyForecasts, setStoryForecasts] = useState<Map<string, StoryForecastResponse>>(new Map())
 
   const chartRef = useRef<HTMLDivElement>(null)
 
+  // Load teams
   useEffect(() => {
     teamsApi.getAll()
       .then(data => {
@@ -1334,128 +464,74 @@ export function TimelinePage() {
       .catch(err => setError('Failed to load teams: ' + err.message))
   }, [])
 
+  // Load data when team changes
   useEffect(() => {
     if (!selectedTeamId) return
 
     setLoading(true)
     setError(null)
-    setExpandedEpics(new Set())
 
-    getForecast(selectedTeamId)
-      .then(data => {
-        setForecast(data)
+    Promise.all([
+      getForecast(selectedTeamId),
+      getUnifiedPlanning(selectedTeamId)
+    ])
+      .then(([forecastData, planData]) => {
+        setForecast(forecastData)
+        setUnifiedPlan(planData)
         setLoading(false)
       })
       .catch(err => {
-        setError('Failed to load forecast: ' + err.message)
+        setError('Failed to load data: ' + err.message)
         setLoading(false)
       })
   }, [selectedTeamId])
 
-  // Load story forecasts when showStories is enabled
+  // Auto-scroll to today
   useEffect(() => {
-    if (!showStories || !forecast || !selectedTeamId) {
-      setStoryForecasts(new Map())
-      return
-    }
+    if (!unifiedPlan || !chartRef.current) return
 
-    // Load story forecast for all epics with team
-    const loadForecasts = async () => {
-      const newForecasts = new Map<string, StoryForecastResponse>()
-
-      for (const epic of forecast.epics) {
-        try {
-          const storyForecast = await getStoryForecast(epic.epicKey, selectedTeamId)
-          newForecasts.set(epic.epicKey, storyForecast)
-        } catch (err) {
-          console.warn(`Failed to load story forecast for ${epic.epicKey}:`, err)
-        }
-      }
-
-      setStoryForecasts(newForecasts)
-    }
-
-    loadForecasts()
-  }, [showStories, forecast, selectedTeamId])
-
-  // Auto-scroll to today when data loads
-  useEffect(() => {
-    if (!forecast || !chartRef.current) return
-
-    const dateRange = calculateDateRange(forecast)
+    const range = calculateDateRange(unifiedPlan, forecast)
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    const totalDays = daysBetween(dateRange.start, dateRange.end)
-    const todayOffset = daysBetween(dateRange.start, today)
+    const totalDays = daysBetween(range.start, range.end)
+    const todayOffset = daysBetween(range.start, today)
     const todayPercent = todayOffset / totalDays
 
-    // Scroll to show today at ~30% from left
-    const scrollTarget = Math.max(0, (todayPercent - 0.3) * chartRef.current.scrollWidth)
+    const scrollTarget = Math.max(0, (todayPercent - 0.2) * chartRef.current.scrollWidth)
     chartRef.current.scrollLeft = scrollTarget
-  }, [forecast])
-
-  // Track story forecast keys for dependency
-  const storyForecastKeys = useMemo(() =>
-    Array.from(storyForecasts.keys()).join(','),
-    [storyForecasts]
-  )
+  }, [unifiedPlan, forecast])
 
   const dateRange = useMemo(() => {
-    if (!forecast) return null
-    const epicRange = calculateDateRange(forecast)
-
-    // If showing stories, extend range to include all story dates
-    if (showStories && storyForecasts.size > 0) {
-      let minDate = epicRange.start
-      let maxDate = epicRange.end
-
-      storyForecasts.forEach(storyForecast => {
-        storyForecast.stories.forEach(story => {
-          const storyStart = new Date(story.startDate)
-          const storyEnd = new Date(story.endDate)
-          if (storyStart < minDate) minDate = storyStart
-          if (storyEnd > maxDate) maxDate = storyEnd
-        })
-      })
-
-      return { start: minDate, end: maxDate }
-    }
-
-    return epicRange
-  }, [forecast, showStories, storyForecastKeys, storyForecasts])
+    return calculateDateRange(unifiedPlan, forecast)
+  }, [unifiedPlan, forecast])
 
   const headers = useMemo(() => {
-    if (!dateRange) return []
     return generateTimelineHeaders(dateRange, zoom)
   }, [dateRange, zoom])
 
-  const totalDays = dateRange ? daysBetween(dateRange.start, dateRange.end) : 0
+  // Get epics from unified plan
+  const epics = useMemo(() => {
+    if (!unifiedPlan) return []
+    return unifiedPlan.epics
+  }, [unifiedPlan])
 
-  // Filter epics that have schedule data
-  const scheduledEpics = useMemo(() => {
-    if (!forecast) return []
-    return forecast.epics.filter(epic => {
-      const { sa, dev, qa } = epic.phaseSchedule
-      return sa.startDate || dev.startDate || qa.startDate
-    })
+  // Match with forecast for status info
+  const epicForecasts = useMemo(() => {
+    if (!forecast) return new Map<string, EpicForecast>()
+    return new Map(forecast.epics.map(e => [e.epicKey, e]))
   }, [forecast])
 
-  const toggleEpic = useCallback((epicKey: string) => {
-    setExpandedEpics(prev => {
-      const next = new Set(prev)
-      if (next.has(epicKey)) {
-        next.delete(epicKey)
-      } else {
-        next.add(epicKey)
-      }
-      return next
-    })
-  }, [])
+  // Calculate row heights for each epic
+  const rowHeights = useMemo(() => {
+    const heights = new Map<string, number>()
+    for (const epic of epics) {
+      heights.set(epic.epicKey, calculateRowHeight(epic.stories))
+    }
+    return heights
+  }, [epics])
 
-  const jiraBaseUrl = forecast?.epics[0]?.epicKey
-    ? `https://${window.location.hostname.includes('localhost') ? 'jira.atlassian.com' : window.location.hostname}/browse/`
-    : 'https://jira.atlassian.com/browse/'
+  const jiraBaseUrl = 'https://krasivye.atlassian.net/browse/'
 
   return (
     <main className="main-content">
@@ -1465,13 +541,13 @@ export function TimelinePage() {
 
       <div className="timeline-controls">
         <div className="filter-group">
-          <label className="filter-label">Team</label>
+          <label className="filter-label">Команда</label>
           <select
             className="filter-input"
             value={selectedTeamId ?? ''}
             onChange={e => setSelectedTeamId(Number(e.target.value))}
           >
-            <option value="" disabled>Select team...</option>
+            <option value="" disabled>Выберите команду...</option>
             {teams.map(team => (
               <option key={team.id} value={team.id}>{team.name}</option>
             ))}
@@ -1479,137 +555,93 @@ export function TimelinePage() {
         </div>
 
         <div className="filter-group">
-          <label className="filter-label">Zoom</label>
+          <label className="filter-label">Масштаб</label>
           <select
             className="filter-input"
             value={zoom}
             onChange={e => setZoom(e.target.value as ZoomLevel)}
           >
-            <option value="day">Day</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
+            <option value="day">День</option>
+            <option value="week">Неделя</option>
+            <option value="month">Месяц</option>
           </select>
         </div>
 
         <div className="timeline-legend">
-          {showStories ? (
-            <>
-              <span className="legend-item legend-story-todo">To Do</span>
-              <span className="legend-item legend-story-progress">In Progress</span>
-              <span className="legend-item legend-story-done">Done</span>
-              <span className="legend-item legend-story-no-estimate">No Estimate</span>
-            </>
-          ) : (
-            <>
-              <span className="legend-item legend-on-track">On Track</span>
-              <span className="legend-item legend-at-risk">At Risk</span>
-              <span className="legend-item legend-late">Late</span>
-            </>
-          )}
-          <span className="legend-item legend-today">Today</span>
+          <span className="legend-item legend-phase-sa">SA</span>
+          <span className="legend-item legend-phase-dev">DEV</span>
+          <span className="legend-item legend-phase-qa">QA</span>
+          <span className="legend-item legend-today">Сегодня</span>
           <span className="legend-item legend-due">Due Date</span>
         </div>
-
-        <button
-          className={`timeline-stories-btn ${showStories ? 'timeline-stories-btn-active' : ''}`}
-          onClick={() => setShowStories(!showStories)}
-          title={showStories ? 'Hide story segments' : 'Show story segments inside epic bars'}
-        >
-          {showStories ? '📊 Stories ON' : '📊 Stories'}
-        </button>
       </div>
 
-      {loading && <div className="loading">Loading forecast...</div>}
+      {loading && <div className="loading">Загрузка...</div>}
       {error && <div className="error">{error}</div>}
 
-      {!loading && !error && selectedTeamId && forecast && scheduledEpics.length === 0 && (
-        <div className="empty">No epics with schedule data found. Make sure epics have estimates.</div>
+      {!loading && !error && epics.length === 0 && (
+        <div className="empty">Нет эпиков с данными для планирования</div>
       )}
 
-      {!loading && !error && forecast && scheduledEpics.length > 0 && dateRange && (
-        <>
-          <SummaryPanel epics={scheduledEpics} wipStatus={forecast?.wipStatus ?? null} />
-          <WipInsightsPanel wipStatus={forecast?.wipStatus ?? null} epics={scheduledEpics} />
+      {!loading && !error && epics.length > 0 && (
+        <div className="gantt-container">
+          <div className="gantt-labels">
+            <div className="gantt-labels-header">Эпик</div>
+            {epics.map(epic => {
+              const epicForecast = epicForecasts.get(epic.epicKey)
+              const status = epicForecast ? getEpicStatus(epicForecast) : 'no-due-date'
+              const statusIcon = getStatusIcon(status)
+              const rowHeight = rowHeights.get(epic.epicKey) || MIN_ROW_HEIGHT
 
-          <div className="gantt-container">
-            <div className="gantt-labels">
-              <div className="gantt-labels-header">Epic</div>
-              {scheduledEpics.map(epic => {
-                const status = getEpicStatus(epic)
-                const statusIcon = getStatusIcon(status)
-                const isExpanded = expandedEpics.has(epic.epicKey)
-                const isQueued = !epic.isWithinWip
-
-                return (
-                  <div key={epic.epicKey}>
-                    <div
-                      className={`gantt-label-row ${isExpanded ? 'gantt-label-row-expanded' : ''} ${isQueued ? 'gantt-label-row-queued' : ''}`}
-                      onClick={() => toggleEpic(epic.epicKey)}
+              return (
+                <div key={epic.epicKey} className="gantt-label-row" style={{ height: `${rowHeight}px` }}>
+                  <div className="gantt-label-header">
+                    <a
+                      href={`${jiraBaseUrl}${epic.epicKey}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="issue-key"
                     >
-                      <div className="gantt-label-header">
-                        <span className="gantt-expand-icon">{isExpanded ? '▼' : '▶'}</span>
-                        {isQueued && <span className="gantt-queue-badge">#{epic.queuePosition}</span>}
-                        <a
-                          href={`${jiraBaseUrl}${epic.epicKey}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="issue-key"
-                          onClick={e => e.stopPropagation()}
-                        >
-                          {epic.epicKey}
-                        </a>
-                        {statusIcon && <span className="gantt-status-icon">{statusIcon}</span>}
-                      </div>
-                      <span className="gantt-label-title" title={epic.summary}>
-                        {epic.summary}
-                      </span>
-                    </div>
-                    {isExpanded && (
-                      <div className="gantt-label-row gantt-label-phases">
-                        <div className="gantt-phase-labels">
-                          <span className="gantt-phase-tag gantt-phase-tag-sa">SA</span>
-                          <span className="gantt-phase-tag gantt-phase-tag-dev">DEV</span>
-                          <span className="gantt-phase-tag gantt-phase-tag-qa">QA</span>
-                        </div>
-                      </div>
-                    )}
+                      {epic.epicKey}
+                    </a>
+                    {statusIcon && <span className="gantt-status-icon">{statusIcon}</span>}
                   </div>
+                  <span className="gantt-label-title" title={epic.summary}>
+                    {epic.summary}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="gantt-chart" ref={chartRef}>
+            <div className="gantt-header">
+              {headers.map((header, i) => (
+                <div key={i} className="gantt-header-cell">
+                  {header.label}
+                </div>
+              ))}
+            </div>
+
+            <div className="gantt-body">
+              {epics.map(epic => {
+                const epicForecast = epicForecasts.get(epic.epicKey)
+                const rowHeight = rowHeights.get(epic.epicKey) || MIN_ROW_HEIGHT
+                return (
+                  <GanttRow
+                    key={epic.epicKey}
+                    epic={epicForecast}
+                    stories={epic.stories}
+                    globalWarnings={unifiedPlan?.warnings || []}
+                    dateRange={dateRange}
+                    jiraBaseUrl={jiraBaseUrl}
+                    rowHeight={rowHeight}
+                  />
                 )
               })}
             </div>
-
-            <div className="gantt-chart" ref={chartRef}>
-              <div className="gantt-header">
-                {headers.map((header, i) => (
-                  <div key={i} className="gantt-header-cell">
-                    {header.label}
-                  </div>
-                ))}
-              </div>
-
-              <div className="gantt-body">
-                {scheduledEpics.map(epic => (
-                  <GanttRow
-                    key={epic.epicKey}
-                    epic={epic}
-                    rangeStart={dateRange.start}
-                    totalDays={totalDays}
-                    isExpanded={expandedEpics.has(epic.epicKey)}
-                    onToggle={() => toggleEpic(epic.epicKey)}
-                    showStories={showStories}
-                    storyForecast={storyForecasts.get(epic.epicKey) || null}
-                    dateRange={dateRange}
-                    jiraBaseUrl={jiraBaseUrl}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
-
-          <div className="timeline-hint">
-            Click on an epic to expand and see SA/DEV/QA phases
-          </div>
-        </>
+        </div>
       )}
     </main>
   )

@@ -178,6 +178,7 @@ public class JiraIssue {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class JiraTimeTracking {
         private Long originalEstimateSeconds;
+        private Long remainingEstimateSeconds;
         private Long timeSpentSeconds;
 
         public Long getOriginalEstimateSeconds() {
@@ -186,6 +187,14 @@ public class JiraIssue {
 
         public void setOriginalEstimateSeconds(Long originalEstimateSeconds) {
             this.originalEstimateSeconds = originalEstimateSeconds;
+        }
+
+        public Long getRemainingEstimateSeconds() {
+            return remainingEstimateSeconds;
+        }
+
+        public void setRemainingEstimateSeconds(Long remainingEstimateSeconds) {
+            this.remainingEstimateSeconds = remainingEstimateSeconds;
         }
 
         public Long getTimeSpentSeconds() {

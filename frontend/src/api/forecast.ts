@@ -254,3 +254,115 @@ export async function getStoryForecast(epicKey: string, teamId: number): Promise
   )
   return response.data
 }
+
+// ==================== Unified Planning API ====================
+
+/**
+ * Phase schedule for a single phase within a story.
+ */
+export interface UnifiedPhaseSchedule {
+  assigneeAccountId: string | null
+  assigneeDisplayName: string | null
+  startDate: string | null
+  endDate: string | null
+  hours: number
+  noCapacity: boolean
+}
+
+/**
+ * Phase schedules for a story (SA -> DEV -> QA pipeline).
+ */
+export interface PlannedPhases {
+  sa: UnifiedPhaseSchedule | null
+  dev: UnifiedPhaseSchedule | null
+  qa: UnifiedPhaseSchedule | null
+}
+
+/**
+ * Warning types for planning issues.
+ */
+export type WarningType = 'NO_ESTIMATE' | 'NO_CAPACITY' | 'CIRCULAR_DEPENDENCY' | 'FLAGGED'
+
+/**
+ * Planning warning.
+ */
+export interface PlanningWarning {
+  issueKey: string
+  type: WarningType
+  message: string
+}
+
+/**
+ * Planned story with phase schedules.
+ */
+export interface PlannedStory {
+  storyKey: string
+  summary: string
+  autoScore: number | null
+  status: string
+  startDate: string | null
+  endDate: string | null
+  phases: PlannedPhases
+  blockedBy: string[]
+  warnings: PlanningWarning[]
+}
+
+/**
+ * Aggregated phase data for epic.
+ */
+export interface PhaseAggregation {
+  saHours: number
+  devHours: number
+  qaHours: number
+  saStartDate: string | null
+  saEndDate: string | null
+  devStartDate: string | null
+  devEndDate: string | null
+  qaStartDate: string | null
+  qaEndDate: string | null
+}
+
+/**
+ * Planned epic with all its stories.
+ */
+export interface PlannedEpic {
+  epicKey: string
+  summary: string
+  autoScore: number
+  startDate: string | null
+  endDate: string | null
+  stories: PlannedStory[]
+  phaseAggregation: PhaseAggregation
+}
+
+/**
+ * Assignee utilization statistics.
+ */
+export interface UnifiedAssigneeUtilization {
+  displayName: string
+  role: string
+  totalHoursAssigned: number
+  effectiveHoursPerDay: number
+  dailyLoad: Record<string, number>
+}
+
+/**
+ * Result of unified planning algorithm.
+ */
+export interface UnifiedPlanningResult {
+  teamId: number
+  planningDate: string
+  epics: PlannedEpic[]
+  warnings: PlanningWarning[]
+  assigneeUtilization: Record<string, UnifiedAssigneeUtilization>
+}
+
+/**
+ * Получает unified planning для команды.
+ */
+export async function getUnifiedPlanning(teamId: number): Promise<UnifiedPlanningResult> {
+  const response = await axios.get<UnifiedPlanningResult>(
+    `/api/planning/unified?teamId=${teamId}`
+  )
+  return response.data
+}
