@@ -872,7 +872,6 @@ interface BoardRowProps {
 function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped, parentEpicKey, onStoryDragStart, onStoryDragOver, onStoryDrop, onStoryDragEnd, isStoryDragging, isStoryDragOver, isStoryJustDropped, isAnyDragging, isDragInvalid }: BoardRowProps) {
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
-  const autoScoreTooltip = forecast ? `AutoScore: ${forecast.autoScore.toFixed(1)}` : undefined
 
   const dragEffects = isStoryRow && isStoryDragging ? 'dragging' : (isDragging ? 'dragging' : '')
   const dragOverEffects = isStoryRow && isStoryDragOver ? 'drag-over' : (isDragOver ? 'drag-over' : '')
@@ -913,7 +912,6 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         isStoryRow && canReorder && onStoryDragEnd ? onStoryDragEnd :
         undefined
       }
-      title={isEpicRow ? autoScoreTooltip : undefined}
     >
       <td className="cell-expander">
         {hasChildren ? (
