@@ -182,6 +182,21 @@ public class ForecastController {
                             ? new RoleBreakdown(qaEstimate > 0 ? qaEstimate : null, qaLogged > 0 ? qaLogged : null)
                             : null;
 
+                    // Calculate expected done date based on remaining work
+                    LocalDate expectedDone = null;
+                    if (totalEstimate != null && totalEstimate > 0) {
+                        long remainingSeconds = totalEstimate - (totalSpent != null ? totalSpent : 0);
+                        if (remainingSeconds > 0) {
+                            // Simple calculation: remaining hours / 8 hours per day
+                            double remainingHours = remainingSeconds / 3600.0;
+                            int workDays = (int) Math.ceil(remainingHours / 8.0);
+                            expectedDone = LocalDate.now().plusDays(workDays);
+                        } else {
+                            // Already completed - use today
+                            expectedDone = LocalDate.now();
+                        }
+                    }
+
                     return new StoryInfo(
                             issue.getIssueKey(),
                             issue.getSummary(),
@@ -189,7 +204,7 @@ public class ForecastController {
                             issue.getIssueType(),
                             null, // assignee - TODO: добавить когда будет синкаться
                             null, // startDate - TODO: добавить когда будет синкаться
-                            null, // endDate - TODO: вычислять или брать из Jira
+                            expectedDone, // расчетная дата завершения
                             totalEstimate,
                             totalSpent,
                             StoryInfo.determinePhase(issue.getStatus(), issue.getIssueType()),

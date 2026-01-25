@@ -113,6 +113,34 @@
 
 **Результат:** Stories теперь отображаются в одинаковом порядке (по убыванию приоритета) на Board и Timeline, что обеспечивает согласованность UI и упрощает планирование.
 
+### 2026-01-25: Expected Done для stories
+
+**Проблема:** В колонке Expected Done для stories отображался "--" вместо расчетной даты завершения.
+
+**Реализация:**
+1. **Backend: расчет expectedDone для stories**
+   - `BoardNode.java` - добавлено поле `LocalDate expectedDone` для stories
+   - `BoardService.mapToNode()` - рассчитывается expectedDone на основе оставшегося времени
+   - Формула: `remainingDays = ceil((estimate - spent) / 8 hours)`
+   - Если работа завершена (spent >= estimate), то expectedDone = today
+
+2. **Frontend: отображение expectedDone**
+   - Добавлена компонента `StoryExpectedDoneCell` для простого отображения даты
+   - `BoardNode` interface - добавлено поле `expectedDone: string | null`
+   - `BoardRow` - использует `StoryExpectedDoneCell` для stories вместо "--"
+   - Формат даты: "27 янв" (локализация ru-RU)
+
+3. **API /api/planning/epics/{epicKey}/stories**
+   - `StoryInfo` DTO теперь содержит `endDate` (расчетная дата завершения)
+   - Используется тот же алгоритм расчета что и в BoardService
+
+**Примеры:**
+- Story с оценкой 10 часов и 0 logged → expectedDone = today + 2 дня
+- Story с оценкой 8 часов и 3 logged → expectedDone = today + 1 день
+- Story с оценкой 5 часов и 5 logged → expectedDone = today (завершена)
+
+**Результат:** Stories теперь показывают расчетную дату завершения в колонке Expected Done, что помогает в планировании и отслеживании прогресса.
+
 ---
 
 ### 2026-01-23: Jira API cursor-based pagination

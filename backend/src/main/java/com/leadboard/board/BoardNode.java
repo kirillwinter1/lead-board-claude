@@ -3,6 +3,7 @@ package com.leadboard.board;
 import com.leadboard.quality.DataQualityViolation;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class BoardNode {
     private Boolean flagged; // Impediment flag (Story only)
     private List<String> blocks; // Stories blocked by this story (Story only)
     private List<String> blockedBy; // Stories blocking this story (Story only)
+    private LocalDate expectedDone; // Expected completion date (Story only, calculated)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
@@ -209,6 +211,14 @@ public class BoardNode {
 
     public void setBlockedBy(List<String> blockedBy) {
         this.blockedBy = blockedBy;
+    }
+
+    public LocalDate getExpectedDone() {
+        return expectedDone;
+    }
+
+    public void setExpectedDone(LocalDate expectedDone) {
+        this.expectedDone = expectedDone;
     }
 
     public List<DataQualityViolation> getAlerts() {

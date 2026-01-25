@@ -94,6 +94,7 @@ interface BoardNode {
   flagged: boolean | null
   blockedBy: string[] | null
   blocks: string[] | null
+  expectedDone: string | null
   children: BoardNode[]
 }
 
@@ -574,8 +575,25 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`status-badge ${statusClass}`}>{status}</span>
 }
 
+// Simple Expected Done cell for stories (without forecast data)
+function StoryExpectedDoneCell({ endDate }: { endDate: string | null }) {
+  if (!endDate) {
+    return <span className="expected-done-empty">--</span>
+  }
 
-// Expected Done cell with confidence indicator and detailed tooltip
+  const formatDate = (dateStr: string): string => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+  }
+
+  return (
+    <div className="expected-done-cell">
+      <span className="expected-done-date">{formatDate(endDate)}</span>
+    </div>
+  )
+}
+
+// Expected Done cell with confidence indicator and detailed tooltip (for Epics)
 interface ExpectedDoneCellProps {
   forecast: EpicForecast | null
 }
@@ -965,7 +983,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         {isEpic(node.issueType) ? (
           <ExpectedDoneCell forecast={forecast} />
         ) : (
-          <span className="expected-done-empty">--</span>
+          <StoryExpectedDoneCell endDate={node.expectedDone} />
         )}
       </td>
       <td className="cell-progress">

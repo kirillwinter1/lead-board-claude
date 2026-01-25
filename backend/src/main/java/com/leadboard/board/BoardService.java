@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -287,6 +288,22 @@ public class BoardService {
             node.setFlagged(entity.getFlagged());
             node.setBlocks(entity.getBlocks());
             node.setBlockedBy(entity.getIsBlockedBy());
+
+            // Calculate expected done date based on remaining work
+            Long estimate = entity.getOriginalEstimateSeconds();
+            Long spent = entity.getTimeSpentSeconds();
+            if (estimate != null && estimate > 0) {
+                long remainingSeconds = estimate - (spent != null ? spent : 0);
+                if (remainingSeconds > 0) {
+                    // Simple calculation: remaining hours / 8 hours per day
+                    double remainingHours = remainingSeconds / 3600.0;
+                    int workDays = (int) Math.ceil(remainingHours / 8.0);
+                    node.setExpectedDone(LocalDate.now().plusDays(workDays));
+                } else {
+                    // Already completed
+                    node.setExpectedDone(LocalDate.now());
+                }
+            }
         }
 
         return node;
