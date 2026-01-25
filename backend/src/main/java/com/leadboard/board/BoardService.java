@@ -171,6 +171,29 @@ public class BoardService {
             StatusMappingConfig statusMapping = statusMappingService.getDefaultConfig();
             addDataQualityAlerts(filteredEpics, stories, bugs, subtasks, issueMap, epicMap, storyMap, statusMapping);
 
+            // Sort children (stories/bugs) within each epic by autoScore (descending)
+            for (BoardNode epic : epicMap.values()) {
+                if (!epic.getChildren().isEmpty()) {
+                    epic.getChildren().sort((a, b) -> {
+                        // Stories and bugs with autoScore should be sorted
+                        BigDecimal scoreA = a.getAutoScore();
+                        BigDecimal scoreB = b.getAutoScore();
+
+                        // If both have scores, compare (descending)
+                        if (scoreA != null && scoreB != null) {
+                            return scoreB.compareTo(scoreA);
+                        }
+
+                        // Stories with scores come before those without
+                        if (scoreA != null) return -1;
+                        if (scoreB != null) return 1;
+
+                        // Both null - maintain original order
+                        return 0;
+                    });
+                }
+            }
+
             // Apply pagination
             List<BoardNode> items = new ArrayList<>(epicMap.values());
             int total = items.size();
