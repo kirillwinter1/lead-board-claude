@@ -28,6 +28,7 @@
 | F19. Story AutoScore & Prioritization | ✅ Готово | 2026-01-25 |
 | F20. Story-Level Planning (Assignee Capacity) | ✅ Готово | 2026-01-25 |
 | F21. Unified Planning Algorithm | 🚧 В работе (backend + frontend готов) | 2026-01-25 |
+| F22. Team Metrics | ✅ Готово | 2026-01-26 |
 
 ### Документация фич
 
@@ -38,6 +39,7 @@
 | F19. Story AutoScore & Prioritization | [F19_STORY_AUTOSCORE.md](F19_STORY_AUTOSCORE.md) | - |
 | F20. Story-Level Planning | [F20_STORY_FORECAST.md](F20_STORY_FORECAST.md) | - |
 | F21. Unified Planning Algorithm | [F21_UNIFIED_PLANNING.md](F21_UNIFIED_PLANNING.md) | - |
+| F22. Team Metrics | [F22_TEAM_METRICS.md](F22_TEAM_METRICS.md) | - |
 
 ### Будущие фичи
 

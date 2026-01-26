@@ -4,6 +4,7 @@ import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
+import com.leadboard.metrics.service.StatusChangelogService;
 import com.leadboard.planning.AutoScoreService;
 import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
@@ -37,6 +38,7 @@ public class SyncService {
     private final TeamRepository teamRepository;
     private final AutoScoreService autoScoreService;
     private final StoryAutoScoreService storyAutoScoreService;
+    private final StatusChangelogService statusChangelogService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
@@ -44,7 +46,8 @@ public class SyncService {
                        JiraSyncStateRepository syncStateRepository,
                        TeamRepository teamRepository,
                        AutoScoreService autoScoreService,
-                       StoryAutoScoreService storyAutoScoreService) {
+                       StoryAutoScoreService storyAutoScoreService,
+                       StatusChangelogService statusChangelogService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
@@ -52,6 +55,7 @@ public class SyncService {
         this.teamRepository = teamRepository;
         this.autoScoreService = autoScoreService;
         this.storyAutoScoreService = storyAutoScoreService;
+        this.statusChangelogService = statusChangelogService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -189,8 +193,12 @@ public class SyncService {
     }
 
     private void saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
-        JiraIssueEntity entity = issueRepository.findByIssueKey(jiraIssue.getKey())
-                .orElse(new JiraIssueEntity());
+        JiraIssueEntity existing = issueRepository.findByIssueKey(jiraIssue.getKey())
+                .orElse(null);
+        JiraIssueEntity entity = existing != null ? existing : new JiraIssueEntity();
+
+        // Store previous status for changelog detection
+        String previousStatus = existing != null ? existing.getStatus() : null;
 
         // Preserve local Lead Board data that survives sync
         BigDecimal savedRoughEstimateSaDays = entity.getRoughEstimateSaDays();
@@ -201,6 +209,7 @@ public class SyncService {
         Integer savedManualPriorityBoost = entity.getManualPriorityBoost();
         BigDecimal savedAutoScore = entity.getAutoScore();
         OffsetDateTime savedAutoScoreCalculatedAt = entity.getAutoScoreCalculatedAt();
+        OffsetDateTime savedDoneAt = entity.getDoneAt();
 
         entity.setIssueKey(jiraIssue.getKey());
         entity.setIssueId(jiraIssue.getId());
@@ -313,6 +322,21 @@ public class SyncService {
         entity.setManualPriorityBoost(savedManualPriorityBoost != null ? savedManualPriorityBoost : 0);
         entity.setAutoScore(savedAutoScore);
         entity.setAutoScoreCalculatedAt(savedAutoScoreCalculatedAt);
+        entity.setDoneAt(savedDoneAt);
+
+        // Detect status change and record to changelog
+        if (!java.util.Objects.equals(previousStatus, entity.getStatus())) {
+            // Create a temporary entity with old status for changelog detection
+            JiraIssueEntity previousEntity = existing != null ? new JiraIssueEntity() : null;
+            if (previousEntity != null) {
+                previousEntity.setStatus(previousStatus);
+                previousEntity.setUpdatedAt(existing.getUpdatedAt());
+            }
+            statusChangelogService.detectAndRecordStatusChange(previousEntity, entity);
+        }
+
+        // Update done_at based on current status
+        statusChangelogService.updateDoneAtIfNeeded(entity);
 
         issueRepository.save(entity);
     }

@@ -104,6 +104,9 @@ public class JiraIssueEntity {
     @Column(name = "started_at")
     private OffsetDateTime startedAt;
 
+    @Column(name = "done_at")
+    private OffsetDateTime doneAt;
+
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
 
@@ -395,6 +398,14 @@ public class JiraIssueEntity {
 
     public void setStartedAt(OffsetDateTime startedAt) {
         this.startedAt = startedAt;
+    }
+
+    public OffsetDateTime getDoneAt() {
+        return doneAt;
+    }
+
+    public void setDoneAt(OffsetDateTime doneAt) {
+        this.doneAt = doneAt;
     }
 
     // ==================== Derived/Computed Methods ====================

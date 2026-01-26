@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
+import { getMetricsSummary, TeamMetricsSummary } from '../api/metrics'
+import { MetricCard } from '../components/metrics/MetricCard'
+import { ThroughputChart } from '../components/metrics/ThroughputChart'
+import { TimeInStatusChart } from '../components/metrics/TimeInStatusChart'
+import { AssigneeTable } from '../components/metrics/AssigneeTable'
 
 // --- WIP History Chart Component ---
 
@@ -196,9 +201,25 @@ function WipHistoryChart({ teamId }: WipHistoryChartProps) {
 export function TeamMetricsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
+  const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
   const [loading, setLoading] = useState(true)
+  const [metricsLoading, setMetricsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [period, setPeriod] = useState(30) // days
+  const [issueType, setIssueType] = useState<string>('')
 
+  // Computed date range
+  const dateRange = useMemo(() => {
+    const to = new Date()
+    const from = new Date()
+    from.setDate(from.getDate() - period)
+    return {
+      from: from.toISOString().split('T')[0],
+      to: to.toISOString().split('T')[0]
+    }
+  }, [period])
+
+  // Load teams
   useEffect(() => {
     teamsApi.getAll()
       .then(data => {
@@ -214,6 +235,28 @@ export function TeamMetricsPage() {
         setLoading(false)
       })
   }, [])
+
+  // Load metrics when team or filters change
+  useEffect(() => {
+    if (!selectedTeamId) return
+
+    setMetricsLoading(true)
+    getMetricsSummary(
+      selectedTeamId,
+      dateRange.from,
+      dateRange.to,
+      issueType || undefined
+    )
+      .then(data => {
+        setMetrics(data)
+        setMetricsLoading(false)
+      })
+      .catch(err => {
+        console.error('Failed to load metrics:', err)
+        setMetrics(null)
+        setMetricsLoading(false)
+      })
+  }, [selectedTeamId, dateRange.from, dateRange.to, issueType])
 
   return (
     <main className="main-content">
@@ -235,6 +278,33 @@ export function TeamMetricsPage() {
             ))}
           </select>
         </div>
+        <div className="filter-group">
+          <label className="filter-label">Period</label>
+          <select
+            className="filter-input"
+            value={period}
+            onChange={e => setPeriod(Number(e.target.value))}
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={14}>Last 14 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={60}>Last 60 days</option>
+            <option value={90}>Last 90 days</option>
+          </select>
+        </div>
+        <div className="filter-group">
+          <label className="filter-label">Issue Type</label>
+          <select
+            className="filter-input"
+            value={issueType}
+            onChange={e => setIssueType(e.target.value)}
+          >
+            <option value="">All</option>
+            <option value="Epic">Epics</option>
+            <option value="Story">Stories</option>
+            <option value="Sub-task">Sub-tasks</option>
+          </select>
+        </div>
       </div>
 
       {loading && <div className="loading">Loading...</div>}
@@ -242,6 +312,48 @@ export function TeamMetricsPage() {
 
       {!loading && !error && selectedTeamId && (
         <div className="metrics-content">
+          {/* Summary Cards */}
+          {metricsLoading ? (
+            <div className="loading">Loading metrics...</div>
+          ) : metrics ? (
+            <>
+              <div className="metrics-summary-cards">
+                <MetricCard
+                  title="Throughput"
+                  value={metrics.throughput.total}
+                  subtitle={`${metrics.throughput.totalStories} stories, ${metrics.throughput.totalEpics} epics`}
+                />
+                <MetricCard
+                  title="Avg Lead Time"
+                  value={`${metrics.leadTime.avgDays.toFixed(1)} days`}
+                  subtitle={`Median: ${metrics.leadTime.medianDays.toFixed(1)} days | P90: ${metrics.leadTime.p90Days.toFixed(1)} days`}
+                />
+                <MetricCard
+                  title="Avg Cycle Time"
+                  value={`${metrics.cycleTime.avgDays.toFixed(1)} days`}
+                  subtitle={`Median: ${metrics.cycleTime.medianDays.toFixed(1)} days | P90: ${metrics.cycleTime.p90Days.toFixed(1)} days`}
+                />
+                <MetricCard
+                  title="Sample Size"
+                  value={metrics.leadTime.sampleSize}
+                  subtitle="completed issues"
+                />
+              </div>
+
+              {/* Throughput Chart */}
+              <ThroughputChart data={metrics.throughput.byPeriod} />
+
+              {/* Time in Status Chart */}
+              <TimeInStatusChart data={metrics.timeInStatuses} />
+
+              {/* By Assignee Table */}
+              <AssigneeTable data={metrics.byAssignee} />
+            </>
+          ) : (
+            <div className="chart-empty">No metrics data available for this period</div>
+          )}
+
+          {/* WIP History */}
           <WipHistoryChart teamId={selectedTeamId} />
         </div>
       )}
