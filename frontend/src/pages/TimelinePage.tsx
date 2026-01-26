@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, UnifiedPhaseSchedule, PlanningWarning } from '../api/forecast'
 
+// Issue type icons
+import storyIcon from '../icons/story.png'
+import bugIcon from '../icons/bug.png'
+import epicIcon from '../icons/epic.png'
+import subtaskIcon from '../icons/subtask.png'
+
 type ZoomLevel = 'day' | 'week' | 'month'
 type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
 
@@ -134,6 +140,42 @@ const PHASE_COLORS = {
   sa: '#85B8FF',   // Blue 300 — светло-синий
   dev: '#D6A0FB',  // Purple 300 — светло-фиолетовый
   qa: '#8BDBE5'    // Teal 300 — светло-бирюзовый
+}
+
+// Get issue type icon
+function getIssueTypeIcon(issueType: string | null): string {
+  if (!issueType) return storyIcon
+  const type = issueType.toLowerCase()
+  if (type.includes('bug')) return bugIcon
+  if (type.includes('epic')) return epicIcon
+  if (type.includes('sub') || type.includes('подзадача')) return subtaskIcon
+  return storyIcon
+}
+
+// Format seconds to hours
+function formatHours(seconds: number | null): string {
+  if (seconds === null || seconds === 0) return '0ч'
+  return `${Math.round(seconds / 3600)}ч`
+}
+
+// Check if phase has hours
+function phaseHasHours(phase: { hours?: number } | null | undefined): boolean {
+  return phase != null && phase.hours != null && phase.hours > 0
+}
+
+// Get status color based on status name
+function getStatusColor(status: string): { bg: string; text: string } {
+  const s = status.toLowerCase()
+  if (s.includes('done') || s.includes('готов') || s.includes('выполнен') || s.includes('закрыт')) {
+    return { bg: '#22c55e', text: '#fff' } // green
+  }
+  if (s.includes('progress') || s.includes('работ') || s.includes('review') || s.includes('ревью')) {
+    return { bg: '#3b82f6', text: '#fff' } // blue
+  }
+  if (s.includes('test') || s.includes('тест')) {
+    return { bg: '#8b5cf6', text: '#fff' } // purple
+  }
+  return { bg: '#6b7280', text: '#fff' } // gray for todo/backlog
 }
 
 // Allocate lanes for stories to avoid overlap
@@ -291,18 +333,24 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
               {renderPhaseSegment(story.phases?.dev ?? null, 'dev', startDate, duration)}
               {renderPhaseSegment(story.phases?.qa ?? null, 'qa', startDate, duration)}
 
-              <span style={{
-                position: 'absolute',
-                left: '50%',
-                top: '50%',
-                transform: 'translate(-50%, -50%)',
-                fontSize: '11px',
-                fontWeight: 600,
-                color: 'white',
-                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                zIndex: 2,
-                pointerEvents: 'none'
-              }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: 'white',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                  zIndex: 2,
+                  cursor: 'pointer'
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  window.open(`${jiraBaseUrl}${story.storyKey}`, '_blank')
+                }}
+              >
                 {storyNumber}{hasWarning ? ' ⚠' : ''}
               </span>
             </div>
@@ -312,6 +360,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
 
       {hoveredStory && createPortal(
         <div
+          className="timeline-tooltip"
           style={{
             position: 'fixed',
             left: tooltipPos.x,
@@ -319,68 +368,160 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
             transform: 'translate(-50%, -100%)',
             zIndex: 10000,
             pointerEvents: 'none',
-            background: 'rgba(0,0,0,0.9)',
-            borderRadius: '6px',
-            padding: '12px',
-            minWidth: '280px',
-            maxWidth: '400px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            background: 'rgba(0,0,0,0.92)',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            minWidth: '300px',
+            maxWidth: '420px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
             color: 'white',
             fontSize: '13px'
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: '8px' }}>
-            <a
-              href={`${jiraBaseUrl}${hoveredStory.storyKey}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ pointerEvents: 'auto', color: '#60a5fa', textDecoration: 'none' }}
+          {/* Header: Type icon + Key + AutoScore + Status */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img
+                src={getIssueTypeIcon(hoveredStory.issueType)}
+                alt={hoveredStory.issueType || 'Story'}
+                style={{ width: '16px', height: '16px' }}
+              />
+              <a
+                href={`${jiraBaseUrl}${hoveredStory.storyKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ pointerEvents: 'auto', color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}
+              >
+                {hoveredStory.storyKey}
+              </a>
+              {hoveredStory.autoScore !== null && (
+                <span style={{ color: '#9ca3af', fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
+              )}
+              {hoveredStory.flagged && (
+                <span style={{ color: '#f97316' }} title="Flagged">🚩</span>
+              )}
+            </div>
+            <span
+              style={{
+                fontSize: '11px',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                background: getStatusColor(hoveredStory.status).bg,
+                color: getStatusColor(hoveredStory.status).text,
+                fontWeight: 500
+              }}
             >
-              {hoveredStory.storyKey}
-            </a>
-            {hoveredStory.autoScore !== null && (
-              <span style={{ color: '#9ca3af', marginLeft: '8px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
-            )}
+              {hoveredStory.status}
+            </span>
           </div>
 
-          <div style={{ color: '#d1d5db', marginBottom: '8px', fontSize: '12px' }}>
+          {/* Summary */}
+          <div style={{ color: '#d1d5db', marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
             {hoveredStory.summary || 'No summary'}
           </div>
 
+          {/* Progress bar */}
+          {hoveredStory.totalEstimateSeconds && hoveredStory.totalEstimateSeconds > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
+                <span style={{ color: '#9ca3af' }}>Прогресс</span>
+                <span style={{ color: '#e5e7eb' }}>
+                  {formatHours(hoveredStory.totalLoggedSeconds)} / {formatHours(hoveredStory.totalEstimateSeconds)}
+                  <span style={{ color: '#9ca3af', marginLeft: '6px' }}>
+                    ({hoveredStory.progressPercent ?? 0}%)
+                  </span>
+                </span>
+              </div>
+              <div style={{ height: '6px', background: '#374151', borderRadius: '3px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${hoveredStory.progressPercent ?? 0}%`,
+                    background: (hoveredStory.progressPercent ?? 0) > 100 ? '#ef4444' : '#22c55e',
+                    borderRadius: '3px',
+                    transition: 'width 0.2s'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Dates */}
           {hoveredStory.startDate && hoveredStory.endDate && (
-            <div style={{ marginBottom: '8px', color: '#9ca3af' }}>
+            <div style={{ marginBottom: '10px', color: '#9ca3af', fontSize: '12px' }}>
               📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))}
             </div>
           )}
 
+          {/* Phase breakdown with progress */}
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <tbody>
-              {hoveredStory.phases?.sa && hoveredStory.phases.sa.hours > 0 && (
+              {(phaseHasHours(hoveredStory.phases?.sa) || hoveredStory.roleProgress?.sa) && (
                 <tr>
-                  <td style={{ padding: '2px 4px' }}><span style={{ color: PHASE_COLORS.sa }}>●</span> SA</td>
-                  <td style={{ padding: '2px 4px' }}>{hoveredStory.phases.sa.assigneeDisplayName || '-'}</td>
-                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>{hoveredStory.phases.sa.hours.toFixed(0)}ч</td>
+                  <td style={{ padding: '3px 4px' }}>
+                    <span style={{ color: PHASE_COLORS.sa }}>●</span> SA
+                    {hoveredStory.roleProgress?.sa?.completed && (
+                      <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{hoveredStory.phases?.sa?.assigneeDisplayName || '-'}</td>
+                  <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                    {hoveredStory.roleProgress?.sa ? (
+                      <span>
+                        {formatHours(hoveredStory.roleProgress.sa.loggedSeconds)}/{formatHours(hoveredStory.roleProgress.sa.estimateSeconds)}
+                      </span>
+                    ) : (
+                      <span>{hoveredStory.phases?.sa?.hours.toFixed(0)}ч</span>
+                    )}
+                  </td>
                 </tr>
               )}
-              {hoveredStory.phases?.dev && hoveredStory.phases.dev.hours > 0 && (
+              {(phaseHasHours(hoveredStory.phases?.dev) || hoveredStory.roleProgress?.dev) && (
                 <tr>
-                  <td style={{ padding: '2px 4px' }}><span style={{ color: PHASE_COLORS.dev }}>●</span> DEV</td>
-                  <td style={{ padding: '2px 4px' }}>{hoveredStory.phases.dev.assigneeDisplayName || '-'}</td>
-                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>{hoveredStory.phases.dev.hours.toFixed(0)}ч</td>
+                  <td style={{ padding: '3px 4px' }}>
+                    <span style={{ color: PHASE_COLORS.dev }}>●</span> DEV
+                    {hoveredStory.roleProgress?.dev?.completed && (
+                      <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{hoveredStory.phases?.dev?.assigneeDisplayName || '-'}</td>
+                  <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                    {hoveredStory.roleProgress?.dev ? (
+                      <span>
+                        {formatHours(hoveredStory.roleProgress.dev.loggedSeconds)}/{formatHours(hoveredStory.roleProgress.dev.estimateSeconds)}
+                      </span>
+                    ) : (
+                      <span>{hoveredStory.phases?.dev?.hours.toFixed(0)}ч</span>
+                    )}
+                  </td>
                 </tr>
               )}
-              {hoveredStory.phases?.qa && hoveredStory.phases.qa.hours > 0 && (
+              {(phaseHasHours(hoveredStory.phases?.qa) || hoveredStory.roleProgress?.qa) && (
                 <tr>
-                  <td style={{ padding: '2px 4px' }}><span style={{ color: PHASE_COLORS.qa }}>●</span> QA</td>
-                  <td style={{ padding: '2px 4px' }}>{hoveredStory.phases.qa.assigneeDisplayName || '-'}</td>
-                  <td style={{ padding: '2px 4px', textAlign: 'right' }}>{hoveredStory.phases.qa.hours.toFixed(0)}ч</td>
+                  <td style={{ padding: '3px 4px' }}>
+                    <span style={{ color: PHASE_COLORS.qa }}>●</span> QA
+                    {hoveredStory.roleProgress?.qa?.completed && (
+                      <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
+                    )}
+                  </td>
+                  <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{hoveredStory.phases?.qa?.assigneeDisplayName || '-'}</td>
+                  <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                    {hoveredStory.roleProgress?.qa ? (
+                      <span>
+                        {formatHours(hoveredStory.roleProgress.qa.loggedSeconds)}/{formatHours(hoveredStory.roleProgress.qa.estimateSeconds)}
+                      </span>
+                    ) : (
+                      <span>{hoveredStory.phases?.qa?.hours.toFixed(0)}ч</span>
+                    )}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
 
+          {/* Blocked by */}
           {hoveredStory.blockedBy && hoveredStory.blockedBy.length > 0 && (
-            <div style={{ color: '#f87171', marginTop: '8px', fontSize: '12px' }}>
+            <div style={{ color: '#f87171', marginTop: '10px', fontSize: '12px', borderTop: '1px solid #374151', paddingTop: '8px' }}>
               🚫 Blocked by: {hoveredStory.blockedBy.join(', ')}
             </div>
           )}

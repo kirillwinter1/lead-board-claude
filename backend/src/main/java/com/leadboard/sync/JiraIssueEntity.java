@@ -396,4 +396,25 @@ public class JiraIssueEntity {
     public void setStartedAt(OffsetDateTime startedAt) {
         this.startedAt = startedAt;
     }
+
+    // ==================== Derived/Computed Methods ====================
+
+    /**
+     * Calculate effective estimate for this issue.
+     * If remainingEstimateSeconds is set, use (timeSpent + remaining) as the effective total.
+     * Otherwise fall back to originalEstimateSeconds.
+     *
+     * This is the single source of truth for estimate calculations across the application.
+     *
+     * @return effective estimate in seconds, or 0 if no estimate available
+     */
+    public long getEffectiveEstimateSeconds() {
+        if (remainingEstimateSeconds != null) {
+            // Effective estimate = spent + remaining
+            long spent = timeSpentSeconds != null ? timeSpentSeconds : 0;
+            return spent + remainingEstimateSeconds;
+        }
+        // Fallback to original estimate
+        return originalEstimateSeconds != null ? originalEstimateSeconds : 0;
+    }
 }

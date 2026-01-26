@@ -43,7 +43,39 @@ public record UnifiedPlanningResult(
             LocalDate endDate,
             PlannedPhases phases,
             List<String> blockedBy,
-            List<PlanningWarning> warnings
+            List<PlanningWarning> warnings,
+            // Additional fields for tooltip
+            String issueType,
+            String priority,
+            Boolean flagged,
+            // Aggregated progress from subtasks
+            Long totalEstimateSeconds,
+            Long totalLoggedSeconds,
+            Integer progressPercent,
+            // Phase completion status
+            RoleProgressInfo roleProgress
+    ) {}
+
+    /**
+     * Progress info per role (SA/DEV/QA).
+     */
+    public record RoleProgressInfo(
+            PhaseProgressInfo sa,
+            PhaseProgressInfo dev,
+            PhaseProgressInfo qa
+    ) {
+        public static RoleProgressInfo empty() {
+            return new RoleProgressInfo(null, null, null);
+        }
+    }
+
+    /**
+     * Progress info for a single phase.
+     */
+    public record PhaseProgressInfo(
+            Long estimateSeconds,
+            Long loggedSeconds,
+            boolean completed
     ) {}
 
     /**

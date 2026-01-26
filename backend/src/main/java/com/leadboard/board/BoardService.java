@@ -246,7 +246,7 @@ public class BoardService {
                 jiraUrl
         );
 
-        node.setEstimateSeconds(getEffectiveEstimate(entity));
+        node.setEstimateSeconds(entity.getEffectiveEstimateSeconds());
         node.setLoggedSeconds(entity.getTimeSpentSeconds());
 
         // Set team info
@@ -342,22 +342,6 @@ public class BoardService {
         }
 
         return node;
-    }
-
-    /**
-     * Calculate effective estimate for an issue.
-     * If remainingEstimateSeconds is set, use (timeSpent + remaining) as the effective total.
-     * Otherwise fall back to originalEstimateSeconds.
-     */
-    private Long getEffectiveEstimate(JiraIssueEntity entity) {
-        Long remaining = entity.getRemainingEstimateSeconds();
-        if (remaining != null) {
-            // Effective estimate = spent + remaining
-            Long spent = entity.getTimeSpentSeconds();
-            return (spent != null ? spent : 0) + remaining;
-        }
-        // Fallback to original estimate
-        return entity.getOriginalEstimateSeconds();
     }
 
     private boolean isEpic(String issueType) {

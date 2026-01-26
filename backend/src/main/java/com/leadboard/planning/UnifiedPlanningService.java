@@ -188,6 +188,7 @@ public class UnifiedPlanningService {
                 ));
 
                 // Add unplanned story to list with warning
+                StoryProgressData progressData = extractProgressData(story, statusMapping);
                 plannedStories.add(new PlannedStory(
                         story.getIssueKey(),
                         story.getSummary(),
@@ -196,7 +197,14 @@ public class UnifiedPlanningService {
                         null, null,
                         PlannedPhases.empty(),
                         story.getIsBlockedBy() != null ? story.getIsBlockedBy() : List.of(),
-                        List.of(new PlanningWarning(story.getIssueKey(), WarningType.NO_ESTIMATE, "No estimate"))
+                        List.of(new PlanningWarning(story.getIssueKey(), WarningType.NO_ESTIMATE, "No estimate")),
+                        story.getIssueType(),
+                        story.getPriority(),
+                        story.getFlagged(),
+                        progressData.totalEstimate(),
+                        progressData.totalLogged(),
+                        progressData.progressPercent(),
+                        progressData.roleProgress()
                 ));
                 continue;
             }
@@ -382,6 +390,9 @@ public class UnifiedPlanningService {
             storyEnd = saSchedule.endDate();
         }
 
+        // Get progress data from subtasks
+        StoryProgressData progressData = extractProgressData(story, statusMapping);
+
         return new PlannedStory(
                 storyKey,
                 story.getSummary(),
@@ -391,7 +402,14 @@ public class UnifiedPlanningService {
                 storyEnd,
                 new PlannedPhases(saSchedule, devSchedule, qaSchedule),
                 blockedBy != null ? blockedBy : List.of(),
-                warnings
+                warnings,
+                story.getIssueType(),
+                story.getPriority(),
+                story.getFlagged(),
+                progressData.totalEstimate(),
+                progressData.totalLogged(),
+                progressData.progressPercent(),
+                progressData.roleProgress()
         );
     }
 
@@ -520,6 +538,66 @@ public class UnifiedPlanningService {
         }
 
         return new PhaseHours(saHours, devHours, qaHours);
+    }
+
+    /**
+     * Extracts progress data from story's subtasks (for tooltip display).
+     * Uses JiraIssueEntity.getEffectiveEstimateSeconds() as single source of truth.
+     */
+    private StoryProgressData extractProgressData(JiraIssueEntity story, StatusMappingConfig statusMapping) {
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
+
+        long saEstimate = 0, saLogged = 0;
+        long devEstimate = 0, devLogged = 0;
+        long qaEstimate = 0, qaLogged = 0;
+        boolean saDone = true, devDone = true, qaDone = true;
+        boolean saExists = false, devExists = false, qaExists = false;
+
+        for (JiraIssueEntity subtask : subtasks) {
+            // Use effective estimate from entity (single source of truth)
+            long est = subtask.getEffectiveEstimateSeconds();
+            long log = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+            boolean isDone = statusMappingService.isDone(subtask.getStatus(), statusMapping);
+
+            String phase = statusMappingService.determinePhase(
+                    subtask.getStatus(),
+                    subtask.getIssueType(),
+                    statusMapping
+            );
+
+            switch (phase) {
+                case "SA" -> {
+                    saEstimate += est;
+                    saLogged += log;
+                    saExists = true;
+                    if (!isDone) saDone = false;
+                }
+                case "QA" -> {
+                    qaEstimate += est;
+                    qaLogged += log;
+                    qaExists = true;
+                    if (!isDone) qaDone = false;
+                }
+                default -> {
+                    devEstimate += est;
+                    devLogged += log;
+                    devExists = true;
+                    if (!isDone) devDone = false;
+                }
+            }
+        }
+
+        long totalEstimate = saEstimate + devEstimate + qaEstimate;
+        long totalLogged = saLogged + devLogged + qaLogged;
+        int progressPercent = totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0;
+
+        RoleProgressInfo roleProgress = new RoleProgressInfo(
+                saExists ? new PhaseProgressInfo(saEstimate, saLogged, saDone) : null,
+                devExists ? new PhaseProgressInfo(devEstimate, devLogged, devDone) : null,
+                qaExists ? new PhaseProgressInfo(qaEstimate, qaLogged, qaDone) : null
+        );
+
+        return new StoryProgressData(totalEstimate, totalLogged, progressPercent, roleProgress);
     }
 
     /**
@@ -671,6 +749,20 @@ public class UnifiedPlanningService {
                     dev.multiply(multiplier).setScale(2, RoundingMode.HALF_UP),
                     qa.multiply(multiplier).setScale(2, RoundingMode.HALF_UP)
             );
+        }
+    }
+
+    /**
+     * Aggregated progress data from subtasks.
+     */
+    private record StoryProgressData(
+            long totalEstimate,
+            long totalLogged,
+            int progressPercent,
+            RoleProgressInfo roleProgress
+    ) {
+        static StoryProgressData empty() {
+            return new StoryProgressData(0, 0, 0, RoleProgressInfo.empty());
         }
     }
 }

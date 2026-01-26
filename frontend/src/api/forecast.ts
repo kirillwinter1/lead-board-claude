@@ -293,6 +293,24 @@ export interface PlanningWarning {
 }
 
 /**
+ * Progress info for a single phase (SA/DEV/QA).
+ */
+export interface PhaseProgressInfo {
+  estimateSeconds: number
+  loggedSeconds: number
+  completed: boolean
+}
+
+/**
+ * Role progress info for a story.
+ */
+export interface RoleProgressInfo {
+  sa: PhaseProgressInfo | null
+  dev: PhaseProgressInfo | null
+  qa: PhaseProgressInfo | null
+}
+
+/**
  * Planned story with phase schedules.
  */
 export interface PlannedStory {
@@ -305,6 +323,15 @@ export interface PlannedStory {
   phases: PlannedPhases
   blockedBy: string[]
   warnings: PlanningWarning[]
+  // Additional fields for tooltip
+  issueType: string | null
+  priority: string | null
+  flagged: boolean | null
+  // Aggregated progress from subtasks
+  totalEstimateSeconds: number | null
+  totalLoggedSeconds: number | null
+  progressPercent: number | null
+  roleProgress: RoleProgressInfo | null
 }
 
 /**
