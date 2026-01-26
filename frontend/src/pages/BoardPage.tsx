@@ -4,6 +4,7 @@ import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from
 import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '../api/forecast'
 import { updateStoryPriority } from '../api/stories'
 import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
+import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 
 // Sound effect for drag & drop - Pop sound
 const playDropSound = () => {
@@ -1367,56 +1368,57 @@ function FilterPanel({
 
   return (
     <div className="filter-panel">
-      <div className="filter-group">
-        <label className="filter-label">Search by key</label>
+      <div className="filter-group filter-search">
+        <svg
+          className="search-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+        >
+          <path
+            d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M14 14L10.5 10.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
         <input
           type="text"
-          placeholder="e.g. LB-1"
+          placeholder="Search by key..."
           value={searchKey}
           onChange={(e) => onSearchKeyChange(e.target.value)}
           className="filter-input"
         />
       </div>
 
-      <div className="filter-group">
-        <label className="filter-label">Team</label>
-        <div className="filter-checkboxes">
-          {availableTeams.length === 0 ? (
-            <span className="filter-empty">No teams</span>
-          ) : (
-            availableTeams.map(team => (
-              <label key={team} className="filter-checkbox">
-                <input
-                  type="checkbox"
-                  checked={selectedTeams.has(team)}
-                  onChange={() => onTeamToggle(team)}
-                />
-                <span>{team}</span>
-              </label>
-            ))
-          )}
-        </div>
-      </div>
+      <MultiSelectDropdown
+        label="Team"
+        options={availableTeams}
+        selected={selectedTeams}
+        onToggle={onTeamToggle}
+        placeholder="All teams"
+      />
 
-      <div className="filter-group">
-        <label className="filter-label">Status</label>
-        <div className="filter-checkboxes">
-          {availableStatuses.map(status => (
-            <label key={status} className="filter-checkbox">
-              <input
-                type="checkbox"
-                checked={selectedStatuses.has(status)}
-                onChange={() => onStatusToggle(status)}
-              />
-              <span>{status}</span>
-            </label>
-          ))}
-        </div>
-      </div>
+      <MultiSelectDropdown
+        label="Status"
+        options={availableStatuses}
+        selected={selectedStatuses}
+        onToggle={onStatusToggle}
+        placeholder="All statuses"
+      />
 
       {hasActiveFilters && (
         <button className="btn btn-secondary btn-clear" onClick={onClearFilters}>
-          Clear filters
+          Clear
         </button>
       )}
 
@@ -1424,7 +1426,6 @@ function FilterPanel({
         {syncStatus && (
           <span className="sync-info">
             Last sync: {formatSyncTime(syncStatus.lastSyncCompletedAt)}
-            {syncStatus.issuesCount > 0 && ` (${syncStatus.issuesCount} issues)`}
           </span>
         )}
         <button

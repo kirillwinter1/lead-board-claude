@@ -424,34 +424,34 @@ public class BoardService {
             }
         }
 
-        // For Epic in TODO: preserve rough estimates in roleProgress, just update logged time
-        if (isEpic(node.getIssueType()) && node.isEpicInTodo() && node.getRoleProgress() != null) {
-            BoardNode.RoleProgress existingRp = node.getRoleProgress();
+        // For Epic in TODO: check if children have estimates
+        if (isEpic(node.getIssueType()) && node.isEpicInTodo()) {
+            long totalEstimateFromChildren = analyticsEstimate + developmentEstimate + testingEstimate;
 
-            // Update RoleMetrics with aggregated logged time while preserving rough estimates
-            existingRp.getAnalytics().setEstimateSeconds(analyticsEstimate);
-            existingRp.getAnalytics().setLoggedSeconds(analyticsLogged);
-            existingRp.getAnalytics().setProgress(analyticsEstimate > 0
-                    ? (int) Math.min(100, (analyticsLogged * 100) / analyticsEstimate) : 0);
+            if (totalEstimateFromChildren > 0) {
+                // Children have estimates → use aggregated values (not rough estimates)
+                node.setEstimateSeconds(totalEstimateFromChildren);
+                node.setLoggedSeconds(totalLogged);
+                node.setProgress(totalEstimateFromChildren > 0
+                        ? (int) Math.min(100, (totalLogged * 100) / totalEstimateFromChildren) : 0);
 
-            existingRp.getDevelopment().setEstimateSeconds(developmentEstimate);
-            existingRp.getDevelopment().setLoggedSeconds(developmentLogged);
-            existingRp.getDevelopment().setProgress(developmentEstimate > 0
-                    ? (int) Math.min(100, (developmentLogged * 100) / developmentEstimate) : 0);
+                // Create new roleProgress with aggregated values, without rough estimates
+                BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
+                roleProgress.setAnalytics(new BoardNode.RoleMetrics(analyticsEstimate, analyticsLogged, null));
+                roleProgress.setDevelopment(new BoardNode.RoleMetrics(developmentEstimate, developmentLogged, null));
+                roleProgress.setTesting(new BoardNode.RoleMetrics(testingEstimate, testingLogged, null));
+                node.setRoleProgress(roleProgress);
+            } else if (node.getRoleProgress() != null) {
+                // No children estimates → keep rough estimates (already set in mapToNode)
+                node.setLoggedSeconds(totalLogged);
 
-            existingRp.getTesting().setEstimateSeconds(testingEstimate);
-            existingRp.getTesting().setLoggedSeconds(testingLogged);
-            existingRp.getTesting().setProgress(testingEstimate > 0
-                    ? (int) Math.min(100, (testingLogged * 100) / testingEstimate) : 0);
-
-            node.setLoggedSeconds(totalLogged);
-
-            // Calculate overall progress based on rough estimate (already set in mapToNode)
-            Long estimate = node.getEstimateSeconds();
-            if (estimate != null && estimate > 0) {
-                node.setProgress((int) Math.min(100, (totalLogged * 100) / estimate));
-            } else {
-                node.setProgress(0);
+                // Calculate overall progress based on rough estimate
+                Long estimate = node.getEstimateSeconds();
+                if (estimate != null && estimate > 0) {
+                    node.setProgress((int) Math.min(100, (totalLogged * 100) / estimate));
+                } else {
+                    node.setProgress(0);
+                }
             }
         } else if (isEpic(node.getIssueType()) && !node.isEpicInTodo()) {
             // For Epic in progress: aggregate from children (same as Story/Bug)
