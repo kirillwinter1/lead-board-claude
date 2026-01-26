@@ -16,36 +16,43 @@ import java.util.Map;
 /**
  * Расчёт AutoScore — автоматического приоритета эпика для планирования.
  *
- * Факторы и их веса:
- * - Статус (20): In Progress = 20, другие = 0
- * - Прогресс (15): процент выполнения * 15
- * - Due date (25): экспоненциальный рост к дедлайну
- * - Priority (15): Highest=15, High=10, Medium=5, Low=0
- * - Размер (10): инверсия от estimate (меньше = больше)
- * - Возраст (10): логарифм от дней с создания
- * - Ручной boost: любое значение для ручной сортировки
+ * Принцип: "Закончить начатое" — эпики на поздних стадиях workflow имеют высший приоритет.
  *
- * Итого: максимум 100 баллов
+ * Факторы и их веса:
+ * - Статус (-5 to +30): позиция в Epic Workflow
+ *   - ACCEPTANCE/E2E TESTING = +30 (почти готово)
+ *   - DEVELOPING = +25 (активная разработка)
+ *   - ЗАПЛАНИРОВАНО = +15 (готов к старту)
+ *   - ROUGH ESTIMATE = +10 (оценивается)
+ *   - REQUIREMENTS = +5 (пишутся БТ)
+ *   - НОВОЕ = -5 (не начат)
+ * - Priority (20): Jira приоритет (Highest=20, High=15, Medium=10, Low=5)
+ * - Due date (25): экспоненциальный рост к дедлайну
+ * - Прогресс (10): процент выполнения (logged/estimate)
+ * - Размер (5): инверсия от estimate (меньше = выше, без оценки = -5)
+ * - Возраст (5): логарифм от дней с создания
+ * - Ручной boost: любое значение для ручной корректировки
  */
 @Service
 public class AutoScoreCalculator {
 
     private static final Logger log = LoggerFactory.getLogger(AutoScoreCalculator.class);
 
-    // Веса факторов
-    private static final BigDecimal WEIGHT_STATUS = new BigDecimal("20");
-    private static final BigDecimal WEIGHT_PROGRESS = new BigDecimal("15");
+    // Веса факторов (обновлены 2026-01-26)
+    private static final BigDecimal WEIGHT_PROGRESS = new BigDecimal("10");
     private static final BigDecimal WEIGHT_DUE_DATE = new BigDecimal("25");
-    private static final BigDecimal WEIGHT_PRIORITY = new BigDecimal("15");
-    private static final BigDecimal WEIGHT_SIZE = new BigDecimal("10");
-    private static final BigDecimal WEIGHT_AGE = new BigDecimal("10");
-    private static final BigDecimal WEIGHT_MANUAL_BOOST = new BigDecimal("5");
+    private static final BigDecimal WEIGHT_PRIORITY = new BigDecimal("20");
+    private static final BigDecimal WEIGHT_SIZE = new BigDecimal("5");
+    private static final BigDecimal WEIGHT_AGE = new BigDecimal("5");
 
-    // Статусы "в работе"
-    private static final String[] IN_PROGRESS_STATUSES = {
-            "In Progress", "В работе", "In Review", "На ревью",
-            "In Development", "Development", "Testing", "На тестировании"
-    };
+    // Баллы за статус в Epic Workflow (чем дальше по workflow — тем выше)
+    private static final int STATUS_SCORE_ACCEPTANCE = 30;    // Почти готово
+    private static final int STATUS_SCORE_E2E_TESTING = 30;   // Почти готово
+    private static final int STATUS_SCORE_DEVELOPING = 25;    // Активная разработка
+    private static final int STATUS_SCORE_PLANNED = 15;       // Готов к старту
+    private static final int STATUS_SCORE_ROUGH_ESTIMATE = 10; // Оценивается
+    private static final int STATUS_SCORE_REQUIREMENTS = 5;   // Пишутся БТ
+    private static final int STATUS_SCORE_NEW = -5;           // Не начат
 
     /**
      * Рассчитывает AutoScore для эпика.
@@ -81,7 +88,8 @@ public class AutoScoreCalculator {
     }
 
     /**
-     * Статус: In Progress = 20, иначе 0
+     * Статус: баллы зависят от позиции в Epic Workflow.
+     * Чем дальше по workflow — тем выше приоритет (закончить начатое).
      */
     private BigDecimal calculateStatusScore(JiraIssueEntity epic) {
         String status = epic.getStatus();
@@ -89,11 +97,49 @@ public class AutoScoreCalculator {
             return BigDecimal.ZERO;
         }
 
-        for (String inProgressStatus : IN_PROGRESS_STATUSES) {
-            if (status.equalsIgnoreCase(inProgressStatus)) {
-                return WEIGHT_STATUS;
-            }
+        String statusLower = status.toLowerCase();
+
+        // Финальные стадии — максимальный приоритет
+        if (statusLower.contains("acceptance") || statusLower.contains("приёмка") || statusLower.contains("приемка")) {
+            return BigDecimal.valueOf(STATUS_SCORE_ACCEPTANCE);
         }
+        if (statusLower.contains("e2e") || statusLower.contains("end-to-end") || statusLower.contains("e2e testing")) {
+            return BigDecimal.valueOf(STATUS_SCORE_E2E_TESTING);
+        }
+
+        // Активная разработка
+        if (statusLower.contains("developing") || statusLower.contains("development") ||
+            statusLower.contains("in progress") || statusLower.contains("в работе") ||
+            statusLower.contains("в разработке")) {
+            return BigDecimal.valueOf(STATUS_SCORE_DEVELOPING);
+        }
+
+        // Готов к старту
+        if (statusLower.contains("запланировано") || statusLower.contains("planned") ||
+            statusLower.contains("ready")) {
+            return BigDecimal.valueOf(STATUS_SCORE_PLANNED);
+        }
+
+        // Оценивается
+        if (statusLower.contains("rough estimate") || statusLower.contains("estimation") ||
+            statusLower.contains("оценка") || statusLower.contains("estimate")) {
+            return BigDecimal.valueOf(STATUS_SCORE_ROUGH_ESTIMATE);
+        }
+
+        // Пишутся БТ
+        if (statusLower.contains("requirements") || statusLower.contains("требования") ||
+            statusLower.contains("analysis") || statusLower.contains("аналитика")) {
+            return BigDecimal.valueOf(STATUS_SCORE_REQUIREMENTS);
+        }
+
+        // Не начат
+        if (statusLower.contains("новое") || statusLower.contains("new") ||
+            statusLower.contains("backlog") || statusLower.contains("to do") ||
+            statusLower.contains("open")) {
+            return BigDecimal.valueOf(STATUS_SCORE_NEW);
+        }
+
+        // Неизвестный статус — нейтральный балл
         return BigDecimal.ZERO;
     }
 
@@ -160,7 +206,8 @@ public class AutoScoreCalculator {
     }
 
     /**
-     * Priority: Highest=15, High=10, Medium=5, Low=2, Lowest=0
+     * Priority: Highest=20, High=15, Medium=10, Low=5, Lowest=0
+     * Увеличен вес Jira Priority как осознанного бизнес-решения.
      */
     private BigDecimal calculatePriorityScore(JiraIssueEntity epic) {
         String priority = epic.getPriority();
@@ -169,10 +216,10 @@ public class AutoScoreCalculator {
         }
 
         return switch (priority.toLowerCase()) {
-            case "highest", "blocker", "критический" -> WEIGHT_PRIORITY;
-            case "high", "critical", "высокий" -> new BigDecimal("10");
-            case "medium", "major", "средний" -> new BigDecimal("5");
-            case "low", "minor", "низкий" -> new BigDecimal("2");
+            case "highest", "blocker", "критический" -> WEIGHT_PRIORITY; // 20
+            case "high", "critical", "высокий" -> new BigDecimal("15");
+            case "medium", "major", "средний" -> new BigDecimal("10");
+            case "low", "minor", "низкий" -> new BigDecimal("5");
             case "lowest", "trivial", "минимальный" -> BigDecimal.ZERO;
             default -> BigDecimal.ZERO;
         };
@@ -180,16 +227,18 @@ public class AutoScoreCalculator {
 
     /**
      * Размер: инверсия от estimate (меньше эпик = выше приоритет, быстрее закрыть).
-     * Формула: 10 * (1 - log(estimate_days) / log(max_days))
+     * Формула: 5 * (1 - log(estimate_days) / log(max_days))
      * где max_days = 90 (для нормализации)
+     *
+     * Без оценки = -5 (штраф за отсутствие оценки, а не бонус!)
      */
     private BigDecimal calculateSizeScore(JiraIssueEntity epic) {
         // Используем rough estimate если есть, иначе original estimate
         BigDecimal totalDays = getTotalEstimateDays(epic);
 
         if (totalDays == null || totalDays.compareTo(BigDecimal.ZERO) <= 0) {
-            // Нет оценки — средний балл
-            return new BigDecimal("5");
+            // Нет оценки — штраф! Эпик без оценки должен быть внизу списка.
+            return new BigDecimal("-5");
         }
 
         double days = totalDays.doubleValue();
@@ -199,16 +248,16 @@ public class AutoScoreCalculator {
             return BigDecimal.ZERO;
         }
 
-        // Логарифмическая шкала: маленькие эпики получают больше баллов
-        double score = 10 * (1 - Math.log(days + 1) / Math.log(maxDays + 1));
-        return BigDecimal.valueOf(Math.max(0, Math.min(10, score)))
+        // Логарифмическая шкала: маленькие эпики получают больше баллов (max 5)
+        double score = 5 * (1 - Math.log(days + 1) / Math.log(maxDays + 1));
+        return BigDecimal.valueOf(Math.max(0, Math.min(5, score)))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 
     /**
      * Возраст: логарифм от дней с создания.
-     * Старые эпики получают приоритет.
-     * Формула: 10 * log(days + 1) / log(365)
+     * Старые эпики получают небольшой бонус.
+     * Формула: 5 * log(days + 1) / log(365)
      */
     private BigDecimal calculateAgeScore(JiraIssueEntity epic) {
         OffsetDateTime createdAt = epic.getJiraCreatedAt();
@@ -224,9 +273,9 @@ public class AutoScoreCalculator {
             return BigDecimal.ZERO;
         }
 
-        // Логарифмическая шкала: быстрый рост в начале, замедление к году
-        double score = 10 * Math.log(days + 1) / Math.log(365);
-        return BigDecimal.valueOf(Math.min(10, score))
+        // Логарифмическая шкала: быстрый рост в начале, замедление к году (max 5)
+        double score = 5 * Math.log(days + 1) / Math.log(365);
+        return BigDecimal.valueOf(Math.min(5, score))
                 .setScale(2, RoundingMode.HALF_UP);
     }
 

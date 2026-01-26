@@ -205,8 +205,21 @@ public class BoardService {
                 }
             }
 
-            // Apply pagination
+            // Sort epics by autoScore (descending)
             List<BoardNode> items = new ArrayList<>(epicMap.values());
+            items.sort((a, b) -> {
+                BigDecimal scoreA = a.getAutoScore();
+                BigDecimal scoreB = b.getAutoScore();
+
+                if (scoreA != null && scoreB != null) {
+                    return scoreB.compareTo(scoreA); // Descending
+                }
+                if (scoreA != null) return -1;
+                if (scoreB != null) return 1;
+                return 0;
+            });
+
+            // Apply pagination
             int total = items.size();
             int fromIndex = Math.min(page * size, total);
             int toIndex = Math.min(fromIndex + size, total);
