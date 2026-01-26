@@ -10,8 +10,10 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -45,8 +47,7 @@ public class TeamMetricsService {
         // Group by period
         Map<LocalDate, Map<String, Integer>> periodMap = new LinkedHashMap<>();
         for (Object[] row : weeklyData) {
-            Timestamp ts = (Timestamp) row[0];
-            LocalDate periodStart = ts != null ? ts.toLocalDateTime().toLocalDate() : null;
+            LocalDate periodStart = parseLocalDate(row[0]);
             String type = (String) row[1];
             int count = ((Number) row[2]).intValue();
 
@@ -249,5 +250,29 @@ public class TeamMetricsService {
         return lowerValue.add(
                 upperValue.subtract(lowerValue).multiply(BigDecimal.valueOf(fraction))
         ).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Parse LocalDate from various database types (Timestamp, Instant, OffsetDateTime).
+     */
+    private LocalDate parseLocalDate(Object value) {
+        if (value == null) return null;
+        if (value instanceof Timestamp ts) {
+            return ts.toLocalDateTime().toLocalDate();
+        }
+        if (value instanceof Instant instant) {
+            return instant.atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+        if (value instanceof OffsetDateTime odt) {
+            return odt.toLocalDate();
+        }
+        if (value instanceof java.sql.Date sqlDate) {
+            return sqlDate.toLocalDate();
+        }
+        if (value instanceof LocalDate ld) {
+            return ld;
+        }
+        log.warn("Unknown date type: {}", value.getClass().getName());
+        return null;
     }
 }
