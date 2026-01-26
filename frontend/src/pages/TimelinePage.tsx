@@ -129,11 +129,11 @@ function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): { date: Dat
   return headers
 }
 
-// Phase colors
+// Phase colors - Atlassian Design System (300 level)
 const PHASE_COLORS = {
-  sa: '#3b82f6',
-  dev: '#22c55e',
-  qa: '#8b5cf6'
+  sa: '#85B8FF',   // Blue 300 — светло-синий
+  dev: '#D6A0FB',  // Purple 300 — светло-фиолетовый
+  qa: '#8BDBE5'    // Teal 300 — светло-бирюзовый
 }
 
 // Allocate lanes for stories to avoid overlap

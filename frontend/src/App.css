@@ -605,30 +605,30 @@ body {
 }
 
 .role-chip.sa {
-  background: #e3f2fd;
-  color: #0d47a1;
+  background: #E9F2FE;
+  color: #1558BC;
 }
 
 .role-chip.sa .role-chip-fill {
-  background: #0d47a1;
+  background: #669DF1;
 }
 
 .role-chip.dev {
-  background: #e8f5e9;
-  color: #1b5e20;
+  background: #F8EEFE;
+  color: #803FA5;
 }
 
 .role-chip.dev .role-chip-fill {
-  background: #1b5e20;
+  background: #B55FEB;
 }
 
 .role-chip.qa {
-  background: #fff3e0;
-  color: #e65100;
+  background: #E7F9FF;
+  color: #206A83;
 }
 
 .role-chip.qa .role-chip-fill {
-  background: #e65100;
+  background: #6CC3E0;
 }
 
 .role-chip.disabled {
@@ -1125,29 +1125,29 @@ body {
   outline: none;
 }
 
-/* Epic role chip colors */
+/* Epic role chip colors - Atlassian Design System */
 .epic-role-chip.sa {
-  color: #0d47a1;
+  color: #1558BC;
 }
 
 .epic-role-chip.sa.todo {
-  border-color: #bbdefb;
+  border-color: #CFE1FD;
 }
 
 .epic-role-chip.dev {
-  color: #1b5e20;
+  color: #803FA5;
 }
 
 .epic-role-chip.dev.todo {
-  border-color: #c8e6c9;
+  border-color: #EED7FC;
 }
 
 .epic-role-chip.qa {
-  color: #e65100;
+  color: #206A83;
 }
 
 .epic-role-chip.qa.todo {
-  border-color: #ffe0b2;
+  border-color: #C6EDFB;
 }
 
 /* Epic in progress - with progress bar */
@@ -1191,15 +1191,15 @@ body {
 }
 
 .epic-role-chip.sa .epic-role-progress-fill {
-  background: #0d47a1;
+  background: #669DF1;
 }
 
 .epic-role-chip.dev .epic-role-progress-fill {
-  background: #1b5e20;
+  background: #B55FEB;
 }
 
 .epic-role-chip.qa .epic-role-progress-fill {
-  background: #e65100;
+  background: #6CC3E0;
 }
 
 .epic-role-progress-fill.overburn {
@@ -2209,17 +2209,17 @@ body {
   background: #de350b;
 }
 
-/* Phase legend for story view */
+/* Phase legend for story view - Atlassian Design System (400-500 level) */
 .legend-phase-sa::before {
-  background: #3b82f6;
+  background: #669DF1;
 }
 
 .legend-phase-dev::before {
-  background: #22c55e;
+  background: #B55FEB;
 }
 
 .legend-phase-qa::before {
-  background: #8b5cf6;
+  background: #6CC3E0;
 }
 
 .legend-blocked::before {
