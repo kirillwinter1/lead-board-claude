@@ -360,6 +360,15 @@ export interface PlannedEpic {
   endDate: string | null
   stories: PlannedStory[]
   phaseAggregation: PhaseAggregation
+  // Additional fields for epic card/tooltip
+  status: string | null
+  dueDate: string | null
+  totalEstimateSeconds: number | null
+  totalLoggedSeconds: number | null
+  progressPercent: number | null
+  roleProgress: RoleProgressInfo | null
+  storiesTotal: number
+  storiesActive: number
 }
 
 /**

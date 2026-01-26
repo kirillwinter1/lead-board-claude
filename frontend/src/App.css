@@ -2475,7 +2475,7 @@ body {
 
 .gantt-labels {
   flex-shrink: 0;
-  width: 240px;
+  width: 280px;
   border-right: 1px solid #dfe1e6;
   background: #fafbfc;
 }
@@ -2568,7 +2568,16 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-left: 18px;
+  padding-left: 20px;
+  margin-top: 1px;
+  line-height: 1.3;
+}
+
+.status-badge {
+  display: inline-block;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Phase labels in expanded row */
@@ -4006,8 +4015,10 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end;
   flex: 1;
   max-width: 60px;
+  height: 100%;
   cursor: pointer;
 }
 
@@ -4015,8 +4026,9 @@ body {
   width: 100%;
   max-width: 40px;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .bar {

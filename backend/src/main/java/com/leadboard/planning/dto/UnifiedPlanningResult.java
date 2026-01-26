@@ -28,7 +28,16 @@ public record UnifiedPlanningResult(
             LocalDate startDate,
             LocalDate endDate,
             List<PlannedStory> stories,
-            PhaseAggregation phaseAggregation
+            PhaseAggregation phaseAggregation,
+            // Additional fields for epic card/tooltip
+            String status,
+            LocalDate dueDate,
+            Long totalEstimateSeconds,
+            Long totalLoggedSeconds,
+            Integer progressPercent,
+            RoleProgressInfo roleProgress,
+            int storiesTotal,
+            int storiesActive
     ) {}
 
     /**

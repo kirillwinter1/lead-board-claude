@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, UnifiedPhaseSchedule, PlanningWarning } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning } from '../api/forecast'
+import { getConfig } from '../api/config'
 
 // Issue type icons
 import storyIcon from '../icons/story.png'
@@ -10,7 +11,6 @@ import epicIcon from '../icons/epic.png'
 import subtaskIcon from '../icons/subtask.png'
 
 type ZoomLevel = 'day' | 'week' | 'month'
-type EpicStatus = 'on-track' | 'at-risk' | 'late' | 'no-due-date'
 
 interface DateRange {
   start: Date
@@ -44,24 +44,6 @@ function startOfWeek(date: Date): Date {
 
 function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-// --- Status calculation ---
-
-function getEpicStatus(epic: EpicForecast): EpicStatus {
-  if (!epic.dueDate) return 'no-due-date'
-  const delta = epic.dueDateDeltaDays ?? 0
-  if (delta <= 0) return 'on-track'
-  if (delta <= 5) return 'at-risk'
-  return 'late'
-}
-
-function getStatusIcon(status: EpicStatus): string | null {
-  switch (status) {
-    case 'at-risk': return '⚠️'
-    case 'late': return '🔴'
-    default: return null
-  }
 }
 
 // --- Date range & timeline ---
@@ -163,21 +145,6 @@ function phaseHasHours(phase: { hours?: number } | null | undefined): boolean {
   return phase != null && phase.hours != null && phase.hours > 0
 }
 
-// Get status color based on status name
-function getStatusColor(status: string): { bg: string; text: string } {
-  const s = status.toLowerCase()
-  if (s.includes('done') || s.includes('готов') || s.includes('выполнен') || s.includes('закрыт')) {
-    return { bg: '#22c55e', text: '#fff' } // green
-  }
-  if (s.includes('progress') || s.includes('работ') || s.includes('review') || s.includes('ревью')) {
-    return { bg: '#3b82f6', text: '#fff' } // blue
-  }
-  if (s.includes('test') || s.includes('тест')) {
-    return { bg: '#8b5cf6', text: '#fff' } // purple
-  }
-  return { bg: '#6b7280', text: '#fff' } // gray for todo/backlog
-}
-
 // Allocate lanes for stories to avoid overlap
 function allocateStoryLanes(stories: PlannedStory[]): Map<string, number> {
   const lanes = new Map<string, number>()
@@ -226,6 +193,291 @@ function calculateRowHeight(stories: PlannedStory[]): number {
   const storyLanes = allocateStoryLanes(activeStories)
   const maxLane = Math.max(0, ...Array.from(storyLanes.values())) + 1
   return Math.max(MIN_ROW_HEIGHT, maxLane * (BAR_HEIGHT + LANE_GAP) + 8)
+}
+
+// --- Status badge colors (Atlassian Design System) ---
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  'new': { bg: '#dfe1e6', text: '#42526e' },
+  'backlog': { bg: '#dfe1e6', text: '#42526e' },
+  'to do': { bg: '#dfe1e6', text: '#42526e' },
+  'planned': { bg: '#deebff', text: '#0747a6' },
+  'developing': { bg: '#e3fcef', text: '#006644' },
+  'in progress': { bg: '#e3fcef', text: '#006644' },
+  'e2e testing': { bg: '#eae6ff', text: '#403294' },
+  'done': { bg: '#dfe1e6', text: '#42526e' },
+  'новый': { bg: '#dfe1e6', text: '#42526e' },
+  'бэклог': { bg: '#dfe1e6', text: '#42526e' },
+  'запланировано': { bg: '#deebff', text: '#0747a6' },
+  'в разработке': { bg: '#e3fcef', text: '#006644' },
+  'e2e тестирование': { bg: '#eae6ff', text: '#403294' },
+  'готово': { bg: '#dfe1e6', text: '#42526e' },
+}
+
+function getStatusColor(status: string | null): { bg: string; text: string } {
+  if (!status) return { bg: '#dfe1e6', text: '#42526e' }
+  return STATUS_COLORS[status.toLowerCase()] || { bg: '#dfe1e6', text: '#42526e' }
+}
+
+// --- Epic Label Component with Tooltip ---
+interface EpicLabelProps {
+  epic: PlannedEpic
+  epicForecast: EpicForecast | undefined
+  jiraBaseUrl: string
+  rowHeight: number
+}
+
+function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+  const labelRef = useRef<HTMLDivElement>(null)
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    setTooltipPos({ x: rect.right + 8, y: rect.top })
+    setShowTooltip(true)
+  }
+
+  const statusColor = getStatusColor(epic.status)
+  const progress = epic.progressPercent ?? 0
+  const dueDateDelta = epicForecast?.dueDateDeltaDays ?? null
+
+  // Due date status indicator
+  let dueDateIndicator = null
+  if (epic.dueDate) {
+    if (dueDateDelta === null || dueDateDelta <= 0) {
+      dueDateIndicator = <span style={{ color: '#36B37E', fontSize: 10 }}>●</span>
+    } else if (dueDateDelta <= 5) {
+      dueDateIndicator = <span style={{ color: '#FFAB00', fontSize: 10 }}>●</span>
+    } else {
+      dueDateIndicator = <span style={{ color: '#FF5630', fontSize: 10 }}>●</span>
+    }
+  }
+
+  // Shorten status for display
+  const shortStatus = (epic.status || '').length > 12
+    ? (epic.status || '').substring(0, 10) + '…'
+    : (epic.status || 'Unknown')
+
+  return (
+    <>
+      <div
+        ref={labelRef}
+        className="gantt-label-row"
+        style={{ height: `${rowHeight}px` }}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        {/* Row 1: Icon + Key + Status badge + Progress */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <img src={epicIcon} alt="Epic" style={{ width: 16, height: 16 }} />
+            <a
+              href={`${jiraBaseUrl}${epic.epicKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="issue-key"
+            >
+              {epic.epicKey}
+            </a>
+            {dueDateIndicator}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{
+                backgroundColor: statusColor.bg,
+                color: statusColor.text,
+                padding: '1px 5px',
+                borderRadius: 3,
+                fontSize: 9,
+                fontWeight: 500,
+              }}
+              title={epic.status || ''}
+            >
+              {shortStatus}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <div style={{
+                width: 32,
+                height: 5,
+                backgroundColor: '#dfe1e6',
+                borderRadius: 2,
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${progress}%`,
+                  height: '100%',
+                  backgroundColor: progress >= 100 ? '#36B37E' : '#0065FF',
+                }} />
+              </div>
+              <span style={{ fontSize: 9, color: '#6b778c', minWidth: 22 }}>{progress}%</span>
+            </div>
+          </div>
+        </div>
+        <span className="gantt-label-title" title={epic.summary}>
+          {epic.summary}
+        </span>
+      </div>
+
+      {showTooltip && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            zIndex: 10000,
+            pointerEvents: 'none',
+            background: 'rgba(23, 43, 77, 0.98)',
+            borderRadius: 8,
+            padding: 14,
+            minWidth: 300,
+            maxWidth: 400,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            color: 'white',
+            fontSize: 13
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <img src={epicIcon} alt="Epic" style={{ width: 16, height: 16 }} />
+              <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{epic.epicKey}</span>
+              <span style={{ color: '#8993A4', fontSize: 11 }}>({epic.autoScore?.toFixed(0)})</span>
+            </div>
+            <span
+              style={{
+                backgroundColor: statusColor.bg,
+                color: statusColor.text,
+                padding: '2px 8px',
+                borderRadius: 3,
+                fontSize: 11,
+                fontWeight: 500
+              }}
+            >
+              {epic.status || 'Unknown'}
+            </span>
+          </div>
+
+          {/* Summary */}
+          <div style={{ color: '#B3BAC5', marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>
+            {epic.summary}
+          </div>
+
+          {/* Progress section */}
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ color: '#8993A4', fontSize: 11 }}>Прогресс</span>
+              <span style={{ color: '#B3BAC5', fontSize: 11 }}>
+                {formatHours(epic.totalLoggedSeconds)} / {formatHours(epic.totalEstimateSeconds)}
+              </span>
+            </div>
+            <div style={{
+              width: '100%',
+              height: 8,
+              backgroundColor: '#42526e',
+              borderRadius: 4,
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${progress}%`,
+                height: '100%',
+                backgroundColor: progress >= 100 ? '#36B37E' : '#0065FF',
+                borderRadius: 4
+              }} />
+            </div>
+            <div style={{ textAlign: 'right', color: '#B3BAC5', fontSize: 12, marginTop: 2 }}>
+              {progress}%
+            </div>
+          </div>
+
+          {/* Dates section */}
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12 }}>
+            <div>
+              <span style={{ color: '#8993A4' }}>📅 </span>
+              <span style={{ color: '#B3BAC5' }}>
+                {epic.startDate ? formatDateShort(new Date(epic.startDate)) : '—'}
+                {' → '}
+                {epic.endDate ? formatDateShort(new Date(epic.endDate)) : '—'}
+              </span>
+            </div>
+            {epic.dueDate && (
+              <div>
+                <span style={{ color: '#8993A4' }}>⏰ Due: </span>
+                <span style={{ color: dueDateDelta && dueDateDelta > 0 ? '#FF5630' : '#36B37E' }}>
+                  {formatDateShort(new Date(epic.dueDate))}
+                  {dueDateDelta !== null && dueDateDelta > 0 && ` (+${dueDateDelta}д)`}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Role progress */}
+          {epic.roleProgress && (
+            <div style={{ borderTop: '1px solid #42526e', paddingTop: 10, marginBottom: 10 }}>
+              <table style={{ width: '100%', fontSize: 12 }}>
+                <tbody>
+                  {epic.roleProgress.sa && (
+                    <tr>
+                      <td style={{ padding: '3px 0', width: 50 }}>
+                        <span style={{ color: PHASE_COLORS.sa }}>●</span> SA
+                        {epic.roleProgress.sa.completed && <span style={{ marginLeft: 4 }}>✓</span>}
+                      </td>
+                      <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
+                        {formatHours(epic.roleProgress.sa.loggedSeconds)} / {formatHours(epic.roleProgress.sa.estimateSeconds)}
+                      </td>
+                      <td style={{ color: '#8993A4', textAlign: 'right', width: 45 }}>
+                        {epic.roleProgress.sa.estimateSeconds
+                          ? Math.min(100, Math.round((epic.roleProgress.sa.loggedSeconds || 0) * 100 / epic.roleProgress.sa.estimateSeconds))
+                          : 0}%
+                      </td>
+                    </tr>
+                  )}
+                  {epic.roleProgress.dev && (
+                    <tr>
+                      <td style={{ padding: '3px 0' }}>
+                        <span style={{ color: PHASE_COLORS.dev }}>●</span> DEV
+                        {epic.roleProgress.dev.completed && <span style={{ marginLeft: 4 }}>✓</span>}
+                      </td>
+                      <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
+                        {formatHours(epic.roleProgress.dev.loggedSeconds)} / {formatHours(epic.roleProgress.dev.estimateSeconds)}
+                      </td>
+                      <td style={{ color: '#8993A4', textAlign: 'right' }}>
+                        {epic.roleProgress.dev.estimateSeconds
+                          ? Math.min(100, Math.round((epic.roleProgress.dev.loggedSeconds || 0) * 100 / epic.roleProgress.dev.estimateSeconds))
+                          : 0}%
+                      </td>
+                    </tr>
+                  )}
+                  {epic.roleProgress.qa && (
+                    <tr>
+                      <td style={{ padding: '3px 0' }}>
+                        <span style={{ color: PHASE_COLORS.qa }}>●</span> QA
+                        {epic.roleProgress.qa.completed && <span style={{ marginLeft: 4 }}>✓</span>}
+                      </td>
+                      <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
+                        {formatHours(epic.roleProgress.qa.loggedSeconds)} / {formatHours(epic.roleProgress.qa.estimateSeconds)}
+                      </td>
+                      <td style={{ color: '#8993A4', textAlign: 'right' }}>
+                        {epic.roleProgress.qa.estimateSeconds
+                          ? Math.min(100, Math.round((epic.roleProgress.qa.loggedSeconds || 0) * 100 / epic.roleProgress.qa.estimateSeconds))
+                          : 0}%
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Footer stats */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8993A4', fontSize: 11 }}>
+            <span>📊 AutoScore: {epic.autoScore?.toFixed(0) || '—'}</span>
+            <span>📋 Stories: {epic.storiesActive} активн. / {epic.storiesTotal} всего</span>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
 }
 
 // --- Story Bars Component ---
@@ -589,11 +841,16 @@ export function TimelinePage() {
   const [zoom, setZoom] = useState<ZoomLevel>('week')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
 
   const chartRef = useRef<HTMLDivElement>(null)
 
-  // Load teams
+  // Load config and teams
   useEffect(() => {
+    getConfig()
+      .then(config => setJiraBaseUrl(config.jiraBaseUrl))
+      .catch(err => console.error('Failed to load config:', err))
+
     teamsApi.getAll()
       .then(data => {
         const activeTeams = data.filter(t => t.active)
@@ -672,8 +929,6 @@ export function TimelinePage() {
     return heights
   }, [epics])
 
-  const jiraBaseUrl = 'https://krasivye.atlassian.net/browse/'
-
   return (
     <main className="main-content">
       <div className="page-header">
@@ -730,27 +985,16 @@ export function TimelinePage() {
             <div className="gantt-labels-header">Эпик</div>
             {epics.map(epic => {
               const epicForecast = epicForecasts.get(epic.epicKey)
-              const status = epicForecast ? getEpicStatus(epicForecast) : 'no-due-date'
-              const statusIcon = getStatusIcon(status)
               const rowHeight = rowHeights.get(epic.epicKey) || MIN_ROW_HEIGHT
 
               return (
-                <div key={epic.epicKey} className="gantt-label-row" style={{ height: `${rowHeight}px` }}>
-                  <div className="gantt-label-header">
-                    <a
-                      href={`${jiraBaseUrl}${epic.epicKey}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="issue-key"
-                    >
-                      {epic.epicKey}
-                    </a>
-                    {statusIcon && <span className="gantt-status-icon">{statusIcon}</span>}
-                  </div>
-                  <span className="gantt-label-title" title={epic.summary}>
-                    {epic.summary}
-                  </span>
-                </div>
+                <EpicLabel
+                  key={epic.epicKey}
+                  epic={epic}
+                  epicForecast={epicForecast}
+                  jiraBaseUrl={jiraBaseUrl}
+                  rowHeight={rowHeight}
+                />
               )
             })}
           </div>

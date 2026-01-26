@@ -160,6 +160,17 @@ public class UnifiedPlanningService {
         LocalDate devStartDate = null, devEndDate = null;
         LocalDate qaStartDate = null, qaEndDate = null;
 
+        // Epic progress accumulators
+        long epicTotalEstimate = 0;
+        long epicTotalLogged = 0;
+        long saEstimate = 0, saLogged = 0;
+        long devEstimate = 0, devLogged = 0;
+        long qaEstimate = 0, qaLogged = 0;
+        boolean saExists = false, devExists = false, qaExists = false;
+        boolean saDone = true, devDone = true, qaDone = true;
+        int storiesTotal = stories.size();
+        int storiesActive = 0;
+
         for (JiraIssueEntity story : stories) {
             // Skip done stories
             if (statusMappingService.isDone(story.getStatus(), statusMapping)) {
@@ -270,6 +281,42 @@ public class UnifiedPlanningService {
                     qaEndDate = phases.qa().endDate();
                 }
             }
+
+            // Accumulate epic progress from story
+            if (plannedStory.totalEstimateSeconds() != null) {
+                epicTotalEstimate += plannedStory.totalEstimateSeconds();
+            }
+            if (plannedStory.totalLoggedSeconds() != null) {
+                epicTotalLogged += plannedStory.totalLoggedSeconds();
+            }
+
+            // Accumulate role progress
+            RoleProgressInfo rp = plannedStory.roleProgress();
+            if (rp != null) {
+                if (rp.sa() != null) {
+                    saEstimate += rp.sa().estimateSeconds() != null ? rp.sa().estimateSeconds() : 0;
+                    saLogged += rp.sa().loggedSeconds() != null ? rp.sa().loggedSeconds() : 0;
+                    saExists = true;
+                    if (!rp.sa().completed()) saDone = false;
+                }
+                if (rp.dev() != null) {
+                    devEstimate += rp.dev().estimateSeconds() != null ? rp.dev().estimateSeconds() : 0;
+                    devLogged += rp.dev().loggedSeconds() != null ? rp.dev().loggedSeconds() : 0;
+                    devExists = true;
+                    if (!rp.dev().completed()) devDone = false;
+                }
+                if (rp.qa() != null) {
+                    qaEstimate += rp.qa().estimateSeconds() != null ? rp.qa().estimateSeconds() : 0;
+                    qaLogged += rp.qa().loggedSeconds() != null ? rp.qa().loggedSeconds() : 0;
+                    qaExists = true;
+                    if (!rp.qa().completed()) qaDone = false;
+                }
+            }
+
+            // Count active story
+            if (!statusMappingService.isDone(plannedStory.status(), statusMapping)) {
+                storiesActive++;
+            }
         }
 
         PhaseAggregation aggregation = new PhaseAggregation(
@@ -279,6 +326,21 @@ public class UnifiedPlanningService {
                 qaStartDate, qaEndDate
         );
 
+        // Calculate epic progress percent
+        int epicProgressPercent = epicTotalEstimate > 0
+                ? (int) Math.min(100, (epicTotalLogged * 100) / epicTotalEstimate)
+                : 0;
+
+        // Build role progress for epic
+        RoleProgressInfo epicRoleProgress = new RoleProgressInfo(
+                saExists ? new PhaseProgressInfo(saEstimate, saLogged, saDone) : null,
+                devExists ? new PhaseProgressInfo(devEstimate, devLogged, devDone) : null,
+                qaExists ? new PhaseProgressInfo(qaEstimate, qaLogged, qaDone) : null
+        );
+
+        // Get due date from epic entity
+        LocalDate dueDate = epic.getDueDate();
+
         return new PlannedEpic(
                 epicKey,
                 epic.getSummary(),
@@ -286,7 +348,15 @@ public class UnifiedPlanningService {
                 epicStartDate,
                 epicEndDate,
                 plannedStories,
-                aggregation
+                aggregation,
+                epic.getStatus(),
+                dueDate,
+                epicTotalEstimate,
+                epicTotalLogged,
+                epicProgressPercent,
+                epicRoleProgress,
+                storiesTotal,
+                storiesActive
         );
     }
 

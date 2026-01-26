@@ -15,6 +15,7 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
   }
 
   const maxValue = Math.max(...data.map(d => d.total), 1)
+  const chartHeight = 200 // pixels for bar area
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -39,9 +40,10 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
           </div>
           <div className="chart-bars">
             {data.map((period, i) => {
-              const epicHeight = (period.epics / maxValue) * 100
-              const storyHeight = (period.stories / maxValue) * 100
-              const subtaskHeight = (period.subtasks / maxValue) * 100
+              const epicHeight = (period.epics / maxValue) * chartHeight
+              const storyHeight = (period.stories / maxValue) * chartHeight
+              const subtaskHeight = (period.subtasks / maxValue) * chartHeight
+              const totalHeight = epicHeight + storyHeight + subtaskHeight
 
               return (
                 <div
@@ -49,23 +51,23 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
                   className="bar-group"
                   title={`${formatDate(period.periodStart)}\nEpics: ${period.epics}\nStories: ${period.stories}\nSubtasks: ${period.subtasks}\nTotal: ${period.total}`}
                 >
-                  <div className="stacked-bar">
-                    {subtaskHeight > 0 && (
+                  <div className="stacked-bar" style={{ height: `${totalHeight}px` }}>
+                    {epicHeight > 0 && (
                       <div
-                        className="bar bar-subtask"
-                        style={{ height: `${subtaskHeight}%` }}
+                        className="bar bar-epic"
+                        style={{ height: `${epicHeight}px` }}
                       />
                     )}
                     {storyHeight > 0 && (
                       <div
                         className="bar bar-story"
-                        style={{ height: `${storyHeight}%` }}
+                        style={{ height: `${storyHeight}px` }}
                       />
                     )}
-                    {epicHeight > 0 && (
+                    {subtaskHeight > 0 && (
                       <div
-                        className="bar bar-epic"
-                        style={{ height: `${epicHeight}%` }}
+                        className="bar bar-subtask"
+                        style={{ height: `${subtaskHeight}px` }}
                       />
                     )}
                   </div>
