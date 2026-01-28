@@ -23,9 +23,16 @@ function formatDateShort(date: Date): string {
   return date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' })
 }
 
+function toLocalMidnight(date: Date): Date {
+  const d = new Date(date)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
 function daysBetween(start: Date, end: Date): number {
-  const diffTime = end.getTime() - start.getTime()
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  const s = toLocalMidnight(start)
+  const e = toLocalMidnight(end)
+  return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24))
 }
 
 function addDays(date: Date, days: number): Date {
@@ -81,9 +88,11 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
     }
   }
 
-  // Add padding
-  minDate = addDays(minDate, -3)
-  maxDate = addDays(maxDate, 7)
+  // Align to week boundaries so date % matches header grid exactly
+  minDate = startOfWeek(addDays(minDate, -3))
+  const paddedMax = addDays(maxDate, 7)
+  const numWeeks = Math.ceil(daysBetween(minDate, paddedMax) / 7)
+  maxDate = addDays(minDate, numWeeks * 7)
 
   return { start: minDate, end: maxDate }
 }

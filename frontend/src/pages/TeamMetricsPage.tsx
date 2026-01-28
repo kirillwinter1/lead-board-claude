@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
-import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse } from '../api/metrics'
+import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getLtc, LtcResponse } from '../api/metrics'
 import { getConfig } from '../api/config'
 import { MetricCard } from '../components/metrics/MetricCard'
+import { LtcGauge } from '../components/metrics/LtcGauge'
 import { ThroughputChart } from '../components/metrics/ThroughputChart'
 import { TimeInStatusChart } from '../components/metrics/TimeInStatusChart'
 import { AssigneeTable } from '../components/metrics/AssigneeTable'
@@ -15,7 +16,7 @@ interface WipHistoryChartProps {
   teamId: number
 }
 
-function WipHistoryChart({ teamId }: WipHistoryChartProps) {
+export function WipHistoryChart({ teamId }: WipHistoryChartProps) {
   const [history, setHistory] = useState<WipHistoryResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -205,6 +206,7 @@ export function TeamMetricsPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
   const [forecastAccuracy, setForecastAccuracy] = useState<ForecastAccuracyResponse | null>(null)
+  const [ltc, setLtc] = useState<LtcResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -253,7 +255,7 @@ export function TeamMetricsPage() {
 
     setMetricsLoading(true)
 
-    // Load both metrics and forecast accuracy in parallel
+    // Load metrics, forecast accuracy, and LTC in parallel
     Promise.all([
       getMetricsSummary(
         selectedTeamId,
@@ -261,17 +263,20 @@ export function TeamMetricsPage() {
         dateRange.to,
         issueType || undefined
       ),
-      getForecastAccuracy(selectedTeamId, dateRange.from, dateRange.to)
+      getForecastAccuracy(selectedTeamId, dateRange.from, dateRange.to),
+      getLtc(selectedTeamId, dateRange.from, dateRange.to)
     ])
-      .then(([metricsData, accuracyData]) => {
+      .then(([metricsData, accuracyData, ltcData]) => {
         setMetrics(metricsData)
         setForecastAccuracy(accuracyData)
+        setLtc(ltcData)
         setMetricsLoading(false)
       })
       .catch(err => {
         console.error('Failed to load metrics:', err)
         setMetrics(null)
         setForecastAccuracy(null)
+        setLtc(null)
         setMetricsLoading(false)
       })
   }, [selectedTeamId, dateRange.from, dateRange.to, issueType])
@@ -336,25 +341,32 @@ export function TeamMetricsPage() {
           ) : metrics ? (
             <>
               <div className="metrics-summary-cards">
+                <LtcGauge
+                  value={ltc && ltc.totalEpics > 0 ? ltc.avgLtcActual : null}
+                  title="LTC Actual"
+                  subtitle={ltc && ltc.totalEpics > 0 ? `среднее по ${ltc.totalEpics} эпикам` : 'нет данных'}
+                  tooltip="Отношение фактической длительности эпика (рабочие дни) к оценке (человеко-дни). ≤1.1 — отлично, 1.1–1.5 — допустимо, >1.5 — проблема."
+                />
+                <LtcGauge
+                  value={ltc && ltc.totalEpics > 0 ? ltc.avgLtcForecast : null}
+                  title="LTC Forecast"
+                  subtitle={ltc && ltc.totalEpics > 0 ? 'точность прогноза' : 'нет данных'}
+                  tooltip="Отношение фактической длительности к прогнозу из планирования. Показывает точность прогнозирования."
+                />
                 <MetricCard
                   title="Throughput"
                   value={metrics.throughput.total}
                   subtitle={`${metrics.throughput.totalStories} stories, ${metrics.throughput.totalEpics} epics`}
+                  tooltip="Количество завершённых задач за выбранный период."
                 />
                 <MetricCard
-                  title="Avg Lead Time"
-                  value={`${metrics.leadTime.avgDays.toFixed(1)} days`}
-                  subtitle={`Median: ${metrics.leadTime.medianDays.toFixed(1)} days | P90: ${metrics.leadTime.p90Days.toFixed(1)} days`}
-                />
-                <MetricCard
-                  title="Avg Cycle Time"
-                  value={`${metrics.cycleTime.avgDays.toFixed(1)} days`}
-                  subtitle={`Median: ${metrics.cycleTime.medianDays.toFixed(1)} days | P90: ${metrics.cycleTime.p90Days.toFixed(1)} days`}
-                />
-                <MetricCard
-                  title="Sample Size"
-                  value={metrics.leadTime.sampleSize}
-                  subtitle="completed issues"
+                  title="On-Time Rate"
+                  value={ltc && ltc.totalEpics > 0 ? `${ltc.onTimeRate.toFixed(0)}%` : '—'}
+                  subtitle={ltc && ltc.totalEpics > 0 ? `${ltc.onTimeCount} из ${ltc.totalEpics} вовремя` : 'нет данных'}
+                  trend={ltc && ltc.totalEpics > 0
+                    ? (ltc.onTimeRate >= 80 ? 'up' : ltc.onTimeRate < 50 ? 'down' : 'neutral')
+                    : undefined}
+                  tooltip="Процент эпиков с LTC ≤ 1.1 — завершённых в рамках оценки."
                 />
               </div>
 
@@ -376,8 +388,7 @@ export function TeamMetricsPage() {
             <div className="chart-empty">No metrics data available for this period</div>
           )}
 
-          {/* WIP History */}
-          <WipHistoryChart teamId={selectedTeamId} />
+          {/* WIP History — disabled */}
         </div>
       )}
 

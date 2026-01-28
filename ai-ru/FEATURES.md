@@ -29,6 +29,13 @@
 | F20. Story-Level Planning (Assignee Capacity) | ✅ Готово | 2026-01-25 |
 | F21. Unified Planning Algorithm | 🚧 В работе (backend + frontend готов) | 2026-01-25 |
 | F22. Team Metrics | ✅ Готово | 2026-01-26 |
+| F23. Planning Poker | ✅ Готово | 2026-01-28 |
+| F24. Team Metrics v2 (LTC, Burndown, Forecast) | 📋 Planned | - |
+| F25. Recommendation System | 📋 Planned | - |
+| F26. Employee Performance Dashboard | 📋 Planned | - |
+| F27. RBAC (Role-Based Access Control) | 📋 Planned | - |
+| F28. RICE Scoring & AutoScore Integration | 📋 Planned | - |
+| F29. Project-Level Management (идея) | 💡 Idea | - |
 
 ### Документация фич
 

@@ -2,6 +2,7 @@ package com.leadboard.metrics.controller;
 
 import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.service.ForecastAccuracyService;
+import com.leadboard.metrics.service.LtcService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -15,13 +16,16 @@ public class TeamMetricsController {
 
     private final TeamMetricsService metricsService;
     private final ForecastAccuracyService forecastAccuracyService;
+    private final LtcService ltcService;
 
     public TeamMetricsController(
             TeamMetricsService metricsService,
-            ForecastAccuracyService forecastAccuracyService
+            ForecastAccuracyService forecastAccuracyService,
+            LtcService ltcService
     ) {
         this.metricsService = metricsService;
         this.forecastAccuracyService = forecastAccuracyService;
+        this.ltcService = ltcService;
     }
 
     @GetMapping("/throughput")
@@ -92,5 +96,13 @@ public class TeamMetricsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return forecastAccuracyService.calculateAccuracy(teamId, from, to);
+    }
+
+    @GetMapping("/ltc")
+    public LtcResponse getLtc(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ltcService.calculateLtc(teamId, from, to);
     }
 }

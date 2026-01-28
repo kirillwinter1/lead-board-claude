@@ -143,6 +143,37 @@ export async function getByAssignee(
   return response.data
 }
 
+// ==================== LTC (Lead Time to Commit) ====================
+
+export interface EpicLtc {
+  epicKey: string
+  summary: string
+  workingDaysActual: number
+  estimateDays: number | null
+  forecastDays: number | null
+  ltcActual: number | null
+  ltcForecast: number | null
+}
+
+export interface LtcResponse {
+  avgLtcActual: number
+  avgLtcForecast: number
+  totalEpics: number
+  onTimeCount: number
+  onTimeRate: number
+  epics: EpicLtc[]
+}
+
+export async function getLtc(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<LtcResponse> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/ltc?${params}`)
+  return response.data
+}
+
 // ==================== Forecast Accuracy ====================
 
 export interface EpicAccuracy {
