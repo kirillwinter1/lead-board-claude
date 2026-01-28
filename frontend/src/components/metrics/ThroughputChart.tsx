@@ -1,4 +1,5 @@
 import { PeriodThroughput } from '../../api/metrics'
+import './ThroughputChart.css'
 
 interface ThroughputChartProps {
   data: PeriodThroughput[]

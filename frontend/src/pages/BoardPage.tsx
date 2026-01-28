@@ -5,6 +5,7 @@ import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '
 import { updateStoryPriority } from '../api/stories'
 import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
+import './BoardPage.css'
 
 // Sound effect for drag & drop - Pop sound
 const playDropSound = () => {

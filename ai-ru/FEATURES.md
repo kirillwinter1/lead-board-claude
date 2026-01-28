@@ -30,7 +30,7 @@
 | F21. Unified Planning Algorithm | 🚧 В работе (backend + frontend готов) | 2026-01-25 |
 | F22. Team Metrics | ✅ Готово | 2026-01-26 |
 | F23. Planning Poker | ✅ Готово | 2026-01-28 |
-| F24. Team Metrics v2 (LTC, Burndown, Forecast) | 📋 Planned | - |
+| F24. Team Metrics v2 (LTC, Burndown, Forecast) | 🚧 В работе | 2026-01-28 |
 | F25. Recommendation System | 📋 Planned | - |
 | F26. Employee Performance Dashboard | 📋 Planned | - |
 | F27. RBAC (Role-Based Access Control) | 📋 Planned | - |
@@ -862,6 +862,39 @@ status-mapping:
 - [x] UI страница Data Quality
 - [x] Alert badges на Board
 - [x] Unit-тесты (191 тест, все проходят)
+
+---
+
+### 2026-01-28: Forecast Accuracy — рабочие дни, Developing-статус, оценка
+
+**Улучшения ForecastAccuracyService:**
+
+1. **Рабочие дни вместо календарных**
+   - `plannedDays`, `actualDays`, `scheduleVariance` считаются через `WorkCalendarService.countWorkdays()`
+   - Учитываются выходные и праздники по производственному календарю РФ
+
+2. **Actual Start/End по StatusChangelog**
+   - `actualStart` = первый переход в статус из `timeLoggingAllowedStatuses` (Developing, В разработке, E2E Testing)
+   - `actualEnd` = последний переход в статус из `epicWorkflow.doneStatuses` (Done, Готово, Закрыто)
+   - Fallback: `startedAt`/`doneAt` из `JiraIssueEntity` если нет changelog
+   - Добавлен `findByIssueKeyOrderByTransitionedAtAsc` в `StatusChangelogRepository`
+
+3. **Изменение оценки (Estimate Change)**
+   - `initialEstimateHours` — из первого снэпшота где эпик появился (`totalEstimateSeconds / 3600`)
+   - `developingEstimateHours` — из снэпшота ближайшего к дате входа в Developing
+   - UI: колонка "Оценка" между "Дней факт" и "Ratio"
+   - Цветовая индикация: красный (рост), зелёный (снижение), серый (без изменений)
+
+4. **Обновлён раздел "Как читать эту таблицу?"**
+   - Описание рабочих дней вместо календарных
+   - Описание новой колонки "Оценка"
+
+**Файлы:**
+- `ForecastAccuracyService.java` — WorkCalendar, StatusChangelog, estimates
+- `ForecastAccuracyResponse.java` — +2 поля (initialEstimateHours, developingEstimateHours)
+- `StatusChangelogRepository.java` — +1 метод
+- `ForecastAccuracyChart.tsx` — колонка "Оценка", обновлённые подсказки
+- `ForecastAccuracyChart.css` — стили estimate pills
 
 ---
 

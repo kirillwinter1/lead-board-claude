@@ -1,0 +1,36 @@
+/* Metrics Table */
+.metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.metrics-table th,
+.metrics-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.metrics-table th {
+  font-weight: 600;
+  color: #6b778c;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f4f5f7;
+}
+
+.metrics-table td {
+  color: #172b4d;
+}
+
+.metrics-table tbody tr:hover {
+  background: #f4f5f7;
+}
+
+.metrics-table-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+

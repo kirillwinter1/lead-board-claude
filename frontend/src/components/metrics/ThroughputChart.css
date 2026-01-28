@@ -1,0 +1,164 @@
+/* Chart Sections */
+.chart-section {
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.chart-section h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.chart-empty {
+  text-align: center;
+  color: #6b778c;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+/* Throughput Chart */
+.throughput-chart {
+  display: flex;
+  height: 250px;
+  padding-bottom: 30px;
+}
+
+.chart-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 8px;
+  width: 40px;
+  text-align: right;
+}
+
+.chart-y-label {
+  font-size: 11px;
+  color: #6b778c;
+  line-height: 1;
+}
+
+.chart-area {
+  flex: 1;
+  position: relative;
+}
+
+.chart-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.chart-grid-line {
+  border-top: 1px solid #ebecf0;
+}
+
+.chart-bars {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 30px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  padding: 0 8px;
+}
+
+.bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  max-width: 60px;
+  height: 100%;
+  cursor: pointer;
+}
+
+.stacked-bar {
+  width: 100%;
+  max-width: 40px;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bar {
+  width: 100%;
+  min-height: 2px;
+  transition: opacity 0.2s;
+}
+
+.bar-epic {
+  background-color: #6554c0;
+  border-radius: 4px 4px 0 0;
+}
+
+.bar-story {
+  background-color: #0065ff;
+}
+
+.bar-subtask {
+  background-color: #00b8d9;
+  border-radius: 0 0 4px 4px;
+}
+
+.bar-group:hover .bar {
+  opacity: 0.8;
+}
+
+.bar-label {
+  font-size: 10px;
+  color: #6b778c;
+  margin-top: 8px;
+  white-space: nowrap;
+}
+
+/* Chart Legend */
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #6b778c;
+}
+
+.legend-item::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+
+.legend-epic::before {
+  background-color: #6554c0;
+}
+
+.legend-story::before {
+  background-color: #0065ff;
+}
+
+.legend-subtask::before {
+  background-color: #00b8d9;
+}
+

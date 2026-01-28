@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getConfig } from '../api/config'
+import './PlanningPokerPage.css'
 import {
   PokerSession,
   EligibleEpic,

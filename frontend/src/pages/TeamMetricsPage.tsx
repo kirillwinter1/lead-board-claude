@@ -3,6 +3,7 @@ import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
 import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getLtc, LtcResponse } from '../api/metrics'
 import { getConfig } from '../api/config'
+import './TeamMetricsPage.css'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { LtcGauge } from '../components/metrics/LtcGauge'
 import { ThroughputChart } from '../components/metrics/ThroughputChart'
@@ -370,6 +371,11 @@ export function TeamMetricsPage() {
                 />
               </div>
 
+              {/* Forecast Accuracy */}
+              {forecastAccuracy && (
+                <ForecastAccuracyChart data={forecastAccuracy} jiraBaseUrl={jiraBaseUrl} />
+              )}
+
               {/* Throughput Chart */}
               <ThroughputChart data={metrics.throughput.byPeriod} />
 
@@ -378,11 +384,6 @@ export function TeamMetricsPage() {
 
               {/* By Assignee Table */}
               <AssigneeTable data={metrics.byAssignee} />
-
-              {/* Forecast Accuracy */}
-              {forecastAccuracy && (
-                <ForecastAccuracyChart data={forecastAccuracy} jiraBaseUrl={jiraBaseUrl} />
-              )}
             </>
           ) : (
             <div className="chart-empty">No metrics data available for this period</div>

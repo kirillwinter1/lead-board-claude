@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import './MultiSelectDropdown.css'
 
 interface MultiSelectDropdownProps {
   label: string

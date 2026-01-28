@@ -15,6 +15,8 @@ public interface StatusChangelogRepository extends JpaRepository<StatusChangelog
 
     List<StatusChangelogEntity> findByIssueKeyOrderByTransitionedAtDesc(String issueKey);
 
+    List<StatusChangelogEntity> findByIssueKeyOrderByTransitionedAtAsc(String issueKey);
+
     Optional<StatusChangelogEntity> findFirstByIssueKeyOrderByTransitionedAtDesc(String issueKey);
 
     @Query("SELECT s FROM StatusChangelogEntity s WHERE s.issueKey = :issueKey AND s.toStatus = :toStatus AND s.transitionedAt = :transitionedAt")

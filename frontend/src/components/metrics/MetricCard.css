@@ -1,0 +1,138 @@
+/* =====================================================
+   TEAM METRICS - Summary Cards & Charts
+   ===================================================== */
+
+.metrics-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.metric-card {
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.metric-card-title {
+  font-size: 13px;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.metric-card-value {
+  font-size: 32px;
+  font-weight: 600;
+  color: #172b4d;
+  line-height: 1.2;
+}
+
+.metric-card-value.trend-up {
+  color: #00875a;
+}
+
+.metric-card-value.trend-down {
+  color: #de350b;
+}
+
+.metric-card-value.trend-neutral {
+  color: #ff991f;
+}
+
+.metric-card-subtitle {
+  font-size: 12px;
+  color: #6b778c;
+  margin-top: 8px;
+}
+
+/* Metric card layout — equal height cards */
+.metrics-summary-cards {
+  align-items: stretch;
+}
+
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Metric card header with tooltip */
+.metric-card-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.metric-tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.metric-tooltip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #c1c7d0;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  transition: background 0.15s;
+}
+
+.metric-tooltip-icon:hover {
+  background: #6b778c;
+}
+
+.metric-tooltip-text {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #172b4d;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  width: 240px;
+  text-align: left;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.metric-tooltip-wrapper:hover .metric-tooltip-text {
+  display: block;
+}
+
+/* LTC Gauge card */
+.ltc-gauge-card {
+  justify-content: flex-start;
+}
+
+.ltc-gauge-container {
+  width: 160px;
+  height: 90px;
+  margin: 4px auto -4px;
+  overflow: hidden;
+}
+
+.ltc-gauge-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 0;
+}
+

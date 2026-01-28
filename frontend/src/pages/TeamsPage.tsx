@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { teamsApi, Team, CreateTeamRequest, TeamsConfig, TeamSyncStatus } from '../api/teams'
 import { Modal } from '../components/Modal'
+import './TeamsPage.css'
 
 export function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([])

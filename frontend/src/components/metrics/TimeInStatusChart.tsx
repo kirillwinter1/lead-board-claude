@@ -1,4 +1,5 @@
 import { TimeInStatusResponse } from '../../api/metrics'
+import './TimeInStatusChart.css'
 
 interface TimeInStatusChartProps {
   data: TimeInStatusResponse[]

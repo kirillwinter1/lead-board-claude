@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot } from '../api/forecast'
 import { getConfig } from '../api/config'
+import './TimelinePage.css'
 
 // Issue type icons
 import storyIcon from '../icons/story.png'

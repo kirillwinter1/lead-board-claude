@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
 import logo from '../icons/logo.png'
+import './Header.css'
 
 interface AuthUser {
   id: number

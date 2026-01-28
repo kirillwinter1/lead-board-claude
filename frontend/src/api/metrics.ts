@@ -188,6 +188,8 @@ export interface EpicAccuracy {
   accuracyRatio: number
   scheduleVariance: number
   status: 'ON_TIME' | 'EARLY' | 'LATE'
+  initialEstimateHours: number
+  developingEstimateHours: number
 }
 
 export interface ForecastAccuracyResponse {

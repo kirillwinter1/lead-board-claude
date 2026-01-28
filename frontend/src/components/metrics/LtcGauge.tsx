@@ -1,4 +1,5 @@
 import GaugeComponent from 'react-gauge-component'
+import './MetricCard.css'
 
 interface LtcGaugeProps {
   value: number | null

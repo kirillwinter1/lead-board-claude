@@ -1,4 +1,5 @@
 import { AssigneeMetrics } from '../../api/metrics'
+import './AssigneeTable.css'
 
 interface AssigneeTableProps {
   data: AssigneeMetrics[]

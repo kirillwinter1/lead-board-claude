@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getConfig } from '../api/config'
+import './PlanningPokerPage.css'
 import {
   PokerSession,
   PokerStory,

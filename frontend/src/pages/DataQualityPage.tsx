@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import axios from 'axios'
+import './DataQualityPage.css'
 
 interface ViolationDto {
   rule: string

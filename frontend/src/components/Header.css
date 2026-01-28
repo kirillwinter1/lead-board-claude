@@ -1,0 +1,99 @@
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-left h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: #172b4d;
+  margin: 0;
+}
+
+.logo-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+.header-logo {
+  height: 36px;
+  width: auto;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+}
+
+.sync-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sync-info {
+  font-size: 13px;
+  color: #6b778c;
+}
+
+.btn-refresh {
+  min-width: 100px;
+}
+
+.btn-refresh.syncing {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Auth Status */
+.auth-status {
+  margin-left: 16px;
+  padding-left: 16px;
+  border-left: 1px solid #dfe1e6;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #172b4d;
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #0052cc;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.btn-link:hover {
+  text-decoration: underline;
+}
+
+.btn-logout {
+  margin-left: 8px;
+  color: #6b778c;
+}
+

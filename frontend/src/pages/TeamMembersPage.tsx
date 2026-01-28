@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest, PlanningConfig } from '../api/teams'
 import { Modal } from '../components/Modal'
+import './TeamsPage.css'
 
 const ROLES = ['SA', 'DEV', 'QA'] as const
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const

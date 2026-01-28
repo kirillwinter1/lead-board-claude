@@ -39,6 +39,8 @@ public record ForecastAccuracyResponse(
             int actualDays,                // Actual duration in days
             BigDecimal accuracyRatio,      // planned / actual (>1 = faster, <1 = slower)
             int scheduleVariance,          // Days early (negative) or late (positive)
-            String status                  // ON_TIME, EARLY, LATE
+            String status,                 // ON_TIME, EARLY, LATE
+            long initialEstimateHours,     // Estimate when epic first appeared in snapshots
+            long developingEstimateHours   // Estimate when epic entered Developing
     ) {}
 }

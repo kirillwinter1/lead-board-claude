@@ -1,3 +1,5 @@
+import './MetricCard.css'
+
 interface MetricCardProps {
   title: string
   value: string | number

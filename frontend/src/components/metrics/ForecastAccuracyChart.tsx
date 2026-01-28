@@ -1,4 +1,5 @@
 import { ForecastAccuracyResponse, EpicAccuracy } from '../../api/metrics'
+import './ForecastAccuracyChart.css'
 
 interface ForecastAccuracyChartProps {
   data: ForecastAccuracyResponse
@@ -27,15 +28,6 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'EARLY': return '#36B37E'
-      case 'ON_TIME': return '#0065FF'
-      case 'LATE': return '#FF5630'
-      default: return '#6B778C'
-    }
-  }
-
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'EARLY': return 'Раньше срока'
@@ -51,9 +43,30 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
     return '#FF5630' // Poor
   }
 
+  const formatEstimate = (epic: EpicAccuracy) => {
+    const initial = epic.initialEstimateHours
+    const developing = epic.developingEstimateHours
+    if (!initial && !developing) return '—'
+    if (initial === developing || !developing) return `${initial}ч`
+    return `${initial}ч → ${developing}ч`
+  }
+
+  const getEstimateClass = (epic: EpicAccuracy) => {
+    const initial = epic.initialEstimateHours
+    const developing = epic.developingEstimateHours
+    if (!initial || !developing || initial === developing) return 'estimate-same'
+    return developing > initial ? 'estimate-up' : 'estimate-down'
+  }
+
   return (
     <div className="chart-section">
-      <h3>Forecast Accuracy</h3>
+      <div className="accuracy-header">
+        <h3>Forecast Accuracy</h3>
+        <p className="accuracy-description">
+          Насколько точно команда попадает в плановые сроки по эпикам.
+          Сравниваем прогноз из планирования с фактической датой завершения.
+        </p>
+      </div>
 
       {/* Summary Cards */}
       <div className="accuracy-summary">
@@ -63,7 +76,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
           </div>
           <div className="accuracy-label">
             Accuracy Ratio
-            <span className="accuracy-hint">план/факт</span>
+            <span className="accuracy-hint">плановые дни / фактические дни</span>
           </div>
         </div>
 
@@ -73,7 +86,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
           </div>
           <div className="accuracy-label">
             On-Time Delivery
-            <span className="accuracy-hint">в срок или раньше</span>
+            <span className="accuracy-hint">% эпиков завершённых в срок или раньше</span>
           </div>
         </div>
 
@@ -83,7 +96,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
           </div>
           <div className="accuracy-label">
             Schedule Variance
-            <span className="accuracy-hint">среднее отклонение</span>
+            <span className="accuracy-hint">среднее отклонение в днях (− раньше, + позже)</span>
           </div>
         </div>
 
@@ -109,13 +122,14 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
             <thead>
               <tr>
                 <th>Эпик</th>
-                <th>План</th>
-                <th>Факт</th>
-                <th>Дней план</th>
-                <th>Дней факт</th>
-                <th>Ratio</th>
-                <th>Отклонение</th>
-                <th>Статус</th>
+                <th title="Плановые даты начала и окончания из прогноза">План</th>
+                <th title="Фактические даты начала и завершения">Факт</th>
+                <th title="Количество рабочих дней по плану">Дней план</th>
+                <th title="Количество рабочих дней по факту">Дней факт</th>
+                <th title="Изменение оценки: при появлении → при входе в разработку">Оценка</th>
+                <th title="Плановые дни / Фактические дни. 1.0 = идеальное попадание">Ratio</th>
+                <th title="Разница в днях: факт минус план. Минус = раньше срока">Отклонение</th>
+                <th title="Раньше срока / В срок / С опозданием">Статус</th>
               </tr>
             </thead>
             <tbody>
@@ -144,20 +158,34 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
                   </td>
                   <td className="number-cell">{epic.plannedDays}</td>
                   <td className="number-cell">{epic.actualDays}</td>
-                  <td className="number-cell" style={{ color: getAccuracyColor(epic.accuracyRatio) }}>
-                    {epic.accuracyRatio.toFixed(2)}
+                  <td className="number-cell">
+                    <span className={`estimate-pill ${getEstimateClass(epic)}`}>
+                      {formatEstimate(epic)}
+                    </span>
                   </td>
-                  <td className="number-cell" style={{ color: getStatusColor(epic.status) }}>
-                    {epic.scheduleVariance > 0 ? '+' : ''}{epic.scheduleVariance}д
+                  <td className="number-cell">
+                    <div className="ratio-cell">
+                      <span style={{ color: getAccuracyColor(epic.accuracyRatio) }}>
+                        {epic.accuracyRatio.toFixed(2)}
+                      </span>
+                      <div className="ratio-gauge">
+                        <div
+                          className="ratio-gauge-fill"
+                          style={{
+                            width: `${Math.min(epic.accuracyRatio / 1.5 * 100, 100)}%`,
+                            backgroundColor: getAccuracyColor(epic.accuracyRatio),
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </td>
+                  <td className="number-cell">
+                    <span className={`variance-pill ${epic.scheduleVariance < 0 ? 'variance-early' : epic.scheduleVariance > 0 ? 'variance-late' : 'variance-ontime'}`}>
+                      {epic.scheduleVariance > 0 ? '+' : ''}{epic.scheduleVariance}д
+                    </span>
                   </td>
                   <td>
-                    <span
-                      className="status-badge"
-                      style={{
-                        backgroundColor: getStatusColor(epic.status) + '20',
-                        color: getStatusColor(epic.status),
-                      }}
-                    >
+                    <span className={`status-pill ${epic.status === 'EARLY' ? 'status-early' : epic.status === 'ON_TIME' ? 'status-ontime' : 'status-late'}`}>
                       {getStatusLabel(epic.status)}
                     </span>
                   </td>
@@ -168,18 +196,53 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
         </div>
       )}
 
-      {/* Legend */}
-      <div className="accuracy-legend">
-        <div className="legend-section">
-          <strong>Accuracy Ratio:</strong>
-          <span style={{ color: '#36B37E' }}>0.95-1.05 = отлично</span>
-          <span style={{ color: '#FFAB00' }}>0.8-1.2 = приемлемо</span>
-          <span style={{ color: '#FF5630' }}>&lt;0.8 или &gt;1.2 = требует внимания</span>
-        </div>
-        <div className="legend-section">
-          <span>Ratio &gt; 1 = сделали быстрее плана</span>
-          <span>Ratio &lt; 1 = сделали медленнее плана</span>
-        </div>
+      {/* How to read */}
+      <div className="accuracy-howto">
+        <details>
+          <summary className="accuracy-howto-toggle">Как читать эту таблицу?</summary>
+          <div className="accuracy-howto-content">
+            <div className="howto-block">
+              <strong>Что показывает Forecast Accuracy?</strong>
+              <p>Сравнивает плановые сроки эпика (из прогноза на планировании) с фактическими датами завершения. Все расчёты ведутся в <b>рабочих днях</b> (без выходных и праздников). Фактические даты берутся из истории переходов статусов (вход в Developing → выход в Done).</p>
+            </div>
+            <div className="howto-block">
+              <strong>Accuracy Ratio</strong>
+              <p>Плановые рабочие дни делим на фактические. Идеал — <b>1.00</b> (план = факт).</p>
+              <ul>
+                <li><span style={{ color: '#36B37E' }}>0.95–1.05</span> — отличное попадание</li>
+                <li><span style={{ color: '#FFAB00' }}>0.80–1.20</span> — приемлемое отклонение</li>
+                <li><span style={{ color: '#FF5630' }}>&lt;0.80 или &gt;1.20</span> — требует внимания</li>
+              </ul>
+              <p>Ratio &gt; 1 — сделали быстрее плана. Ratio &lt; 1 — медленнее.</p>
+            </div>
+            <div className="howto-block">
+              <strong>Отклонение (Schedule Variance)</strong>
+              <p>Разница в рабочих днях между фактом и планом.</p>
+              <ul>
+                <li><span className="variance-pill variance-early">−3д</span> — завершили на 3 рабочих дня раньше</li>
+                <li><span className="variance-pill variance-ontime">0д</span> — точно в срок</li>
+                <li><span className="variance-pill variance-late">+5д</span> — опоздание на 5 рабочих дней</li>
+              </ul>
+            </div>
+            <div className="howto-block">
+              <strong>Оценка (Estimate Change)</strong>
+              <p>Изменение трудозатрат эпика: от первого появления в прогнозе до входа в разработку.</p>
+              <ul>
+                <li><span className="estimate-pill estimate-same">120ч</span> — оценка не менялась</li>
+                <li><span className="estimate-pill estimate-up">80ч → 120ч</span> — оценка выросла (scope creep)</li>
+                <li><span className="estimate-pill estimate-down">120ч → 80ч</span> — оценка снизилась</li>
+              </ul>
+            </div>
+            <div className="howto-block">
+              <strong>Что делать с результатами?</strong>
+              <ul>
+                <li>On-Time Delivery &lt; 50% — стоит пересмотреть подход к оценке сроков</li>
+                <li>Ratio стабильно &lt; 1 — команда систематически недооценивает сложность</li>
+                <li>Ratio стабильно &gt; 1 — оценки завышены, можно планировать плотнее</li>
+              </ul>
+            </div>
+          </div>
+        </details>
       </div>
     </div>
   )
