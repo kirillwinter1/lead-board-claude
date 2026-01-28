@@ -1,176 +1,51 @@
-# Lead Board — Документация для разработки
+# Lead Board — Документация
 
 ## Что такое Lead Board?
 
-Lead Board — SaaS-продукт для управления IT-доставкой. Работает поверх Jira и помогает ответить на вопросы:
-
-- Сколько работы у нас реально есть?
-- Как далеко мы от завершения?
+SaaS-продукт для управления IT-доставкой поверх Jira. Отвечает на вопросы:
+- Сколько работы реально есть?
 - Успеем ли доставить в квартале?
 - Где переоцениваем или недооцениваем?
 
-**Целевые пользователи:** Team Leads, Engineering Managers, Product Managers, Delivery Managers
+**Пользователи:** Team Leads, Engineering Managers, Product Managers, Delivery Managers
 
-**Ключевая ценность:** Прозрачность вместо оптимизма. Планирование на основе фактов, а не обещаний.
+## Содержание
 
----
+| Документ | Описание |
+|----------|----------|
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Карта кодовой базы (пакеты, сервисы, entities, API, frontend) |
+| [FEATURES.md](FEATURES.md) | Индекс фич со статусами и ссылками на спецификации |
+| [RULES.md](RULES.md) | Бизнес-правила + правила разработки |
+| [TECH_DEBT.md](TECH_DEBT.md) | Технический долг и архитектурные проблемы |
+| [JIRA_WORKFLOWS.md](JIRA_WORKFLOWS.md) | Jira workflows (Epic, Story, Subtask) |
+| [API_PLANNING.md](API_PLANNING.md) | API Planning документация |
+| [ROADMAP_V2.md](ROADMAP_V2.md) | Роадмап будущих фич (F24-F29) |
+| [features/](features/) | Детальные спецификации фич (F14-F23) |
+| [archive/](archive/) | Устаревшие документы |
 
-## Содержание папки
+## Текущие страницы UI
 
-| Файл | Описание |
-|------|----------|
-| [CONTEXT.md](./CONTEXT.md) | Контекст и видение продукта |
-| [MAIN_PAGE.md](./MAIN_PAGE.md) | Описание главной страницы (Board) |
-| [FEATURES.md](./FEATURES.md) | Список фич с описанием и критериями готовности |
-| [RULES.md](./RULES.md) | Правила разработки, принципы, чеклисты |
-| [F13_AUTOPLANNING.md](./F13_AUTOPLANNING.md) | Спецификация фичи автопланирования |
-| [F13_PLAN.md](./F13_PLAN.md) | План реализации автопланирования |
-| [F14_TIMELINE_GANTT.md](./F14_TIMELINE_GANTT.md) | Спецификация Timeline/Gantt |
-| [API_PLANNING.md](./API_PLANNING.md) | Документация Planning API |
-
----
-
-## Текущий статус (Январь 2026)
-
-### Реализованные фичи
-
-| Фича | Описание |
-|------|----------|
-| **F1. Bootstrap** | Монорепозиторий: Java 21 + Spring Boot 3 backend, React + Vite + TypeScript frontend |
-| **F2. Jira Integration** | Интеграция с Jira REST API v3, иерархия Epic → Story → Sub-task → Bug |
-| **F3. Sync & Cache** | PostgreSQL кэш, инкрементальная синхронизация, кнопка Refresh |
-| **F4. OAuth 2.0** | Авторизация через Atlassian, хранение токенов, автообновление |
-| **F5. Team Backend** | CRUD API для команд и участников (/api/teams) |
-| **F6. Team UI** | Страницы управления командами и участниками |
-| **F7. Team Sync** | Синхронизация команд и участников из Atlassian Teams API |
-| **F10. Epic-Team Mapping** | Синхронизация команды из Jira Team field, отображение на Board |
-| **F13. Автопланирование** | AutoScore, Expected Done, drag & drop приоритетов, конвейерная модель SA→DEV→QA |
-| **F14. Timeline/Gantt** | Gantt-диаграмма с фазами, zoom уровни, индикаторы Today/Due Date |
-| **F17. Configurable Status Mapping** | Настраиваемый маппинг статусов Jira на категории (TODO/IN_PROGRESS/DONE) |
-| **F18. Data Quality** | 20 правил проверки качества данных (ERROR/WARNING/INFO) |
-| **F19. Story AutoScore** | Автоматическая приоритизация stories с учётом dependencies, топологическая сортировка |
-
-### Текущий UI
-
-**Главная страница (Board) — `/`:**
-- Табличный вид с колонками: NAME, TEAM, ESTIMATE, LOGGED TIME, OVERALL PROGRESS, ROLE-BASED PROGRESS, STATUS, ALERTS
-- Раскрываемые строки (Epic → Story → Sub-task)
-- Команда отображается из Jira Team field
-- Иконки типов задач Jira
-- Прогресс-бары с процентами
-- Чипы ролей (SA/DEV/QA) с визуальным заполнением
-- Фильтры: поиск по ключу, выбор статусов
-- Кнопка Refresh для синхронизации с Jira
-
-**Страница команд — `/teams`:**
-- Список всех команд с количеством участников
-- Кнопка "Sync from Atlassian" для синхронизации команд
-- Создание/редактирование/деактивация команд (если включено manualTeamManagement)
-- Jira Team Value для маппинга с Epic
-
-**Страница участников — `/teams/:id`:**
-- Список участников команды
-- Роль (SA/DEV/QA), грейд (Junior/Middle/Senior), часы в день
-- Добавление/редактирование/деактивация участников
-
-### API Endpoints
-
-| Метод | Путь | Описание |
-|-------|------|----------|
-| GET | /api/health | Проверка работоспособности |
-| GET | /api/board | Получить доску (из кэша) |
-| GET | /api/sync/status | Статус синхронизации задач |
-| POST | /api/sync/trigger | Запустить синхронизацию задач |
-| GET | /api/teams | Список команд |
-| POST | /api/teams | Создать команду |
-| GET | /api/teams/{id} | Получить команду |
-| PUT | /api/teams/{id} | Обновить команду |
-| DELETE | /api/teams/{id} | Деактивировать команду |
-| GET | /api/teams/config | Конфигурация команд |
-| GET | /api/teams/sync/status | Статус синхронизации команд |
-| POST | /api/teams/sync/trigger | Синхронизировать команды из Atlassian |
-| GET | /api/teams/{id}/members | Участники команды |
-| POST | /api/teams/{id}/members | Добавить участника |
-| PUT | /api/teams/{id}/members/{mid} | Обновить участника |
-| POST | /api/teams/{id}/members/{mid}/deactivate | Деактивировать |
-| GET | /api/teams/{id}/planning-config | Конфигурация планирования команды |
-| PUT | /api/teams/{id}/planning-config | Обновить конфигурацию планирования |
-| GET | /api/calendar/workdays | Рабочие дни за период |
-| GET | /api/calendar/is-workday | Проверка рабочего дня |
-| GET | /api/calendar/count-workdays | Подсчёт рабочих дней |
-| GET | /api/calendar/add-workdays | Дата через N рабочих дней |
-| POST | /api/calendar/refresh | Обновить кэш календаря |
-| GET | /api/epics/{epicKey}/stories | Получить stories с AutoScore |
-| PATCH | /api/stories/{storyKey}/priority | Обновить ручной приоритет story |
-| POST | /api/planning/recalculate-stories | Пересчитать AutoScore для stories |
-| GET | /api/data-quality | Проверки качества данных |
-
----
-
-## Быстрый старт для разработчика
-
-### 1. Прочитай правила
-Файл `RULES.md` содержит ключевые принципы, которые нельзя нарушать:
-- Jira — единственный источник истины
-- Backend — единственный источник расчётов
-- Конфигурируемость вместо хардкода
-- Тесты обязательны
-
-### 2. Выбери фичу
-Файл `FEATURES.md` содержит упорядоченный список фич с зависимостями.
-Начинай с F1 и двигайся по порядку.
-
-### 3. Чеклист перед завершением
-- Тесты написаны и проходят
-- Конфигурация вместо хардкода
-- Миграции совместимы назад
-- Проект собирается и запускается
-
----
+| Путь | Страница | Описание |
+|------|----------|----------|
+| `/` | Board | Доска Epic→Story→Subtask с прогрессом, оценками, alerts |
+| `/timeline` | Timeline | Gantt-диаграмма с фазами SA/DEV/QA |
+| `/metrics` | Metrics | Командные метрики: LTC, throughput, forecast accuracy |
+| `/data-quality` | Data Quality | Отчёт о качестве данных (17 правил) |
+| `/teams` | Teams | Управление командами |
+| `/teams/:id` | Members | Участники, planning config |
+| `/poker` | Poker | Planning Poker (лобби + комнаты) |
 
 ## Технологии
 
 | Компонент | Технология |
 |-----------|------------|
-| Backend | Java 21, Spring Boot 3, PostgreSQL |
-| Frontend | React, TypeScript, Vite |
+| Backend | Java 21, Spring Boot 3, PostgreSQL, Flyway |
+| Frontend | React 18, TypeScript, Vite |
 | Auth | Atlassian OAuth 2.0 (3LO) |
 | Infra | Docker Compose |
 
----
+## Быстрый старт
 
-## Доменная модель (кратко)
-
-```
-Company
-└── JiraSpace (Jira-проект)
-    └── Team
-        └── TeamMember
-
-Epic (принадлежит команде)
-└── Story
-    └── Sub-task (Analytics / Development / Testing)
-```
-
----
-
-## Ключевые формулы
-
-**Прогресс:**
-```
-progress = min(logged_hours / estimated_hours, 1.0)
-```
-
-**Время:**
-```
-1 человеко-день = 8 часов
-```
-
----
-
-## Контакты и ссылки
-
-- Оригинальная документация: папка `ai/`
-- Спецификации фич: `ai/SPEC/`
-- История промптов: `ai/PROMPTS/`
-- Технический долг: `ai/TODO/`
+1. Прочитай [RULES.md](RULES.md) — ключевые принципы
+2. Прочитай [ARCHITECTURE.md](ARCHITECTURE.md) — карта кодовой базы
+3. Смотри [FEATURES.md](FEATURES.md) — что реализовано и что планируется
