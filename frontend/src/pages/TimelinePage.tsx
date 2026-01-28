@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot } from '../api/forecast'
 import { getConfig } from '../api/config'
 
 // Issue type icons
@@ -178,7 +178,7 @@ function allocateStoryLanes(stories: PlannedStory[]): Map<string, number> {
 // Constants for layout
 const BAR_HEIGHT = 22
 const LANE_GAP = 3
-const MIN_ROW_HEIGHT = 36
+const MIN_ROW_HEIGHT = 48
 
 // Calculate row height for an epic based on its stories
 function calculateRowHeight(stories: PlannedStory[]): number {
@@ -254,8 +254,8 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
   }
 
   // Shorten status for display
-  const shortStatus = (epic.status || '').length > 12
-    ? (epic.status || '').substring(0, 10) + '…'
+  const shortStatus = (epic.status || '').length > 18
+    ? (epic.status || '').substring(0, 16) + '…'
     : (epic.status || 'Unknown')
 
   return (
@@ -843,6 +843,11 @@ export function TimelinePage() {
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
 
+  // Historical snapshot state
+  const [availableDates, setAvailableDates] = useState<string[]>([])
+  const [selectedHistoricalDate, setSelectedHistoricalDate] = useState<string>('') // empty = live data
+  const [isHistoricalMode, setIsHistoricalMode] = useState(false)
+
   const chartRef = useRef<HTMLDivElement>(null)
 
   // Load config and teams
@@ -862,27 +867,70 @@ export function TimelinePage() {
       .catch(err => setError('Failed to load teams: ' + err.message))
   }, [])
 
-  // Load data when team changes
+  // Load available snapshot dates when team changes
+  useEffect(() => {
+    if (!selectedTeamId) return
+
+    getAvailableSnapshotDates(selectedTeamId)
+      .then(dates => {
+        setAvailableDates(dates)
+        // Reset historical date selection when team changes
+        setSelectedHistoricalDate('')
+        setIsHistoricalMode(false)
+      })
+      .catch(err => console.error('Failed to load snapshot dates:', err))
+  }, [selectedTeamId])
+
+  // Load data when team or historical date changes
   useEffect(() => {
     if (!selectedTeamId) return
 
     setLoading(true)
     setError(null)
 
-    Promise.all([
-      getForecast(selectedTeamId),
-      getUnifiedPlanning(selectedTeamId)
-    ])
-      .then(([forecastData, planData]) => {
-        setForecast(forecastData)
-        setUnifiedPlan(planData)
-        setLoading(false)
-      })
-      .catch(err => {
-        setError('Failed to load data: ' + err.message)
-        setLoading(false)
-      })
-  }, [selectedTeamId])
+    if (selectedHistoricalDate && isHistoricalMode) {
+      // Load from historical snapshot
+      Promise.all([
+        getForecastSnapshot(selectedTeamId, selectedHistoricalDate),
+        getUnifiedPlanningSnapshot(selectedTeamId, selectedHistoricalDate)
+      ])
+        .then(([forecastData, planData]) => {
+          setForecast(forecastData)
+          setUnifiedPlan(planData)
+          setLoading(false)
+        })
+        .catch(err => {
+          setError('Failed to load historical snapshot: ' + err.message)
+          setLoading(false)
+        })
+    } else {
+      // Load live data
+      Promise.all([
+        getForecast(selectedTeamId),
+        getUnifiedPlanning(selectedTeamId)
+      ])
+        .then(([forecastData, planData]) => {
+          setForecast(forecastData)
+          setUnifiedPlan(planData)
+          setLoading(false)
+        })
+        .catch(err => {
+          setError('Failed to load data: ' + err.message)
+          setLoading(false)
+        })
+    }
+  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode])
+
+  // Handle historical date selection
+  const handleHistoricalDateChange = (date: string) => {
+    if (date === '') {
+      setSelectedHistoricalDate('')
+      setIsHistoricalMode(false)
+    } else {
+      setSelectedHistoricalDate(date)
+      setIsHistoricalMode(true)
+    }
+  }
 
   // Auto-scroll to today
   useEffect(() => {
@@ -963,6 +1011,28 @@ export function TimelinePage() {
           </select>
         </div>
 
+        <div className="filter-group">
+          <label className="filter-label">
+            Дата
+            {isHistoricalMode && (
+              <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>📜 Исторические данные</span>
+            )}
+          </label>
+          <select
+            className="filter-input"
+            value={selectedHistoricalDate}
+            onChange={e => handleHistoricalDateChange(e.target.value)}
+            style={{ minWidth: 140 }}
+          >
+            <option value="">Сегодня (live)</option>
+            {availableDates.map(date => (
+              <option key={date} value={date}>
+                {new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="timeline-legend">
           <span className="legend-item legend-phase-sa">SA</span>
           <span className="legend-item legend-phase-dev">DEV</span>
@@ -971,6 +1041,18 @@ export function TimelinePage() {
           <span className="legend-item legend-due">Due Date</span>
         </div>
       </div>
+
+      {isHistoricalMode && (
+        <div className="historical-mode-banner">
+          📜 Просмотр исторического снэпшота от {new Date(selectedHistoricalDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+          <button
+            onClick={() => handleHistoricalDateChange('')}
+            style={{ marginLeft: 12, padding: '2px 8px', fontSize: 12, cursor: 'pointer' }}
+          >
+            Вернуться к текущим данным
+          </button>
+        </div>
+      )}
 
       {loading && <div className="loading">Загрузка...</div>}
       {error && <div className="error">{error}</div>}

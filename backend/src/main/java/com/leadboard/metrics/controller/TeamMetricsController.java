@@ -1,6 +1,7 @@
 package com.leadboard.metrics.controller;
 
 import com.leadboard.metrics.dto.*;
+import com.leadboard.metrics.service.ForecastAccuracyService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -13,9 +14,14 @@ import java.util.List;
 public class TeamMetricsController {
 
     private final TeamMetricsService metricsService;
+    private final ForecastAccuracyService forecastAccuracyService;
 
-    public TeamMetricsController(TeamMetricsService metricsService) {
+    public TeamMetricsController(
+            TeamMetricsService metricsService,
+            ForecastAccuracyService forecastAccuracyService
+    ) {
         this.metricsService = metricsService;
+        this.forecastAccuracyService = forecastAccuracyService;
     }
 
     @GetMapping("/throughput")
@@ -75,5 +81,16 @@ public class TeamMetricsController {
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey) {
         return metricsService.getSummary(teamId, from, to, issueType, epicKey);
+    }
+
+    /**
+     * Get forecast accuracy metrics - compares planned vs actual completion dates.
+     */
+    @GetMapping("/forecast-accuracy")
+    public ForecastAccuracyResponse getForecastAccuracy(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return forecastAccuracyService.calculateAccuracy(teamId, from, to);
     }
 }

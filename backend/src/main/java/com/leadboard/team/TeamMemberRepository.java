@@ -16,4 +16,8 @@ public interface TeamMemberRepository extends JpaRepository<TeamMemberEntity, Lo
     boolean existsByTeamIdAndJiraAccountIdAndActiveTrue(Long teamId, String jiraAccountId);
 
     Optional<TeamMemberEntity> findByJiraAccountIdAndActiveTrue(String jiraAccountId);
+
+    Optional<TeamMemberEntity> findByTeamIdAndJiraAccountId(Long teamId, String jiraAccountId);
+
+    Optional<TeamMemberEntity> findByTeamIdAndJiraAccountIdAndActiveTrue(Long teamId, String jiraAccountId);
 }

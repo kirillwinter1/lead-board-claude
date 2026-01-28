@@ -142,3 +142,43 @@ export async function getByAssignee(
   const response = await axios.get(`/api/metrics/by-assignee?${params}`)
   return response.data
 }
+
+// ==================== Forecast Accuracy ====================
+
+export interface EpicAccuracy {
+  epicKey: string
+  summary: string
+  plannedStart: string | null
+  plannedEnd: string | null
+  actualStart: string | null
+  actualEnd: string | null
+  plannedDays: number
+  actualDays: number
+  accuracyRatio: number
+  scheduleVariance: number
+  status: 'ON_TIME' | 'EARLY' | 'LATE'
+}
+
+export interface ForecastAccuracyResponse {
+  teamId: number
+  from: string
+  to: string
+  avgAccuracyRatio: number
+  onTimeDeliveryRate: number
+  avgScheduleVariance: number
+  totalCompleted: number
+  onTimeCount: number
+  lateCount: number
+  earlyCount: number
+  epics: EpicAccuracy[]
+}
+
+export async function getForecastAccuracy(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<ForecastAccuracyResponse> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/forecast-accuracy?${params}`)
+  return response.data
+}

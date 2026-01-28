@@ -402,3 +402,55 @@ export async function getUnifiedPlanning(teamId: number): Promise<UnifiedPlannin
   )
   return response.data
 }
+
+// ==================== Forecast Snapshots API ====================
+
+/**
+ * Получает доступные даты снэпшотов для команды.
+ */
+export async function getAvailableSnapshotDates(teamId: number): Promise<string[]> {
+  const response = await axios.get<string[]>(
+    `/api/forecast-snapshots/dates?teamId=${teamId}`
+  )
+  return response.data
+}
+
+/**
+ * Получает unified planning из исторического снэпшота.
+ */
+export async function getUnifiedPlanningSnapshot(teamId: number, date: string): Promise<UnifiedPlanningResult> {
+  const response = await axios.get<UnifiedPlanningResult>(
+    `/api/forecast-snapshots/unified?teamId=${teamId}&date=${date}`
+  )
+  return response.data
+}
+
+/**
+ * Получает forecast из исторического снэпшота.
+ */
+export async function getForecastSnapshot(teamId: number, date: string): Promise<ForecastResponse> {
+  const response = await axios.get<ForecastResponse>(
+    `/api/forecast-snapshots/forecast?teamId=${teamId}&date=${date}`
+  )
+  return response.data
+}
+
+/**
+ * Создаёт снэпшот вручную (для тестирования).
+ */
+export async function createForecastSnapshot(teamId: number): Promise<{ status: string; date?: string }> {
+  const response = await axios.post<{ status: string; date?: string }>(
+    `/api/forecast-snapshots/create?teamId=${teamId}`
+  )
+  return response.data
+}
+
+/**
+ * Создаёт снэпшот для указанной даты (для backfill).
+ */
+export async function createForecastSnapshotForDate(teamId: number, date: string): Promise<{ status: string; date: string }> {
+  const response = await axios.post<{ status: string; date: string }>(
+    `/api/forecast-snapshots/create-for-date?teamId=${teamId}&date=${date}`
+  )
+  return response.data
+}

@@ -12,6 +12,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
+import java.util.Map;
 
 @Component
 public class JiraClient {
@@ -111,5 +113,157 @@ public class JiraClient {
                 .retrieve()
                 .bodyToMono(JiraSearchResponse.class)
                 .block();
+    }
+
+    /**
+     * Create a new issue in Jira (Story, Epic, etc.)
+     */
+    public String createIssue(String projectKey, String issueType, String summary, String parentKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        Map<String, Object> fields = new java.util.HashMap<>();
+        fields.put("project", Map.of("key", projectKey));
+        fields.put("summary", summary);
+        fields.put("issuetype", Map.of("name", issueType));
+
+        if (parentKey != null && !parentKey.isEmpty()) {
+            // For Story linked to Epic
+            fields.put("parent", Map.of("key", parentKey));
+        }
+
+        Map<String, Object> body = Map.of("fields", fields);
+
+        if (accessToken != null && cloudId != null) {
+            return createIssueWithOAuth(body, accessToken, cloudId);
+        }
+        return createIssueWithBasicAuth(body);
+    }
+
+    private String createIssueWithOAuth(Map<String, Object> body, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        Map<String, Object> response = webClient.post()
+                .uri(baseUrl + "/rest/api/3/issue")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+
+        return (String) response.get("key");
+    }
+
+    private String createIssueWithBasicAuth(Map<String, Object> body) {
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        Map<String, Object> response = webClient.post()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+
+        return (String) response.get("key");
+    }
+
+    /**
+     * Create a subtask under a parent issue
+     */
+    public String createSubtask(String parentKey, String summary, String projectKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        Map<String, Object> fields = new java.util.HashMap<>();
+        fields.put("project", Map.of("key", projectKey));
+        fields.put("summary", summary);
+        fields.put("issuetype", Map.of("name", "Sub-task"));
+        fields.put("parent", Map.of("key", parentKey));
+
+        Map<String, Object> body = Map.of("fields", fields);
+
+        if (accessToken != null && cloudId != null) {
+            return createIssueWithOAuth(body, accessToken, cloudId);
+        }
+        return createIssueWithBasicAuth(body);
+    }
+
+    /**
+     * Get subtasks of an issue
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getSubtasks(String parentKey) {
+        String jql = "parent = " + parentKey;
+        JiraSearchResponse response = search(jql, 50, null);
+        return response.getIssues().stream()
+                .map(issue -> {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("key", issue.getKey());
+                    map.put("fields", Map.of("summary", issue.getFields().getSummary()));
+                    return map;
+                })
+                .toList();
+    }
+
+    /**
+     * Update time estimate on an issue (in seconds)
+     */
+    public void updateEstimate(String issueKey, int estimateSeconds) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        Map<String, Object> body = Map.of(
+                "fields", Map.of(
+                        "timetracking", Map.of(
+                                "originalEstimate", formatTimeEstimate(estimateSeconds)
+                        )
+                )
+        );
+
+        if (accessToken != null && cloudId != null) {
+            updateIssueWithOAuth(issueKey, body, accessToken, cloudId);
+        } else {
+            updateIssueWithBasicAuth(issueKey, body);
+        }
+    }
+
+    private void updateIssueWithOAuth(String issueKey, Map<String, Object> body, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        webClient.put()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    private void updateIssueWithBasicAuth(String issueKey, Map<String, Object> body) {
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        webClient.put()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey)
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    private String formatTimeEstimate(int seconds) {
+        int hours = seconds / 3600;
+        if (hours >= 8) {
+            int days = hours / 8;
+            int remainingHours = hours % 8;
+            if (remainingHours > 0) {
+                return days + "d " + remainingHours + "h";
+            }
+            return days + "d";
+        }
+        return hours + "h";
     }
 }

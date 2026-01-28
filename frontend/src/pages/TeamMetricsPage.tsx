@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
-import { getMetricsSummary, TeamMetricsSummary } from '../api/metrics'
+import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse } from '../api/metrics'
+import { getConfig } from '../api/config'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { ThroughputChart } from '../components/metrics/ThroughputChart'
 import { TimeInStatusChart } from '../components/metrics/TimeInStatusChart'
 import { AssigneeTable } from '../components/metrics/AssigneeTable'
+import { ForecastAccuracyChart } from '../components/metrics/ForecastAccuracyChart'
 
 // --- WIP History Chart Component ---
 
@@ -202,11 +204,13 @@ export function TeamMetricsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
+  const [forecastAccuracy, setForecastAccuracy] = useState<ForecastAccuracyResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [period, setPeriod] = useState(30) // days
   const [issueType, setIssueType] = useState<string>('')
+  const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
 
   // Computed date range
   const dateRange = useMemo(() => {
@@ -218,6 +222,13 @@ export function TeamMetricsPage() {
       to: to.toISOString().split('T')[0]
     }
   }, [period])
+
+  // Load config for Jira URL
+  useEffect(() => {
+    getConfig()
+      .then(config => setJiraBaseUrl(config.jiraBaseUrl))
+      .catch(err => console.error('Failed to load config:', err))
+  }, [])
 
   // Load teams
   useEffect(() => {
@@ -241,19 +252,26 @@ export function TeamMetricsPage() {
     if (!selectedTeamId) return
 
     setMetricsLoading(true)
-    getMetricsSummary(
-      selectedTeamId,
-      dateRange.from,
-      dateRange.to,
-      issueType || undefined
-    )
-      .then(data => {
-        setMetrics(data)
+
+    // Load both metrics and forecast accuracy in parallel
+    Promise.all([
+      getMetricsSummary(
+        selectedTeamId,
+        dateRange.from,
+        dateRange.to,
+        issueType || undefined
+      ),
+      getForecastAccuracy(selectedTeamId, dateRange.from, dateRange.to)
+    ])
+      .then(([metricsData, accuracyData]) => {
+        setMetrics(metricsData)
+        setForecastAccuracy(accuracyData)
         setMetricsLoading(false)
       })
       .catch(err => {
         console.error('Failed to load metrics:', err)
         setMetrics(null)
+        setForecastAccuracy(null)
         setMetricsLoading(false)
       })
   }, [selectedTeamId, dateRange.from, dateRange.to, issueType])
@@ -348,6 +366,11 @@ export function TeamMetricsPage() {
 
               {/* By Assignee Table */}
               <AssigneeTable data={metrics.byAssignee} />
+
+              {/* Forecast Accuracy */}
+              {forecastAccuracy && (
+                <ForecastAccuracyChart data={forecastAccuracy} jiraBaseUrl={jiraBaseUrl} />
+              )}
             </>
           ) : (
             <div className="chart-empty">No metrics data available for this period</div>

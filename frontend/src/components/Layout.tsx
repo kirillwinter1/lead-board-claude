@@ -67,6 +67,9 @@ export function Layout() {
             <NavLink to="/data-quality" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Data Quality
             </NavLink>
+            <NavLink to="/poker" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              Poker
+            </NavLink>
             <NavLink to="/teams" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Teams
             </NavLink>

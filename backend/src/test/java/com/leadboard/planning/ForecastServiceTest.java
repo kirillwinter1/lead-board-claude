@@ -157,7 +157,14 @@ class ForecastServiceTest {
                             new UnifiedPlanningResult.PhaseSchedule("user-3", "QA User", today.plusDays(5), today.plusDays(5), new BigDecimal("8"), false)
                     ),
                     List.of(),
-                    List.of()
+                    List.of(),
+                    "Story",
+                    "Medium",
+                    false,
+                    null,
+                    null,
+                    null,
+                    RoleProgressInfo.empty()
             );
 
             PhaseAggregation aggregation = new PhaseAggregation(
@@ -176,7 +183,15 @@ class ForecastServiceTest {
                     today,
                     today.plusDays(5),
                     List.of(story),
-                    aggregation
+                    aggregation,
+                    "Developing",
+                    null,
+                    null,
+                    null,
+                    null,
+                    RoleProgressInfo.empty(),
+                    1,
+                    1
             );
 
             UnifiedPlanningResult unifiedResult = new UnifiedPlanningResult(
@@ -274,9 +289,11 @@ class ForecastServiceTest {
             LocalDate today = LocalDate.now();
 
             PlannedStory story1 = new PlannedStory("STORY-1", "Story 1", BigDecimal.TEN, "To Do",
-                    today, today.plusDays(2), PlannedPhases.empty(), List.of(), List.of());
+                    today, today.plusDays(2), PlannedPhases.empty(), List.of(), List.of(),
+                    "Story", "Medium", false, null, null, null, RoleProgressInfo.empty());
             PlannedStory story2 = new PlannedStory("STORY-2", "Story 2", BigDecimal.TEN, "To Do",
-                    today, today.plusDays(2), PlannedPhases.empty(), List.of(), List.of());
+                    today, today.plusDays(2), PlannedPhases.empty(), List.of(), List.of(),
+                    "Story", "Medium", false, null, null, null, RoleProgressInfo.empty());
 
             PlannedEpic plannedEpic = new PlannedEpic(
                     "EPIC-1", "Test Epic", new BigDecimal("80"),
@@ -287,7 +304,8 @@ class ForecastServiceTest {
                             today, today.plusDays(1),
                             today.plusDays(2), today.plusDays(4),
                             today.plusDays(5), today.plusDays(5)
-                    )
+                    ),
+                    "Developing", null, null, null, null, RoleProgressInfo.empty(), 2, 2
             );
 
             List<PlanningWarning> warnings = List.of(
@@ -489,7 +507,14 @@ class ForecastServiceTest {
                 endDate,
                 PlannedPhases.empty(),
                 List.of(),
-                List.of()
+                List.of(),
+                "Story",
+                "Medium",
+                false,
+                null,
+                null,
+                null,
+                RoleProgressInfo.empty()
         );
 
         PhaseAggregation aggregation = new PhaseAggregation(
@@ -506,7 +531,15 @@ class ForecastServiceTest {
                 startDate,
                 endDate,
                 List.of(story),
-                aggregation
+                aggregation,
+                "Developing",
+                null,
+                null,
+                null,
+                null,
+                RoleProgressInfo.empty(),
+                1,
+                1
         );
     }
 }

@@ -6,6 +6,8 @@ import { TeamMembersPage } from './pages/TeamMembersPage'
 import { TimelinePage } from './pages/TimelinePage'
 import { TeamMetricsPage } from './pages/TeamMetricsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
+import { PlanningPokerPage } from './pages/PlanningPokerPage'
+import { PokerRoomPage } from './pages/PokerRoomPage'
 import './App.css'
 
 function App() {
@@ -17,6 +19,8 @@ function App() {
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="metrics" element={<TeamMetricsPage />} />
           <Route path="data-quality" element={<DataQualityPage />} />
+          <Route path="poker" element={<PlanningPokerPage />} />
+          <Route path="poker/room/:roomCode" element={<PokerRoomPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
         </Route>
