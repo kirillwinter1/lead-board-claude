@@ -1,32 +1,50 @@
 # Lead Board
 
-Project management dashboard for tracking team leads and tasks.
+Инструмент для управления IT-доставкой поверх Jira. Автоматически приоритизирует задачи и прогнозирует сроки завершения эпиков на основе реальной загрузки команды.
 
-## Prerequisites
+## Проблема
 
-- Java 21
-- Node.js 18+
-- Docker (for PostgreSQL)
+Сложно давать заказчикам реальные сроки. Ручное планирование не учитывает загрузку команды, зависимости между задачами и конфликтующие приоритеты от разных заказчиков. В итоге — постоянные вопросы о сроках, задержки и непонятно как работает команда.
 
-## Quick Start
+## Решение
 
-### 1. Start PostgreSQL
+Lead Board подключается к Jira, анализирует задачи и автоматически строит прогноз с учетом загрузки каждого участника команды. Система приоритизирует работу для быстрой доставки и показывает реалистичные сроки завершения эпиков.
+
+## Основные возможности
+
+**Автоматический прогноз** — система расставляет приоритеты и рассчитывает когда каждый эпик будет готов, учитывая загрузку команды и зависимости между задачами. Можно давать заказчикам реальные сроки на основе прогнозов. Поддерживаются грязные оценки для быстрого планирования.
+
+**Прозрачность процессов** — видно прогресс по каждому эпику и story с детализацией по ролям (аналитика, разработка, тестирование). Timeline показывает план работ, автоматическая проверка находит проблемы в данных.
+
+**Контроль эффективности** — метрики точности оценок, соответствия прогнозу и скорости доставки по команде и каждому участнику. Понятно как работает команда.
+
+**Интеграция с Jira** — работает поверх существующих процессов через REST API, не требует изменений в workflow.
+
+## Для кого
+
+- **Тимлид** — видит загрузку команды, прогресс по эпикам, кто чем занят и где узкие места
+- **Engineering Manager** — сравнивает команды по метрикам, контролирует сроки и качество оценок
+- **Product Manager** — понимает когда фича будет готова и какие есть риски
+- **Delivery Manager** — отслеживает общую картину доставки и точность прогнозов
+
+## Быстрый старт
+
+### 1. Запустить PostgreSQL
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-### 2. Run Backend
+### 2. Запустить backend
 
 ```bash
 cd backend
-./gradlew build
 ./gradlew bootRun
 ```
 
-Backend will be available at http://localhost:8080
+Backend доступен на http://localhost:8080
 
-### 3. Run Frontend
+### 3. Запустить frontend
 
 ```bash
 cd frontend
@@ -34,35 +52,45 @@ npm install
 npm run dev
 ```
 
-Frontend will be available at http://localhost:5173
+Frontend доступен на http://localhost:5173
 
-## API Endpoints
+### Требования
 
-### Core
-- `GET /api/health` - Health check endpoint
-- `GET /api/board` - Get hierarchical board (Epic → Story → Sub-task)
-- `POST /api/sync/trigger` - Trigger Jira sync
+- Java 21
+- Node.js 18+
+- Docker (для PostgreSQL)
 
-### Planning & AutoScore
-- `GET /api/planning/forecast?teamId=1` - Get forecast for team epics
-- `GET /api/epics/{epicKey}/stories` - Get stories sorted by AutoScore
-- `PATCH /api/stories/{storyKey}/priority` - Update story manual priority boost
-- `POST /api/planning/recalculate-stories` - Recalculate AutoScore for stories
+## Страницы
 
-### Teams & Members
-- `GET /api/teams` - List teams
-- `GET /api/teams/{id}/members` - List team members
-- `PUT /api/teams/{id}/planning-config` - Update planning configuration
+| Путь | Страница | Описание |
+|------|----------|----------|
+| `/` | Board | Доска Epic → Story → Subtask с прогрессом, оценками и алертами |
+| `/timeline` | Timeline | Gantt-диаграмма с фазами SA/DEV/QA и прогнозом завершения |
+| `/metrics` | Метрики | LTC, throughput, forecast accuracy, метрики по исполнителям |
+| `/data-quality` | Качество данных | 17 правил автоматической проверки данных |
+| `/teams` | Команды | Управление командами, участниками и конфигурацией планирования |
+| `/poker` | Planning Poker | Real-time оценка stories командой через WebSocket |
 
-### Data Quality
-- `GET /api/data-quality?teamId=1` - Get data quality violations
-
-## Project Structure
+## Структура проекта
 
 ```
 lead-board-claude/
-├── backend/         # Spring Boot application
-├── frontend/        # React + Vite application
+├── backend/          # Spring Boot (Java 21, PostgreSQL, Flyway)
+├── frontend/         # React + Vite + TypeScript
+├── ai-ru/            # Документация
+│   ├── ARCHITECTURE.md   # Карта кодовой базы
+│   ├── FEATURES.md       # Индекс фич
+│   ├── RULES.md          # Бизнес-правила и правила разработки
+│   ├── TECH_DEBT.md      # Технический долг
+│   ├── features/         # Спецификации фич (F14–F23)
+│   └── archive/          # Устаревшие документы
 ├── docker-compose.yml
-└── README.md
+└── CLAUDE.md             # Инструкции для Claude Code
 ```
+
+## Документация
+
+- [Карта кодовой базы](ai-ru/ARCHITECTURE.md) — пакеты, сервисы, entities, API, frontend
+- [Индекс фич](ai-ru/FEATURES.md) — статусы реализации и ссылки на спецификации
+- [Бизнес-правила](ai-ru/RULES.md) — ключевые принципы и правила разработки
+- [Технический долг](ai-ru/TECH_DEBT.md) — архитектурные проблемы и план улучшений
