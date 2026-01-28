@@ -8,12 +8,14 @@ import { TeamMetricsPage } from './pages/TeamMetricsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { PlanningPokerPage } from './pages/PlanningPokerPage'
 import { PokerRoomPage } from './pages/PokerRoomPage'
+import { LandingPage } from './pages/landing/LandingPage'
 import './App.css'
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/landing" element={<LandingPage />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<BoardPage />} />
           <Route path="timeline" element={<TimelinePage />} />
