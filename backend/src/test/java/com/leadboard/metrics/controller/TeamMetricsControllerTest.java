@@ -1,8 +1,8 @@
 package com.leadboard.metrics.controller;
 
 import com.leadboard.metrics.dto.*;
+import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
-import com.leadboard.metrics.service.LtcService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +33,7 @@ class TeamMetricsControllerTest {
     private ForecastAccuracyService forecastAccuracyService;
 
     @MockBean
-    private LtcService ltcService;
+    private DsrService dsrService;
 
     @Test
     void getSummary_returnsAllMetrics() throws Exception {

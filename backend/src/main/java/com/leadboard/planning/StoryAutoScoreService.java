@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
  * - DueDateWeight (0-40 based on urgency)
  * - EstimateQualityPenalty (no subtasks = -100)
  * - FlaggedPenalty (flagged = -200)
- * - ManualBoost (no limits)
  */
 @Service
 public class StoryAutoScoreService {
@@ -89,9 +88,6 @@ public class StoryAutoScoreService {
 
         // 8. Flagged Penalty (flagged = -200)
         breakdown.put("flagged", calculateFlaggedPenalty(story));
-
-        // 9. Manual Boost (no limits)
-        breakdown.put("manual", BigDecimal.valueOf(story.getManualPriorityBoost() != null ? story.getManualPriorityBoost() : 0));
 
         return breakdown;
     }

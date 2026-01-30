@@ -40,3 +40,35 @@ export async function updateRoughEstimate(
   )
   return response.data
 }
+
+export interface OrderRequest {
+  position: number
+}
+
+export interface OrderResponse {
+  issueKey: string
+  manualOrder: number | null
+  autoScore: number | null
+}
+
+export async function updateEpicOrder(
+  epicKey: string,
+  position: number
+): Promise<OrderResponse> {
+  const response = await axios.put<OrderResponse>(
+    `/api/epics/${epicKey}/order`,
+    { position }
+  )
+  return response.data
+}
+
+export async function updateStoryOrder(
+  storyKey: string,
+  position: number
+): Promise<OrderResponse> {
+  const response = await axios.put<OrderResponse>(
+    `/api/stories/${storyKey}/order`,
+    { position }
+  )
+  return response.data
+}

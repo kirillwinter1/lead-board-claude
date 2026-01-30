@@ -31,7 +31,9 @@ import java.util.Map;
  * - Прогресс (10): процент выполнения (logged/estimate)
  * - Размер (5): инверсия от estimate (меньше = выше, без оценки = -5)
  * - Возраст (5): логарифм от дней с создания
- * - Ручной boost: любое значение для ручной корректировки
+ *
+ * Порядок эпиков определяется полем manual_order (drag & drop).
+ * AutoScore используется только для рекомендаций.
  */
 @Service
 public class AutoScoreCalculator {
@@ -82,7 +84,6 @@ public class AutoScoreCalculator {
         factors.put("priority", calculatePriorityScore(epic));
         factors.put("size", calculateSizeScore(epic));
         factors.put("age", calculateAgeScore(epic));
-        factors.put("manualBoost", calculateManualBoostScore(epic));
 
         return factors;
     }
@@ -277,18 +278,6 @@ public class AutoScoreCalculator {
         double score = 5 * Math.log(days + 1) / Math.log(365);
         return BigDecimal.valueOf(Math.min(5, score))
                 .setScale(2, RoundingMode.HALF_UP);
-    }
-
-    /**
-     * Ручной boost: любое значение.
-     * Позволяет вручную корректировать приоритет эпика.
-     */
-    private BigDecimal calculateManualBoostScore(JiraIssueEntity epic) {
-        Integer boost = epic.getManualPriorityBoost();
-        if (boost == null) {
-            return BigDecimal.ZERO;
-        }
-        return BigDecimal.valueOf(boost);
     }
 
     /**

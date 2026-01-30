@@ -42,7 +42,6 @@ export interface EpicForecast {
   epicKey: string
   summary: string
   autoScore: number
-  manualPriorityBoost: number | null
   expectedDone: string | null
   confidence: Confidence
   dueDateDeltaDays: number | null
@@ -104,17 +103,6 @@ export async function getForecast(teamId: number, statuses?: string[]): Promise<
 export async function recalculateAutoScore(teamId?: number): Promise<{ epicsUpdated: number }> {
   const params = teamId ? `?teamId=${teamId}` : ''
   const response = await axios.post<{ status: string; epicsUpdated: number }>(`/api/planning/recalculate${params}`)
-  return response.data
-}
-
-/**
- * Обновляет ручной boost приоритета.
- */
-export async function updateManualBoost(epicKey: string, boost: number): Promise<{ newAutoScore: number }> {
-  const response = await axios.patch<{ epicKey: string; boost: number; newAutoScore: number }>(
-    `/api/planning/autoscore/epics/${epicKey}/boost`,
-    { boost }
-  )
   return response.data
 }
 

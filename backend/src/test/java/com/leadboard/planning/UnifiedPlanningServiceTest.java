@@ -85,9 +85,9 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity devSubtask = createSubtask("SUB-2", "DEV Task", "STORY-1", "Development", 16 * 3600L, 0L);
         JiraIssueEntity qaSubtask = createSubtask("SUB-3", "QA Task", "STORY-1", "Testing", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask, devSubtask, qaSubtask));
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
@@ -137,9 +137,9 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 8 * 3600L, 0L);
         JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
         when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(sa2));
 
@@ -185,9 +185,9 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 4 * 3600L, 0L);
         JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 4 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
         when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(sa2));
 
@@ -227,9 +227,9 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity epic = createEpic("EPIC-1", "Test Epic", new BigDecimal("80"));
         JiraIssueEntity story = createStory("STORY-1", "No Estimate Story", "EPIC-1", new BigDecimal("50"));
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of()); // No subtasks
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
@@ -265,9 +265,9 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity dev1 = createSubtask("SUB-1", "DEV Task", "STORY-1", "Development", 8 * 3600L, 0L);
         JiraIssueEntity dev2 = createSubtask("SUB-2", "DEV Task", "STORY-2", "Development", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(dev1));
         when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(dev2));
 
@@ -308,10 +308,10 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 8 * 3600L, 0L);
         JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
-                .thenReturn(List.of(epic1, epic2)); // Sorted by AutoScore DESC
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story1));
-        when(issueRepository.findByParentKey("EPIC-2")).thenReturn(List.of(story2));
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+                .thenReturn(List.of(epic1, epic2)); // Sorted by manual_order ASC
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-2")).thenReturn(List.of(story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
         when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(sa2));
 
@@ -358,9 +358,9 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity story = createStory("STORY-1", "Story", "EPIC-1", new BigDecimal("50"));
         JiraIssueEntity saSubtask = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask));
 
         // Only DEV, no SA

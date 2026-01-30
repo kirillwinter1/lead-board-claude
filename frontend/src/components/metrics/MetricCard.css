@@ -117,19 +117,19 @@
   display: block;
 }
 
-/* LTC Gauge card */
-.ltc-gauge-card {
+/* DSR Gauge card */
+.dsr-gauge-card {
   justify-content: flex-start;
 }
 
-.ltc-gauge-container {
+.dsr-gauge-container {
   width: 160px;
   height: 90px;
   margin: 4px auto -4px;
   overflow: hidden;
 }
 
-.ltc-gauge-value {
+.dsr-gauge-value {
   font-size: 32px;
   font-weight: 600;
   line-height: 1.2;

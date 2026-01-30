@@ -143,34 +143,34 @@ export async function getByAssignee(
   return response.data
 }
 
-// ==================== LTC (Lead Time to Commit) ====================
+// ==================== DSR (Delivery Speed Ratio) ====================
 
-export interface EpicLtc {
+export interface EpicDsr {
   epicKey: string
   summary: string
   workingDaysActual: number
   estimateDays: number | null
   forecastDays: number | null
-  ltcActual: number | null
-  ltcForecast: number | null
+  dsrActual: number | null
+  dsrForecast: number | null
 }
 
-export interface LtcResponse {
-  avgLtcActual: number
-  avgLtcForecast: number
+export interface DsrResponse {
+  avgDsrActual: number
+  avgDsrForecast: number
   totalEpics: number
   onTimeCount: number
   onTimeRate: number
-  epics: EpicLtc[]
+  epics: EpicDsr[]
 }
 
-export async function getLtc(
+export async function getDsr(
   teamId: number,
   from: string,
   to: string
-): Promise<LtcResponse> {
+): Promise<DsrResponse> {
   const params = new URLSearchParams({ teamId: String(teamId), from, to })
-  const response = await axios.get(`/api/metrics/ltc?${params}`)
+  const response = await axios.get(`/api/metrics/dsr?${params}`)
   return response.data
 }
 

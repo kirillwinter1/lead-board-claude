@@ -11,7 +11,6 @@ import { PilotSection } from './sections/PilotSection'
 import { DifferentiationSection } from './sections/DifferentiationSection'
 import { CaseSection } from './sections/CaseSection'
 import { FounderSection } from './sections/FounderSection'
-import { ResultsSection } from './sections/ResultsSection'
 import './LandingPage.css'
 
 export function LandingPage() {
@@ -28,7 +27,6 @@ export function LandingPage() {
       <ProblemSection />
       <MethodSection onRequestDemo={openModal} />
       <BaselineSection />
-      <ResultsSection />
       <AuditSection onRequestAudit={openModal} />
       <PilotSection />
       <DifferentiationSection />

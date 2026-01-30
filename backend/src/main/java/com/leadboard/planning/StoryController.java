@@ -2,8 +2,6 @@ package com.leadboard.planning;
 
 import com.leadboard.planning.dto.RecalculateResponse;
 import com.leadboard.planning.dto.StoriesResponse;
-import com.leadboard.planning.dto.StoryWithScore;
-import com.leadboard.planning.dto.UpdatePriorityRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,20 +27,6 @@ public class StoryController {
     public ResponseEntity<StoriesResponse> getStoriesWithScore(@PathVariable String epicKey) {
         StoriesResponse response = storyPriorityService.getStoriesWithScore(epicKey);
         return ResponseEntity.ok(response);
-    }
-
-    /**
-     * Update manual priority boost for a story.
-     *
-     * PATCH /api/stories/{storyKey}/priority
-     */
-    @PatchMapping("/stories/{storyKey}/priority")
-    public ResponseEntity<StoryWithScore> updatePriority(
-            @PathVariable String storyKey,
-            @RequestBody UpdatePriorityRequest request
-    ) {
-        StoryWithScore updated = storyPriorityService.updateManualBoost(storyKey, request.boost());
-        return ResponseEntity.ok(updated);
     }
 
     /**

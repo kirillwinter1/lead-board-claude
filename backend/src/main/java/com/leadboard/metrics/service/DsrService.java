@@ -6,8 +6,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.forecast.entity.ForecastSnapshotEntity;
 import com.leadboard.forecast.repository.ForecastSnapshotRepository;
-import com.leadboard.metrics.dto.EpicLtc;
-import com.leadboard.metrics.dto.LtcResponse;
+import com.leadboard.metrics.dto.EpicDsr;
+import com.leadboard.metrics.dto.DsrResponse;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -21,10 +21,20 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.*;
 
+/**
+ * Delivery Speed Ratio (DSR) Service.
+ *
+ * DSR = actual working days / current estimate (in days)
+ *
+ * Interpretation:
+ * - 1.0 = baseline speed
+ * - < 1.0 = completed faster than estimated
+ * - > 1.0 = completed slower than estimated
+ */
 @Service
-public class LtcService {
+public class DsrService {
 
-    private static final Logger log = LoggerFactory.getLogger(LtcService.class);
+    private static final Logger log = LoggerFactory.getLogger(DsrService.class);
     private static final BigDecimal ON_TIME_THRESHOLD = new BigDecimal("1.1");
 
     private final JiraIssueRepository issueRepository;
@@ -32,7 +42,7 @@ public class LtcService {
     private final ForecastSnapshotRepository snapshotRepository;
     private final ObjectMapper objectMapper;
 
-    public LtcService(
+    public DsrService(
             JiraIssueRepository issueRepository,
             WorkCalendarService workCalendarService,
             ForecastSnapshotRepository snapshotRepository
@@ -44,18 +54,18 @@ public class LtcService {
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
-    public LtcResponse calculateLtc(Long teamId, LocalDate from, LocalDate to) {
+    public DsrResponse calculateDsr(Long teamId, LocalDate from, LocalDate to) {
         List<JiraIssueEntity> completedEpics = issueRepository.findCompletedEpicsInPeriod(
                 teamId,
                 from.atStartOfDay().atOffset(ZoneOffset.UTC),
                 to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)
         );
 
-        log.info("LTC: Found {} completed epics for team {} between {} and {}",
+        log.info("DSR: Found {} completed epics for team {} between {} and {}",
                 completedEpics.size(), teamId, from, to);
 
         if (completedEpics.isEmpty()) {
-            return new LtcResponse(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, List.of());
+            return new DsrResponse(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, List.of());
         }
 
         // Load forecast snapshots
@@ -63,46 +73,46 @@ public class LtcService {
         List<ForecastSnapshotEntity> snapshots = snapshotRepository.findByTeamIdAndDateRange(teamId, snapshotFrom, to);
         Map<LocalDate, UnifiedPlanningResult> snapshotsByDate = parseSnapshots(snapshots);
 
-        List<EpicLtc> epicLtcs = new ArrayList<>();
-        BigDecimal totalLtcActual = BigDecimal.ZERO;
-        BigDecimal totalLtcForecast = BigDecimal.ZERO;
-        int ltcActualCount = 0;
-        int ltcForecastCount = 0;
+        List<EpicDsr> epicDsrs = new ArrayList<>();
+        BigDecimal totalDsrActual = BigDecimal.ZERO;
+        BigDecimal totalDsrForecast = BigDecimal.ZERO;
+        int dsrActualCount = 0;
+        int dsrForecastCount = 0;
         int onTimeCount = 0;
 
         for (JiraIssueEntity epic : completedEpics) {
-            EpicLtc ltc = calculateEpicLtc(epic, snapshotsByDate);
-            if (ltc != null) {
-                epicLtcs.add(ltc);
-                if (ltc.ltcActual() != null) {
-                    totalLtcActual = totalLtcActual.add(ltc.ltcActual());
-                    ltcActualCount++;
-                    if (ltc.ltcActual().compareTo(ON_TIME_THRESHOLD) <= 0) {
+            EpicDsr dsr = calculateEpicDsr(epic, snapshotsByDate);
+            if (dsr != null) {
+                epicDsrs.add(dsr);
+                if (dsr.dsrActual() != null) {
+                    totalDsrActual = totalDsrActual.add(dsr.dsrActual());
+                    dsrActualCount++;
+                    if (dsr.dsrActual().compareTo(ON_TIME_THRESHOLD) <= 0) {
                         onTimeCount++;
                     }
                 }
-                if (ltc.ltcForecast() != null) {
-                    totalLtcForecast = totalLtcForecast.add(ltc.ltcForecast());
-                    ltcForecastCount++;
+                if (dsr.dsrForecast() != null) {
+                    totalDsrForecast = totalDsrForecast.add(dsr.dsrForecast());
+                    dsrForecastCount++;
                 }
             }
         }
 
-        int totalEpics = epicLtcs.size();
-        BigDecimal avgLtcActual = ltcActualCount > 0
-                ? totalLtcActual.divide(BigDecimal.valueOf(ltcActualCount), 2, RoundingMode.HALF_UP)
+        int totalEpics = epicDsrs.size();
+        BigDecimal avgDsrActual = dsrActualCount > 0
+                ? totalDsrActual.divide(BigDecimal.valueOf(dsrActualCount), 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
-        BigDecimal avgLtcForecast = ltcForecastCount > 0
-                ? totalLtcForecast.divide(BigDecimal.valueOf(ltcForecastCount), 2, RoundingMode.HALF_UP)
+        BigDecimal avgDsrForecast = dsrForecastCount > 0
+                ? totalDsrForecast.divide(BigDecimal.valueOf(dsrForecastCount), 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
         BigDecimal onTimeRate = totalEpics > 0
                 ? BigDecimal.valueOf(onTimeCount * 100.0 / totalEpics).setScale(1, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        return new LtcResponse(avgLtcActual, avgLtcForecast, totalEpics, onTimeCount, onTimeRate, epicLtcs);
+        return new DsrResponse(avgDsrActual, avgDsrForecast, totalEpics, onTimeCount, onTimeRate, epicDsrs);
     }
 
-    private EpicLtc calculateEpicLtc(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate) {
+    private EpicDsr calculateEpicDsr(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate) {
         if (epic.getDoneAt() == null) return null;
 
         LocalDate doneDate = epic.getDoneAt().toLocalDate();
@@ -121,22 +131,22 @@ public class LtcService {
         // Calculate forecastDays from snapshots
         BigDecimal forecastDays = calculateForecastDays(epic, snapshotsByDate);
 
-        BigDecimal ltcActual = estimateDays != null && estimateDays.compareTo(BigDecimal.ZERO) > 0
+        BigDecimal dsrActual = estimateDays != null && estimateDays.compareTo(BigDecimal.ZERO) > 0
                 ? BigDecimal.valueOf(workingDays).divide(estimateDays, 2, RoundingMode.HALF_UP)
                 : null;
 
-        BigDecimal ltcForecast = forecastDays != null && forecastDays.compareTo(BigDecimal.ZERO) > 0
+        BigDecimal dsrForecast = forecastDays != null && forecastDays.compareTo(BigDecimal.ZERO) > 0
                 ? BigDecimal.valueOf(workingDays).divide(forecastDays, 2, RoundingMode.HALF_UP)
                 : null;
 
-        return new EpicLtc(
+        return new EpicDsr(
                 epic.getIssueKey(),
                 epic.getSummary(),
                 workingDays,
                 estimateDays,
                 forecastDays,
-                ltcActual,
-                ltcForecast
+                dsrActual,
+                dsrForecast
         );
     }
 

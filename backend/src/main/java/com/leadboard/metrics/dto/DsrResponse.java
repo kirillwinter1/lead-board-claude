@@ -3,11 +3,11 @@ package com.leadboard.metrics.dto;
 import java.math.BigDecimal;
 import java.util.List;
 
-public record LtcResponse(
-        BigDecimal avgLtcActual,
-        BigDecimal avgLtcForecast,
+public record DsrResponse(
+        BigDecimal avgDsrActual,
+        BigDecimal avgDsrForecast,
         int totalEpics,
         int onTimeCount,
         BigDecimal onTimeRate,
-        List<EpicLtc> epics
+        List<EpicDsr> epics
 ) {}

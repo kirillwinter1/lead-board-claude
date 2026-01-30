@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { LtcGauge } from '../../../components/metrics/LtcGauge'
+import { DsrGauge } from '../../../components/metrics/DsrGauge'
 import { MetricCard } from '../../../components/metrics/MetricCard'
 import { mockMetrics } from '../mockData'
 
@@ -12,17 +12,17 @@ export function DemoMetrics() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <LtcGauge
+        <DsrGauge
           value={mockMetrics.ltcActual}
-          title="LTC Actual"
+          title="DSR Actual"
           subtitle={`среднее по ${mockMetrics.totalEpics} эпикам`}
-          tooltip="Lead Time to Change — отношение фактических трудозатрат к плановым. Значение ≤1.1 — отлично, 1.1-1.5 — норма, >1.5 — требует внимания"
+          tooltip="Delivery Speed Ratio — относительная скорость выполнения эпика с учётом объёма. 1.0 — норма, меньше — быстрее, больше — медленнее."
         />
-        <LtcGauge
+        <DsrGauge
           value={mockMetrics.ltcForecast}
-          title="LTC Forecast"
-          subtitle="прогнозируемый LTC"
-          tooltip="Прогнозируемый LTC на основе текущего прогресса и оставшихся задач"
+          title="DSR Forecast"
+          subtitle="прогнозируемый DSR"
+          tooltip="Прогнозируемый Delivery Speed Ratio на основе текущего прогресса и оставшихся задач."
         />
       </motion.div>
 

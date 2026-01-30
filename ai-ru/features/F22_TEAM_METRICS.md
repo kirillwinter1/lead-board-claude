@@ -1,6 +1,6 @@
 # F22 + F24: Team Metrics
 
-> Объединяет F22_TEAM_METRICS.md (базовые метрики) и F24_TEAM_METRICS_V2.md (LTC, Forecast Accuracy)
+> Объединяет F22_TEAM_METRICS.md (базовые метрики) и F24_TEAM_METRICS_V2.md (DSR, Forecast Accuracy)
 
 ## Обзор
 
@@ -26,10 +26,10 @@ Lead Time = done_at - jira_created_at
 Cycle Time = done_at - started_at
 ```
 
-### LTC (Lead Time Coefficient)
+### DSR (Delivery Speed Ratio)
 Коэффициент точности оценок.
 ```
-LTC = фактические рабочие дни в Developing / (original_estimate / 8h)
+DSR = фактические рабочие дни в Developing / (original_estimate / 8h)
 ```
 Цветовая индикация: зелёный (≤1.1), жёлтый (1.1-1.5), красный (>1.5).
 
@@ -74,7 +74,7 @@ CREATE TABLE status_changelog (
 | `GET /api/metrics/cycle-time` | Cycle Time статистика |
 | `GET /api/metrics/time-in-status` | Время в статусах |
 | `GET /api/metrics/by-assignee` | По исполнителям |
-| `GET /api/metrics/ltc` | LTC по эпикам |
+| `GET /api/metrics/dsr` | DSR по эпикам |
 | `GET /api/metrics/forecast-accuracy` | Forecast vs actual |
 
 ### Параметры
@@ -85,15 +85,15 @@ CREATE TABLE status_changelog (
 ## Frontend
 
 ### Summary Cards (gauge-карточки)
-- LTC команды — среднее с цветовой зоной
-- LTC Forecast — точность прогноза
+- DSR команды — среднее с цветовой зоной
+- DSR Forecast — точность прогноза
 - Throughput — закрыто задач
 - On-Time Delivery — % вовремя
 
 ### Компоненты
 - `MetricCard.tsx` — карточка метрики
 - `ThroughputChart.tsx` — stacked bar по неделям
-- `LtcGauge.tsx` — gauge с цветовыми зонами
+- `DsrGauge.tsx` — gauge с цветовыми зонами
 - `ForecastAccuracyChart.tsx` — таблица plan vs fact с estimate change
 - `TimeInStatusChart.tsx` — horizontal bar
 - `AssigneeTable.tsx` — таблица по исполнителям
@@ -107,7 +107,7 @@ metrics/
 ├── service/
 │   ├── TeamMetricsService.java — throughput, lead/cycle time
 │   ├── ForecastAccuracyService.java — forecast vs actual
-│   ├── LtcService.java — LTC расчёт
+│   ├── DsrService.java — DSR расчёт
 │   └── StatusChangelogService.java — status transitions
 ├── entity/StatusChangelogEntity.java
 ├── repository/StatusChangelogRepository.java, MetricsQueryRepository.java
@@ -116,7 +116,7 @@ metrics/
 
 ### Frontend
 ```
-components/metrics/ — MetricCard, ThroughputChart, LtcGauge, ForecastAccuracyChart, etc.
+components/metrics/ — MetricCard, ThroughputChart, DsrGauge, ForecastAccuracyChart, etc.
 pages/TeamMetricsPage.tsx
 api/metrics.ts
 ```
@@ -131,4 +131,4 @@ api/metrics.ts
 - [ ] Scatter plot для Forecast Accuracy
 - [ ] Throughput Trend с moving average
 - [ ] Team Velocity Chart (logged vs capacity)
-- [ ] Assignee Table: LTC персональный, velocity, trend
+- [ ] Assignee Table: DSR персональный, velocity, trend

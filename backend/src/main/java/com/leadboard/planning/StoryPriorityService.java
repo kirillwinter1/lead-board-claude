@@ -89,40 +89,6 @@ public class StoryPriorityService {
     }
 
     /**
-     * Update manual priority boost for a story.
-     */
-    @Transactional
-    public StoryWithScore updateManualBoost(String storyKey, Integer boost) {
-        JiraIssueEntity story = issueRepository.findByIssueKey(storyKey)
-                .orElseThrow(() -> new IllegalArgumentException("Story not found: " + storyKey));
-
-        // Update manual boost
-        story.setManualPriorityBoost(boost);
-
-        // Recalculate AutoScore
-        StatusMappingConfig teamConfig = statusMappingService.getDefaultConfig();
-        BigDecimal newScore = autoScoreService.calculateAutoScore(story, teamConfig);
-        story.setAutoScore(newScore);
-        story.setAutoScoreCalculatedAt(OffsetDateTime.now());
-
-        issueRepository.save(story);
-
-        log.info("Updated manual boost for story {}: {} -> AutoScore: {}", storyKey, boost, newScore);
-
-        // Get completed stories for canStart
-        List<JiraIssueEntity> allStories = issueRepository.findByParentKey(story.getParentKey());
-        Set<String> completedStories = allStories.stream()
-                .filter(s -> statusMappingService.isDone(s.getStatus(), teamConfig))
-                .map(JiraIssueEntity::getIssueKey)
-                .collect(Collectors.toSet());
-
-        Map<String, Double> storyScores = Map.of(storyKey, newScore.doubleValue());
-        Map<String, Map<String, BigDecimal>> breakdowns = Map.of(storyKey, autoScoreService.calculateScoreBreakdown(story, teamConfig));
-
-        return toStoryWithScore(story, storyScores, breakdowns, completedStories, teamConfig);
-    }
-
-    /**
      * Recalculate AutoScore for all stories.
      */
     @Transactional
@@ -202,7 +168,6 @@ public class StoryPriorityService {
                 story.getPriority(),
                 story.getFlagged(),
                 BigDecimal.valueOf(storyScores.getOrDefault(story.getIssueKey(), 0.0)),
-                story.getManualPriorityBoost(),
                 story.getIsBlockedBy(),
                 story.getBlocks(),
                 canStart,

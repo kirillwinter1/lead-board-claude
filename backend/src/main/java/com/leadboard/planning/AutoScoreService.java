@@ -131,34 +131,6 @@ public class AutoScoreService {
     }
 
     /**
-     * Обновляет ручной boost приоритета.
-     *
-     * @param epicKey ключ эпика
-     * @param boost   новое значение (-10 до +10)
-     * @return новый AutoScore или null если эпик не найден
-     */
-    @Transactional
-    public BigDecimal updateManualBoost(String epicKey, int boost) {
-        Optional<JiraIssueEntity> epicOpt = issueRepository.findByIssueKey(epicKey);
-        if (epicOpt.isEmpty()) {
-            log.warn("Epic not found: {}", epicKey);
-            return null;
-        }
-
-        JiraIssueEntity epic = epicOpt.get();
-        epic.setManualPriorityBoost(boost);
-
-        // Пересчитываем AutoScore
-        BigDecimal score = calculator.calculate(epic);
-        epic.setAutoScore(score);
-        epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
-        issueRepository.save(epic);
-
-        log.info("Updated manual boost for {}: {} -> AutoScore: {}", epicKey, boost, score);
-        return score;
-    }
-
-    /**
      * Получает эпики команды, отсортированные по AutoScore.
      *
      * @param teamId ID команды

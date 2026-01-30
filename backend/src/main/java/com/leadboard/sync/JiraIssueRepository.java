@@ -61,4 +61,43 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("teamId") Long teamId,
             @Param("statuses") List<String> statuses
     );
+
+    // Методы для manual_order сортировки
+    List<JiraIssueEntity> findByIssueTypeInAndTeamIdOrderByManualOrderAsc(List<String> issueTypes, Long teamId);
+
+    List<JiraIssueEntity> findByParentKeyOrderByManualOrderAsc(String parentKey);
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.issueType IN :issueTypes " +
+           "AND e.manualOrder > :fromOrder " +
+           "ORDER BY e.manualOrder ASC")
+    List<JiraIssueEntity> findEpicsWithOrderGreaterThan(
+            @Param("teamId") Long teamId,
+            @Param("issueTypes") List<String> issueTypes,
+            @Param("fromOrder") Integer fromOrder
+    );
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.parentKey = :parentKey " +
+           "AND e.issueType IN :issueTypes " +
+           "AND e.manualOrder > :fromOrder " +
+           "ORDER BY e.manualOrder ASC")
+    List<JiraIssueEntity> findStoriesWithOrderGreaterThan(
+            @Param("parentKey") String parentKey,
+            @Param("issueTypes") List<String> issueTypes,
+            @Param("fromOrder") Integer fromOrder
+    );
+
+    @Query("SELECT COALESCE(MAX(e.manualOrder), 0) FROM JiraIssueEntity e " +
+           "WHERE e.teamId = :teamId AND e.issueType IN :issueTypes")
+    Integer findMaxEpicOrderForTeam(
+            @Param("teamId") Long teamId,
+            @Param("issueTypes") List<String> issueTypes
+    );
+
+    @Query("SELECT COALESCE(MAX(e.manualOrder), 0) FROM JiraIssueEntity e " +
+           "WHERE e.parentKey = :parentKey AND e.issueType IN :issueTypes")
+    Integer findMaxStoryOrderForParent(
+            @Param("parentKey") String parentKey,
+            @Param("issueTypes") List<String> issueTypes
+    );
 }

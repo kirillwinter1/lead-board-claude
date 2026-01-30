@@ -126,13 +126,7 @@ public class ForecastService {
         // Get epic entity for additional data
         Optional<JiraIssueEntity> epicEntityOpt = issueRepository.findByIssueKey(plannedEpic.epicKey());
 
-        Integer manualPriorityBoost = null;
-        LocalDate dueDate = null;
-        if (epicEntityOpt.isPresent()) {
-            JiraIssueEntity epic = epicEntityOpt.get();
-            manualPriorityBoost = epic.getManualPriorityBoost();
-            dueDate = epic.getDueDate();
-        }
+        LocalDate dueDate = epicEntityOpt.map(JiraIssueEntity::getDueDate).orElse(null);
 
         // Calculate confidence from warnings
         Confidence confidence = calculateConfidence(plannedEpic, warnings);
@@ -159,7 +153,6 @@ public class ForecastService {
                 plannedEpic.epicKey(),
                 plannedEpic.summary(),
                 plannedEpic.autoScore(),
-                manualPriorityBoost,
                 plannedEpic.endDate(),
                 confidence,
                 dueDateDeltaDays,

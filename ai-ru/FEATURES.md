@@ -24,9 +24,9 @@
 | F19 | Story AutoScore & Prioritization | ✅ | 2026-01-25 | [features/F19](features/F19_STORY_AUTOSCORE.md) |
 | F20 | Story-Level Planning | ✅ | 2026-01-25 | [features/F20](features/F20_STORY_FORECAST.md) |
 | F21 | Unified Planning Algorithm | ✅ | 2026-01-25 | [features/F21](features/F21_UNIFIED_PLANNING.md) |
-| F22 | Team Metrics + LTC + Forecast Accuracy | ✅ | 2026-01-26 | [features/F22](features/F22_TEAM_METRICS.md) |
+| F22 | Team Metrics + DSR + Forecast Accuracy | ✅ | 2026-01-26 | [features/F22](features/F22_TEAM_METRICS.md) |
 | F23 | Planning Poker | ✅ | 2026-01-28 | [features/F23](features/F23_PLANNING_POKER.md) |
-| F24 | Team Metrics v2 (LTC Gauge, Forecast) | 🚧 | 2026-01-28 | [features/F22](features/F22_TEAM_METRICS.md) (объединён) |
+| F24 | Team Metrics v2 (DSR Gauge, Forecast) | 🚧 | 2026-01-28 | [features/F22](features/F22_TEAM_METRICS.md) (объединён) |
 | F25 | Recommendation System | 📋 | — | — |
 | F26 | Employee Performance Dashboard | 📋 | — | — |
 | F27 | RBAC | 📋 | — | — |

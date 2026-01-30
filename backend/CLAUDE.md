@@ -24,7 +24,7 @@ cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/backend
 | `epic` | Rough estimates |
 | `forecast` | Снэпшоты прогнозов |
 | `jira` | JiraClient — REST API клиент |
-| `metrics` | Командные метрики (throughput, LTC, forecast accuracy) |
+| `metrics` | Командные метрики (throughput, DSR, forecast accuracy) |
 | `planning` | **Ядро**: UnifiedPlanningService, AutoScore, StoryForecast |
 | `poker` | Planning Poker + WebSocket |
 | `quality` | Data Quality — 17 правил проверки |

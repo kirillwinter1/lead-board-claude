@@ -190,10 +190,12 @@
 
 .landing-hero-split {
   display: grid;
-  grid-template-columns: 1fr 400px;
+  grid-template-columns: 1fr auto;
   gap: 60px;
   align-items: center;
   text-align: left;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .landing-hero-content {
@@ -2112,6 +2114,89 @@
   color: #166534;
 }
 
+/* ============================================
+   Results Snapshot Card (Hero right side)
+   ============================================ */
+
+.results-snapshot {
+  background: var(--landing-bg-alt);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius);
+  padding: 20px;
+  box-shadow: var(--landing-shadow-lg);
+  min-width: 320px;
+  max-width: 360px;
+}
+
+.results-snapshot-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.results-snapshot-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  color: var(--landing-text);
+}
+
+.results-snapshot-subtitle {
+  font-size: 0.75rem;
+  color: var(--landing-text-secondary);
+  margin: 0;
+}
+
+.results-snapshot-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.results-snapshot-card {
+  background: var(--landing-bg);
+  border: 1px solid var(--landing-border);
+  border-radius: var(--landing-radius-sm);
+  padding: 12px 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.results-snapshot-card-label {
+  font-size: 0.75rem;
+  color: var(--landing-text-secondary);
+  margin-bottom: 4px;
+}
+
+.results-snapshot-card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.results-snapshot-before {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #97a0af;
+}
+
+.results-snapshot-arrow {
+  font-size: 0.875rem;
+  color: #97a0af;
+}
+
+.results-snapshot-after {
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: #006644;
+  line-height: 1.2;
+}
+
+.results-snapshot-card-detail {
+  font-size: 0.6875rem;
+  color: var(--landing-muted);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .landing-section {
@@ -2160,6 +2245,11 @@
 
   .landing-hero-visual {
     order: -1;
+  }
+
+  .results-snapshot {
+    min-width: 100%;
+    max-width: 100%;
   }
 
   .landing-icp-grid {
@@ -2640,7 +2730,7 @@
 }
 
 /* ============================================
-   Demo Metrics v2 - LTC Gauges & Cards
+   Demo Metrics v2 - DSR Gauges & Cards
    ============================================ */
 
 .demo-metrics {

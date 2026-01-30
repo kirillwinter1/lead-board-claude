@@ -30,7 +30,6 @@ export interface StoryWithScore {
   priority: string | null
   flagged: boolean | null
   autoScore: number
-  manualBoost: number | null
   blockedBy: string[] | null
   blocks: string[] | null
   canStart: boolean
@@ -57,23 +56,11 @@ export interface StoriesResponse {
   dependencyGraph: DependencyGraph
 }
 
-export interface UpdatePriorityRequest {
-  boost: number
-}
-
 /**
  * Get stories for an epic sorted by AutoScore
  */
 export async function getStoriesWithScore(epicKey: string): Promise<StoriesResponse> {
   const response = await axios.get(`/api/epics/${epicKey}/stories`)
-  return response.data
-}
-
-/**
- * Update manual priority boost for a story
- */
-export async function updateStoryPriority(storyKey: string, boost: number): Promise<StoryWithScore> {
-  const response = await axios.patch(`/api/stories/${storyKey}/priority`, { boost })
   return response.data
 }
 

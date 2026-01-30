@@ -11,7 +11,6 @@ public record AutoScoreDto(
         String epicKey,
         String summary,
         BigDecimal autoScore,
-        Integer manualPriorityBoost,
         OffsetDateTime calculatedAt,
         Map<String, BigDecimal> factors
 ) {
@@ -19,7 +18,7 @@ public record AutoScoreDto(
      * Создаёт DTO с базовой информацией (без детализации факторов).
      */
     public static AutoScoreDto basic(String epicKey, String summary, BigDecimal autoScore,
-                                     Integer manualPriorityBoost, OffsetDateTime calculatedAt) {
-        return new AutoScoreDto(epicKey, summary, autoScore, manualPriorityBoost, calculatedAt, null);
+                                     OffsetDateTime calculatedAt) {
+        return new AutoScoreDto(epicKey, summary, autoScore, calculatedAt, null);
     }
 }

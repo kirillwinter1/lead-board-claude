@@ -18,12 +18,14 @@ com.leadboard/
 ├── epic/           — Rough estimates для эпиков
 ├── forecast/       — Снэпшоты прогнозов (историческое хранение)
 ├── jira/           — Jira REST API клиент, модели данных (JiraIssue 464 LOC)
-├── metrics/        — Командные метрики: throughput, lead/cycle time, LTC, forecast accuracy
+├── metrics/        — Командные метрики: throughput, lead/cycle time, DSR (Delivery Speed Ratio), forecast accuracy
 ├── planning/       — Ядро планирования:
 │   ├── UnifiedPlanningService (838 LOC) — основной алгоритм
 │   ├── AutoScoreCalculator (320 LOC) — приоритизация эпиков (7 факторов)
 │   ├── StoryAutoScoreService (392 LOC) — приоритизация stories (9 факторов)
 │   ├── StoryForecastService (464 LOC) — прогноз по stories с assignee capacity
+│   ├── IssueOrderService — ручное упорядочивание эпиков и stories (drag & drop)
+│   ├── IssueOrderController — API для manual_order (PUT /api/epics/{key}/order, PUT /api/stories/{key}/order)
 │   ├── ForecastService (274 LOC) — legacy прогнозирование
 │   └── AssigneeSchedule (197 LOC) — расписания исполнителей
 ├── poker/          — Planning Poker с WebSocket (real-time)
@@ -94,7 +96,7 @@ com.leadboard/
 |----------|------|----------|
 | BoardPage | / | Основная доска Epic→Story→Subtask (1798 LOC) |
 | TimelinePage | /timeline | Gantt-диаграмма с фазами SA/DEV/QA (1126 LOC) |
-| TeamMetricsPage | /metrics | Метрики команды: LTC, throughput, forecast accuracy |
+| TeamMetricsPage | /metrics | Метрики команды: DSR, throughput, forecast accuracy |
 | DataQualityPage | /data-quality | Отчёт о качестве данных |
 | TeamsPage | /teams | Управление командами |
 | TeamMembersPage | /teams/:id | Участники команды, planning config |
@@ -110,7 +112,7 @@ frontend/src/
 │   ├── Layout.tsx      — Навигация + табы
 │   ├── Modal.tsx       — Модальные окна
 │   ├── MultiSelectDropdown.tsx
-│   └── metrics/        — MetricCard, ThroughputChart, LtcGauge, ForecastAccuracyChart, etc.
+│   └── metrics/        — MetricCard, ThroughputChart, DsrGauge, ForecastAccuracyChart, etc.
 ├── hooks/
 │   └── usePokerWebSocket.ts — WebSocket для Poker
 ├── pages/          — 8 страниц (см. выше)

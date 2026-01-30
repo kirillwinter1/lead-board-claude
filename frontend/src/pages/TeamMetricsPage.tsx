@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
-import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getLtc, LtcResponse } from '../api/metrics'
+import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getDsr, DsrResponse } from '../api/metrics'
 import { getConfig } from '../api/config'
 import './TeamMetricsPage.css'
 import { MetricCard } from '../components/metrics/MetricCard'
-import { LtcGauge } from '../components/metrics/LtcGauge'
+import { DsrGauge } from '../components/metrics/DsrGauge'
 import { ThroughputChart } from '../components/metrics/ThroughputChart'
 import { TimeInStatusChart } from '../components/metrics/TimeInStatusChart'
 import { AssigneeTable } from '../components/metrics/AssigneeTable'
@@ -207,7 +207,7 @@ export function TeamMetricsPage() {
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
   const [forecastAccuracy, setForecastAccuracy] = useState<ForecastAccuracyResponse | null>(null)
-  const [ltc, setLtc] = useState<LtcResponse | null>(null)
+  const [dsr, setDsr] = useState<DsrResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [metricsLoading, setMetricsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -256,7 +256,7 @@ export function TeamMetricsPage() {
 
     setMetricsLoading(true)
 
-    // Load metrics, forecast accuracy, and LTC in parallel
+    // Load metrics, forecast accuracy, and DSR in parallel
     Promise.all([
       getMetricsSummary(
         selectedTeamId,
@@ -265,19 +265,19 @@ export function TeamMetricsPage() {
         issueType || undefined
       ),
       getForecastAccuracy(selectedTeamId, dateRange.from, dateRange.to),
-      getLtc(selectedTeamId, dateRange.from, dateRange.to)
+      getDsr(selectedTeamId, dateRange.from, dateRange.to)
     ])
-      .then(([metricsData, accuracyData, ltcData]) => {
+      .then(([metricsData, accuracyData, dsrData]) => {
         setMetrics(metricsData)
         setForecastAccuracy(accuracyData)
-        setLtc(ltcData)
+        setDsr(dsrData)
         setMetricsLoading(false)
       })
       .catch(err => {
         console.error('Failed to load metrics:', err)
         setMetrics(null)
         setForecastAccuracy(null)
-        setLtc(null)
+        setDsr(null)
         setMetricsLoading(false)
       })
   }, [selectedTeamId, dateRange.from, dateRange.to, issueType])
@@ -342,16 +342,16 @@ export function TeamMetricsPage() {
           ) : metrics ? (
             <>
               <div className="metrics-summary-cards">
-                <LtcGauge
-                  value={ltc && ltc.totalEpics > 0 ? ltc.avgLtcActual : null}
-                  title="LTC Actual"
-                  subtitle={ltc && ltc.totalEpics > 0 ? `среднее по ${ltc.totalEpics} эпикам` : 'нет данных'}
-                  tooltip="Отношение фактической длительности эпика (рабочие дни) к оценке (человеко-дни). ≤1.1 — отлично, 1.1–1.5 — допустимо, >1.5 — проблема."
+                <DsrGauge
+                  value={dsr && dsr.totalEpics > 0 ? dsr.avgDsrActual : null}
+                  title="DSR Actual"
+                  subtitle={dsr && dsr.totalEpics > 0 ? `среднее по ${dsr.totalEpics} эпикам` : 'нет данных'}
+                  tooltip="Delivery Speed Ratio — относительная скорость выполнения эпика с учётом объёма. 1.0 — норма, меньше — быстрее, больше — медленнее."
                 />
-                <LtcGauge
-                  value={ltc && ltc.totalEpics > 0 ? ltc.avgLtcForecast : null}
-                  title="LTC Forecast"
-                  subtitle={ltc && ltc.totalEpics > 0 ? 'точность прогноза' : 'нет данных'}
+                <DsrGauge
+                  value={dsr && dsr.totalEpics > 0 ? dsr.avgDsrForecast : null}
+                  title="DSR Forecast"
+                  subtitle={dsr && dsr.totalEpics > 0 ? 'точность прогноза' : 'нет данных'}
                   tooltip="Отношение фактической длительности к прогнозу из планирования. Показывает точность прогнозирования."
                 />
                 <MetricCard
@@ -362,12 +362,12 @@ export function TeamMetricsPage() {
                 />
                 <MetricCard
                   title="On-Time Rate"
-                  value={ltc && ltc.totalEpics > 0 ? `${ltc.onTimeRate.toFixed(0)}%` : '—'}
-                  subtitle={ltc && ltc.totalEpics > 0 ? `${ltc.onTimeCount} из ${ltc.totalEpics} вовремя` : 'нет данных'}
-                  trend={ltc && ltc.totalEpics > 0
-                    ? (ltc.onTimeRate >= 80 ? 'up' : ltc.onTimeRate < 50 ? 'down' : 'neutral')
+                  value={dsr && dsr.totalEpics > 0 ? `${dsr.onTimeRate.toFixed(0)}%` : '—'}
+                  subtitle={dsr && dsr.totalEpics > 0 ? `${dsr.onTimeCount} из ${dsr.totalEpics} вовремя` : 'нет данных'}
+                  trend={dsr && dsr.totalEpics > 0
+                    ? (dsr.onTimeRate >= 80 ? 'up' : dsr.onTimeRate < 50 ? 'down' : 'neutral')
                     : undefined}
-                  tooltip="Процент эпиков с LTC ≤ 1.1 — завершённых в рамках оценки."
+                  tooltip="Процент эпиков с DSR ≤ 1.1 — завершённых в рамках оценки."
                 />
               </div>
 

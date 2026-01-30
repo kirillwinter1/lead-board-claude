@@ -66,7 +66,7 @@ Frontend доступен на http://localhost:5173
 |------|----------|----------|
 | `/` | Board | Доска Epic → Story → Subtask с прогрессом, оценками и алертами |
 | `/timeline` | Timeline | Gantt-диаграмма с фазами SA/DEV/QA и прогнозом завершения |
-| `/metrics` | Метрики | LTC, throughput, forecast accuracy, метрики по исполнителям |
+| `/metrics` | Метрики | Delivery Speed Ratio, throughput, forecast accuracy, метрики по исполнителям |
 | `/data-quality` | Качество данных | 17 правил автоматической проверки данных |
 | `/teams` | Команды | Управление командами, участниками и конфигурацией планирования |
 | `/poker` | Planning Poker | Real-time оценка stories командой через WebSocket |

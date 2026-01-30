@@ -1,8 +1,7 @@
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'react'
 import axios from 'axios'
-import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
-import { getForecast, EpicForecast, ForecastResponse, updateManualBoost } from '../api/forecast'
-import { updateStoryPriority } from '../api/stories'
+import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig, updateEpicOrder, updateStoryOrder } from '../api/epics'
+import { getForecast, EpicForecast, ForecastResponse } from '../api/forecast'
 import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 import './BoardPage.css'
@@ -92,7 +91,7 @@ interface BoardNode {
   roughEstimateQaDays: number | null
   alerts: DataQualityViolation[]
   autoScore: number | null
-  manualBoost: number | null
+  manualOrder: number | null
   flagged: boolean | null
   blockedBy: string[] | null
   blocks: string[] | null
@@ -377,7 +376,24 @@ function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
   )
 }
 
-function PriorityCell({ node }: { node: BoardNode }) {
+// Recommendation indicator - shows if manual order differs from autoScore recommendation
+function getRecommendationIcon(actualPosition: number, recommendedPosition: number, autoScore: number | null): { icon: string; className: string } {
+  if (autoScore === null || actualPosition === recommendedPosition) {
+    return { icon: '●', className: 'match' }
+  }
+  if (actualPosition < recommendedPosition) {
+    return { icon: '↓', className: 'suggest-down' }
+  }
+  return { icon: '↑', className: 'suggest-up' }
+}
+
+interface PriorityCellProps {
+  node: BoardNode
+  recommendedPosition?: number
+  actualPosition?: number
+}
+
+function PriorityCell({ node, recommendedPosition, actualPosition }: PriorityCellProps) {
   const [showTooltip, setShowTooltip] = useState(false)
   const [breakdown, setBreakdown] = useState<ScoreBreakdown | null>(null)
   const [loading, setLoading] = useState(false)
@@ -480,12 +496,10 @@ function PriorityCell({ node }: { node: BoardNode }) {
     dueDate: 'Срок',
     estimateQuality: 'Качество оценки',
     flagged: 'Флаг',
-    manual: 'Ручная корректировка',
     // Epic factors
     statusWeight: 'Статус',
     storyCompletion: 'Завершение историй',
-    dueDateWeight: 'Срок',
-    manualBoost: 'Ручная корректировка'
+    dueDateWeight: 'Срок'
   }
 
   return (
@@ -499,6 +513,11 @@ function PriorityCell({ node }: { node: BoardNode }) {
       <span className="priority-score" style={{ fontWeight: 600 }}>
         {score.toFixed(0)}
       </span>
+      {actualPosition !== undefined && recommendedPosition !== undefined && (
+        <span className={`recommendation-indicator ${getRecommendationIcon(actualPosition, recommendedPosition, node.autoScore).className}`}>
+          {getRecommendationIcon(actualPosition, recommendedPosition, node.autoScore).icon}
+        </span>
+      )}
       {icons.length > 0 && (
         <span className="priority-icons" style={{ marginLeft: '6px' }}>
           {icons.join(' ')}
@@ -520,12 +539,16 @@ function PriorityCell({ node }: { node: BoardNode }) {
           </div>
           <div className="priority-tooltip-total">
             Total Score: <strong>{score.toFixed(1)}</strong>
-            {node.manualBoost !== null && node.manualBoost !== 0 && (
-              <span className="manual-boost-badge">
-                {node.manualBoost > 0 ? '+' : ''}{node.manualBoost}
-              </span>
-            )}
           </div>
+
+          {recommendedPosition !== undefined && actualPosition !== undefined && (
+            <div className="priority-tooltip-recommendation">
+              Рекомендуемая позиция: <strong>{recommendedPosition}</strong>
+              {actualPosition !== recommendedPosition && (
+                <span className="current-position"> (сейчас: {actualPosition})</span>
+              )}
+            </div>
+          )}
 
           {loading && (
             <div className="priority-tooltip-loading">Загрузка...</div>
@@ -909,9 +932,12 @@ interface BoardRowProps {
   // Drag state for preventing accidental clicks
   isAnyDragging?: boolean
   isDragInvalid?: boolean
+  // Recommendation indicator
+  actualPosition?: number
+  recommendedPosition?: number
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped, parentEpicKey, onStoryDragStart, onStoryDragOver, onStoryDrop, onStoryDragEnd, isStoryDragging, isStoryDragOver, isStoryJustDropped, isAnyDragging, isDragInvalid }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, index, onDragStart, onDragOver, onDrop, onDragEnd, isDragging, isDragOver, isJustDropped, parentEpicKey, onStoryDragStart, onStoryDragOver, onStoryDrop, onStoryDragEnd, isStoryDragging, isStoryDragOver, isStoryJustDropped, isAnyDragging, isDragInvalid, actualPosition, recommendedPosition }: BoardRowProps) {
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
 
@@ -931,7 +957,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
   }
 
   return (
-    <tr
+    <div
       className={`board-row level-${level} ${dragEffects} ${dragOverEffects} ${dragInvalidEffects} ${justDroppedEffects}`}
       draggable={(isEpicRow || isStoryRow) && canReorder}
       onDragStart={
@@ -955,20 +981,22 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         undefined
       }
     >
-      <td className="cell-expander">
+      <div className="cell cell-expander">
         {hasChildren ? (
           <button
-            className={`expander-btn ${isAnyDragging ? 'disabled-during-drag' : ''}`}
+            className={`expander-btn ${isAnyDragging ? 'disabled-during-drag' : ''} ${expanded ? 'expanded' : ''}`}
             onClick={handleExpanderClick}
             style={isAnyDragging ? { pointerEvents: 'none' } : undefined}
           >
-            <span className={`chevron ${expanded ? 'expanded' : ''}`}>›</span>
+            <svg className="expander-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </button>
         ) : (
           <span className="expander-placeholder" />
         )}
-      </td>
-      <td className="cell-name">
+      </div>
+      <div className="cell cell-name">
         <div className="name-content" style={{ paddingLeft: `${level * 20}px` }}>
           {(isEpicRow || isStoryRow) && canReorder && (
             <span className="drag-handle" title={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}>⋮⋮</span>
@@ -979,43 +1007,47 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
           </a>
           <span className="issue-title">{node.title}</span>
         </div>
-      </td>
-      <td className="cell-team">{node.teamName || '--'}</td>
-      <td className="cell-priority">
+      </div>
+      <div className="cell cell-team">{node.teamName || '--'}</div>
+      <div className="cell cell-priority">
         {node.autoScore !== null && node.autoScore !== undefined ? (
-          <PriorityCell node={node} />
+          <PriorityCell
+            node={node}
+            recommendedPosition={recommendedPosition}
+            actualPosition={actualPosition}
+          />
         ) : (
           <span className="priority-empty">--</span>
         )}
-      </td>
-      <td className="cell-expected-done">
+      </div>
+      <div className="cell cell-expected-done">
         {isEpic(node.issueType) ? (
           <ExpectedDoneCell forecast={forecast} />
         ) : (
           <StoryExpectedDoneCell endDate={node.expectedDone} assignee={node.assigneeDisplayName} />
         )}
-      </td>
-      <td className="cell-progress">
+      </div>
+      <div className="cell cell-progress">
         <ProgressCell
           loggedSeconds={node.loggedSeconds}
           estimateSeconds={node.estimateSeconds}
           progress={node.progress}
         />
-      </td>
-      <td className="cell-roles">
+      </div>
+      <div className="cell cell-roles">
         <RoleChips
           node={node}
           config={roughEstimateConfig}
           onRoughEstimateUpdate={onRoughEstimateUpdate}
         />
-      </td>
-      <td className="cell-status">
+      </div>
+      <div className="cell cell-status">
         <StatusBadge status={node.status} />
-      </td>
-      <td className="cell-alerts">
+      </div>
+      <div className="cell cell-alerts">
         <AlertIcon node={node} />
-      </td>
-    </tr>
+      </div>
+    </div>
   )
 }
 
@@ -1198,128 +1230,204 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     setDragInvalidStoryKey(null)
   }
 
-  const renderRows = (nodes: BoardNode[], level: number, startIndex: number = 0, parentEpicKey?: string): JSX.Element[] => {
-    const rows: JSX.Element[] = []
-    let currentIndex = startIndex
+  // Render children (stories/subtasks) with animation wrapper
+  const renderChildren = (children: BoardNode[], parentKey: string, level: number, isExpanded: boolean): JSX.Element => {
+    // Get recommendations for stories in this epic
+    const storyRecommendations = level === 1 ? getStoryRecommendations(children) : new Map<string, number>()
 
-    for (const node of nodes) {
-      const isExpanded = expandedKeys.has(node.issueKey)
-      const hasChildren = node.children.length > 0
-      const forecast = forecastMap.get(node.issueKey) || null
-      const nodeIndex = currentIndex
+    return (
+      <div className={`children-wrapper ${isExpanded ? 'expanded' : ''}`}>
+        <div className="children-container">
+          {children.map((child, childIndex) => {
+            const childIsExpanded = expandedKeys.has(child.issueKey)
+            const childHasChildren = child.children.length > 0
+            const childForecast = forecastMap.get(child.issueKey) || null
 
-      rows.push(
-        <BoardRow
-          key={node.issueKey}
-          node={node}
-          level={level}
-          expanded={isExpanded}
-          onToggle={() => toggleExpand(node.issueKey)}
-          hasChildren={hasChildren}
-          roughEstimateConfig={roughEstimateConfig}
-          onRoughEstimateUpdate={onRoughEstimateUpdate}
-          forecast={forecast}
-          canReorder={canReorder}
-          index={nodeIndex}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onDragEnd={handleDragEnd}
-          isDragging={draggingIndex === nodeIndex && level === 0}
-          isDragOver={dragOverIndex === nodeIndex && level === 0}
-          isJustDropped={droppedEpicKey === node.issueKey}
-          parentEpicKey={parentEpicKey}
-          onStoryDragStart={handleStoryDragStart}
-          onStoryDragOver={handleStoryDragOver}
-          onStoryDrop={handleStoryDrop}
-          onStoryDragEnd={handleStoryDragEnd}
-          isStoryDragging={draggingStoryKey === node.issueKey}
-          isStoryDragOver={dragOverStoryKey === node.issueKey}
-          isStoryJustDropped={droppedStoryKey === node.issueKey}
-          isAnyDragging={draggingEpicKey !== null || draggingStoryKey !== null}
-          isDragInvalid={dragInvalidStoryKey === node.issueKey}
-        />
-      )
+            // Story recommendations
+            const isStoryType = child.issueType === 'Story' || child.issueType === 'История' ||
+                               child.issueType === 'Bug' || child.issueType === 'Баг'
+            const actualPosition = isStoryType ? (child.manualOrder ?? (childIndex + 1)) : undefined
+            const recommendedPosition = isStoryType ? storyRecommendations.get(child.issueKey) : undefined
 
-      if (level === 0) {
-        currentIndex++
-      }
-
-      if (isExpanded && hasChildren) {
-        rows.push(...renderRows(node.children, level + 1, currentIndex, level === 0 ? node.issueKey : parentEpicKey))
-      }
-    }
-
-    return rows
+            return (
+              <Fragment key={child.issueKey}>
+                <BoardRow
+                  node={child}
+                  level={level}
+                  expanded={childIsExpanded}
+                  onToggle={() => toggleExpand(child.issueKey)}
+                  hasChildren={childHasChildren}
+                  roughEstimateConfig={roughEstimateConfig}
+                  onRoughEstimateUpdate={onRoughEstimateUpdate}
+                  forecast={childForecast}
+                  canReorder={canReorder}
+                  index={childIndex}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                  isDragging={false}
+                  isDragOver={false}
+                  isJustDropped={droppedStoryKey === child.issueKey}
+                  parentEpicKey={parentKey}
+                  onStoryDragStart={handleStoryDragStart}
+                  onStoryDragOver={handleStoryDragOver}
+                  onStoryDrop={handleStoryDrop}
+                  onStoryDragEnd={handleStoryDragEnd}
+                  isStoryDragging={draggingStoryKey === child.issueKey}
+                  isStoryDragOver={dragOverStoryKey === child.issueKey}
+                  isStoryJustDropped={droppedStoryKey === child.issueKey}
+                  isAnyDragging={draggingEpicKey !== null || draggingStoryKey !== null}
+                  isDragInvalid={dragInvalidStoryKey === child.issueKey}
+                  actualPosition={actualPosition}
+                  recommendedPosition={recommendedPosition}
+                />
+                {childHasChildren && renderChildren(child.children, child.issueKey, level + 1, childIsExpanded)}
+              </Fragment>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
+  // Calculate recommended positions based on autoScore (descending)
+  // Returns a map: issueKey -> recommended position (1-based)
+  // Only calculate when exactly one team is selected (recommendations are per-team)
+  const epicRecommendations = useMemo(() => {
+    // Recommendations only make sense within a single team
+    if (!canReorder) {
+      return new Map<string, number>()
+    }
+
+    const sorted = [...items]
+      .filter(e => e.autoScore !== null)
+      .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
+
+    const recommendations = new Map<string, number>()
+    sorted.forEach((epic, idx) => {
+      recommendations.set(epic.issueKey, idx + 1) // 1-based
+    })
+    return recommendations
+  }, [items, canReorder])
+
+  // Calculate recommended positions for stories within each epic
+  const getStoryRecommendations = useCallback((children: BoardNode[]): Map<string, number> => {
+    const stories = children.filter(c =>
+      c.issueType === 'Story' || c.issueType === 'История' ||
+      c.issueType === 'Bug' || c.issueType === 'Баг'
+    )
+    const sorted = [...stories]
+      .filter(s => s.autoScore !== null)
+      .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
+
+    const recommendations = new Map<string, number>()
+    sorted.forEach((story, idx) => {
+      recommendations.set(story.issueKey, idx + 1) // 1-based
+    })
+    return recommendations
+  }, [])
+
   return (
     <div className="board-table-container">
-      <table className="board-table">
-        <thead>
-          <tr>
-            <th className="th-expander"></th>
-            <th className="th-name">NAME</th>
-            <th className="th-team">TEAM</th>
-            <th className="th-priority">PRIORITY</th>
-            <th className="th-expected-done">
-              <span className="th-with-info">
-                EXPECTED DONE
-                <span
-                  className="info-icon"
-                  onMouseEnter={() => setShowInfoTooltip(true)}
-                  onMouseLeave={() => setShowInfoTooltip(false)}
-                >
-                  i
-                  {showInfoTooltip && (
-                    <div className="info-tooltip">
-                      <div className="info-tooltip-title">Прогноз завершения</div>
-                      <p>Дата рассчитывается на основе:</p>
-                      <ul>
-                        <li>Остатка работы по ролям (SA → DEV → QA)</li>
-                        <li>Производительности команды</li>
-                        <li>Производственного календаря</li>
-                      </ul>
-                      <div className="info-tooltip-section">
-                        <strong>Уверенность:</strong>
-                        <div className="confidence-legend">
-                          <span><span className="confidence-dot high"></span> Высокая — есть оценки</span>
-                          <span><span className="confidence-dot medium"></span> Средняя — частичные оценки</span>
-                          <span><span className="confidence-dot low"></span> Низкая — нет оценок</span>
-                        </div>
-                      </div>
-                      <div className="info-tooltip-section">
-                        <strong>Порядок эпиков:</strong>
-                        <p>Эпики отсортированы по AutoScore. Перетащите эпик для изменения приоритета.</p>
+      <div className="board-grid">
+        <div className="board-header">
+          <div className="cell th-expander"></div>
+          <div className="cell th-name">NAME</div>
+          <div className="cell th-team">TEAM</div>
+          <div className="cell th-priority">PRIORITY</div>
+          <div className="cell th-expected-done">
+            <span className="th-with-info">
+              EXPECTED DONE
+              <span
+                className="info-icon"
+                onMouseEnter={() => setShowInfoTooltip(true)}
+                onMouseLeave={() => setShowInfoTooltip(false)}
+              >
+                i
+                {showInfoTooltip && (
+                  <div className="info-tooltip">
+                    <div className="info-tooltip-title">Прогноз завершения</div>
+                    <p>Дата рассчитывается на основе:</p>
+                    <ul>
+                      <li>Остатка работы по ролям (SA → DEV → QA)</li>
+                      <li>Производительности команды</li>
+                      <li>Производственного календаря</li>
+                    </ul>
+                    <div className="info-tooltip-section">
+                      <strong>Уверенность:</strong>
+                      <div className="confidence-legend">
+                        <span><span className="confidence-dot high"></span> Высокая — есть оценки</span>
+                        <span><span className="confidence-dot medium"></span> Средняя — частичные оценки</span>
+                        <span><span className="confidence-dot low"></span> Низкая — нет оценок</span>
                       </div>
                     </div>
-                  )}
-                </span>
+                    <div className="info-tooltip-section">
+                      <strong>Порядок эпиков:</strong>
+                      <p>Перетащите эпик для изменения приоритета. Стрелки показывают рекомендации AutoScore.</p>
+                    </div>
+                  </div>
+                )}
               </span>
-            </th>
-            <th className="th-progress">PROGRESS</th>
-            <th className="th-roles">ROLE-BASED PROGRESS</th>
-            <th className="th-status">STATUS</th>
-            <th className="th-alerts">ALERTS</th>
-          </tr>
-        </thead>
-        <tbody>
-          {renderRows(items, 0)}
+            </span>
+          </div>
+          <div className="cell th-progress">PROGRESS</div>
+          <div className="cell th-roles">ROLE-BASED PROGRESS</div>
+          <div className="cell th-status">STATUS</div>
+          <div className="cell th-alerts">ALERTS</div>
+        </div>
+        <div className="board-body">
+          {items.map((epic, epicIndex) => {
+            const isExpanded = expandedKeys.has(epic.issueKey)
+            const hasChildren = epic.children.length > 0
+            const forecast = forecastMap.get(epic.issueKey) || null
+            // Actual position is the visual position in the filtered list (1-based)
+            const actualPosition = epicIndex + 1
+            const recommendedPosition = epicRecommendations.get(epic.issueKey)
+
+            return (
+              <Fragment key={epic.issueKey}>
+                <BoardRow
+                  node={epic}
+                  level={0}
+                  expanded={isExpanded}
+                  onToggle={() => toggleExpand(epic.issueKey)}
+                  hasChildren={hasChildren}
+                  roughEstimateConfig={roughEstimateConfig}
+                  onRoughEstimateUpdate={onRoughEstimateUpdate}
+                  forecast={forecast}
+                  canReorder={canReorder}
+                  index={epicIndex}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                  isDragging={draggingIndex === epicIndex}
+                  isDragOver={dragOverIndex === epicIndex}
+                  isJustDropped={droppedEpicKey === epic.issueKey}
+                  isAnyDragging={draggingEpicKey !== null || draggingStoryKey !== null}
+                  actualPosition={actualPosition}
+                  recommendedPosition={recommendedPosition}
+                />
+                {hasChildren && renderChildren(epic.children, epic.issueKey, 1, isExpanded)}
+              </Fragment>
+            )
+          })}
           {canReorder && draggingIndex !== null && (
-            <tr
+            <div
               className={`board-row drop-zone-row ${dragOverIndex === items.length ? 'drag-over' : ''}`}
               onDragOver={(e) => { e.preventDefault(); setDragOverIndex(items.length) }}
               onDrop={handleDropAtEnd}
             >
-              <td colSpan={8} className="drop-zone-cell">
+              <div className="drop-zone-cell">
                 <span>Переместить в конец списка</span>
-              </td>
-            </tr>
+              </div>
+            </div>
           )}
-        </tbody>
-      </table>
+        </div>
+      </div>
     </div>
   )
 }
@@ -1550,7 +1658,7 @@ export function BoardPage() {
     return map
   }, [allForecasts])
 
-  // Get selected team ID for reorder operations
+  // Get selected team ID for forecast loading
   const selectedTeamId = useMemo(() => {
     if (selectedTeams.size !== 1) return null
     const teamName = Array.from(selectedTeams)[0]
@@ -1558,7 +1666,8 @@ export function BoardPage() {
     return epic?.teamId || null
   }, [selectedTeams, board])
 
-  // For drag & drop, we need exactly one team selected
+  // Drag & drop is enabled when exactly one team is selected
+  // This ensures we reorder within the same team context
   const canReorder = selectedTeamId !== null
 
   const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => {
@@ -1567,118 +1676,33 @@ export function BoardPage() {
     await fetchBoard()
   }, [fetchBoard])
 
-  // Handle reorder via drag & drop
-  const handleReorder = useCallback(async (epicKey: string, newIndex: number) => {
-    if (!selectedTeamId) return
-
-    const teamForecast = allForecasts.get(selectedTeamId)
-    if (!teamForecast) return
-
-    // Get epics sorted by autoScore (descending)
-    const sortedEpics = [...teamForecast.epics].sort((a, b) => b.autoScore - a.autoScore)
-    const currentIndex = sortedEpics.findIndex(e => e.epicKey === epicKey)
-
-    if (currentIndex === -1 || currentIndex === newIndex) return
-
-    const currentEpic = sortedEpics[currentIndex]
-    const currentBaseScore = currentEpic.autoScore - (currentEpic.manualPriorityBoost || 0)
-
-    let newBoost = 0
-
-    if (newIndex < currentIndex) {
-      // Moving UP - need to beat the epic at newIndex
-      const targetEpic = sortedEpics[newIndex]
-      const targetScore = targetEpic.autoScore
-      // Need: baseScore + newBoost > targetScore
-      newBoost = Math.ceil(targetScore - currentBaseScore + 0.5)
-    } else {
-      // Moving DOWN - need to be below the epic at newIndex
-      const targetEpic = sortedEpics[newIndex]
-      const targetScore = targetEpic.autoScore
-
-      // Need: baseScore + newBoost < targetScore
-      // If there's an epic below the target, we need to be above it
-      const epicBelow = sortedEpics[newIndex + 1]
-      const scoreBelow = epicBelow ? epicBelow.autoScore : 0
-
-      // Target: be between targetScore and scoreBelow
-      const targetMiddle = (targetScore + scoreBelow) / 2
-      newBoost = Math.floor(targetMiddle - currentBaseScore)
-    }
-
-    // No clamping - boost can be any value needed to achieve the desired position
+  // Handle reorder via drag & drop - simple position-based API
+  const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
+    // New position is 1-based (targetIndex is 0-based)
+    const newPosition = targetIndex + 1
 
     try {
-      await updateManualBoost(epicKey, newBoost)
-      // Refetch forecast for this team
-      const data = await getForecast(selectedTeamId)
-      setAllForecasts(prev => {
-        const newMap = new Map(prev)
-        newMap.set(selectedTeamId, data)
-        return newMap
-      })
+      await updateEpicOrder(epicKey, newPosition)
+      // Refetch board to get updated order
+      await fetchBoard()
     } catch (err) {
-      console.error('Failed to reorder:', err)
+      console.error('Failed to reorder epic:', err)
     }
-  }, [allForecasts, selectedTeamId])
+  }, [fetchBoard])
 
-  // Handle story reorder via drag & drop
-  const handleStoryReorder = useCallback(async (storyKey: string, parentEpicKey: string, newIndex: number) => {
-    // Find parent epic in board
-    const parentEpic = board.find(epic => epic.issueKey === parentEpicKey)
-    if (!parentEpic) return
-
-    // Get stories (including bugs) sorted by autoScore (descending)
-    const stories = parentEpic.children
-      .filter(child =>
-        child.issueType === 'Story' || child.issueType === 'История' ||
-        child.issueType === 'Bug' || child.issueType === 'Баг'
-      )
-      .filter(s => s.autoScore !== null)
-      .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
-
-    const currentIndex = stories.findIndex(s => s.issueKey === storyKey)
-    if (currentIndex === -1 || currentIndex === newIndex) return
-
-    const currentStory = stories[currentIndex]
-    const currentBaseScore = (currentStory.autoScore || 0) - (currentStory.manualBoost || 0)
-
-    let newBoost = 0
-
-    if (newIndex < currentIndex) {
-      // Moving UP - need to beat the story at newIndex
-      // IMPORTANT: Compare BASE scores only (exclude manualBoost) to prevent accumulation
-      const targetStory = stories[newIndex]
-      const targetBaseScore = (targetStory.autoScore || 0) - (targetStory.manualBoost || 0)
-
-      // We need: currentBaseScore + newBoost > targetBaseScore
-      // newBoost > targetBaseScore - currentBaseScore
-      newBoost = Math.max(0, Math.ceil(targetBaseScore - currentBaseScore + 0.5))
-    } else {
-      // Moving DOWN - need to be below the story at newIndex
-      // IMPORTANT: Compare BASE scores only (exclude manualBoost) to prevent accumulation
-      const targetStory = stories[newIndex]
-      const targetBaseScore = (targetStory.autoScore || 0) - (targetStory.manualBoost || 0)
-
-      // If there's a story below the target, we need to be above it
-      const storyBelow = stories[newIndex + 1]
-      const storyBelowBaseScore = storyBelow
-        ? ((storyBelow.autoScore || 0) - (storyBelow.manualBoost || 0))
-        : 0
-
-      // Target: be between targetBaseScore and storyBelowBaseScore
-      const targetMiddle = (targetBaseScore + storyBelowBaseScore) / 2
-      newBoost = Math.floor(targetMiddle - currentBaseScore)
-    }
+  // Handle story reorder via drag & drop - simple position-based API
+  const handleStoryReorder = useCallback(async (storyKey: string, _parentEpicKey: string, newIndex: number) => {
+    // New position is 1-based (newIndex is 0-based)
+    const newPosition = newIndex + 1
 
     try {
-      await updateStoryPriority(storyKey, newBoost)
-      // Refetch board to get updated data
+      await updateStoryOrder(storyKey, newPosition)
+      // Refetch board to get updated order
       await fetchBoard()
     } catch (err) {
       console.error('Failed to reorder story:', err)
     }
-  }, [board, fetchBoard])
+  }, [fetchBoard])
 
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
@@ -1697,7 +1721,8 @@ export function BoardPage() {
   }, [board])
 
   const filteredBoard = useMemo(() => {
-    let filtered = board.filter(epic => {
+    // Board is already sorted by manual_order from backend
+    return board.filter(epic => {
       if (searchKey) {
         const keyLower = searchKey.toLowerCase()
         if (!epic.issueKey.toLowerCase().includes(keyLower)) {
@@ -1712,20 +1737,7 @@ export function BoardPage() {
       }
       return true
     })
-
-    // Sort by AutoScore (descending) when forecasts are available
-    if (forecastMap.size > 0) {
-      filtered = filtered.sort((a, b) => {
-        const forecastA = forecastMap.get(a.issueKey)
-        const forecastB = forecastMap.get(b.issueKey)
-        const scoreA = forecastA?.autoScore ?? 0
-        const scoreB = forecastB?.autoScore ?? 0
-        return scoreB - scoreA
-      })
-    }
-
-    return filtered
-  }, [board, searchKey, selectedStatuses, selectedTeams, forecastMap])
+  }, [board, searchKey, selectedStatuses, selectedTeams])
 
   const handleStatusToggle = (status: string) => {
     setSelectedStatuses(prev => {

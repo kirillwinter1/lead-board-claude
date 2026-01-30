@@ -12,7 +12,6 @@ public record StoryWithScore(
         String priority,
         Boolean flagged,
         BigDecimal autoScore,
-        Integer manualBoost,
         List<String> blockedBy,
         List<String> blocks,
         Boolean canStart,

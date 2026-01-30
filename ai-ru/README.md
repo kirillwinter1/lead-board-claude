@@ -29,7 +29,7 @@ SaaS-продукт для управления IT-доставкой повер
 |------|----------|----------|
 | `/` | Board | Доска Epic→Story→Subtask с прогрессом, оценками, alerts |
 | `/timeline` | Timeline | Gantt-диаграмма с фазами SA/DEV/QA |
-| `/metrics` | Metrics | Командные метрики: LTC, throughput, forecast accuracy |
+| `/metrics` | Metrics | Командные метрики: Delivery Speed Ratio, throughput, forecast accuracy |
 | `/data-quality` | Data Quality | Отчёт о качестве данных (17 правил) |
 | `/teams` | Teams | Управление командами |
 | `/teams/:id` | Members | Участники, planning config |

@@ -10,7 +10,6 @@ public record EpicForecast(
         String epicKey,
         String summary,
         BigDecimal autoScore,
-        Integer manualPriorityBoost,
         LocalDate expectedDone,
         Confidence confidence,
         Integer dueDateDeltaDays,
@@ -35,7 +34,6 @@ public record EpicForecast(
             String epicKey,
             String summary,
             BigDecimal autoScore,
-            Integer manualPriorityBoost,
             LocalDate expectedDone,
             Confidence confidence,
             Integer dueDateDeltaDays,
@@ -43,32 +41,9 @@ public record EpicForecast(
             RemainingByRole remainingByRole,
             PhaseSchedule phaseSchedule
     ) {
-        this(epicKey, summary, autoScore, manualPriorityBoost, expectedDone,
+        this(epicKey, summary, autoScore, expectedDone,
              confidence, dueDateDeltaDays, dueDate, remainingByRole, phaseSchedule,
              null, null, true, null);
-    }
-
-    /**
-     * Конструктор для обратной совместимости (team-level WIP, без role-level).
-     */
-    public EpicForecast(
-            String epicKey,
-            String summary,
-            BigDecimal autoScore,
-            Integer manualPriorityBoost,
-            LocalDate expectedDone,
-            Confidence confidence,
-            Integer dueDateDeltaDays,
-            LocalDate dueDate,
-            RemainingByRole remainingByRole,
-            PhaseSchedule phaseSchedule,
-            Integer queuePosition,
-            LocalDate queuedUntil,
-            Boolean isWithinWip
-    ) {
-        this(epicKey, summary, autoScore, manualPriorityBoost, expectedDone,
-             confidence, dueDateDeltaDays, dueDate, remainingByRole, phaseSchedule,
-             queuePosition, queuedUntil, isWithinWip, null);
     }
 
     /**

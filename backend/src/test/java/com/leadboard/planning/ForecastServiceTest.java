@@ -492,7 +492,6 @@ class ForecastServiceTest {
         epic.setStatus("Developing");
         epic.setTeamId(TEAM_ID);
         epic.setAutoScore(new BigDecimal("50"));
-        epic.setManualPriorityBoost(0);
         return epic;
     }
 

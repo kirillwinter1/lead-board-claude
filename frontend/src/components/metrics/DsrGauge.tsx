@@ -1,11 +1,11 @@
 import GaugeComponent from 'react-gauge-component'
 import './MetricCard.css'
 
-interface LtcGaugeProps {
+interface DsrGaugeProps {
   value: number | null
   title: string
   subtitle: string
-  tooltip: string
+  tooltip?: string
 }
 
 function getValueColor(v: number): string {
@@ -14,9 +14,12 @@ function getValueColor(v: number): string {
   return '#de350b'
 }
 
-export function LtcGauge({ value, title, subtitle, tooltip }: LtcGaugeProps) {
+const DEFAULT_TOOLTIP = `Delivery Speed Ratio — относительная скорость выполнения эпика с учётом объёма.
+1.0 — норма, меньше — быстрее, больше — медленнее.`
+
+export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: DsrGaugeProps) {
   return (
-    <div className="metric-card ltc-gauge-card">
+    <div className="metric-card dsr-gauge-card">
       <div className="metric-card-header">
         <div className="metric-card-title">{title}</div>
         <div className="metric-tooltip-wrapper">
@@ -26,7 +29,7 @@ export function LtcGauge({ value, title, subtitle, tooltip }: LtcGaugeProps) {
       </div>
       {value !== null ? (
         <>
-          <div className="ltc-gauge-container">
+          <div className="dsr-gauge-container">
             <GaugeComponent
               type="semicircle"
               arc={{
@@ -53,7 +56,7 @@ export function LtcGauge({ value, title, subtitle, tooltip }: LtcGaugeProps) {
               }}
             />
           </div>
-          <div className="ltc-gauge-value" style={{ color: getValueColor(value) }}>
+          <div className="dsr-gauge-value" style={{ color: getValueColor(value) }}>
             {value.toFixed(2)}
           </div>
           <div className="metric-card-subtitle">{subtitle}</div>

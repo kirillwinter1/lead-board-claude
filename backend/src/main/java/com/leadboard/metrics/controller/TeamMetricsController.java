@@ -1,8 +1,8 @@
 package com.leadboard.metrics.controller;
 
 import com.leadboard.metrics.dto.*;
+import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
-import com.leadboard.metrics.service.LtcService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
@@ -16,16 +16,16 @@ public class TeamMetricsController {
 
     private final TeamMetricsService metricsService;
     private final ForecastAccuracyService forecastAccuracyService;
-    private final LtcService ltcService;
+    private final DsrService dsrService;
 
     public TeamMetricsController(
             TeamMetricsService metricsService,
             ForecastAccuracyService forecastAccuracyService,
-            LtcService ltcService
+            DsrService dsrService
     ) {
         this.metricsService = metricsService;
         this.forecastAccuracyService = forecastAccuracyService;
-        this.ltcService = ltcService;
+        this.dsrService = dsrService;
     }
 
     @GetMapping("/throughput")
@@ -98,11 +98,16 @@ public class TeamMetricsController {
         return forecastAccuracyService.calculateAccuracy(teamId, from, to);
     }
 
-    @GetMapping("/ltc")
-    public LtcResponse getLtc(
+    /**
+     * Get Delivery Speed Ratio (DSR) metrics.
+     * DSR = actual working days / estimate days
+     * 1.0 = baseline, < 1.0 = faster, > 1.0 = slower
+     */
+    @GetMapping("/dsr")
+    public DsrResponse getDsr(
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ltcService.calculateLtc(teamId, from, to);
+        return dsrService.calculateDsr(teamId, from, to);
     }
 }

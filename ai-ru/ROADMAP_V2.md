@@ -1,17 +1,17 @@
 # Roadmap V2 — Production Ready
 
-## F24. Team Metrics v2 (LTC, Burndown, Forecast Integration)
+## F24. Team Metrics v2 (DSR, Burndown, Forecast Integration)
 
 **Приоритет:** ВЫСОКИЙ — развитие главной фичи (Forecast)
 
-### Метрика LTC (Lead Time Coefficient)
-- **LTC Actual** = фактическое время в статусе Developing (рабочие дни, без выходных/праздников) / original estimate (часы → дни)
-- Пример: эпик сделали за 15 рабочих дней при оценке 10 дней → LTC = 1.5
-- Чем меньше LTC — тем эффективнее команда
+### Метрика DSR (Delivery Speed Ratio)
+- **DSR Actual** = фактическое время в статусе Developing (рабочие дни, без выходных/праздников) / original estimate (часы → дни)
+- Пример: эпик сделали за 15 рабочих дней при оценке 10 дней → DSR = 1.5
+- Чем меньше DSR — тем эффективнее команда
 - Учитывать производственный календарь РФ (уже есть)
 
-### Метрика LTC Forecast
-- LTC Forecast = фактическое время в Developing / предрасчитанная длительность по Forecast
+### Метрика DSR Forecast
+- DSR Forecast = фактическое время в Developing / предрасчитанная длительность по Forecast
 - Показывает насколько точно Forecast предсказывает сроки
 
 ### Burndown по эпику
@@ -59,7 +59,7 @@
 1. **Throughput** — количество закрытых задач за период
 2. **Velocity** — залогированные часы vs configured hours per day
 3. **Accuracy** — фактическое время vs оценка (original estimate)
-4. **LTC персональный** — приведённый lead time по задачам сотрудника
+4. **DSR персональный** — приведённый lead time по задачам сотрудника
 5. **Forecast Adherence** — справляется ли с предсказанным объёмом
 6. **Logging Discipline** — логирует больше/меньше чем в конфигурации (hoursPerDay)
 7. **Burndown персональный** — список задач + прогресс по времени

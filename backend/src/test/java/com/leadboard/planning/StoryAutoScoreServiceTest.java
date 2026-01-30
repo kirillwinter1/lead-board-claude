@@ -420,48 +420,6 @@ class StoryAutoScoreServiceTest {
         assertEquals(BigDecimal.ZERO, breakdown.get("flagged"));
     }
 
-    // ==================== Manual Boost Factor Tests ====================
-
-    @Test
-    void manualBoostAddsToScore() {
-        JiraIssueEntity story = createBasicStory();
-        story.setManualPriorityBoost(5);
-
-        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
-
-        assertEquals(new BigDecimal("5"), breakdown.get("manual"));
-    }
-
-    @Test
-    void manualBoostAllowsHighValues() {
-        JiraIssueEntity story = createBasicStory();
-        story.setManualPriorityBoost(50);
-
-        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
-
-        assertEquals(new BigDecimal("50"), breakdown.get("manual"));
-    }
-
-    @Test
-    void manualBoostAllowsNegativeValues() {
-        JiraIssueEntity story = createBasicStory();
-        story.setManualPriorityBoost(-10);
-
-        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
-
-        assertEquals(new BigDecimal("-10"), breakdown.get("manual"));
-    }
-
-    @Test
-    void manualBoostNullGivesZero() {
-        JiraIssueEntity story = createBasicStory();
-        story.setManualPriorityBoost(null);
-
-        Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story, testConfig);
-
-        assertEquals(BigDecimal.ZERO, breakdown.get("manual"));
-    }
-
     // ==================== Combined Score Tests ====================
 
     @Test
@@ -470,12 +428,11 @@ class StoryAutoScoreServiceTest {
         story.setIssueType("Bug"); // +100
         story.setStatus("Development"); // +50
         story.setPriority("Highest"); // +40
-        story.setManualPriorityBoost(10); // +10
 
         BigDecimal score = service.calculateAutoScore(story, testConfig);
 
-        // Bug(100) + Status(50) + Progress(15) + Priority(40) + Manual(10) = 215
-        assertTrue(score.compareTo(new BigDecimal("210")) > 0);
+        // Bug(100) + Status(50) + Progress(15) + Priority(40) = 205
+        assertTrue(score.compareTo(new BigDecimal("200")) > 0);
     }
 
     @Test

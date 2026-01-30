@@ -26,7 +26,7 @@ public class BoardNode {
     private BigDecimal roughEstimateDevDays; // rough estimate for DEV (Epic only, for editing)
     private BigDecimal roughEstimateQaDays; // rough estimate for QA (Epic only, for editing)
     private BigDecimal autoScore; // AutoScore for prioritization (Epic and Story)
-    private BigDecimal manualBoost; // Manual priority boost (Epic and Story)
+    private Integer manualOrder; // Manual order position (1 = first)
     private Boolean flagged; // Impediment flag (Story only)
     private List<String> blocks; // Stories blocked by this story (Story only)
     private List<String> blockedBy; // Stories blocking this story (Story only)
@@ -183,12 +183,12 @@ public class BoardNode {
         this.autoScore = autoScore;
     }
 
-    public BigDecimal getManualBoost() {
-        return manualBoost;
+    public Integer getManualOrder() {
+        return manualOrder;
     }
 
-    public void setManualBoost(BigDecimal manualBoost) {
-        this.manualBoost = manualBoost;
+    public void setManualOrder(Integer manualOrder) {
+        this.manualOrder = manualOrder;
     }
 
     public Boolean getFlagged() {

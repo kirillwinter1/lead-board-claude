@@ -29,7 +29,7 @@ src/
 │   ├── Layout.tsx          — Навигация (табы: Board, Timeline, Metrics, etc.)
 │   ├── Modal.tsx           — Переиспользуемый модальный диалог
 │   ├── MultiSelectDropdown.tsx
-│   └── metrics/            — Компоненты метрик (MetricCard, ThroughputChart, LtcGauge, etc.)
+│   └── metrics/            — Компоненты метрик (MetricCard, ThroughputChart, DsrGauge, etc.)
 ├── hooks/
 │   └── usePokerWebSocket.ts — WebSocket для Planning Poker
 ├── pages/                  — 8 страниц

@@ -1,9 +1,7 @@
 package com.leadboard.planning;
 
 import com.leadboard.planning.dto.AutoScoreDto;
-import com.leadboard.planning.dto.UpdateBoostRequest;
 import com.leadboard.sync.JiraIssueEntity;
-import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,7 +36,6 @@ public class AutoScoreController {
                 details.epicKey(),
                 null, // summary не загружается в getScoreDetails
                 details.totalScore(),
-                null, // manualBoost не возвращается здесь
                 details.calculatedAt(),
                 details.factors()
         ));
@@ -64,32 +61,11 @@ public class AutoScoreController {
                         epic.getIssueKey(),
                         epic.getSummary(),
                         epic.getAutoScore(),
-                        epic.getManualPriorityBoost(),
                         epic.getAutoScoreCalculatedAt()
                 ))
                 .toList();
 
         return ResponseEntity.ok(dtos);
-    }
-
-    /**
-     * Обновляет ручной boost приоритета для эпика.
-     */
-    @PatchMapping("/epics/{epicKey}/boost")
-    public ResponseEntity<Map<String, Object>> updateBoost(
-            @PathVariable String epicKey,
-            @RequestBody @Valid UpdateBoostRequest request) {
-
-        BigDecimal newScore = autoScoreService.updateManualBoost(epicKey, request.boost());
-        if (newScore == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        return ResponseEntity.ok(Map.of(
-                "epicKey", epicKey,
-                "boost", request.boost(),
-                "newAutoScore", newScore
-        ));
     }
 
     /**

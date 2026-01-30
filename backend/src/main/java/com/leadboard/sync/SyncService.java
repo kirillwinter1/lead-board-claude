@@ -206,7 +206,6 @@ public class SyncService {
         BigDecimal savedRoughEstimateQaDays = entity.getRoughEstimateQaDays();
         OffsetDateTime savedRoughEstimateUpdatedAt = entity.getRoughEstimateUpdatedAt();
         String savedRoughEstimateUpdatedBy = entity.getRoughEstimateUpdatedBy();
-        Integer savedManualPriorityBoost = entity.getManualPriorityBoost();
         BigDecimal savedAutoScore = entity.getAutoScore();
         OffsetDateTime savedAutoScoreCalculatedAt = entity.getAutoScoreCalculatedAt();
         OffsetDateTime savedDoneAt = entity.getDoneAt();
@@ -319,7 +318,6 @@ public class SyncService {
         entity.setRoughEstimateQaDays(savedRoughEstimateQaDays);
         entity.setRoughEstimateUpdatedAt(savedRoughEstimateUpdatedAt);
         entity.setRoughEstimateUpdatedBy(savedRoughEstimateUpdatedBy);
-        entity.setManualPriorityBoost(savedManualPriorityBoost != null ? savedManualPriorityBoost : 0);
         entity.setAutoScore(savedAutoScore);
         entity.setAutoScoreCalculatedAt(savedAutoScoreCalculatedAt);
         entity.setDoneAt(savedDoneAt);

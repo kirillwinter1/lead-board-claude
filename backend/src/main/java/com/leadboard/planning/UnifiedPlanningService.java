@@ -707,10 +707,10 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Gets epics sorted by AutoScore DESC.
+     * Gets epics sorted by manual_order ASC.
      */
     private List<JiraIssueEntity> getEpicsSorted(Long teamId, StatusMappingConfig statusMapping) {
-        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(
+        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(
                 EPIC_TYPES, teamId);
 
         // Filter out done epics and those not allowed for planning
@@ -721,10 +721,10 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Gets stories for an epic, sorted by AutoScore with dependencies.
+     * Gets stories for an epic, sorted by manual_order with dependencies.
      */
     private List<JiraIssueEntity> getStoriesSorted(String epicKey, StatusMappingConfig statusMapping) {
-        List<JiraIssueEntity> children = issueRepository.findByParentKey(epicKey);
+        List<JiraIssueEntity> children = issueRepository.findByParentKeyOrderByManualOrderAsc(epicKey);
 
         // Filter to stories only (not subtasks)
         List<JiraIssueEntity> stories = children.stream()
@@ -736,11 +736,17 @@ public class UnifiedPlanningService {
             return stories;
         }
 
-        // Build score map
+        // Build order map (use manualOrder, fallback to autoScore for dependencies)
         Map<String, Double> storyScores = new HashMap<>();
         for (JiraIssueEntity story : stories) {
-            BigDecimal score = story.getAutoScore() != null ? story.getAutoScore() : BigDecimal.ZERO;
-            storyScores.put(story.getIssueKey(), score.doubleValue());
+            // Use negative manual_order so higher priority (lower order) comes first
+            Integer manualOrder = story.getManualOrder();
+            if (manualOrder != null) {
+                storyScores.put(story.getIssueKey(), -manualOrder.doubleValue());
+            } else {
+                BigDecimal score = story.getAutoScore() != null ? story.getAutoScore() : BigDecimal.ZERO;
+                storyScores.put(story.getIssueKey(), score.doubleValue());
+            }
         }
 
         // Topological sort with dependencies

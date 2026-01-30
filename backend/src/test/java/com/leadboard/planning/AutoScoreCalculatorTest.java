@@ -418,48 +418,6 @@ class AutoScoreCalculatorTest {
         assertEquals(BigDecimal.ZERO, factors.get("age"));
     }
 
-    // ==================== Manual Boost Factor Tests ====================
-
-    @Test
-    void manualBoostAddsToScore() {
-        JiraIssueEntity epic = createBasicEpic();
-        epic.setManualPriorityBoost(3);
-
-        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
-
-        assertEquals(new BigDecimal("3"), factors.get("manualBoost"));
-    }
-
-    @Test
-    void manualBoostAllowsHighValues() {
-        JiraIssueEntity epic = createBasicEpic();
-        epic.setManualPriorityBoost(10);
-
-        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
-
-        assertEquals(new BigDecimal("10"), factors.get("manualBoost"));
-    }
-
-    @Test
-    void manualBoostAllowsNegativeValues() {
-        JiraIssueEntity epic = createBasicEpic();
-        epic.setManualPriorityBoost(-2);
-
-        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
-
-        assertEquals(new BigDecimal("-2"), factors.get("manualBoost"));
-    }
-
-    @Test
-    void manualBoostNullGivesZero() {
-        JiraIssueEntity epic = createBasicEpic();
-        epic.setManualPriorityBoost(null);
-
-        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
-
-        assertEquals(BigDecimal.ZERO, factors.get("manualBoost"));
-    }
-
     // ==================== Combined Score Tests ====================
 
     @Test
@@ -467,12 +425,11 @@ class AutoScoreCalculatorTest {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Developing");    // +25
         epic.setPriority("High");        // +15
-        epic.setManualPriorityBoost(3);  // +3
 
         BigDecimal score = calculator.calculate(epic);
 
-        // 25 + 15 + 3 + size(-5) + age(~2) = ~40
-        assertTrue(score.compareTo(new BigDecimal("35")) > 0);
+        // 25 + 15 + size(-5) + age(~2) = ~37
+        assertTrue(score.compareTo(new BigDecimal("32")) > 0);
     }
 
     @Test

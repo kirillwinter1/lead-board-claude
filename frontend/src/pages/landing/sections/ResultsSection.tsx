@@ -4,7 +4,7 @@ const resultsMetrics = [
   {
     before: '8.0x',
     after: '1.1x',
-    label: 'Сократил LTC',
+    label: 'Delivery Speed Ratio',
     detail: 'в среднем по 6 командам'
   },
   {

@@ -77,9 +77,6 @@ public class JiraIssueEntity {
     @Column(name = "jira_created_at")
     private OffsetDateTime jiraCreatedAt;
 
-    @Column(name = "manual_priority_boost")
-    private Integer manualPriorityBoost = 0;
-
     @Column(name = "auto_score", precision = 5, scale = 2)
     private BigDecimal autoScore;
 
@@ -106,6 +103,9 @@ public class JiraIssueEntity {
 
     @Column(name = "done_at")
     private OffsetDateTime doneAt;
+
+    @Column(name = "manual_order")
+    private Integer manualOrder;
 
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
@@ -328,14 +328,6 @@ public class JiraIssueEntity {
         this.jiraCreatedAt = jiraCreatedAt;
     }
 
-    public Integer getManualPriorityBoost() {
-        return manualPriorityBoost;
-    }
-
-    public void setManualPriorityBoost(Integer manualPriorityBoost) {
-        this.manualPriorityBoost = manualPriorityBoost;
-    }
-
     public BigDecimal getAutoScore() {
         return autoScore;
     }
@@ -406,6 +398,14 @@ public class JiraIssueEntity {
 
     public void setDoneAt(OffsetDateTime doneAt) {
         this.doneAt = doneAt;
+    }
+
+    public Integer getManualOrder() {
+        return manualOrder;
+    }
+
+    public void setManualOrder(Integer manualOrder) {
+        this.manualOrder = manualOrder;
     }
 
     // ==================== Derived/Computed Methods ====================

@@ -182,37 +182,53 @@ public class BoardService {
             StatusMappingConfig statusMapping = statusMappingService.getDefaultConfig();
             addDataQualityAlerts(filteredEpics, stories, bugs, subtasks, issueMap, epicMap, storyMap, statusMapping);
 
-            // Sort children (stories/bugs) within each epic by autoScore (descending)
+            // Sort children (stories/bugs) within each epic by manualOrder (ascending)
             for (BoardNode epic : epicMap.values()) {
                 if (!epic.getChildren().isEmpty()) {
                     epic.getChildren().sort((a, b) -> {
-                        // Stories and bugs with autoScore should be sorted
+                        Integer orderA = a.getManualOrder();
+                        Integer orderB = b.getManualOrder();
+
+                        // If both have order, compare (ascending)
+                        if (orderA != null && orderB != null) {
+                            return orderA.compareTo(orderB);
+                        }
+
+                        // Items with order come before those without
+                        if (orderA != null) return -1;
+                        if (orderB != null) return 1;
+
+                        // Both null - fall back to autoScore (descending) for backward compatibility
                         BigDecimal scoreA = a.getAutoScore();
                         BigDecimal scoreB = b.getAutoScore();
-
-                        // If both have scores, compare (descending)
                         if (scoreA != null && scoreB != null) {
                             return scoreB.compareTo(scoreA);
                         }
-
-                        // Stories with scores come before those without
                         if (scoreA != null) return -1;
                         if (scoreB != null) return 1;
 
-                        // Both null - maintain original order
                         return 0;
                     });
                 }
             }
 
-            // Sort epics by autoScore (descending)
+            // Sort epics by manualOrder (ascending)
             List<BoardNode> items = new ArrayList<>(epicMap.values());
             items.sort((a, b) -> {
+                Integer orderA = a.getManualOrder();
+                Integer orderB = b.getManualOrder();
+
+                if (orderA != null && orderB != null) {
+                    return orderA.compareTo(orderB); // Ascending
+                }
+                if (orderA != null) return -1;
+                if (orderB != null) return 1;
+
+                // Fall back to autoScore (descending) for backward compatibility
                 BigDecimal scoreA = a.getAutoScore();
                 BigDecimal scoreB = b.getAutoScore();
-
                 if (scoreA != null && scoreB != null) {
-                    return scoreB.compareTo(scoreA); // Descending
+                    return scoreB.compareTo(scoreA);
                 }
                 if (scoreA != null) return -1;
                 if (scoreB != null) return 1;
@@ -294,20 +310,16 @@ public class BoardService {
             // For Epics in progress: RoleProgress will be set by aggregateProgress()
         }
 
-        // Set AutoScore for both Epics and Stories
+        // Set AutoScore and ManualOrder for both Epics and Stories
         if ("Epic".equalsIgnoreCase(entity.getIssueType()) || "Эпик".equalsIgnoreCase(entity.getIssueType())) {
-            // Epic AutoScore
+            // Epic AutoScore and ManualOrder
             node.setAutoScore(entity.getAutoScore());
-            if (entity.getManualPriorityBoost() != null) {
-                node.setManualBoost(new BigDecimal(entity.getManualPriorityBoost()));
-            }
+            node.setManualOrder(entity.getManualOrder());
         } else if ("Story".equalsIgnoreCase(entity.getIssueType()) || "История".equalsIgnoreCase(entity.getIssueType()) ||
                    "Bug".equalsIgnoreCase(entity.getIssueType()) || "Баг".equalsIgnoreCase(entity.getIssueType())) {
-            // Story/Bug AutoScore + additional fields
+            // Story/Bug AutoScore, ManualOrder + additional fields
             node.setAutoScore(entity.getAutoScore());
-            if (entity.getManualPriorityBoost() != null) {
-                node.setManualBoost(new BigDecimal(entity.getManualPriorityBoost()));
-            }
+            node.setManualOrder(entity.getManualOrder());
             node.setFlagged(entity.getFlagged());
             node.setBlocks(entity.getBlocks());
             node.setBlockedBy(entity.getIsBlockedBy());
