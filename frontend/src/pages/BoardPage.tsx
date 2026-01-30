@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'rea
 import axios from 'axios'
 import { Reorder, useDragControls } from 'framer-motion'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig, updateEpicOrder, updateStoryOrder } from '../api/epics'
-import { getForecast, EpicForecast, ForecastResponse, getUnifiedPlanning } from '../api/forecast'
+import { getForecast, EpicForecast, ForecastResponse, getUnifiedPlanning, PlannedStory } from '../api/forecast'
 import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 import './BoardPage.css'
@@ -603,8 +603,18 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`status-badge ${statusClass}`}>{status}</span>
 }
 
-// Simple Expected Done cell for stories (without forecast data)
-function StoryExpectedDoneCell({ endDate, assignee }: { endDate: string | null, assignee: string | null }) {
+// Expected Done cell for stories with tooltip
+interface StoryExpectedDoneCellProps {
+  endDate: string | null
+  assignee: string | null
+  storyPlanning: PlannedStory | null
+}
+
+function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: StoryExpectedDoneCellProps) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
+  const cellRef = useRef<HTMLDivElement>(null)
+
   if (!endDate) {
     return <span className="expected-done-empty">--</span>
   }
@@ -614,13 +624,120 @@ function StoryExpectedDoneCell({ endDate, assignee }: { endDate: string | null, 
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   }
 
+  const formatDateRange = (start: string | null | undefined, end: string | null | undefined): string => {
+    if (!start && !end) return '—'
+    if (!start) return `→ ${formatDate(end!)}`
+    if (!end) return `${formatDate(start)} →`
+    return `${formatDate(start)} → ${formatDate(end)}`
+  }
+
+  const handleMouseEnter = () => {
+    setShowTooltip(true)
+
+    if (cellRef.current) {
+      const rect = cellRef.current.getBoundingClientRect()
+      const tooltipWidth = 280
+      const spaceBelow = window.innerHeight - rect.bottom
+      const spaceAbove = rect.top
+      const minSpaceNeeded = 180
+
+      let top: number
+      let left = rect.left + rect.width / 2 - tooltipWidth / 2
+
+      if (spaceBelow >= minSpaceNeeded) {
+        top = rect.bottom + 8
+      } else if (spaceAbove >= minSpaceNeeded) {
+        top = rect.top - 8
+      } else {
+        top = rect.bottom + 8
+      }
+
+      if (left + tooltipWidth > window.innerWidth) {
+        left = window.innerWidth - tooltipWidth - 16
+      }
+      if (left < 16) {
+        left = 16
+      }
+
+      setTooltipPos({
+        top,
+        left,
+        showAbove: spaceBelow < minSpaceNeeded && spaceAbove >= minSpaceNeeded
+      })
+    }
+  }
+
   return (
-    <div className="expected-done-cell" style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+    <div
+      ref={cellRef}
+      className="expected-done-cell"
+      style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: storyPlanning ? 'help' : undefined }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
       <span className="expected-done-date">{formatDate(endDate)}</span>
       {assignee && (
         <span style={{ fontSize: '0.75rem', color: '#666', fontStyle: 'italic' }}>
           {assignee}
         </span>
+      )}
+
+      {showTooltip && tooltipPos && storyPlanning && (
+        <div
+          className="forecast-tooltip"
+          style={{
+            top: `${tooltipPos.top}px`,
+            left: `${tooltipPos.left}px`,
+            transform: tooltipPos.showAbove ? 'translateY(-100%)' : 'none'
+          }}
+        >
+          <div className="forecast-tooltip-header">
+            <span><strong>{storyPlanning.storyKey}</strong></span>
+            {storyPlanning.autoScore !== null && (
+              <span>AutoScore: <strong>{storyPlanning.autoScore.toFixed(1)}</strong></span>
+            )}
+          </div>
+
+          <div className="forecast-tooltip-section">
+            <div className="forecast-tooltip-title">Расписание фаз</div>
+            {storyPlanning.phases.sa && (
+              <div className="forecast-phase">
+                <span className="phase-label sa">SA</span>
+                <span className="phase-dates">{formatDateRange(storyPlanning.phases.sa.startDate, storyPlanning.phases.sa.endDate)}</span>
+                {storyPlanning.phases.sa.assigneeDisplayName && (
+                  <span className="phase-assignee">{storyPlanning.phases.sa.assigneeDisplayName}</span>
+                )}
+              </div>
+            )}
+            {storyPlanning.phases.dev && (
+              <div className="forecast-phase">
+                <span className="phase-label dev">DEV</span>
+                <span className="phase-dates">{formatDateRange(storyPlanning.phases.dev.startDate, storyPlanning.phases.dev.endDate)}</span>
+                {storyPlanning.phases.dev.assigneeDisplayName && (
+                  <span className="phase-assignee">{storyPlanning.phases.dev.assigneeDisplayName}</span>
+                )}
+              </div>
+            )}
+            {storyPlanning.phases.qa && (
+              <div className="forecast-phase">
+                <span className="phase-label qa">QA</span>
+                <span className="phase-dates">{formatDateRange(storyPlanning.phases.qa.startDate, storyPlanning.phases.qa.endDate)}</span>
+                {storyPlanning.phases.qa.assigneeDisplayName && (
+                  <span className="phase-assignee">{storyPlanning.phases.qa.assigneeDisplayName}</span>
+                )}
+              </div>
+            )}
+            {!storyPlanning.phases.sa && !storyPlanning.phases.dev && !storyPlanning.phases.qa && (
+              <div className="forecast-phase" style={{ color: '#666' }}>Нет данных о фазах</div>
+            )}
+          </div>
+
+          {storyPlanning.blockedBy && storyPlanning.blockedBy.length > 0 && (
+            <div className="forecast-tooltip-footer" style={{ color: '#de350b' }}>
+              Заблокировано: {storyPlanning.blockedBy.join(', ')}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -919,9 +1036,11 @@ interface BoardRowProps {
   recommendedPosition?: number
   // Drag controls for framer-motion
   dragControls?: ReturnType<typeof useDragControls>
+  // Story planning data for tooltip
+  storyPlanning?: PlannedStory | null
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragControls }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragControls, storyPlanning }: BoardRowProps) {
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
 
@@ -997,7 +1116,7 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
         {isEpic(node.issueType) ? (
           <ExpectedDoneCell forecast={forecast} />
         ) : (
-          <StoryExpectedDoneCell endDate={node.expectedDone} assignee={node.assigneeDisplayName} />
+          <StoryExpectedDoneCell endDate={node.expectedDone} assignee={node.assigneeDisplayName} storyPlanning={storyPlanning || null} />
         )}
       </div>
       <div className="cell cell-progress">
@@ -1029,6 +1148,7 @@ interface BoardTableProps {
   roughEstimateConfig: RoughEstimateConfig | null
   onRoughEstimateUpdate: (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
   forecastMap: Map<string, EpicForecast>
+  storyPlanningMap: Map<string, PlannedStory>
   canReorder: boolean
   onReorder: (epicKey: string, newIndex: number) => Promise<void>
   onStoryReorder: (storyKey: string, parentEpicKey: string, newIndex: number) => Promise<void>
@@ -1142,6 +1262,7 @@ function DraggableStoryRow({
   actualPosition,
   recommendedPosition,
   onDragEnd,
+  storyPlanning,
   children
 }: {
   story: BoardNode
@@ -1155,6 +1276,7 @@ function DraggableStoryRow({
   actualPosition: number | undefined
   recommendedPosition: number | undefined
   onDragEnd?: () => void
+  storyPlanning?: PlannedStory | null
   children?: React.ReactNode
 }) {
   const dragControls = useDragControls()
@@ -1175,6 +1297,7 @@ function DraggableStoryRow({
           isJustDropped={false}
           actualPosition={actualPosition}
           recommendedPosition={recommendedPosition}
+          storyPlanning={storyPlanning}
         />
         {children}
       </div>
@@ -1216,6 +1339,7 @@ function DraggableStoryRow({
         canReorder={canReorder}
         isJustDropped={false}
         actualPosition={actualPosition}
+        storyPlanning={storyPlanning}
         recommendedPosition={recommendedPosition}
         dragControls={dragControls}
       />
@@ -1224,7 +1348,7 @@ function DraggableStoryRow({
   )
 }
 
-function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, canReorder, onReorder, onStoryReorder }: BoardTableProps) {
+function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, storyPlanningMap, canReorder, onReorder, onStoryReorder }: BoardTableProps) {
   // Load expanded keys from localStorage
   const loadExpandedKeys = (): Set<string> => {
     try {
@@ -1444,6 +1568,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
                     actualPosition={actualPosition}
                     recommendedPosition={recommendedPosition}
                     onDragEnd={commitStoryReorder}
+                    storyPlanning={storyPlanningMap.get(story.issueKey)}
                   >
                     {storyHasChildren && renderChildren(story.children, story.issueKey, level + 1, storyIsExpanded)}
                   </DraggableStoryRow>
@@ -1473,6 +1598,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
                     isJustDropped={false}
                     actualPosition={actualPosition}
                     recommendedPosition={recommendedPosition}
+                    storyPlanning={storyPlanningMap.get(story.issueKey)}
                   />
                   {storyHasChildren && renderChildren(story.children, story.issueKey, level + 1, storyIsExpanded)}
                 </Fragment>
@@ -1822,6 +1948,9 @@ export function BoardPage() {
   // Load forecasts for all teams
   const [allForecasts, setAllForecasts] = useState<Map<number, ForecastResponse>>(new Map())
 
+  // Story planning data from unified planning (storyKey -> PlannedStory)
+  const [storyPlanningMap, setStoryPlanningMap] = useState<Map<string, PlannedStory>>(new Map())
+
   const loadForecasts = useCallback(() => {
     if (allTeamIds.length === 0) return
 
@@ -1846,20 +1975,53 @@ export function BoardPage() {
     loadForecasts()
   }, [loadForecasts])
 
+  // Load story planning data for tooltips
+  const loadStoryPlanning = useCallback(() => {
+    if (allTeamIds.length === 0) return
+
+    Promise.all(
+      allTeamIds.map(teamId =>
+        getUnifiedPlanning(teamId)
+          .then(data => ({ teamId, data }))
+          .catch(() => null)
+      )
+    ).then(results => {
+      const newMap = new Map<string, PlannedStory>()
+      results.forEach(result => {
+        if (result) {
+          result.data.epics.forEach(epic => {
+            epic.stories.forEach(story => {
+              newMap.set(story.storyKey, story)
+            })
+          })
+        }
+      })
+      setStoryPlanningMap(newMap)
+    })
+  }, [allTeamIds])
+
+  useEffect(() => {
+    loadStoryPlanning()
+  }, [loadStoryPlanning])
+
   // Reload story expected done dates and order from unified planning
   const reloadStoryExpectedDone = useCallback(async (teamId: number) => {
     try {
       const planning = await getUnifiedPlanning(teamId)
-      // Build maps: storyKey -> endDate, epicKey -> story order
+      // Build maps: storyKey -> endDate, storyKey -> PlannedStory, epicKey -> story order
       const storyEndDates = new Map<string, string | null>()
       const epicStoryOrder = new Map<string, string[]>()
+      const newStoryPlanningMap = new Map<string, PlannedStory>()
       planning.epics.forEach(epic => {
         const storyKeys = epic.stories.map(story => {
           storyEndDates.set(story.storyKey, story.endDate)
+          newStoryPlanningMap.set(story.storyKey, story)
           return story.storyKey
         })
         epicStoryOrder.set(epic.epicKey, storyKeys)
       })
+      // Update story planning map
+      setStoryPlanningMap(newStoryPlanningMap)
       // Update board state with new expectedDone and correct story order
       setBoard(prevBoard => prevBoard.map(epic => {
         const storyOrder = epicStoryOrder.get(epic.issueKey)
@@ -2060,6 +2222,7 @@ export function BoardPage() {
             roughEstimateConfig={roughEstimateConfig}
             onRoughEstimateUpdate={handleRoughEstimateUpdate}
             forecastMap={forecastMap}
+            storyPlanningMap={storyPlanningMap}
             canReorder={canReorder}
             onReorder={handleReorder}
             onStoryReorder={handleStoryReorder}
