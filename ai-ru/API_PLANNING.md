@@ -49,7 +49,6 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
       "epicKey": "LB-123",
       "summary": "Реализация автопланирования",
       "autoScore": 85.5,
-      "manualPriorityBoost": 0,
       "expectedDone": "2026-03-15",
       "confidence": "HIGH",
       "dueDateDeltaDays": -3,
@@ -127,8 +126,7 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 |------|-----|----------|
 | epicKey | string | Ключ эпика в Jira |
 | summary | string | Название эпика |
-| autoScore | number | Автоматический приоритет (0-100+) |
-| manualPriorityBoost | number | Ручная корректировка приоритета |
+| autoScore | number | Автоматический приоритет (для рекомендаций) |
 | expectedDone | string | Прогнозная дата завершения |
 | confidence | string | Уровень уверенности: HIGH, MEDIUM, LOW |
 | dueDateDeltaDays | number | Разница с due date (+ опоздание, - запас) |
@@ -254,9 +252,9 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 ---
 
-### PATCH /api/planning/autoscore/epics/{epicKey}/boost
+### PUT /api/epics/{epicKey}/order
 
-Обновляет ручной boost приоритета для эпика.
+Обновляет позицию эпика в списке команды (drag & drop).
 
 **Path параметры:**
 
@@ -267,7 +265,7 @@ GET /api/planning/wip-history?teamId=1&days=30
 **Body:**
 ```json
 {
-  "boost": 10
+  "newPosition": 3
 }
 ```
 
@@ -275,12 +273,40 @@ GET /api/planning/wip-history?teamId=1&days=30
 ```json
 {
   "epicKey": "LB-123",
-  "boost": 10,
-  "newAutoScore": 95.5
+  "newPosition": 3,
+  "teamId": 1
 }
 ```
 
-**Примечание:** boost может быть любым целым числом (положительным или отрицательным). Используется для drag & drop переупорядочивания.
+**Примечание:** `newPosition` — позиция в списке (1-based). Остальные эпики автоматически сдвигаются.
+
+---
+
+### PUT /api/stories/{storyKey}/order
+
+Обновляет позицию story внутри эпика (drag & drop).
+
+**Path параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| storyKey | string | Ключ story (например, LB-456) |
+
+**Body:**
+```json
+{
+  "newPosition": 2
+}
+```
+
+**Ответ:**
+```json
+{
+  "storyKey": "LB-456",
+  "newPosition": 2,
+  "parentKey": "LB-123"
+}
+```
 
 ---
 
@@ -294,16 +320,14 @@ GET /api/planning/wip-history?teamId=1&days=30
   "epicKey": "LB-123",
   "summary": "Реализация автопланирования",
   "totalScore": 85.5,
-  "manualPriorityBoost": 0,
   "calculatedAt": "2026-01-24T12:00:00Z",
   "factors": {
-    "status": 20.0,
+    "status": 25.0,
     "progress": 7.5,
     "dueDate": 25.0,
     "priority": 15.0,
-    "size": 8.0,
-    "age": 5.0,
-    "manualBoost": 5.0
+    "size": 4.0,
+    "age": 3.0
   }
 }
 ```
@@ -312,13 +336,14 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 | Фактор | Макс. баллов | Описание |
 |--------|--------------|----------|
-| status | 20 | In Progress = 20, остальные = 0 |
-| progress | 15 | (logged / estimate) * 15 |
+| status | 30 | Позиция в workflow: Acceptance=30, Developing=25, Planned=15, New=-5 |
+| progress | 10 | (logged / estimate) * 10 |
 | dueDate | 25 | Экспоненциальный рост к дедлайну |
-| priority | 15 | Highest=15, High=10, Medium=5, Low=2 |
-| size | 10 | Инверсия от размера (меньше = больше) |
-| age | 10 | Логарифм от дней с создания |
-| manualBoost | ∞ | Ручная корректировка |
+| priority | 20 | Highest=20, High=15, Medium=10, Low=5 |
+| size | 5 | Инверсия от размера (меньше = выше), без оценки = -5 |
+| age | 5 | Логарифм от дней с создания |
+
+**Примечание:** AutoScore используется только для рекомендаций. Порядок эпиков определяется через `manual_order`.
 
 ---
 
@@ -338,19 +363,19 @@ GET /api/planning/wip-history?teamId=1&days=30
   {
     "epicKey": "LB-123",
     "summary": "Эпик 1",
-    "totalScore": 85.5,
-    "manualPriorityBoost": 0,
+    "autoScore": 85.5,
     "calculatedAt": "2026-01-24T12:00:00Z"
   },
   {
     "epicKey": "LB-124",
     "summary": "Эпик 2",
-    "totalScore": 72.3,
-    "manualPriorityBoost": 0,
+    "autoScore": 72.3,
     "calculatedAt": "2026-01-24T12:00:00Z"
   }
 ]
 ```
+
+**Примечание:** Эпики возвращаются отсортированными по `manual_order` (не по autoScore).
 
 ---
 
