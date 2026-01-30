@@ -47,6 +47,8 @@ body {
 /* Main content */
 .main-content {
   min-height: 400px;
+  max-width: 1600px;
+  margin: 0 auto;
 }
 
 .loading, .error, .empty {

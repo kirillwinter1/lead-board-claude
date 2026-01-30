@@ -670,16 +670,13 @@ function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: StoryExpect
   return (
     <div
       ref={cellRef}
-      className="expected-done-cell"
-      style={{ display: 'flex', flexDirection: 'column', gap: '2px', cursor: storyPlanning ? 'help' : undefined }}
+      className="expected-done-cell story-expected-done"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span className="expected-done-date">{formatDate(endDate)}</span>
       {assignee && (
-        <span style={{ fontSize: '0.75rem', color: '#666', fontStyle: 'italic' }}>
-          {assignee}
-        </span>
+        <span className="expected-done-assignee">{assignee}</span>
       )}
 
       {showTooltip && tooltipPos && storyPlanning && (

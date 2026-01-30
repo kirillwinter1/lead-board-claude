@@ -13,19 +13,23 @@
 
 .board-header {
   display: grid;
-  grid-template-columns: 40px minmax(280px, 1fr) 100px 110px 130px 90px 260px 140px 70px;
+  grid-template-columns: 40px minmax(280px, 1fr) 100px 110px 130px 110px 260px 200px 70px;
   gap: 0;
   background: #f4f5f7;
   border-bottom: 1px solid #dfe1e6;
 }
 
 .board-header .cell {
-  padding: 12px 16px;
+  padding: 12px 24px;
   font-size: 11px;
   font-weight: 600;
   color: #6b778c;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.board-header .th-progress {
+  padding: 12px 16px;
   display: flex;
   align-items: center;
 }
@@ -41,10 +45,11 @@
 
 .th-name {
   min-width: 280px;
+  flex: 1;
 }
 
 .th-team {
-  width: 100px;
+  width: 110px;
 }
 
 .th-priority {
@@ -57,7 +62,7 @@
 }
 
 .th-status {
-  width: 140px;
+  width: 200px;
 }
 
 .th-alerts {
@@ -68,7 +73,7 @@
 /* Grid Rows */
 .board-row {
   display: grid;
-  grid-template-columns: 40px minmax(280px, 1fr) 100px 110px 130px 90px 260px 140px 70px;
+  grid-template-columns: 40px minmax(280px, 1fr) 100px 110px 130px 110px 260px 200px 70px;
   gap: 0;
   border-bottom: 1px solid #ebecf0;
   transition: background-color 0.15s, transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
@@ -110,9 +115,13 @@
 }
 
 .board-row .cell {
-  padding: 12px 16px;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
+}
+
+.board-row .cell-progress {
+  padding: 12px 16px;
 }
 
 /* Children Wrapper - CSS Grid animation trick */
@@ -209,6 +218,7 @@
 /* Name Cell */
 .cell-name {
   min-width: 280px;
+  flex: 1;
   overflow: hidden;
 }
 
@@ -363,7 +373,7 @@
 
 /* Status Badge */
 .cell-status {
-  width: 140px;
+  width: 200px;
 }
 
 .status-badge {
@@ -632,6 +642,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .expected-done-empty {
@@ -660,6 +671,18 @@
 .expected-done-date {
   font-weight: 500;
   color: #172b4d;
+}
+
+.story-expected-done {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.expected-done-assignee {
+  font-size: 11px;
+  color: #6b778c;
+  font-style: italic;
 }
 
 .expected-done-delta {
@@ -1364,13 +1387,13 @@
 
 /* Unified Progress Cell */
 .th-progress {
-  width: 90px;
-  min-width: 90px;
+  width: 110px;
+  min-width: 110px;
 }
 
 .cell-progress {
-  width: 90px;
-  min-width: 90px;
+  width: 110px;
+  min-width: 110px;
 }
 
 .unified-progress-cell {
