@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'rea
 import axios from 'axios'
 import { Reorder, useDragControls } from 'framer-motion'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig, updateEpicOrder, updateStoryOrder } from '../api/epics'
-import { getForecast, EpicForecast, ForecastResponse } from '../api/forecast'
+import { getForecast, EpicForecast, ForecastResponse, getUnifiedPlanning } from '../api/forecast'
 import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 import './BoardPage.css'
@@ -1846,6 +1846,33 @@ export function BoardPage() {
     loadForecasts()
   }, [loadForecasts])
 
+  // Reload story expected done dates from unified planning
+  const reloadStoryExpectedDone = useCallback(async (teamId: number) => {
+    try {
+      const planning = await getUnifiedPlanning(teamId)
+      // Build map of storyKey -> endDate
+      const storyEndDates = new Map<string, string | null>()
+      planning.epics.forEach(epic => {
+        epic.stories.forEach(story => {
+          storyEndDates.set(story.storyKey, story.endDate)
+        })
+      })
+      // Update board state with new expectedDone for stories
+      setBoard(prevBoard => prevBoard.map(epic => ({
+        ...epic,
+        children: epic.children.map(child => {
+          const newEndDate = storyEndDates.get(child.issueKey)
+          if (newEndDate !== undefined) {
+            return { ...child, expectedDone: newEndDate }
+          }
+          return child
+        })
+      })))
+    } catch (err) {
+      console.error('Failed to reload story expected done:', err)
+    }
+  }, [])
+
   // Create forecast map for quick lookup (merged from all teams)
   const forecastMap = useMemo(() => {
     const map = new Map<string, EpicForecast>()
@@ -1874,30 +1901,36 @@ export function BoardPage() {
   }, [fetchBoard])
 
   // Handle reorder via drag & drop - simple position-based API
-  // Note: No fetchBoard() - local state is already updated. Only reload forecasts.
+  // Note: No fetchBoard() - local state is already updated. Reload forecasts and story dates.
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
     try {
       await updateEpicOrder(epicKey, newPosition)
-      // Reload forecasts since order affects expected done dates
+      // Reload forecasts (for epic expected done) and story dates
       loadForecasts()
+      if (selectedTeamId) {
+        await reloadStoryExpectedDone(selectedTeamId)
+      }
     } catch (err) {
       console.error('Failed to reorder epic:', err)
     }
-  }, [loadForecasts])
+  }, [loadForecasts, selectedTeamId, reloadStoryExpectedDone])
 
   // Handle story reorder via drag & drop - simple position-based API
-  // Note: No fetchBoard() - local state is already updated. Only reload forecasts.
+  // Note: No fetchBoard() - local state is already updated. Reload story dates from unified planning.
   const handleStoryReorder = useCallback(async (storyKey: string, _parentEpicKey: string, newIndex: number) => {
     const newPosition = newIndex + 1
     try {
       await updateStoryOrder(storyKey, newPosition)
-      // Reload forecasts since order affects expected done dates
+      // Reload forecasts (for epic expected done) and story dates
       loadForecasts()
+      if (selectedTeamId) {
+        await reloadStoryExpectedDone(selectedTeamId)
+      }
     } catch (err) {
       console.error('Failed to reorder story:', err)
     }
-  }, [loadForecasts])
+  }, [loadForecasts, selectedTeamId, reloadStoryExpectedDone])
 
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
