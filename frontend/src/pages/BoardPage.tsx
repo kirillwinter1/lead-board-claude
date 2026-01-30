@@ -1846,28 +1846,62 @@ export function BoardPage() {
     loadForecasts()
   }, [loadForecasts])
 
-  // Reload story expected done dates from unified planning
+  // Reload story expected done dates and order from unified planning
   const reloadStoryExpectedDone = useCallback(async (teamId: number) => {
     try {
       const planning = await getUnifiedPlanning(teamId)
-      // Build map of storyKey -> endDate
+      // Build maps: storyKey -> endDate, epicKey -> story order
       const storyEndDates = new Map<string, string | null>()
+      const epicStoryOrder = new Map<string, string[]>()
       planning.epics.forEach(epic => {
-        epic.stories.forEach(story => {
+        const storyKeys = epic.stories.map(story => {
           storyEndDates.set(story.storyKey, story.endDate)
+          return story.storyKey
         })
+        epicStoryOrder.set(epic.epicKey, storyKeys)
       })
-      // Update board state with new expectedDone for stories
-      setBoard(prevBoard => prevBoard.map(epic => ({
-        ...epic,
-        children: epic.children.map(child => {
-          const newEndDate = storyEndDates.get(child.issueKey)
-          if (newEndDate !== undefined) {
-            return { ...child, expectedDone: newEndDate }
-          }
-          return child
-        })
-      })))
+      // Update board state with new expectedDone and correct story order
+      setBoard(prevBoard => prevBoard.map(epic => {
+        const storyOrder = epicStoryOrder.get(epic.issueKey)
+        if (!storyOrder) return epic
+
+        // Separate stories and subtasks
+        const stories = epic.children.filter(c =>
+          c.issueType === 'Story' || c.issueType === 'История' ||
+          c.issueType === 'Bug' || c.issueType === 'Баг'
+        )
+        const subtasks = epic.children.filter(c =>
+          c.issueType !== 'Story' && c.issueType !== 'История' &&
+          c.issueType !== 'Bug' && c.issueType !== 'Баг'
+        )
+
+        // Sort stories by the order from unified planning
+        const storyMap = new Map(stories.map(s => [s.issueKey, s]))
+        const orderedStories = storyOrder
+          .map(key => storyMap.get(key))
+          .filter((s): s is BoardNode => s !== undefined)
+          .map(story => {
+            const newEndDate = storyEndDates.get(story.issueKey)
+            if (newEndDate !== undefined) {
+              return { ...story, expectedDone: newEndDate }
+            }
+            return story
+          })
+
+        // Add any stories not in the order (shouldn't happen, but safety)
+        const orderedKeys = new Set(storyOrder)
+        const remainingStories = stories
+          .filter(s => !orderedKeys.has(s.issueKey))
+          .map(story => {
+            const newEndDate = storyEndDates.get(story.issueKey)
+            if (newEndDate !== undefined) {
+              return { ...story, expectedDone: newEndDate }
+            }
+            return story
+          })
+
+        return { ...epic, children: [...orderedStories, ...remainingStories, ...subtasks] }
+      }))
     } catch (err) {
       console.error('Failed to reload story expected done:', err)
     }
