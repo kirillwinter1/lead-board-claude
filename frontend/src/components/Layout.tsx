@@ -52,26 +52,26 @@ export function Layout() {
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <NavLink to="/" className="logo-link">
+          <NavLink to="/board" className="logo-link">
             <img src={logo} alt="Lead Board" className="header-logo" />
           </NavLink>
           <nav className="nav-tabs">
-            <NavLink to="/" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
+            <NavLink to="/board" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
               Board
             </NavLink>
-            <NavLink to="/timeline" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to="/board/timeline" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Timeline
             </NavLink>
-            <NavLink to="/metrics" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to="/board/metrics" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Metrics
             </NavLink>
-            <NavLink to="/data-quality" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to="/board/data-quality" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Data Quality
             </NavLink>
-            <NavLink to="/poker" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to="/board/poker" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Poker
             </NavLink>
-            <NavLink to="/teams" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to="/board/teams" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Teams
             </NavLink>
           </nav>

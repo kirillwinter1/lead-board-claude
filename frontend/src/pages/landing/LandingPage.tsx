@@ -1,29 +1,45 @@
+import { useState } from 'react'
 import { LandingHeader } from './components/LandingHeader'
+import { AuditModal } from './components/AuditModal'
 import { HeroSection } from './sections/HeroSection'
+import { ICPSection } from './sections/ICPSection'
 import { ProblemSection } from './sections/ProblemSection'
-import { SolutionSection } from './sections/SolutionSection'
-import { FeaturesSection } from './sections/FeaturesSection'
-import { DemoSection } from './sections/DemoSection'
-import { SocialProofSection } from './sections/SocialProofSection'
-import { CTASection } from './sections/CTASection'
+import { MethodSection } from './sections/MethodSection'
+import { BaselineSection } from './sections/BaselineSection'
+import { AuditSection } from './sections/AuditSection'
+import { PilotSection } from './sections/PilotSection'
+import { DifferentiationSection } from './sections/DifferentiationSection'
+import { CaseSection } from './sections/CaseSection'
+import { FounderSection } from './sections/FounderSection'
+import { ResultsSection } from './sections/ResultsSection'
 import './LandingPage.css'
 
 export function LandingPage() {
+  const [isModalOpen, setIsModalOpen] = useState(false)
+
+  const openModal = () => setIsModalOpen(true)
+  const closeModal = () => setIsModalOpen(false)
+
   return (
-    <div className="landing-page">
-      <LandingHeader />
-      <HeroSection />
+    <div className="landing-page landing-page-dense">
+      <LandingHeader onRequestAudit={openModal} />
+      <HeroSection onRequestAudit={openModal} />
+      <ICPSection />
       <ProblemSection />
-      <SolutionSection />
-      <FeaturesSection />
-      <DemoSection />
-      <SocialProofSection />
-      <CTASection />
+      <MethodSection onRequestDemo={openModal} />
+      <BaselineSection />
+      <ResultsSection />
+      <AuditSection onRequestAudit={openModal} />
+      <PilotSection />
+      <DifferentiationSection />
+      <CaseSection onRequestAudit={openModal} />
+      <FounderSection />
       <footer className="landing-footer">
         <p className="landing-footer-text">
           Lead Board {new Date().getFullYear()}
         </p>
       </footer>
+      <AuditModal isOpen={isModalOpen} onClose={closeModal} />
     </div>
   )
 }

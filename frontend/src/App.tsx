@@ -15,8 +15,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/landing" element={<LandingPage />} />
-        <Route path="/" element={<Layout />}>
+        <Route path="/board" element={<Layout />}>
           <Route index element={<BoardPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="metrics" element={<TeamMetricsPage />} />
