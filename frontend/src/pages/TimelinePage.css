@@ -1267,30 +1267,26 @@
 
 /* ========== ANIMATIONS & TRANSITIONS ========== */
 
-/* Slide-in animation from left */
-@keyframes slideInFromLeft {
+/* Slide-in animation for entire epic row */
+@keyframes slideInRow {
   0% {
     opacity: 0;
-    transform: translateX(-100%) scaleX(0.3);
-  }
-  60% {
-    opacity: 1;
-    transform: translateX(5%) scaleX(1.02);
+    transform: translateX(-30px);
   }
   100% {
     opacity: 1;
-    transform: translateX(0) scaleX(1);
+    transform: translateX(0);
   }
+}
+
+/* Row entrance animation - all stories in a row animate together */
+.gantt-row-content.gantt-row-animate {
+  animation: slideInRow 0.6s ease-out both;
 }
 
 /* Smooth hover transitions for story bars */
 .story-bar {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-/* Entrance animation - only applied when shouldAnimate is true */
-.story-bar.story-bar-animate {
-  animation: slideInFromLeft 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 .story-bar:hover {

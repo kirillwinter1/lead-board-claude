@@ -486,11 +486,9 @@ interface StoryBarProps {
   jiraBaseUrl: string
   globalWarnings: PlanningWarning[]
   onHover: (story: PlannedStory | null, pos?: { x: number; y: number }) => void
-  animationIndex: number
-  shouldAnimate: boolean
 }
 
-function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover, animationIndex, shouldAnimate }: StoryBarProps) {
+function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover }: StoryBarProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
   const startDate = new Date(story.startDate!)
   const endDate = new Date(story.endDate!)
@@ -537,12 +535,9 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
     onHover(story, { x: rect.left + rect.width / 2, y: rect.top - 8 })
   }
 
-  // Staggered animation delay based on index (50ms between each bar)
-  const animationDelay = shouldAnimate ? `${animationIndex * 50}ms` : '0ms'
-
   return (
     <div
-      className={`story-bar ${shouldAnimate ? 'story-bar-animate' : ''}`}
+      className="story-bar"
       style={{
         position: 'absolute',
         left: `${leftPercent}%`,
@@ -554,7 +549,6 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         overflow: 'hidden',
         background: '#e5e7eb',
         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
-        animationDelay,
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => onHover(null)}
@@ -594,10 +588,9 @@ interface StoryBarsProps {
   dateRange: DateRange
   jiraBaseUrl: string
   globalWarnings: PlanningWarning[]
-  shouldAnimate: boolean
 }
 
-function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, shouldAnimate }: StoryBarsProps) {
+function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -633,8 +626,6 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, shouldAnim
             jiraBaseUrl={jiraBaseUrl}
             globalWarnings={globalWarnings}
             onHover={handleHover}
-            animationIndex={index}
-            shouldAnimate={shouldAnimate}
           />
         ))}
       </div>
@@ -821,10 +812,11 @@ interface GanttRowProps {
   dateRange: DateRange
   jiraBaseUrl: string
   rowHeight: number
+  epicIndex: number
   shouldAnimate: boolean
 }
 
-function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, shouldAnimate }: GanttRowProps) {
+function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate }: GanttRowProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
 
   const today = new Date()
@@ -836,9 +828,17 @@ function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHe
   const dueDateOffset = dueDate ? daysBetween(dateRange.start, dueDate) : null
   const dueDatePercent = dueDateOffset !== null ? (dueDateOffset / totalDays) * 100 : null
 
+  // Animation delay based on epic row index (150ms between each row)
+  const animationStyle = shouldAnimate ? {
+    animationDelay: `${epicIndex * 150}ms`
+  } : {}
+
   return (
     <div className="gantt-row" style={{ height: `${rowHeight}px` }}>
-      <div className="gantt-row-content" style={{ position: 'relative', padding: '4px 0' }}>
+      <div
+        className={`gantt-row-content ${shouldAnimate ? 'gantt-row-animate' : ''}`}
+        style={{ position: 'relative', padding: '4px 0', ...animationStyle }}
+      >
         {/* Today line */}
         {todayPercent >= 0 && todayPercent <= 100 && (
           <div className="gantt-today-line" style={{ left: `${todayPercent}%` }} />
@@ -855,7 +855,6 @@ function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHe
           dateRange={dateRange}
           jiraBaseUrl={jiraBaseUrl}
           globalWarnings={globalWarnings}
-          shouldAnimate={shouldAnimate}
         />
       </div>
     </div>
@@ -1161,7 +1160,7 @@ export function TimelinePage() {
             </div>
 
             <div className="gantt-body">
-              {epics.map(epic => {
+              {epics.map((epic, epicIndex) => {
                 const epicForecast = epicForecasts.get(epic.epicKey)
                 const rowHeight = rowHeights.get(epic.epicKey) || MIN_ROW_HEIGHT
                 return (
@@ -1173,6 +1172,7 @@ export function TimelinePage() {
                     dateRange={dateRange}
                     jiraBaseUrl={jiraBaseUrl}
                     rowHeight={rowHeight}
+                    epicIndex={epicIndex}
                     shouldAnimate={shouldAnimate}
                   />
                 )
