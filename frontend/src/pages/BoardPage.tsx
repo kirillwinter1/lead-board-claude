@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
+  DragOverEvent,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -1338,6 +1339,10 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(loadExpandedKeys)
   const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
+  // Live preview positions during drag - shows where items would end up
+  const [dragPreviewPositions, setDragPreviewPositions] = useState<Map<string, number> | null>(null)
+  const [storyDragPreviewPositions, setStoryDragPreviewPositions] = useState<Map<string, number> | null>(null)
+
   // @dnd-kit sensors for keyboard and pointer
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -1371,8 +1376,38 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     })
   }
 
+  // Calculate preview positions during drag - live feedback
+  const handleEpicDragOver = useCallback((event: DragOverEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) {
+      setDragPreviewPositions(null)
+      return
+    }
+
+    const oldIndex = items.findIndex(e => e.issueKey === active.id)
+    const newIndex = items.findIndex(e => e.issueKey === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      setDragPreviewPositions(null)
+      return
+    }
+
+    // Calculate what positions would be after drop
+    const reordered = [...items]
+    const [movedItem] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, movedItem)
+
+    const positions = new Map<string, number>()
+    reordered.forEach((epic, idx) => {
+      positions.set(epic.issueKey, idx + 1)
+    })
+    setDragPreviewPositions(positions)
+  }, [items])
+
   // Handle epic drag end - call API directly
   const handleEpicDragEnd = useCallback(async (event: DragEndEvent) => {
+    setDragPreviewPositions(null) // Clear preview
+
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -1385,8 +1420,38 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     }
   }, [items, onReorder])
 
+  // Calculate preview positions for stories during drag
+  const handleStoryDragOver = useCallback((event: DragOverEvent, stories: BoardNode[]) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) {
+      setStoryDragPreviewPositions(null)
+      return
+    }
+
+    const oldIndex = stories.findIndex(s => s.issueKey === active.id)
+    const newIndex = stories.findIndex(s => s.issueKey === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      setStoryDragPreviewPositions(null)
+      return
+    }
+
+    // Calculate what positions would be after drop
+    const reordered = [...stories]
+    const [movedItem] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, movedItem)
+
+    const positions = new Map<string, number>()
+    reordered.forEach((story, idx) => {
+      positions.set(story.issueKey, idx + 1)
+    })
+    setStoryDragPreviewPositions(positions)
+  }, [])
+
   // Handle story drag end - call API directly
   const handleStoryDragEnd = useCallback(async (event: DragEndEvent, parentKey: string, stories: BoardNode[]) => {
+    setStoryDragPreviewPositions(null) // Clear preview
+
     const { active, over } = event
     if (!over || active.id === over.id) return
 
@@ -1453,6 +1518,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragOver={(event) => handleStoryDragOver(event, stories)}
               onDragEnd={(event) => handleStoryDragEnd(event, parentKey, stories)}
             >
               <SortableContext
@@ -1463,7 +1529,8 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
                   const storyIsExpanded = expandedKeys.has(story.issueKey)
                   const storyHasChildren = story.children.length > 0
                   const storyForecast = forecastMap.get(story.issueKey) || null
-                  const actualPosition = storyIndex + 1
+                  // Use preview position during drag for live feedback
+                  const actualPosition = storyDragPreviewPositions?.get(story.issueKey) ?? (storyIndex + 1)
                   const recommendedPosition = storyRecommendations.get(story.issueKey)
 
                   return (
@@ -1599,6 +1666,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
+              onDragOver={handleEpicDragOver}
               onDragEnd={handleEpicDragEnd}
             >
               <SortableContext
@@ -1609,7 +1677,8 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
                   const isExpanded = expandedKeys.has(epic.issueKey)
                   const hasChildren = epic.children.length > 0
                   const forecast = forecastMap.get(epic.issueKey) || null
-                  const actualPosition = epicIndex + 1
+                  // Use preview position during drag for live feedback
+                  const actualPosition = dragPreviewPositions?.get(epic.issueKey) ?? (epicIndex + 1)
                   const recommendedPosition = epicRecommendations.get(epic.issueKey)
 
                   return (
@@ -1679,15 +1748,15 @@ export function BoardPage() {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
 
-  const fetchBoard = useCallback(async () => {
-    setLoading(true)
+  const fetchBoard = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const response = await axios.get<BoardResponse>('/api/board')
       setBoard(response.data.items)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to load board')
+      if (!silent) setError(err instanceof Error ? err.message : 'Failed to load board')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
@@ -1832,33 +1901,72 @@ export function BoardPage() {
 
   // Handle reorder via drag & drop - simple position-based API
   // Pattern: Optimistic UI + Backend Reconciliation
-  // After API success, fetchBoard() to sync with backend (source of truth)
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
+
+    // Optimistic update: immediately reorder in UI
+    setBoard(prevBoard => {
+      const items = [...prevBoard]
+      const oldIndex = items.findIndex(e => e.issueKey === epicKey)
+      if (oldIndex === -1 || oldIndex === targetIndex) return prevBoard
+
+      const [movedItem] = items.splice(oldIndex, 1)
+      items.splice(targetIndex, 0, movedItem)
+
+      // Update manualOrder for all affected items
+      return items.map((item, idx) => ({
+        ...item,
+        manualOrder: idx + 1
+      }))
+    })
+
     try {
       await updateEpicOrder(epicKey, newPosition)
-      // Fetch fresh data from backend (source of truth)
-      await fetchBoard()
+      // Silent fetch to reconcile with backend (no loading state)
+      fetchBoard(true)
       loadForecasts()
     } catch (err) {
       console.error('Failed to reorder epic:', err)
-      // On error, also fetch to restore correct state
+      // On error, fetch to restore correct state
       await fetchBoard()
     }
   }, [fetchBoard, loadForecasts])
 
   // Handle story reorder via drag & drop - simple position-based API
   // Pattern: Optimistic UI + Backend Reconciliation
-  const handleStoryReorder = useCallback(async (storyKey: string, _parentEpicKey: string, newIndex: number) => {
+  const handleStoryReorder = useCallback(async (storyKey: string, parentEpicKey: string, newIndex: number) => {
     const newPosition = newIndex + 1
+
+    // Optimistic update: immediately reorder story in UI
+    setBoard(prevBoard => {
+      return prevBoard.map(epic => {
+        if (epic.issueKey !== parentEpicKey) return epic
+
+        const children = [...epic.children]
+        const oldIndex = children.findIndex(s => s.issueKey === storyKey)
+        if (oldIndex === -1 || oldIndex === newIndex) return epic
+
+        const [movedItem] = children.splice(oldIndex, 1)
+        children.splice(newIndex, 0, movedItem)
+
+        // Update manualOrder for all affected stories
+        const updatedChildren = children.map((child, idx) => ({
+          ...child,
+          manualOrder: idx + 1
+        }))
+
+        return { ...epic, children: updatedChildren }
+      })
+    })
+
     try {
       await updateStoryOrder(storyKey, newPosition)
-      // Fetch fresh data from backend (source of truth)
-      await fetchBoard()
+      // Silent fetch to reconcile with backend (no loading state)
+      fetchBoard(true)
       loadForecasts()
     } catch (err) {
       console.error('Failed to reorder story:', err)
-      // On error, also fetch to restore correct state
+      // On error, fetch to restore correct state
       await fetchBoard()
     }
   }, [fetchBoard, loadForecasts])
