@@ -97,15 +97,6 @@ export async function getForecast(teamId: number, statuses?: string[]): Promise<
   return response.data
 }
 
-/**
- * Пересчитывает AutoScore.
- */
-export async function recalculateAutoScore(teamId?: number): Promise<{ epicsUpdated: number }> {
-  const params = teamId ? `?teamId=${teamId}` : ''
-  const response = await axios.post<{ status: string; epicsUpdated: number }>(`/api/planning/recalculate${params}`)
-  return response.data
-}
-
 // WIP History types
 export interface WipDataPoint {
   date: string
@@ -149,7 +140,6 @@ export async function createWipSnapshot(teamId: number): Promise<{ status: strin
 }
 
 // Story types
-export type StoryStatusCategory = 'TO_DO' | 'IN_PROGRESS' | 'DONE'
 export type StoryPhase = 'SA' | 'DEV' | 'QA'
 
 export interface RoleBreakdown {
@@ -179,67 +169,6 @@ export interface StoryInfo {
  */
 export async function getEpicStories(epicKey: string): Promise<StoryInfo[]> {
   const response = await axios.get<StoryInfo[]>(`/api/planning/epics/${epicKey}/stories`)
-  return response.data
-}
-
-/**
- * Определяет категорию статуса сторя.
- */
-export function getStoryStatusCategory(status: string): StoryStatusCategory {
-  const statusLower = status.toLowerCase()
-
-  if (statusLower.includes('done') || statusLower.includes('closed') ||
-      statusLower.includes('resolved') || statusLower.includes('завершен') ||
-      statusLower.includes('готов') || statusLower.includes('выполнен')) {
-    return 'DONE'
-  }
-  if (statusLower.includes('progress') || statusLower.includes('work') ||
-      statusLower.includes('review') || statusLower.includes('test') ||
-      statusLower.includes('в работе') || statusLower.includes('ревью')) {
-    return 'IN_PROGRESS'
-  }
-  return 'TO_DO'
-}
-
-// Story Forecast types (assignee-based capacity planning)
-export interface StorySchedule {
-  storyKey: string
-  storySummary: string | null
-  assigneeAccountId: string | null
-  assigneeDisplayName: string | null
-  startDate: string
-  endDate: string
-  workDays: number
-  isUnassigned: boolean
-  isBlocked: boolean
-  blockingStories: string[]
-  autoScore: number | null
-  status: string | null
-  timeSpentSeconds: number | null
-  originalEstimateSeconds: number | null
-}
-
-export interface AssigneeUtilization {
-  displayName: string
-  role: 'SA' | 'DEV' | 'QA'
-  workDaysAssigned: number
-  effectiveHoursPerDay: number
-}
-
-export interface StoryForecastResponse {
-  epicKey: string
-  epicStartDate: string
-  stories: StorySchedule[]
-  assigneeUtilization: Record<string, AssigneeUtilization>
-}
-
-/**
- * Получает story-level forecast для эпика с учетом assignee capacity.
- */
-export async function getStoryForecast(epicKey: string, teamId: number): Promise<StoryForecastResponse> {
-  const response = await axios.get<StoryForecastResponse>(
-    `/api/planning/epics/${epicKey}/story-forecast?teamId=${teamId}`
-  )
   return response.data
 }
 
@@ -423,22 +352,3 @@ export async function getForecastSnapshot(teamId: number, date: string): Promise
   return response.data
 }
 
-/**
- * Создаёт снэпшот вручную (для тестирования).
- */
-export async function createForecastSnapshot(teamId: number): Promise<{ status: string; date?: string }> {
-  const response = await axios.post<{ status: string; date?: string }>(
-    `/api/forecast-snapshots/create?teamId=${teamId}`
-  )
-  return response.data
-}
-
-/**
- * Создаёт снэпшот для указанной даты (для backfill).
- */
-export async function createForecastSnapshotForDate(teamId: number, date: string): Promise<{ status: string; date: string }> {
-  const response = await axios.post<{ status: string; date: string }>(
-    `/api/forecast-snapshots/create-for-date?teamId=${teamId}&date=${date}`
-  )
-  return response.data
-}

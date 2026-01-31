@@ -114,15 +114,7 @@ export async function getSessionsByTeam(teamId: number): Promise<PokerSession[]>
   return response.data
 }
 
-export async function startSession(sessionId: number): Promise<PokerSession> {
-  const response = await axios.post(`/api/poker/sessions/${sessionId}/start`)
-  return response.data
-}
-
-export async function completeSession(sessionId: number): Promise<PokerSession> {
-  const response = await axios.post(`/api/poker/sessions/${sessionId}/complete`)
-  return response.data
-}
+// Note: startSession/completeSession are done via WebSocket
 
 export interface AddStoryRequest {
   title: string
@@ -144,42 +136,7 @@ export async function addStory(
   return response.data
 }
 
-export async function deleteStory(storyId: number): Promise<void> {
-  await axios.delete(`/api/poker/stories/${storyId}`)
-}
-
-export async function getStories(sessionId: number): Promise<PokerStory[]> {
-  const response = await axios.get(`/api/poker/sessions/${sessionId}/stories`)
-  return response.data
-}
-
-export async function revealVotes(storyId: number): Promise<PokerStory> {
-  const response = await axios.post(`/api/poker/stories/${storyId}/reveal`)
-  return response.data
-}
-
-export interface SetFinalRequest {
-  saHours: number | null
-  devHours: number | null
-  qaHours: number | null
-}
-
-export async function setFinalEstimate(
-  storyId: number,
-  request: SetFinalRequest,
-  updateJira: boolean = true
-): Promise<PokerStory> {
-  const response = await axios.post(
-    `/api/poker/stories/${storyId}/final?updateJira=${updateJira}`,
-    { storyId, ...request }
-  )
-  return response.data
-}
-
-export async function moveToNextStory(sessionId: number): Promise<PokerStory | null> {
-  const response = await axios.post(`/api/poker/sessions/${sessionId}/next`)
-  return response.status === 204 ? null : response.data
-}
+// Note: deleteStory, getStories, revealVotes, setFinalEstimate, moveToNextStory are done via WebSocket
 
 export async function getVotes(storyId: number): Promise<PokerVote[]> {
   const response = await axios.get(`/api/poker/stories/${storyId}/votes`)
