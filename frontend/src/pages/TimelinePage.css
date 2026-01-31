@@ -1265,3 +1265,78 @@
   font-weight: 600;
 }
 
+/* ========== ANIMATIONS & TRANSITIONS ========== */
+
+/* Smooth hover transitions for story bars */
+.story-bar {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.story-bar:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2) !important;
+  z-index: 20 !important;
+}
+
+/* Phase segments glow on hover */
+.story-bar > div {
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.story-bar:hover > div {
+  filter: brightness(1.1);
+}
+
+/* Due line hover effect */
+.gantt-due-line {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.gantt-due-line:hover {
+  transform: scaleX(1.5);
+  box-shadow: 0 0 12px rgba(222, 53, 11, 0.4);
+}
+
+/* Today line subtle pulse */
+.gantt-today-line {
+  transition: opacity 0.3s ease;
+}
+
+.gantt-today-line:hover {
+  opacity: 1;
+}
+
+/* Gantt row hover */
+.gantt-row {
+  transition: background 0.15s ease;
+}
+
+/* Label row hover */
+.gantt-label-row {
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.gantt-label-row:hover {
+  transform: translateX(2px);
+}
+
+/* Tooltip smooth appear */
+.timeline-tooltip {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Legend items hover */
+.legend-item {
+  transition: opacity 0.15s ease;
+}
+
+.legend-item:hover {
+  opacity: 0.7;
+}
+
+/* Controls smooth transitions */
+.timeline-controls select,
+.timeline-controls button {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+

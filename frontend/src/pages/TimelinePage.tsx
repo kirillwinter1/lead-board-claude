@@ -478,6 +478,110 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
   )
 }
 
+// --- Story Bar Component ---
+interface StoryBarProps {
+  story: PlannedStory
+  lane: number
+  dateRange: DateRange
+  jiraBaseUrl: string
+  globalWarnings: PlanningWarning[]
+  onHover: (story: PlannedStory | null, pos?: { x: number; y: number }) => void
+}
+
+function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover }: StoryBarProps) {
+  const totalDays = daysBetween(dateRange.start, dateRange.end)
+  const startDate = new Date(story.startDate!)
+  const endDate = new Date(story.endDate!)
+
+  const daysFromStart = daysBetween(dateRange.start, startDate)
+  const duration = daysBetween(startDate, endDate) + 1
+  const leftPercent = (daysFromStart / totalDays) * 100
+  const widthPercent = (duration / totalDays) * 100
+
+  const storyNumber = story.storyKey.split('-')[1] || story.storyKey
+  const isBlocked = story.blockedBy && story.blockedBy.length > 0
+  const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
+
+  const renderPhaseSegment = (
+    phase: UnifiedPhaseSchedule | null,
+    phaseType: 'sa' | 'dev' | 'qa'
+  ) => {
+    if (!phase || !phase.startDate || !phase.endDate || phase.hours <= 0) return null
+
+    const phaseStart = new Date(phase.startDate)
+    const phaseEnd = new Date(phase.endDate)
+    const phaseStartOffset = daysBetween(startDate, phaseStart)
+    const phaseDuration = daysBetween(phaseStart, phaseEnd) + 1
+    const phaseLeftPercent = Math.max(0, (phaseStartOffset / duration) * 100)
+    const phaseWidthPercent = Math.min(100 - phaseLeftPercent, (phaseDuration / duration) * 100)
+
+    return (
+      <div
+        key={phaseType}
+        style={{
+          position: 'absolute',
+          left: `${phaseLeftPercent}%`,
+          width: `${phaseWidthPercent}%`,
+          height: '100%',
+          backgroundColor: PHASE_COLORS[phaseType],
+          opacity: phase.noCapacity ? 0.4 : 1
+        }}
+      />
+    )
+  }
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    onHover(story, { x: rect.left + rect.width / 2, y: rect.top - 8 })
+  }
+
+  return (
+    <div
+      className="story-bar"
+      style={{
+        position: 'absolute',
+        left: `${leftPercent}%`,
+        width: `${Math.max(widthPercent, 1)}%`,
+        top: `${lane * (BAR_HEIGHT + LANE_GAP)}px`,
+        height: `${BAR_HEIGHT}px`,
+        borderRadius: '4px',
+        border: isBlocked ? '2px solid #ef4444' : '1px solid rgba(0,0,0,0.15)',
+        overflow: 'hidden',
+        background: '#e5e7eb',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => onHover(null)}
+    >
+      {renderPhaseSegment(story.phases?.sa ?? null, 'sa')}
+      {renderPhaseSegment(story.phases?.dev ?? null, 'dev')}
+      {renderPhaseSegment(story.phases?.qa ?? null, 'qa')}
+
+      <span
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: '11px',
+          fontWeight: 600,
+          color: 'white',
+          textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+          zIndex: 2,
+          pointerEvents: 'auto',
+          cursor: 'pointer'
+        }}
+        onClick={(e) => {
+          e.stopPropagation()
+          window.open(`${jiraBaseUrl}${story.storyKey}`, '_blank')
+        }}
+      >
+        {storyNumber}{hasWarning ? ' ⚠' : ''}
+      </span>
+    </div>
+  )
+}
+
 // --- Story Bars Component ---
 interface StoryBarsProps {
   stories: PlannedStory[]
@@ -501,111 +605,29 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
     return <div className="story-empty-text">Нет активных сторей</div>
   }
 
-  const totalDays = daysBetween(dateRange.start, dateRange.end)
   const storyLanes = allocateStoryLanes(activeStories)
   const maxLane = Math.max(0, ...Array.from(storyLanes.values())) + 1
   const containerHeight = maxLane * (BAR_HEIGHT + LANE_GAP)
 
-  const handleMouseEnter = (e: React.MouseEvent, story: PlannedStory) => {
-    e.stopPropagation()
-    const rect = e.currentTarget.getBoundingClientRect()
-    setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top - 8 })
+  const handleHover = (story: PlannedStory | null, pos?: { x: number; y: number }) => {
     setHoveredStory(story)
-  }
-
-  const renderPhaseSegment = (
-    phase: UnifiedPhaseSchedule | null,
-    phaseType: 'sa' | 'dev' | 'qa',
-    storyStart: Date,
-    storyDuration: number
-  ) => {
-    if (!phase || !phase.startDate || !phase.endDate || phase.hours <= 0) return null
-
-    const phaseStart = new Date(phase.startDate)
-    const phaseEnd = new Date(phase.endDate)
-    const phaseStartOffset = daysBetween(storyStart, phaseStart)
-    const phaseDuration = daysBetween(phaseStart, phaseEnd) + 1
-    const leftPercent = Math.max(0, (phaseStartOffset / storyDuration) * 100)
-    const widthPercent = Math.min(100 - leftPercent, (phaseDuration / storyDuration) * 100)
-
-    return (
-      <div
-        key={phaseType}
-        style={{
-          position: 'absolute',
-          left: `${leftPercent}%`,
-          width: `${widthPercent}%`,
-          height: '100%',
-          backgroundColor: PHASE_COLORS[phaseType],
-          opacity: phase.noCapacity ? 0.4 : 1
-        }}
-      />
-    )
+    if (pos) setTooltipPos(pos)
   }
 
   return (
     <>
       <div style={{ height: `${containerHeight}px`, position: 'relative', width: '100%' }}>
-        {activeStories.map(story => {
-          const startDate = new Date(story.startDate!)
-          const endDate = new Date(story.endDate!)
-          const lane = storyLanes.get(story.storyKey) || 0
-
-          const daysFromStart = daysBetween(dateRange.start, startDate)
-          const duration = daysBetween(startDate, endDate) + 1
-          const leftPercent = (daysFromStart / totalDays) * 100
-          const widthPercent = (duration / totalDays) * 100
-
-          const storyNumber = story.storyKey.split('-')[1] || story.storyKey
-          const isBlocked = story.blockedBy && story.blockedBy.length > 0
-          const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
-
-          return (
-            <div
-              key={story.storyKey}
-              style={{
-                position: 'absolute',
-                left: `${leftPercent}%`,
-                width: `${Math.max(widthPercent, 1)}%`,
-                top: `${lane * (BAR_HEIGHT + LANE_GAP)}px`,
-                height: `${BAR_HEIGHT}px`,
-                borderRadius: '3px',
-                border: isBlocked ? '2px solid #ef4444' : '1px solid rgba(0,0,0,0.12)',
-                overflow: 'hidden',
-                cursor: 'pointer',
-                background: '#e5e7eb',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-              }}
-              onMouseEnter={e => handleMouseEnter(e, story)}
-              onMouseLeave={() => setHoveredStory(null)}
-            >
-              {renderPhaseSegment(story.phases?.sa ?? null, 'sa', startDate, duration)}
-              {renderPhaseSegment(story.phases?.dev ?? null, 'dev', startDate, duration)}
-              {renderPhaseSegment(story.phases?.qa ?? null, 'qa', startDate, duration)}
-
-              <span
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: 'white',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                  zIndex: 2,
-                  cursor: 'pointer'
-                }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  window.open(`${jiraBaseUrl}${story.storyKey}`, '_blank')
-                }}
-              >
-                {storyNumber}{hasWarning ? ' ⚠' : ''}
-              </span>
-            </div>
-          )
-        })}
+        {activeStories.map((story, index) => (
+          <StoryBar
+            key={story.storyKey}
+            story={story}
+            lane={index}
+            dateRange={dateRange}
+            jiraBaseUrl={jiraBaseUrl}
+            globalWarnings={globalWarnings}
+            onHover={handleHover}
+          />
+        ))}
       </div>
 
       {hoveredStory && createPortal(
