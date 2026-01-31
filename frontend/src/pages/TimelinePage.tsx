@@ -486,9 +486,11 @@ interface StoryBarProps {
   jiraBaseUrl: string
   globalWarnings: PlanningWarning[]
   onHover: (story: PlannedStory | null, pos?: { x: number; y: number }) => void
+  animationIndex: number
+  shouldAnimate: boolean
 }
 
-function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover }: StoryBarProps) {
+function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover, animationIndex, shouldAnimate }: StoryBarProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
   const startDate = new Date(story.startDate!)
   const endDate = new Date(story.endDate!)
@@ -535,9 +537,12 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
     onHover(story, { x: rect.left + rect.width / 2, y: rect.top - 8 })
   }
 
+  // Staggered animation delay based on index (50ms between each bar)
+  const animationDelay = shouldAnimate ? `${animationIndex * 50}ms` : '0ms'
+
   return (
     <div
-      className="story-bar"
+      className={`story-bar ${shouldAnimate ? 'story-bar-animate' : ''}`}
       style={{
         position: 'absolute',
         left: `${leftPercent}%`,
@@ -549,6 +554,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         overflow: 'hidden',
         background: '#e5e7eb',
         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+        animationDelay,
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => onHover(null)}
@@ -588,9 +594,10 @@ interface StoryBarsProps {
   dateRange: DateRange
   jiraBaseUrl: string
   globalWarnings: PlanningWarning[]
+  shouldAnimate: boolean
 }
 
-function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
+function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, shouldAnimate }: StoryBarsProps) {
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -626,6 +633,8 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
             jiraBaseUrl={jiraBaseUrl}
             globalWarnings={globalWarnings}
             onHover={handleHover}
+            animationIndex={index}
+            shouldAnimate={shouldAnimate}
           />
         ))}
       </div>
@@ -812,9 +821,10 @@ interface GanttRowProps {
   dateRange: DateRange
   jiraBaseUrl: string
   rowHeight: number
+  shouldAnimate: boolean
 }
 
-function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight }: GanttRowProps) {
+function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, shouldAnimate }: GanttRowProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
 
   const today = new Date()
@@ -845,6 +855,7 @@ function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHe
           dateRange={dateRange}
           jiraBaseUrl={jiraBaseUrl}
           globalWarnings={globalWarnings}
+          shouldAnimate={shouldAnimate}
         />
       </div>
     </div>
@@ -877,6 +888,10 @@ export function TimelinePage() {
   const [availableDates, setAvailableDates] = useState<string[]>([])
   const [selectedHistoricalDate, setSelectedHistoricalDate] = useState<string>('') // empty = live data
   const [isHistoricalMode, setIsHistoricalMode] = useState(false)
+
+  // Animation state - animate only on fresh data load
+  const [shouldAnimate, setShouldAnimate] = useState(false)
+  const animationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const chartRef = useRef<HTMLDivElement>(null)
 
@@ -921,6 +936,20 @@ export function TimelinePage() {
     setLoading(true)
     setError(null)
 
+    // Clear any pending animation timeout
+    if (animationTimeoutRef.current) {
+      clearTimeout(animationTimeoutRef.current)
+    }
+
+    const triggerAnimation = () => {
+      // Enable animation for fresh data
+      setShouldAnimate(true)
+      // Disable animation after all bars have animated (prevent re-animation on hover/tooltip)
+      animationTimeoutRef.current = setTimeout(() => {
+        setShouldAnimate(false)
+      }, 2000) // 2 seconds should cover all staggered animations
+    }
+
     if (selectedHistoricalDate && isHistoricalMode) {
       // Load from historical snapshot
       Promise.all([
@@ -931,6 +960,7 @@ export function TimelinePage() {
           setForecast(forecastData)
           setUnifiedPlan(planData)
           setLoading(false)
+          triggerAnimation()
         })
         .catch(err => {
           setError('Failed to load historical snapshot: ' + err.message)
@@ -946,11 +976,18 @@ export function TimelinePage() {
           setForecast(forecastData)
           setUnifiedPlan(planData)
           setLoading(false)
+          triggerAnimation()
         })
         .catch(err => {
           setError('Failed to load data: ' + err.message)
           setLoading(false)
         })
+    }
+
+    return () => {
+      if (animationTimeoutRef.current) {
+        clearTimeout(animationTimeoutRef.current)
+      }
     }
   }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode])
 
@@ -1136,6 +1173,7 @@ export function TimelinePage() {
                     dateRange={dateRange}
                     jiraBaseUrl={jiraBaseUrl}
                     rowHeight={rowHeight}
+                    shouldAnimate={shouldAnimate}
                   />
                 )
               })}
