@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
   DndContext,
@@ -1737,6 +1738,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
 }
 
 export function BoardPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [board, setBoard] = useState<BoardNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -1747,6 +1749,7 @@ export function BoardPage() {
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
+  const [urlTeamInitialized, setUrlTeamInitialized] = useState(false)
 
   const fetchBoard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -1802,6 +1805,42 @@ export function BoardPage() {
     fetchSyncStatus()
     fetchRoughEstimateConfig()
   }, [fetchBoard, fetchSyncStatus, fetchRoughEstimateConfig])
+
+  // Initialize team filter from URL after board loads
+  useEffect(() => {
+    if (board.length === 0 || urlTeamInitialized) return
+
+    const urlTeamId = searchParams.get('teamId')
+    if (urlTeamId) {
+      const teamIdNum = Number(urlTeamId)
+      const epic = board.find(e => e.teamId === teamIdNum)
+      if (epic?.teamName) {
+        setSelectedTeams(new Set([epic.teamName]))
+      }
+    }
+    setUrlTeamInitialized(true)
+  }, [board, searchParams, urlTeamInitialized])
+
+  // Sync selectedTeams to URL (when exactly one team selected)
+  useEffect(() => {
+    if (!urlTeamInitialized) return
+
+    if (selectedTeams.size === 1) {
+      const teamName = Array.from(selectedTeams)[0]
+      const epic = board.find(e => e.teamName === teamName)
+      if (epic?.teamId) {
+        const currentTeamId = searchParams.get('teamId')
+        if (currentTeamId !== String(epic.teamId)) {
+          setSearchParams({ teamId: String(epic.teamId) })
+        }
+      }
+    } else {
+      // Clear teamId from URL if no team or multiple teams selected
+      if (searchParams.get('teamId')) {
+        setSearchParams({})
+      }
+    }
+  }, [selectedTeams, board, urlTeamInitialized, searchParams, setSearchParams])
 
   // Get all unique team IDs from board
   const allTeamIds = useMemo(() => {

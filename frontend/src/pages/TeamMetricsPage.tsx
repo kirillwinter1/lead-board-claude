@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
 import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getDsr, DsrResponse } from '../api/metrics'
@@ -203,9 +204,19 @@ export function WipHistoryChart({ teamId }: WipHistoryChartProps) {
 // --- Main Team Metrics Page ---
 
 export function TeamMetricsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [teams, setTeams] = useState<Team[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
+
+  // Sync teamId with URL
+  const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
+  const setSelectedTeamId = (id: number | null) => {
+    if (id) {
+      setSearchParams({ teamId: String(id) })
+    } else {
+      setSearchParams({})
+    }
+  }
   const [forecastAccuracy, setForecastAccuracy] = useState<ForecastAccuracyResponse | null>(null)
   const [dsr, setDsr] = useState<DsrResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -233,13 +244,15 @@ export function TeamMetricsPage() {
       .catch(err => console.error('Failed to load config:', err))
   }, [])
 
-  // Load teams
+  // Load teams (once on mount)
   useEffect(() => {
     teamsApi.getAll()
       .then(data => {
         const activeTeams = data.filter(t => t.active)
         setTeams(activeTeams)
-        if (activeTeams.length > 0 && !selectedTeamId) {
+        // If no team in URL and teams available, select first one
+        const urlTeamId = searchParams.get('teamId')
+        if (activeTeams.length > 0 && !urlTeamId) {
           setSelectedTeamId(activeTeams[0].id)
         }
         setLoading(false)
@@ -248,7 +261,8 @@ export function TeamMetricsPage() {
         setError('Failed to load teams: ' + err.message)
         setLoading(false)
       })
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run once on mount
 
   // Load metrics when team or filters change
   useEffect(() => {

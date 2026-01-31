@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import './DataQualityPage.css'
 
@@ -122,12 +123,22 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
 }
 
 export function DataQualityPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [data, setData] = useState<DataQualityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set(['ERROR', 'WARNING', 'INFO']))
+
+  // Sync teamId with URL
+  const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
+  const setSelectedTeamId = (id: number | null) => {
+    if (id) {
+      setSearchParams({ teamId: String(id) })
+    } else {
+      setSearchParams({})
+    }
+  }
   const [ruleFilter, setRuleFilter] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {

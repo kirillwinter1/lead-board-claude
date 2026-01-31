@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot } from '../api/forecast'
 import { getConfig } from '../api/config'
@@ -155,32 +156,18 @@ function phaseHasHours(phase: { hours?: number } | null | undefined): boolean {
   return phase != null && phase.hours != null && phase.hours > 0
 }
 
-// Allocate lanes for stories to avoid overlap
+// Allocate lanes for stories - each story gets its own lane in priority order
+// Stories come pre-sorted by manual_order from backend (same as Board)
 function allocateStoryLanes(stories: PlannedStory[]): Map<string, number> {
   const lanes = new Map<string, number>()
-  const laneEndDates: Date[] = []
 
-  // Sort by start date
-  const sorted = [...stories].filter(s => s.startDate && s.endDate)
-    .sort((a, b) => new Date(a.startDate!).getTime() - new Date(b.startDate!).getTime())
+  // Filter active stories with dates
+  const activeStories = stories.filter(s => s.startDate && s.endDate)
 
-  for (const story of sorted) {
-    const storyStart = new Date(story.startDate!)
-    const storyEnd = new Date(story.endDate!)
-
-    // Find first available lane
-    let lane = 0
-    for (let i = 0; i < laneEndDates.length; i++) {
-      if (laneEndDates[i] < storyStart) {
-        lane = i
-        break
-      }
-      lane = i + 1
-    }
-
-    lanes.set(story.storyKey, lane)
-    laneEndDates[lane] = storyEnd
-  }
+  // Each story gets lane = its index (preserving backend order = priority)
+  activeStories.forEach((story, index) => {
+    lanes.set(story.storyKey, index)
+  })
 
   return lanes
 }
@@ -191,6 +178,7 @@ const LANE_GAP = 3
 const MIN_ROW_HEIGHT = 48
 
 // Calculate row height for an epic based on its stories
+// Each story gets its own lane, so height = number of active stories
 function calculateRowHeight(stories: PlannedStory[]): number {
   const activeStories = stories.filter(s => {
     const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
@@ -200,9 +188,9 @@ function calculateRowHeight(stories: PlannedStory[]): number {
 
   if (activeStories.length === 0) return MIN_ROW_HEIGHT
 
-  const storyLanes = allocateStoryLanes(activeStories)
-  const maxLane = Math.max(0, ...Array.from(storyLanes.values())) + 1
-  return Math.max(MIN_ROW_HEIGHT, maxLane * (BAR_HEIGHT + LANE_GAP) + 8)
+  // Each story on its own lane
+  const numLanes = activeStories.length
+  return Math.max(MIN_ROW_HEIGHT, numLanes * (BAR_HEIGHT + LANE_GAP) + 8)
 }
 
 // --- Status badge colors (Atlassian Design System) ---
@@ -844,9 +832,19 @@ function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHe
 // --- Main component ---
 
 export function TimelinePage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [teams, setTeams] = useState<Team[]>([])
-  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
+
+  // Sync teamId with URL
+  const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
+  const setSelectedTeamId = (id: number | null) => {
+    if (id) {
+      setSearchParams({ teamId: String(id) })
+    } else {
+      setSearchParams({})
+    }
+  }
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
   const [loading, setLoading] = useState(false)
@@ -860,7 +858,7 @@ export function TimelinePage() {
 
   const chartRef = useRef<HTMLDivElement>(null)
 
-  // Load config and teams
+  // Load config and teams (once on mount)
   useEffect(() => {
     getConfig()
       .then(config => setJiraBaseUrl(config.jiraBaseUrl))
@@ -870,12 +868,15 @@ export function TimelinePage() {
       .then(data => {
         const activeTeams = data.filter(t => t.active)
         setTeams(activeTeams)
-        if (activeTeams.length > 0 && !selectedTeamId) {
+        // If no team in URL and teams available, select first one
+        const urlTeamId = searchParams.get('teamId')
+        if (activeTeams.length > 0 && !urlTeamId) {
           setSelectedTeamId(activeTeams[0].id)
         }
       })
       .catch(err => setError('Failed to load teams: ' + err.message))
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Run once on mount, read URL synchronously
 
   // Load available snapshot dates when team changes
   useEffect(() => {

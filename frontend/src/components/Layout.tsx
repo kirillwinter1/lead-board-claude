@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useSearchParams } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
 import logo from '../icons/logo.png'
@@ -18,7 +18,12 @@ interface AuthStatus {
 }
 
 export function Layout() {
+  const [searchParams] = useSearchParams()
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+
+  // Preserve teamId in navigation links
+  const teamId = searchParams.get('teamId')
+  const queryString = teamId ? `?teamId=${teamId}` : ''
 
   const fetchAuthStatus = useCallback(() => {
     axios.get<AuthStatus>('/oauth/atlassian/status')
@@ -56,22 +61,22 @@ export function Layout() {
             <img src={logo} alt="Lead Board" className="header-logo" />
           </NavLink>
           <nav className="nav-tabs">
-            <NavLink to="/board" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
+            <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
               Board
             </NavLink>
-            <NavLink to="/board/timeline" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to={`/board/timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Timeline
             </NavLink>
-            <NavLink to="/board/metrics" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to={`/board/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Metrics
             </NavLink>
-            <NavLink to="/board/data-quality" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to={`/board/data-quality${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Data Quality
             </NavLink>
-            <NavLink to="/board/poker" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to={`/board/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Poker
             </NavLink>
-            <NavLink to="/board/teams" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+            <NavLink to={`/board/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Teams
             </NavLink>
           </nav>
