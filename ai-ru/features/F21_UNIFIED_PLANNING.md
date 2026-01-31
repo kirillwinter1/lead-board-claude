@@ -35,7 +35,7 @@
 ```
 Input:
   - teamId: Long
-  - epics: List<Epic> — эпики команды, отсортированные по AutoScore DESC
+  - epics: List<Epic> — эпики команды, отсортированные по manual_order ASC (см. F25)
   - teamMembers: List<TeamMember> — члены команды с ролями и capacity
   - workCalendar: WorkCalendar — рабочие дни, праздники
   - riskBuffer: BigDecimal — коэффициент буфера (default 0.20)
@@ -592,7 +592,8 @@ Hours: 12.0h
 
 ## Связанные фичи
 
-- **F19. Story AutoScore** — используется для сортировки
+- **F19. Story AutoScore** — используется для рекомендаций (не для сортировки)
+- **F25. Manual Order** — определяет фактический порядок эпиков и сторей
 - **F13. Epic Autoplanning** — заменён UnifiedPlanningService
 - **F20. Story Forecast** — заменён UnifiedPlanningService
 - **F15. WIP Limits** — deprecate for planning (рекомендательные)

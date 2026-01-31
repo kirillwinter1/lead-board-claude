@@ -1,6 +1,21 @@
 import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'react'
 import axios from 'axios'
-import { Reorder, useDragControls } from 'framer-motion'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig, updateEpicOrder, updateStoryOrder } from '../api/epics'
 import { getForecast, EpicForecast, ForecastResponse, getUnifiedPlanning, PlannedStory } from '../api/forecast'
 import { getScoreBreakdown, ScoreBreakdown } from '../api/board'
@@ -1031,13 +1046,13 @@ interface BoardRowProps {
   // Recommendation indicator
   actualPosition?: number
   recommendedPosition?: number
-  // Drag controls for framer-motion
-  dragControls?: ReturnType<typeof useDragControls>
+  // Drag handle props for @dnd-kit
+  dragHandleProps?: Record<string, unknown>
   // Story planning data for tooltip
   storyPlanning?: PlannedStory | null
 }
 
-function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragControls, storyPlanning }: BoardRowProps) {
+function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
 
@@ -1064,30 +1079,14 @@ function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateC
           className="name-content"
           style={{
             paddingLeft: `${level * 20}px`,
-            cursor: (isEpicRow || isStoryRow) && canReorder && dragControls ? 'grab' : undefined,
-            userSelect: (isEpicRow || isStoryRow) && canReorder && dragControls ? 'none' : undefined,
-            WebkitUserSelect: (isEpicRow || isStoryRow) && canReorder && dragControls ? 'none' : undefined,
-            touchAction: (isEpicRow || isStoryRow) && canReorder && dragControls ? 'none' : undefined
           }}
-          onPointerDown={(isEpicRow || isStoryRow) && canReorder && dragControls ? (e) => {
-            // Don't start drag if clicking on a link or button
-            const target = e.target as HTMLElement
-            if (target.tagName === 'A' || target.tagName === 'BUTTON' || target.closest('a') || target.closest('button')) {
-              return
-            }
-            e.preventDefault() // Prevent text selection
-            dragControls.start(e)
-          } : undefined}
         >
-          {(isEpicRow || isStoryRow) && canReorder && dragControls && (
+          {(isEpicRow || isStoryRow) && canReorder && dragHandleProps && (
             <span
               className="drag-handle"
               title={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
-              onPointerDown={(e) => {
-                e.stopPropagation()
-                dragControls.start(e)
-              }}
               style={{ cursor: 'grab', touchAction: 'none' }}
+              {...dragHandleProps}
             >⋮⋮</span>
           )}
           <img src={getIssueIcon(node.issueType)} alt={node.issueType} className="issue-type-icon" />
@@ -1151,8 +1150,8 @@ interface BoardTableProps {
   onStoryReorder: (storyKey: string, parentEpicKey: string, newIndex: number) => Promise<void>
 }
 
-// Draggable Epic Row wrapper using framer-motion
-function DraggableEpicRow({
+// Sortable Epic Row wrapper using @dnd-kit
+function SortableEpicRow({
   epic,
   isExpanded,
   onToggle,
@@ -1163,7 +1162,6 @@ function DraggableEpicRow({
   canReorder,
   actualPosition,
   recommendedPosition,
-  onDragEnd,
   children
 }: {
   epic: BoardNode
@@ -1176,10 +1174,24 @@ function DraggableEpicRow({
   canReorder: boolean
   actualPosition: number
   recommendedPosition: number | undefined
-  onDragEnd?: () => void
   children?: React.ReactNode
 }) {
-  const dragControls = useDragControls()
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: epic.issueKey })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+    zIndex: isDragging ? 100 : 'auto',
+    position: 'relative' as const,
+  }
 
   if (!canReorder) {
     return (
@@ -1204,28 +1216,7 @@ function DraggableEpicRow({
   }
 
   return (
-    <Reorder.Item
-      value={epic}
-      dragListener={false}
-      dragControls={dragControls}
-      layout
-      style={{ listStyle: 'none' }}
-      initial={{ opacity: 1, scale: 1 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileDrag={{
-        scale: 1.02,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
-        zIndex: 100,
-        cursor: 'grabbing'
-      }}
-      exit={{ opacity: 0 }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
-        damping: 30
-      }}
-      onDragEnd={onDragEnd}
-    >
+    <div ref={setNodeRef} style={style}>
       <BoardRow
         node={epic}
         level={0}
@@ -1239,15 +1230,15 @@ function DraggableEpicRow({
         isJustDropped={false}
         actualPosition={actualPosition}
         recommendedPosition={recommendedPosition}
-        dragControls={dragControls}
+        dragHandleProps={{ ...attributes, ...listeners }}
       />
       {children}
-    </Reorder.Item>
+    </div>
   )
 }
 
-// Draggable Story Row wrapper using framer-motion
-function DraggableStoryRow({
+// Sortable Story Row wrapper using @dnd-kit
+function SortableStoryRow({
   story,
   isExpanded,
   onToggle,
@@ -1258,7 +1249,6 @@ function DraggableStoryRow({
   canReorder,
   actualPosition,
   recommendedPosition,
-  onDragEnd,
   storyPlanning,
   children
 }: {
@@ -1272,11 +1262,25 @@ function DraggableStoryRow({
   canReorder: boolean
   actualPosition: number | undefined
   recommendedPosition: number | undefined
-  onDragEnd?: () => void
   storyPlanning?: PlannedStory | null
   children?: React.ReactNode
 }) {
-  const dragControls = useDragControls()
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: story.issueKey })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.8 : 1,
+    zIndex: isDragging ? 100 : 'auto',
+    position: 'relative' as const,
+  }
 
   if (!canReorder) {
     return (
@@ -1302,28 +1306,7 @@ function DraggableStoryRow({
   }
 
   return (
-    <Reorder.Item
-      value={story}
-      dragListener={false}
-      dragControls={dragControls}
-      layout
-      style={{ listStyle: 'none' }}
-      initial={{ opacity: 1, scale: 1 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileDrag={{
-        scale: 1.02,
-        boxShadow: '0 4px 15px rgba(0,0,0,0.12)',
-        zIndex: 100,
-        cursor: 'grabbing'
-      }}
-      exit={{ opacity: 0 }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
-        damping: 30
-      }}
-      onDragEnd={onDragEnd}
-    >
+    <div ref={setNodeRef} style={style}>
       <BoardRow
         node={story}
         level={1}
@@ -1338,10 +1321,10 @@ function DraggableStoryRow({
         actualPosition={actualPosition}
         storyPlanning={storyPlanning}
         recommendedPosition={recommendedPosition}
-        dragControls={dragControls}
+        dragHandleProps={{ ...attributes, ...listeners }}
       />
       {children}
-    </Reorder.Item>
+    </div>
   )
 }
 
@@ -1361,16 +1344,19 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
   }
 
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(loadExpandedKeys)
-  // Local state for smooth reordering animation
-  const [localItems, setLocalItems] = useState<BoardNode[]>(items)
-  // Track pending reorder to call API only when drag ends
-  const pendingEpicReorderRef = useRef<{ key: string; newIndex: number } | null>(null)
-  const pendingStoryReorderRef = useRef<{ key: string; parentKey: string; newIndex: number } | null>(null)
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
-  // Sync local items with props
-  useEffect(() => {
-    setLocalItems(items)
-  }, [items])
+  // @dnd-kit sensors for keyboard and pointer
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Minimum drag distance before activation
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   // Save expanded keys to localStorage whenever they change
   useEffect(() => {
@@ -1393,99 +1379,33 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
     })
   }
 
-  // Handle reorder from framer-motion - only update local state, defer API call
-  const handleReorder = useCallback((newOrder: BoardNode[]) => {
-    // Find what changed
-    const oldOrder = localItems.map(e => e.issueKey)
-    const newOrderKeys = newOrder.map(e => e.issueKey)
+  // Handle epic drag end - call API directly
+  const handleEpicDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-    // Find the item that moved
-    let movedKey: string | null = null
-    let newIndex = -1
-    for (let i = 0; i < newOrderKeys.length; i++) {
-      if (newOrderKeys[i] !== oldOrder[i]) {
-        const keyAtNewPos = newOrderKeys[i]
-        const oldPos = oldOrder.indexOf(keyAtNewPos)
-        if (oldPos !== i) {
-          movedKey = keyAtNewPos
-          newIndex = i
-          break
-        }
-      }
-    }
+    const oldIndex = items.findIndex(e => e.issueKey === active.id)
+    const newIndex = items.findIndex(e => e.issueKey === over.id)
 
-    if (movedKey && newIndex >= 0) {
-      // Update local state immediately for smooth animation
-      setLocalItems(newOrder)
-      // Store pending reorder - will be committed on drag end
-      pendingEpicReorderRef.current = { key: movedKey, newIndex }
-    }
-  }, [localItems])
-
-  // Commit epic reorder to API when drag ends
-  const commitEpicReorder = useCallback(async () => {
-    const pending = pendingEpicReorderRef.current
-    if (pending) {
-      pendingEpicReorderRef.current = null
+    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
       playDropSound()
-      await onReorder(pending.key, pending.newIndex)
+      await onReorder(active.id as string, newIndex)
     }
-  }, [onReorder])
+  }, [items, onReorder])
 
-  // Handle story reorder within an epic
-  const handleStoryReorder = useCallback(async (parentKey: string, newStoryOrder: BoardNode[]) => {
-    // Find what changed
-    const parent = localItems.find(e => e.issueKey === parentKey)
-    if (!parent) return
+  // Handle story drag end - call API directly
+  const handleStoryDragEnd = useCallback(async (event: DragEndEvent, parentKey: string, stories: BoardNode[]) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-    const oldStories = parent.children.filter(c =>
-      c.issueType === 'Story' || c.issueType === 'История' ||
-      c.issueType === 'Bug' || c.issueType === 'Баг'
-    )
-    const oldOrder = oldStories.map(s => s.issueKey)
-    const newOrderKeys = newStoryOrder.map(s => s.issueKey)
+    const oldIndex = stories.findIndex(s => s.issueKey === active.id)
+    const newIndex = stories.findIndex(s => s.issueKey === over.id)
 
-    let movedKey: string | null = null
-    let newIndex = -1
-    for (let i = 0; i < newOrderKeys.length; i++) {
-      if (newOrderKeys[i] !== oldOrder[i]) {
-        const keyAtNewPos = newOrderKeys[i]
-        const oldPos = oldOrder.indexOf(keyAtNewPos)
-        if (oldPos !== i) {
-          movedKey = keyAtNewPos
-          newIndex = i
-          break
-        }
-      }
-    }
-
-    if (movedKey && newIndex >= 0) {
-      // Update local state
-      setLocalItems(prev => prev.map(epic => {
-        if (epic.issueKey !== parentKey) return epic
-        const subtasks = epic.children.filter(c =>
-          c.issueType !== 'Story' && c.issueType !== 'История' &&
-          c.issueType !== 'Bug' && c.issueType !== 'Баг'
-        )
-        return { ...epic, children: [...newStoryOrder, ...subtasks] }
-      }))
-
-      // Store pending reorder - will be committed on drag end
-      pendingStoryReorderRef.current = { key: movedKey, parentKey, newIndex }
-    }
-  }, [localItems])
-
-  // Commit story reorder to API when drag ends
-  const commitStoryReorder = useCallback(async () => {
-    const pending = pendingStoryReorderRef.current
-    if (pending) {
-      pendingStoryReorderRef.current = null
+    if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
       playDropSound()
-      await onStoryReorder(pending.key, pending.parentKey, pending.newIndex)
+      await onStoryReorder(active.id as string, parentKey, newIndex)
     }
   }, [onStoryReorder])
-
-  const [showInfoTooltip, setShowInfoTooltip] = useState(false)
 
   // Calculate recommended positions based on autoScore (descending)
   const epicRecommendations = useMemo(() => {
@@ -1493,7 +1413,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
       return new Map<string, number>()
     }
 
-    const sorted = [...localItems]
+    const sorted = [...items]
       .filter(e => e.autoScore !== null)
       .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
 
@@ -1502,7 +1422,7 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
       recommendations.set(epic.issueKey, idx + 1)
     })
     return recommendations
-  }, [localItems, canReorder])
+  }, [items, canReorder])
 
   // Calculate recommended positions for stories within each epic
   const getStoryRecommendations = useCallback((children: BoardNode[]): Map<string, number> => {
@@ -1538,40 +1458,43 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
       <div className={`children-wrapper ${isExpanded ? 'expanded' : ''}`}>
         <div className="children-container">
           {level === 1 && canReorder && stories.length > 0 ? (
-            <Reorder.Group
-              axis="y"
-              values={stories}
-              onReorder={(newOrder) => handleStoryReorder(parentKey, newOrder)}
-              style={{ listStyle: 'none', padding: 0, margin: 0 }}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={(event) => handleStoryDragEnd(event, parentKey, stories)}
             >
-              {stories.map((story, storyIndex) => {
-                const storyIsExpanded = expandedKeys.has(story.issueKey)
-                const storyHasChildren = story.children.length > 0
-                const storyForecast = forecastMap.get(story.issueKey) || null
-                const actualPosition = storyIndex + 1
-                const recommendedPosition = storyRecommendations.get(story.issueKey)
+              <SortableContext
+                items={stories.map(s => s.issueKey)}
+                strategy={verticalListSortingStrategy}
+              >
+                {stories.map((story, storyIndex) => {
+                  const storyIsExpanded = expandedKeys.has(story.issueKey)
+                  const storyHasChildren = story.children.length > 0
+                  const storyForecast = forecastMap.get(story.issueKey) || null
+                  const actualPosition = storyIndex + 1
+                  const recommendedPosition = storyRecommendations.get(story.issueKey)
 
-                return (
-                  <DraggableStoryRow
-                    key={story.issueKey}
-                    story={story}
-                    isExpanded={storyIsExpanded}
-                    onToggle={() => toggleExpand(story.issueKey)}
-                    hasChildren={storyHasChildren}
-                    roughEstimateConfig={roughEstimateConfig}
-                    onRoughEstimateUpdate={onRoughEstimateUpdate}
-                    forecast={storyForecast}
-                    canReorder={canReorder}
-                    actualPosition={actualPosition}
-                    recommendedPosition={recommendedPosition}
-                    onDragEnd={commitStoryReorder}
-                    storyPlanning={storyPlanningMap.get(story.issueKey)}
-                  >
-                    {storyHasChildren && renderChildren(story.children, story.issueKey, level + 1, storyIsExpanded)}
-                  </DraggableStoryRow>
-                )
-              })}
-            </Reorder.Group>
+                  return (
+                    <SortableStoryRow
+                      key={story.issueKey}
+                      story={story}
+                      isExpanded={storyIsExpanded}
+                      onToggle={() => toggleExpand(story.issueKey)}
+                      hasChildren={storyHasChildren}
+                      roughEstimateConfig={roughEstimateConfig}
+                      onRoughEstimateUpdate={onRoughEstimateUpdate}
+                      forecast={storyForecast}
+                      canReorder={canReorder}
+                      actualPosition={actualPosition}
+                      recommendedPosition={recommendedPosition}
+                      storyPlanning={storyPlanningMap.get(story.issueKey)}
+                    >
+                      {storyHasChildren && renderChildren(story.children, story.issueKey, level + 1, storyIsExpanded)}
+                    </SortableStoryRow>
+                  )
+                })}
+              </SortableContext>
+            </DndContext>
           ) : (
             stories.map((story, storyIndex) => {
               const storyIsExpanded = expandedKeys.has(story.issueKey)
@@ -1681,41 +1604,44 @@ function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecas
         </div>
         <div className="board-body">
           {canReorder ? (
-            <Reorder.Group
-              axis="y"
-              values={localItems}
-              onReorder={handleReorder}
-              style={{ listStyle: 'none', padding: 0, margin: 0 }}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleEpicDragEnd}
             >
-              {localItems.map((epic, epicIndex) => {
-                const isExpanded = expandedKeys.has(epic.issueKey)
-                const hasChildren = epic.children.length > 0
-                const forecast = forecastMap.get(epic.issueKey) || null
-                const actualPosition = epicIndex + 1
-                const recommendedPosition = epicRecommendations.get(epic.issueKey)
+              <SortableContext
+                items={items.map(e => e.issueKey)}
+                strategy={verticalListSortingStrategy}
+              >
+                {items.map((epic, epicIndex) => {
+                  const isExpanded = expandedKeys.has(epic.issueKey)
+                  const hasChildren = epic.children.length > 0
+                  const forecast = forecastMap.get(epic.issueKey) || null
+                  const actualPosition = epicIndex + 1
+                  const recommendedPosition = epicRecommendations.get(epic.issueKey)
 
-                return (
-                  <DraggableEpicRow
-                    key={epic.issueKey}
-                    epic={epic}
-                    isExpanded={isExpanded}
-                    onToggle={() => toggleExpand(epic.issueKey)}
-                    hasChildren={hasChildren}
-                    roughEstimateConfig={roughEstimateConfig}
-                    onRoughEstimateUpdate={onRoughEstimateUpdate}
-                    forecast={forecast}
-                    canReorder={canReorder}
-                    actualPosition={actualPosition}
-                    recommendedPosition={recommendedPosition}
-                    onDragEnd={commitEpicReorder}
-                  >
-                    {hasChildren && renderChildren(epic.children, epic.issueKey, 1, isExpanded)}
-                  </DraggableEpicRow>
-                )
-              })}
-            </Reorder.Group>
+                  return (
+                    <SortableEpicRow
+                      key={epic.issueKey}
+                      epic={epic}
+                      isExpanded={isExpanded}
+                      onToggle={() => toggleExpand(epic.issueKey)}
+                      hasChildren={hasChildren}
+                      roughEstimateConfig={roughEstimateConfig}
+                      onRoughEstimateUpdate={onRoughEstimateUpdate}
+                      forecast={forecast}
+                      canReorder={canReorder}
+                      actualPosition={actualPosition}
+                      recommendedPosition={recommendedPosition}
+                    >
+                      {hasChildren && renderChildren(epic.children, epic.issueKey, 1, isExpanded)}
+                    </SortableEpicRow>
+                  )
+                })}
+              </SortableContext>
+            </DndContext>
           ) : (
-            localItems.map((epic, epicIndex) => {
+            items.map((epic, epicIndex) => {
               const isExpanded = expandedKeys.has(epic.issueKey)
               const hasChildren = epic.children.length > 0
               const forecast = forecastMap.get(epic.issueKey) || null
@@ -2001,70 +1927,6 @@ export function BoardPage() {
     loadStoryPlanning()
   }, [loadStoryPlanning])
 
-  // Reload story expected done dates and order from unified planning
-  const reloadStoryExpectedDone = useCallback(async (teamId: number) => {
-    try {
-      const planning = await getUnifiedPlanning(teamId)
-      // Build maps: storyKey -> endDate, storyKey -> PlannedStory, epicKey -> story order
-      const storyEndDates = new Map<string, string | null>()
-      const epicStoryOrder = new Map<string, string[]>()
-      const newStoryPlanningMap = new Map<string, PlannedStory>()
-      planning.epics.forEach(epic => {
-        const storyKeys = epic.stories.map(story => {
-          storyEndDates.set(story.storyKey, story.endDate)
-          newStoryPlanningMap.set(story.storyKey, story)
-          return story.storyKey
-        })
-        epicStoryOrder.set(epic.epicKey, storyKeys)
-      })
-      // Update story planning map
-      setStoryPlanningMap(newStoryPlanningMap)
-      // Update board state with new expectedDone and correct story order
-      setBoard(prevBoard => prevBoard.map(epic => {
-        const storyOrder = epicStoryOrder.get(epic.issueKey)
-        if (!storyOrder) return epic
-
-        // Separate stories and subtasks
-        const stories = epic.children.filter(c =>
-          c.issueType === 'Story' || c.issueType === 'История' ||
-          c.issueType === 'Bug' || c.issueType === 'Баг'
-        )
-        const subtasks = epic.children.filter(c =>
-          c.issueType !== 'Story' && c.issueType !== 'История' &&
-          c.issueType !== 'Bug' && c.issueType !== 'Баг'
-        )
-
-        // Sort stories by the order from unified planning
-        const storyMap = new Map(stories.map(s => [s.issueKey, s]))
-        const orderedStories = storyOrder
-          .map(key => storyMap.get(key))
-          .filter((s): s is BoardNode => s !== undefined)
-          .map(story => {
-            const newEndDate = storyEndDates.get(story.issueKey)
-            if (newEndDate !== undefined) {
-              return { ...story, expectedDone: newEndDate }
-            }
-            return story
-          })
-
-        // Add any stories not in the order (shouldn't happen, but safety)
-        const orderedKeys = new Set(storyOrder)
-        const remainingStories = stories
-          .filter(s => !orderedKeys.has(s.issueKey))
-          .map(story => {
-            const newEndDate = storyEndDates.get(story.issueKey)
-            if (newEndDate !== undefined) {
-              return { ...story, expectedDone: newEndDate }
-            }
-            return story
-          })
-
-        return { ...epic, children: [...orderedStories, ...remainingStories, ...subtasks] }
-      }))
-    } catch (err) {
-      console.error('Failed to reload story expected done:', err)
-    }
-  }, [])
 
   // Create forecast map for quick lookup (merged from all teams)
   const forecastMap = useMemo(() => {
@@ -2094,36 +1956,37 @@ export function BoardPage() {
   }, [fetchBoard])
 
   // Handle reorder via drag & drop - simple position-based API
-  // Note: No fetchBoard() - local state is already updated. Reload forecasts and story dates.
+  // Pattern: Optimistic UI + Backend Reconciliation
+  // After API success, fetchBoard() to sync with backend (source of truth)
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
     try {
       await updateEpicOrder(epicKey, newPosition)
-      // Reload forecasts (for epic expected done) and story dates
+      // Fetch fresh data from backend (source of truth)
+      await fetchBoard()
       loadForecasts()
-      if (selectedTeamId) {
-        await reloadStoryExpectedDone(selectedTeamId)
-      }
     } catch (err) {
       console.error('Failed to reorder epic:', err)
+      // On error, also fetch to restore correct state
+      await fetchBoard()
     }
-  }, [loadForecasts, selectedTeamId, reloadStoryExpectedDone])
+  }, [fetchBoard, loadForecasts])
 
   // Handle story reorder via drag & drop - simple position-based API
-  // Note: No fetchBoard() - local state is already updated. Reload story dates from unified planning.
+  // Pattern: Optimistic UI + Backend Reconciliation
   const handleStoryReorder = useCallback(async (storyKey: string, _parentEpicKey: string, newIndex: number) => {
     const newPosition = newIndex + 1
     try {
       await updateStoryOrder(storyKey, newPosition)
-      // Reload forecasts (for epic expected done) and story dates
+      // Fetch fresh data from backend (source of truth)
+      await fetchBoard()
       loadForecasts()
-      if (selectedTeamId) {
-        await reloadStoryExpectedDone(selectedTeamId)
-      }
     } catch (err) {
       console.error('Failed to reorder story:', err)
+      // On error, also fetch to restore correct state
+      await fetchBoard()
     }
-  }, [loadForecasts, selectedTeamId, reloadStoryExpectedDone])
+  }, [fetchBoard, loadForecasts])
 
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()

@@ -27,7 +27,7 @@
 | F22 | Team Metrics + DSR + Forecast Accuracy | ✅ | 2026-01-26 | [features/F22](features/F22_TEAM_METRICS.md) |
 | F23 | Planning Poker | ✅ | 2026-01-28 | [features/F23](features/F23_PLANNING_POKER.md) |
 | F24 | Team Metrics v2 (DSR Gauge, Forecast) | 🚧 | 2026-01-28 | [features/F22](features/F22_TEAM_METRICS.md) (объединён) |
-| F25 | Manual Order + Recommendations | ✅ | 2026-01-30 | — |
+| F25 | Manual Order + Recommendations | 🚧 | 2026-01-30 | [features/F25](features/F25_MANUAL_ORDER.md) |
 | F26 | Employee Performance Dashboard | 📋 | — | — |
 | F27 | RBAC | 📋 | — | — |
 | F28 | RICE Scoring & AutoScore | 📋 | — | — |

@@ -23,8 +23,11 @@
 - ✅ Учёт прогресса (timeSpent/estimate)
 - ✅ Учёт наличия subtasks с estimates
 - ✅ Учёт флагов (flagged = низкий приоритет)
-- ✅ Manual priority boost (ручное управление)
-- ✅ Drag & Drop stories в Board для изменения порядка
+
+**Связь с F25 (Manual Order):**
+- AutoScore используется как **рекомендация** для пользователя
+- Фактический порядок задаётся через `manual_order` (drag & drop) — см. [F25](F25_MANUAL_ORDER.md)
+- ~~Manual priority boost~~ — удалён, заменён на `manual_order`
 
 ---
 
@@ -40,8 +43,9 @@ StoryAutoScore =
   + DueDateWeight          // Дедлайн близко = +30, далеко = 0
   + EstimateQualityPenalty // Нет subtasks с estimates = -100
   + FlaggedPenalty         // Flagged = -200 (в конец)
-  + ManualBoost            // Ручное управление пользователем (без ограничений)
 ```
+
+> **Примечание:** AutoScore используется только для рекомендаций. Фактический порядок определяется полем `manual_order` — см. [F25](F25_MANUAL_ORDER.md).
 
 ### Детальная разбивка факторов
 
