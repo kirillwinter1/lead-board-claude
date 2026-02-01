@@ -622,6 +622,46 @@
   text-align: right;
 }
 
+/* Epic with rough estimate only (no subtask estimates) */
+.epic-role-chip.rough-only {
+  background: repeating-linear-gradient(
+    135deg,
+    #f8f9fa,
+    #f8f9fa 3px,
+    #e9ecef 3px,
+    #e9ecef 6px
+  );
+  border: 1px dashed #adb5bd;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.epic-role-chip.rough-only .epic-role-label {
+  font-weight: 600;
+  font-size: 10px;
+}
+
+.epic-role-chip.rough-only .epic-role-value.rough {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.epic-role-chip.sa.rough-only {
+  border-color: #a5c8ff;
+}
+
+.epic-role-chip.dev.rough-only {
+  border-color: #d4a5f7;
+}
+
+.epic-role-chip.qa.rough-only {
+  border-color: #a5e0ed;
+}
+
 .epic-role-times.warning {
   justify-content: center;
   color: #ff8b00;

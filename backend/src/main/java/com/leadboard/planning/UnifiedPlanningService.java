@@ -148,6 +148,11 @@ public class UnifiedPlanningService {
         // Get stories sorted by AutoScore with dependencies
         List<JiraIssueEntity> stories = getStoriesSorted(epicKey, statusMapping);
 
+        // Check if epic has no stories but has rough estimates (planned epic)
+        if (stories.isEmpty() && isPlannedStatus(epic.getStatus()) && hasRoughEstimates(epic)) {
+            return planEpicByRoughEstimates(epic, assigneeSchedules, calendarHelper, riskBuffer);
+        }
+
         List<PlannedStory> plannedStories = new ArrayList<>();
         LocalDate epicStartDate = null;
         LocalDate epicEndDate = null;
@@ -341,6 +346,13 @@ public class UnifiedPlanningService {
         // Get due date from epic entity
         LocalDate dueDate = epic.getDueDate();
 
+        // Check if this epic uses rough estimates (no stories with actual subtasks)
+        boolean isRoughEstimate = plannedStories.isEmpty() && (
+                epic.getRoughEstimateSaDays() != null ||
+                epic.getRoughEstimateDevDays() != null ||
+                epic.getRoughEstimateQaDays() != null
+        );
+
         return new PlannedEpic(
                 epicKey,
                 epic.getSummary(),
@@ -356,7 +368,11 @@ public class UnifiedPlanningService {
                 epicProgressPercent,
                 epicRoleProgress,
                 storiesTotal,
-                storiesActive
+                storiesActive,
+                isRoughEstimate,
+                epic.getRoughEstimateSaDays(),
+                epic.getRoughEstimateDevDays(),
+                epic.getRoughEstimateQaDays()
         );
     }
 
@@ -785,6 +801,124 @@ public class UnifiedPlanningService {
         if (status == null) return false;
         return PLANNED_STATUSES.stream()
                 .anyMatch(s -> s.equalsIgnoreCase(status));
+    }
+
+    /**
+     * Checks if epic has any rough estimates set.
+     */
+    private boolean hasRoughEstimates(JiraIssueEntity epic) {
+        return (epic.getRoughEstimateSaDays() != null && epic.getRoughEstimateSaDays().compareTo(BigDecimal.ZERO) > 0) ||
+                (epic.getRoughEstimateDevDays() != null && epic.getRoughEstimateDevDays().compareTo(BigDecimal.ZERO) > 0) ||
+                (epic.getRoughEstimateQaDays() != null && epic.getRoughEstimateQaDays().compareTo(BigDecimal.ZERO) > 0);
+    }
+
+    /**
+     * Plans an epic directly by its rough estimates (when no stories exist).
+     */
+    private PlannedEpic planEpicByRoughEstimates(
+            JiraIssueEntity epic,
+            Map<String, AssigneeSchedule> assigneeSchedules,
+            AssigneeSchedule.WorkCalendarHelper calendarHelper,
+            BigDecimal riskBuffer
+    ) {
+        String epicKey = epic.getIssueKey();
+        log.info("Planning epic {} by rough estimates (no stories)", epicKey);
+
+        // Get rough estimates and convert to hours
+        BigDecimal saHours = epic.getRoughEstimateSaDays() != null
+                ? epic.getRoughEstimateSaDays().multiply(HOURS_PER_DAY)
+                : BigDecimal.ZERO;
+        BigDecimal devHours = epic.getRoughEstimateDevDays() != null
+                ? epic.getRoughEstimateDevDays().multiply(HOURS_PER_DAY)
+                : BigDecimal.ZERO;
+        BigDecimal qaHours = epic.getRoughEstimateQaDays() != null
+                ? epic.getRoughEstimateQaDays().multiply(HOURS_PER_DAY)
+                : BigDecimal.ZERO;
+
+        // Apply risk buffer
+        BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
+        saHours = saHours.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+        devHours = devHours.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+        qaHours = qaHours.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+
+        // Plan phases sequentially: SA → DEV → QA
+        LocalDate currentDate = LocalDate.now();
+        List<PlanningWarning> warnings = new ArrayList<>();
+
+        LocalDate saStartDate = null, saEndDate = null;
+        LocalDate devStartDate = null, devEndDate = null;
+        LocalDate qaStartDate = null, qaEndDate = null;
+
+        // SA Phase
+        if (saHours.compareTo(BigDecimal.ZERO) > 0) {
+            PhaseSchedule saSchedule = planPhase(
+                    Role.SA, saHours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
+            );
+            if (saSchedule != null && saSchedule.startDate() != null) {
+                saStartDate = saSchedule.startDate();
+                saEndDate = saSchedule.endDate();
+                currentDate = calendarHelper.nextWorkday(saSchedule.endDate());
+            }
+        }
+
+        // DEV Phase (starts after SA)
+        if (devHours.compareTo(BigDecimal.ZERO) > 0) {
+            PhaseSchedule devSchedule = planPhase(
+                    Role.DEV, devHours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
+            );
+            if (devSchedule != null && devSchedule.startDate() != null) {
+                devStartDate = devSchedule.startDate();
+                devEndDate = devSchedule.endDate();
+                currentDate = calendarHelper.nextWorkday(devSchedule.endDate());
+            }
+        }
+
+        // QA Phase (starts after DEV)
+        if (qaHours.compareTo(BigDecimal.ZERO) > 0) {
+            PhaseSchedule qaSchedule = planPhase(
+                    Role.QA, qaHours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
+            );
+            if (qaSchedule != null && qaSchedule.startDate() != null) {
+                qaStartDate = qaSchedule.startDate();
+                qaEndDate = qaSchedule.endDate();
+            }
+        }
+
+        // Determine epic dates
+        LocalDate epicStartDate = saStartDate != null ? saStartDate :
+                devStartDate != null ? devStartDate : qaStartDate;
+        LocalDate epicEndDate = qaEndDate != null ? qaEndDate :
+                devEndDate != null ? devEndDate : saEndDate;
+
+        // Build phase aggregation
+        PhaseAggregation aggregation = new PhaseAggregation(
+                saHours, devHours, qaHours,
+                saStartDate, saEndDate,
+                devStartDate, devEndDate,
+                qaStartDate, qaEndDate
+        );
+
+        return new PlannedEpic(
+                epicKey,
+                epic.getSummary(),
+                epic.getAutoScore(),
+                epicStartDate,
+                epicEndDate,
+                List.of(), // No stories
+                aggregation,
+                epic.getStatus(),
+                epic.getDueDate(),
+                0L,  // totalEstimateSeconds - no actual work logged
+                0L,  // totalLoggedSeconds
+                0,   // progressPercent
+                RoleProgressInfo.empty(),
+                0,   // storiesTotal
+                0,   // storiesActive
+                true, // isRoughEstimate
+                epic.getRoughEstimateSaDays(),
+                epic.getRoughEstimateDevDays(),
+                epic.getRoughEstimateQaDays()
+        );
     }
 
     /**

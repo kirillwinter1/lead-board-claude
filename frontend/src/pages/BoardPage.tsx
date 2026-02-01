@@ -284,6 +284,19 @@ function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpd
     return n.toFixed(1)
   }
 
+  // If no real estimate but has rough estimate - show rough estimate (read-only)
+  if (!hasEstimate && hasRoughEstimate) {
+    return (
+      <div
+        className={`epic-role-chip ${roleClass} rough-only`}
+        title={`Грязная оценка: ${roughEstimate}d`}
+      >
+        <span className="epic-role-label">{label}</span>
+        <span className="epic-role-value rough">{roughEstimate}d</span>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`epic-role-chip ${roleClass} in-progress ${!hasEstimate ? 'no-estimate' : ''}`}
@@ -342,13 +355,33 @@ function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
   const roleProgress = node.roleProgress
 
   // For Epic - use special Epic chips
-  if (isEpic(node.issueType) && roleProgress) {
+  if (isEpic(node.issueType)) {
+    // Create metrics from roleProgress or fallback to rough estimates
+    const saMetrics: RoleMetrics = roleProgress?.analytics ?? {
+      estimateSeconds: 0,
+      loggedSeconds: 0,
+      progress: 0,
+      roughEstimateDays: node.roughEstimateSaDays
+    }
+    const devMetrics: RoleMetrics = roleProgress?.development ?? {
+      estimateSeconds: 0,
+      loggedSeconds: 0,
+      progress: 0,
+      roughEstimateDays: node.roughEstimateDevDays
+    }
+    const qaMetrics: RoleMetrics = roleProgress?.testing ?? {
+      estimateSeconds: 0,
+      loggedSeconds: 0,
+      progress: 0,
+      roughEstimateDays: node.roughEstimateQaDays
+    }
+
     return (
       <div className="epic-role-chips">
         <EpicRoleChip
           label="SA"
           role="sa"
-          metrics={roleProgress.analytics}
+          metrics={saMetrics}
           epicInTodo={node.epicInTodo}
           epicKey={node.issueKey}
           config={config}
@@ -357,7 +390,7 @@ function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
         <EpicRoleChip
           label="DEV"
           role="dev"
-          metrics={roleProgress.development}
+          metrics={devMetrics}
           epicInTodo={node.epicInTodo}
           epicKey={node.issueKey}
           config={config}
@@ -366,7 +399,7 @@ function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
         <EpicRoleChip
           label="QA"
           role="qa"
-          metrics={roleProgress.testing}
+          metrics={qaMetrics}
           epicInTodo={node.epicInTodo}
           epicKey={node.issueKey}
           config={config}

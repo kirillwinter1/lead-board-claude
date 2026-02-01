@@ -37,7 +37,12 @@ public record UnifiedPlanningResult(
             Integer progressPercent,
             RoleProgressInfo roleProgress,
             int storiesTotal,
-            int storiesActive
+            int storiesActive,
+            // Rough estimate fields (for epics without stories)
+            boolean isRoughEstimate,
+            BigDecimal roughEstimateSaDays,
+            BigDecimal roughEstimateDevDays,
+            BigDecimal roughEstimateQaDays
     ) {}
 
     /**
@@ -135,6 +140,12 @@ public record UnifiedPlanningResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                     null, null, null, null, null, null
             );
+        }
+
+        public boolean hasData() {
+            return (saHours != null && saHours.compareTo(BigDecimal.ZERO) > 0) ||
+                    (devHours != null && devHours.compareTo(BigDecimal.ZERO) > 0) ||
+                    (qaHours != null && qaHours.compareTo(BigDecimal.ZERO) > 0);
         }
     }
 

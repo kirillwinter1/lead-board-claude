@@ -286,6 +286,11 @@ export interface PlannedEpic {
   roleProgress: RoleProgressInfo | null
   storiesTotal: number
   storiesActive: number
+  // Rough estimate fields (for epics without stories)
+  isRoughEstimate: boolean
+  roughEstimateSaDays: number | null
+  roughEstimateDevDays: number | null
+  roughEstimateQaDays: number | null
 }
 
 /**

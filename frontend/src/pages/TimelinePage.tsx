@@ -67,14 +67,27 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
   // Use unified plan dates if available
   if (unifiedPlan) {
     for (const epic of unifiedPlan.epics) {
-      for (const story of epic.stories) {
-        if (story.startDate) {
-          const d = new Date(story.startDate)
+      // For rough estimate epics, use epic dates directly
+      if (epic.isRoughEstimate) {
+        if (epic.startDate) {
+          const d = new Date(epic.startDate)
           if (d < minDate) minDate = d
         }
-        if (story.endDate) {
-          const d = new Date(story.endDate)
+        if (epic.endDate) {
+          const d = new Date(epic.endDate)
           if (d > maxDate) maxDate = d
+        }
+      } else {
+        // For regular epics, use story dates
+        for (const story of epic.stories) {
+          if (story.startDate) {
+            const d = new Date(story.startDate)
+            if (d < minDate) minDate = d
+          }
+          if (story.endDate) {
+            const d = new Date(story.endDate)
+            if (d > maxDate) maxDate = d
+          }
         }
       }
     }
@@ -135,6 +148,13 @@ const PHASE_COLORS = {
   qa: '#8BDBE5'    // Teal 300 — светло-бирюзовый
 }
 
+// Dimmed phase colors for rough estimates (50% opacity effect)
+const PHASE_COLORS_DIMMED = {
+  sa: '#c2dbff',   // Lighter blue
+  dev: '#e8cffc',  // Lighter purple
+  qa: '#c5edf2'    // Lighter teal
+}
+
 // Get issue type icon
 function getIssueTypeIcon(issueType: string | null): string {
   if (!issueType) return storyIcon
@@ -179,8 +199,13 @@ const MIN_ROW_HEIGHT = 48
 
 // Calculate row height for an epic based on its stories
 // Each story gets its own lane, so height = number of active stories
-function calculateRowHeight(stories: PlannedStory[]): number {
-  const activeStories = stories.filter(s => {
+function calculateRowHeight(epic: PlannedEpic): number {
+  // For rough estimate epics, just one bar
+  if (epic.isRoughEstimate) {
+    return MIN_ROW_HEIGHT
+  }
+
+  const activeStories = epic.stories.filter(s => {
     const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
     const hasPhases = s.phases?.sa || s.phases?.dev || s.phases?.qa
     return !isDone && hasPhases && s.startDate && s.endDate
@@ -804,9 +829,250 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
   )
 }
 
+// --- Rough Estimate Bar Component (for epics without stories) ---
+interface RoughEstimateBarProps {
+  epic: PlannedEpic
+  dateRange: DateRange
+  jiraBaseUrl: string
+  onHover: (epic: PlannedEpic | null, pos?: { x: number; y: number }) => void
+}
+
+function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstimateBarProps) {
+  const totalDays = daysBetween(dateRange.start, dateRange.end)
+  const agg = epic.phaseAggregation
+
+  // Calculate overall bar position from epic dates
+  if (!epic.startDate || !epic.endDate) return null
+
+  const startDate = new Date(epic.startDate)
+  const endDate = new Date(epic.endDate)
+  const daysFromStart = daysBetween(dateRange.start, startDate)
+  const duration = daysBetween(startDate, endDate) + 1
+  const leftPercent = (daysFromStart / totalDays) * 100
+  const widthPercent = (duration / totalDays) * 100
+
+  // Calculate phase segments within the bar
+  const renderPhaseSegment = (
+    phaseStartDate: string | null,
+    phaseEndDate: string | null,
+    phaseType: 'sa' | 'dev' | 'qa'
+  ) => {
+    if (!phaseStartDate || !phaseEndDate) return null
+
+    const phaseStart = new Date(phaseStartDate)
+    const phaseEnd = new Date(phaseEndDate)
+    const phaseStartOffset = daysBetween(startDate, phaseStart)
+    const phaseDuration = daysBetween(phaseStart, phaseEnd) + 1
+    const phaseLeftPercent = Math.max(0, (phaseStartOffset / duration) * 100)
+    const phaseWidthPercent = Math.min(100 - phaseLeftPercent, (phaseDuration / duration) * 100)
+
+    return (
+      <div
+        key={phaseType}
+        style={{
+          position: 'absolute',
+          left: `${phaseLeftPercent}%`,
+          width: `${phaseWidthPercent}%`,
+          height: '100%',
+          backgroundColor: PHASE_COLORS_DIMMED[phaseType],
+          backgroundImage: `repeating-linear-gradient(
+            135deg,
+            transparent,
+            transparent 3px,
+            rgba(255,255,255,0.4) 3px,
+            rgba(255,255,255,0.4) 6px
+          )`,
+        }}
+      />
+    )
+  }
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect()
+    onHover(epic, { x: rect.left + rect.width / 2, y: rect.top - 8 })
+  }
+
+  return (
+    <div
+      className="rough-estimate-bar"
+      style={{
+        position: 'absolute',
+        left: `${leftPercent}%`,
+        width: `${Math.max(widthPercent, 1)}%`,
+        top: '0px',
+        height: `${BAR_HEIGHT}px`,
+        borderRadius: '4px',
+        border: '1px dashed rgba(0,0,0,0.3)',
+        overflow: 'hidden',
+        background: '#f0f0f0',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+        cursor: 'pointer',
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => onHover(null)}
+      onClick={() => window.open(`${jiraBaseUrl}${epic.epicKey}`, '_blank')}
+    >
+      {renderPhaseSegment(agg.saStartDate, agg.saEndDate, 'sa')}
+      {renderPhaseSegment(agg.devStartDate, agg.devEndDate, 'dev')}
+      {renderPhaseSegment(agg.qaStartDate, agg.qaEndDate, 'qa')}
+
+      <span
+        style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: '10px',
+          fontWeight: 600,
+          color: '#666',
+          textShadow: '0 1px 1px rgba(255,255,255,0.8)',
+          zIndex: 2,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        ~{epic.roughEstimateSaDays ?? 0}/{epic.roughEstimateDevDays ?? 0}/{epic.roughEstimateQaDays ?? 0}д
+      </span>
+    </div>
+  )
+}
+
+// --- Rough Estimate Bars Container ---
+interface RoughEstimateBarsProps {
+  epic: PlannedEpic
+  dateRange: DateRange
+  jiraBaseUrl: string
+}
+
+function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
+  const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
+
+  const handleHover = (ep: PlannedEpic | null, pos?: { x: number; y: number }) => {
+    setHoveredEpic(ep)
+    if (pos) setTooltipPos(pos)
+  }
+
+  const containerHeight = BAR_HEIGHT + LANE_GAP
+
+  return (
+    <>
+      <div style={{ height: `${containerHeight}px`, position: 'relative', width: '100%' }}>
+        <RoughEstimateBar
+          epic={epic}
+          dateRange={dateRange}
+          jiraBaseUrl={jiraBaseUrl}
+          onHover={handleHover}
+        />
+      </div>
+
+      {hoveredEpic && createPortal(
+        <div
+          className="timeline-tooltip"
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 10000,
+            pointerEvents: 'none',
+            background: 'rgba(0,0,0,0.92)',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            minWidth: '280px',
+            maxWidth: '380px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            color: 'white',
+            fontSize: '13px'
+          }}
+        >
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <img src={epicIcon} alt="Epic" style={{ width: '16px', height: '16px' }} />
+              <span style={{ fontWeight: 600, color: '#60a5fa' }}>{hoveredEpic.epicKey}</span>
+            </div>
+            <span
+              style={{
+                fontSize: '10px',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                background: '#fef3c7',
+                color: '#92400e',
+                fontWeight: 500
+              }}
+            >
+              Грязные оценки
+            </span>
+          </div>
+
+          {/* Summary */}
+          <div style={{ color: '#d1d5db', marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
+            {hoveredEpic.summary}
+          </div>
+
+          {/* Rough estimates breakdown */}
+          <div style={{ marginBottom: '10px', borderTop: '1px solid #374151', paddingTop: '10px' }}>
+            <div style={{ color: '#9ca3af', fontSize: '11px', marginBottom: '6px' }}>
+              Оценки (дней):
+            </div>
+            <table style={{ width: '100%', fontSize: '12px' }}>
+              <tbody>
+                {hoveredEpic.roughEstimateSaDays != null && hoveredEpic.roughEstimateSaDays > 0 && (
+                  <tr>
+                    <td style={{ padding: '2px 4px' }}>
+                      <span style={{ color: PHASE_COLORS.sa }}>●</span> SA
+                    </td>
+                    <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                      {hoveredEpic.roughEstimateSaDays} дней
+                    </td>
+                  </tr>
+                )}
+                {hoveredEpic.roughEstimateDevDays != null && hoveredEpic.roughEstimateDevDays > 0 && (
+                  <tr>
+                    <td style={{ padding: '2px 4px' }}>
+                      <span style={{ color: PHASE_COLORS.dev }}>●</span> DEV
+                    </td>
+                    <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                      {hoveredEpic.roughEstimateDevDays} дней
+                    </td>
+                  </tr>
+                )}
+                {hoveredEpic.roughEstimateQaDays != null && hoveredEpic.roughEstimateQaDays > 0 && (
+                  <tr>
+                    <td style={{ padding: '2px 4px' }}>
+                      <span style={{ color: PHASE_COLORS.qa }}>●</span> QA
+                    </td>
+                    <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                      {hoveredEpic.roughEstimateQaDays} дней
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Dates */}
+          {hoveredEpic.startDate && hoveredEpic.endDate && (
+            <div style={{ color: '#9ca3af', fontSize: '12px' }}>
+              📅 {formatDateShort(new Date(hoveredEpic.startDate))} → {formatDateShort(new Date(hoveredEpic.endDate))}
+            </div>
+          )}
+
+          {/* Note */}
+          <div style={{ marginTop: '8px', color: '#6b7280', fontSize: '11px', fontStyle: 'italic' }}>
+            Эпик без сторей, планируется по грязным оценкам
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  )
+}
+
 // --- Gantt Row ---
 interface GanttRowProps {
   epic: EpicForecast | undefined
+  plannedEpic: PlannedEpic
   stories: PlannedStory[]
   globalWarnings: PlanningWarning[]
   dateRange: DateRange
@@ -816,7 +1082,7 @@ interface GanttRowProps {
   shouldAnimate: boolean
 }
 
-function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate }: GanttRowProps) {
+function GanttRow({ epic, plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate }: GanttRowProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
 
   const today = new Date()
@@ -832,6 +1098,9 @@ function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHe
   const animationStyle = shouldAnimate ? {
     animationDelay: `${epicIndex * 150}ms`
   } : {}
+
+  // Check if this is a rough estimate epic (no stories, uses rough estimates)
+  const isRoughEstimate = plannedEpic.isRoughEstimate
 
   return (
     <div className="gantt-row" style={{ height: `${rowHeight}px` }}>
@@ -849,13 +1118,21 @@ function GanttRow({ epic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHe
           <div className="gantt-due-line" style={{ left: `${dueDatePercent}%` }} />
         )}
 
-        {/* Story bars */}
-        <StoryBars
-          stories={stories}
-          dateRange={dateRange}
-          jiraBaseUrl={jiraBaseUrl}
-          globalWarnings={globalWarnings}
-        />
+        {/* Rough estimate bar OR Story bars */}
+        {isRoughEstimate ? (
+          <RoughEstimateBars
+            epic={plannedEpic}
+            dateRange={dateRange}
+            jiraBaseUrl={jiraBaseUrl}
+          />
+        ) : (
+          <StoryBars
+            stories={stories}
+            dateRange={dateRange}
+            jiraBaseUrl={jiraBaseUrl}
+            globalWarnings={globalWarnings}
+          />
+        )}
       </div>
     </div>
   )
@@ -1041,7 +1318,7 @@ export function TimelinePage() {
   const rowHeights = useMemo(() => {
     const heights = new Map<string, number>()
     for (const epic of epics) {
-      heights.set(epic.epicKey, calculateRowHeight(epic.stories))
+      heights.set(epic.epicKey, calculateRowHeight(epic))
     }
     return heights
   }, [epics])
@@ -1167,6 +1444,7 @@ export function TimelinePage() {
                   <GanttRow
                     key={epic.epicKey}
                     epic={epicForecast}
+                    plannedEpic={epic}
                     stories={epic.stories}
                     globalWarnings={unifiedPlan?.warnings || []}
                     dateRange={dateRange}
