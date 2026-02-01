@@ -1,0 +1,133 @@
+package com.leadboard.component;
+
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.team.TeamEntity;
+import com.leadboard.team.TeamRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PostgreSQLContainer;
+
+/**
+ * Base class for Component tests.
+ * Uses Testcontainers PostgreSQL with singleton pattern for full compatibility with production.
+ * The container is shared across all test classes to improve performance.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("component")
+@Import(TestSecurityConfig.class)
+public abstract class ComponentTestBase {
+
+    // Singleton container - started once, shared by all tests
+    static final PostgreSQLContainer<?> postgres;
+
+    static {
+        postgres = new PostgreSQLContainer<>("postgres:15")
+                .withDatabaseName("leadboard_test")
+                .withUsername("test")
+                .withPassword("test");
+        postgres.start();
+    }
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        // Override .env values for tests
+        registry.add("jira.project-key", () -> "TEST");
+        registry.add("jira.base-url", () -> "https://test.atlassian.net");
+    }
+
+    @Autowired
+    protected TestRestTemplate restTemplate;
+
+    @Autowired
+    protected JiraIssueRepository issueRepository;
+
+    @Autowired
+    protected TeamRepository teamRepository;
+
+    @BeforeEach
+    void cleanUp() {
+        issueRepository.deleteAll();
+        teamRepository.deleteAll();
+    }
+
+    protected TeamEntity createTeam(String name) {
+        TeamEntity team = new TeamEntity();
+        team.setName(name);
+        team.setJiraTeamValue(name);
+        team.setActive(true);
+        return teamRepository.save(team);
+    }
+
+    protected JiraIssueEntity createEpic(String key, String summary, Long teamId) {
+        JiraIssueEntity epic = new JiraIssueEntity();
+        epic.setIssueKey(key);
+        epic.setIssueId("id-" + key);
+        epic.setSummary(summary);
+        epic.setIssueType("Эпик");
+        epic.setStatus("Новое");
+        epic.setTeamId(teamId);
+        epic.setProjectKey("TEST");
+        epic.setSubtask(false);
+        return issueRepository.save(epic);
+    }
+
+    protected JiraIssueEntity createEpic(String key, String summary, String status, Long teamId) {
+        JiraIssueEntity epic = new JiraIssueEntity();
+        epic.setIssueKey(key);
+        epic.setIssueId("id-" + key);
+        epic.setSummary(summary);
+        epic.setIssueType("Эпик");
+        epic.setStatus(status);
+        epic.setTeamId(teamId);
+        epic.setProjectKey("TEST");
+        epic.setSubtask(false);
+        return issueRepository.save(epic);
+    }
+
+    protected JiraIssueEntity createStory(String key, String summary, String parentKey, Long teamId) {
+        JiraIssueEntity story = new JiraIssueEntity();
+        story.setIssueKey(key);
+        story.setIssueId("id-" + key);
+        story.setSummary(summary);
+        story.setIssueType("История");
+        story.setStatus("Новое");
+        story.setParentKey(parentKey);
+        story.setTeamId(teamId);
+        story.setProjectKey("TEST");
+        story.setSubtask(false);
+        return issueRepository.save(story);
+    }
+
+    protected JiraIssueEntity createSubtask(String key, String summary, String parentKey, String subtaskType, Long teamId) {
+        JiraIssueEntity subtask = new JiraIssueEntity();
+        subtask.setIssueKey(key);
+        subtask.setIssueId("id-" + key);
+        subtask.setSummary(summary);
+        subtask.setIssueType(subtaskType);
+        subtask.setStatus("Новое");
+        subtask.setParentKey(parentKey);
+        subtask.setTeamId(teamId);
+        subtask.setProjectKey("TEST");
+        subtask.setSubtask(true);
+        return issueRepository.save(subtask);
+    }
+
+    protected JiraIssueEntity createSubtaskWithTime(String key, String summary, String parentKey,
+                                                     String subtaskType, Long teamId,
+                                                     Long estimateSeconds, Long loggedSeconds) {
+        JiraIssueEntity subtask = createSubtask(key, summary, parentKey, subtaskType, teamId);
+        subtask.setOriginalEstimateSeconds(estimateSeconds);
+        subtask.setTimeSpentSeconds(loggedSeconds);
+        return issueRepository.save(subtask);
+    }
+}

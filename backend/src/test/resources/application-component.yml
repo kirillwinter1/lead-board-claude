@@ -1,0 +1,48 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/leadboard_test
+    username: leadboard
+    password: leadboard
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: false
+
+scheduling:
+  enabled: false
+
+jira:
+  base-url: https://test.atlassian.net
+  email: test@test.com
+  api-token: test-token
+  project-key: TEST
+  sync-interval-seconds: 999999999
+  sync-enabled: false
+  team-field-id: customfield_10001
+  organization-id: test-org
+
+atlassian:
+  client-id: test-client-id
+  client-secret: test-client-secret
+  redirect-uri: http://localhost:8080/oauth/callback
+  site-base-url: https://test.atlassian.net
+
+rough-estimate:
+  enabled: true
+  allowed-epic-statuses:
+    - "Новое"
+    - "Requirements"
+    - "Rough Estimate"
+  step-days: 0.5
+  min-days: 0
+  max-days: 100
+
+logging:
+  level:
+    com.leadboard: DEBUG
+    org.springframework.web: DEBUG

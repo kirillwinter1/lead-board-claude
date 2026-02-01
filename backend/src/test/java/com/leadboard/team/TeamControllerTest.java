@@ -1,10 +1,13 @@
 package com.leadboard.team;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.auth.AuthorizationService;
+import com.leadboard.auth.OAuthTokenRepository;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.planning.AutoScoreService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -14,13 +17,17 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+import org.junit.jupiter.api.BeforeEach;
+
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TeamController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class TeamControllerTest {
 
     @Autowired
@@ -40,6 +47,18 @@ class TeamControllerTest {
 
     @MockBean
     private AutoScoreService autoScoreService;
+
+    @MockBean
+    private AuthorizationService authorizationService;
+
+    @MockBean
+    private OAuthTokenRepository oAuthTokenRepository;
+
+    @BeforeEach
+    void setUp() {
+        // By default, allow all team management operations
+        when(authorizationService.canManageTeam(anyLong())).thenReturn(true);
+    }
 
     // ==================== Team Tests ====================
 

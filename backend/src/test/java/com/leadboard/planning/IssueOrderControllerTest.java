@@ -1,8 +1,10 @@
 package com.leadboard.planning;
 
+import com.leadboard.auth.OAuthTokenRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
@@ -17,6 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(IssueOrderController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class IssueOrderControllerTest {
 
     @Autowired
@@ -24,6 +27,9 @@ class IssueOrderControllerTest {
 
     @MockBean
     private IssueOrderService orderService;
+
+    @MockBean
+    private OAuthTokenRepository oAuthTokenRepository;
 
     // ==================== Epic Order Tests ====================
 
@@ -37,7 +43,7 @@ class IssueOrderControllerTest {
         when(orderService.reorderEpic("EPIC-1", 3)).thenReturn(epic);
 
         mockMvc.perform(put("/api/epics/EPIC-1/order")
-                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"position\": 3}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.issueKey").value("EPIC-1"))
@@ -53,7 +59,7 @@ class IssueOrderControllerTest {
         // IllegalArgumentException propagates as 500 error (wrapped in ServletException)
         try {
             mockMvc.perform(put("/api/epics/EPIC-999/order")
-                    .contentType(MediaType.APPLICATION_JSON)
+                                        .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"position\": 1}"));
         } catch (Exception e) {
             // Expected - IllegalArgumentException wrapped in ServletException
@@ -71,7 +77,7 @@ class IssueOrderControllerTest {
         when(orderService.reorderEpic("EPIC-5", 1)).thenReturn(epic);
 
         mockMvc.perform(put("/api/epics/EPIC-5/order")
-                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"position\": 1}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.manualOrder").value(1));
@@ -89,7 +95,7 @@ class IssueOrderControllerTest {
         when(orderService.reorderStory("STORY-1", 2)).thenReturn(story);
 
         mockMvc.perform(put("/api/stories/STORY-1/order")
-                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"position\": 2}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.issueKey").value("STORY-1"))
@@ -105,7 +111,7 @@ class IssueOrderControllerTest {
         // IllegalArgumentException propagates as 500 error (wrapped in ServletException)
         try {
             mockMvc.perform(put("/api/stories/STORY-999/order")
-                    .contentType(MediaType.APPLICATION_JSON)
+                                        .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"position\": 1}"));
         } catch (Exception e) {
             // Expected - IllegalArgumentException wrapped in ServletException
@@ -123,7 +129,7 @@ class IssueOrderControllerTest {
         when(orderService.reorderStory("BUG-1", 1)).thenReturn(bug);
 
         mockMvc.perform(put("/api/stories/BUG-1/order")
-                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"position\": 1}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.issueKey").value("BUG-1"))
@@ -140,7 +146,7 @@ class IssueOrderControllerTest {
         when(orderService.reorderStory("STORY-1", 1)).thenReturn(story);
 
         mockMvc.perform(put("/api/stories/STORY-1/order")
-                .contentType(MediaType.APPLICATION_JSON)
+                                .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"position\": 1}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.autoScore").doesNotExist());

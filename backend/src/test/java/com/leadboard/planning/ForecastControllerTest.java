@@ -1,10 +1,12 @@
 package com.leadboard.planning;
 
+import com.leadboard.auth.OAuthTokenRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ForecastController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ForecastControllerTest {
 
     @Autowired
@@ -28,6 +31,9 @@ class ForecastControllerTest {
 
     @MockBean
     private ForecastService forecastService;
+
+    @MockBean
+    private OAuthTokenRepository oAuthTokenRepository;
 
     @MockBean
     private StoryForecastService storyForecastService;
@@ -40,6 +46,9 @@ class ForecastControllerTest {
 
     @MockBean
     private WipSnapshotService wipSnapshotService;
+
+    @MockBean
+    private RoleLoadService roleLoadService;
 
     @MockBean
     private JiraIssueRepository issueRepository;

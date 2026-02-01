@@ -1,11 +1,13 @@
 package com.leadboard.metrics.controller;
 
+import com.leadboard.auth.OAuthTokenRepository;
 import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TeamMetricsController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class TeamMetricsControllerTest {
 
     @Autowired
@@ -34,6 +37,9 @@ class TeamMetricsControllerTest {
 
     @MockBean
     private DsrService dsrService;
+
+    @MockBean
+    private OAuthTokenRepository oAuthTokenRepository;
 
     @Test
     void getSummary_returnsAllMetrics() throws Exception {
