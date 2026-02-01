@@ -9,7 +9,6 @@ import { BaselineSection } from './sections/BaselineSection'
 import { AuditSection } from './sections/AuditSection'
 import { PilotSection } from './sections/PilotSection'
 import { DifferentiationSection } from './sections/DifferentiationSection'
-import { CaseSection } from './sections/CaseSection'
 import { FounderSection } from './sections/FounderSection'
 import './LandingPage.css'
 
@@ -30,7 +29,6 @@ export function LandingPage() {
       <AuditSection onRequestAudit={openModal} />
       <PilotSection />
       <DifferentiationSection />
-      <CaseSection onRequestAudit={openModal} />
       <FounderSection />
       <footer className="landing-footer">
         <p className="landing-footer-text">
