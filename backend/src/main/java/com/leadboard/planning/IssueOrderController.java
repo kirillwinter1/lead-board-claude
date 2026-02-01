@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.sync.JiraIssueEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -25,6 +26,7 @@ public class IssueOrderController {
      * @return updated epic data
      */
     @PutMapping("/epics/{epicKey}/order")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEAM_LEAD')")
     public ResponseEntity<OrderResponse> updateEpicOrder(
             @PathVariable String epicKey,
             @RequestBody OrderRequest request
@@ -45,6 +47,7 @@ public class IssueOrderController {
      * @return updated story data
      */
     @PutMapping("/stories/{storyKey}/order")
+    @PreAuthorize("hasAnyRole('ADMIN', 'TEAM_LEAD')")
     public ResponseEntity<OrderResponse> updateStoryOrder(
             @PathVariable String storyKey,
             @RequestBody OrderRequest request

@@ -119,7 +119,9 @@ public class OAuthService {
                     user.getAtlassianAccountId(),
                     user.getDisplayName(),
                     user.getEmail(),
-                    user.getAvatarUrl()
+                    user.getAvatarUrl(),
+                    user.getAppRole().name(),
+                    user.getAppRole().getPermissions()
             ));
 
         } catch (Exception e) {
@@ -266,7 +268,9 @@ public class OAuthService {
                 user.getAtlassianAccountId(),
                 user.getDisplayName(),
                 user.getEmail(),
-                user.getAvatarUrl()
+                user.getAvatarUrl(),
+                user.getAppRole().name(),
+                user.getAppRole().getPermissions()
         ));
     }
 
@@ -324,7 +328,15 @@ public class OAuthService {
 
     public record AuthResult(boolean success, String error, AuthenticatedUser user) {}
 
-    public record AuthenticatedUser(Long id, String accountId, String displayName, String email, String avatarUrl) {}
+    public record AuthenticatedUser(
+            Long id,
+            String accountId,
+            String displayName,
+            String email,
+            String avatarUrl,
+            String role,
+            java.util.Set<String> permissions
+    ) {}
 
     public record AuthStatus(boolean authenticated, AuthenticatedUser user) {}
 }

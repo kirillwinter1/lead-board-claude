@@ -10,7 +10,8 @@ Lead Board — SaaS для управления IT-доставкой повер
 
 ```
 com.leadboard/
-├── auth/           — OAuth 2.0 (Atlassian 3LO), пользователи, токены
+├── admin/          — Admin API для управления пользователями
+├── auth/           — OAuth 2.0 (Atlassian 3LO), пользователи, токены, RBAC (AppRole, SecurityConfig)
 ├── board/          — Агрегация данных для доски (BoardService 621 LOC)
 ├── calendar/       — Производственный календарь РФ (xmlcalendar.ru)
 ├── config/         — JiraProperties, WebConfig, RoughEstimateProperties
@@ -87,6 +88,8 @@ com.leadboard/
 | OAuthController | 5 | /oauth/*, /api/auth/* |
 | HealthController | 1 | /api/health |
 | ConfigController | 1 | /api/config/* |
+| AdminController | 2 | /api/admin/* |
+| IssueOrderController | 2 | /api/epics/*/order, /api/stories/*/order |
 
 ## Frontend (React + Vite + TypeScript)
 

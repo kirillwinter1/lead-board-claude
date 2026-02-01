@@ -10,11 +10,17 @@ interface AuthUser {
   displayName: string
   email: string
   avatarUrl: string | null
+  role: string
+  permissions: string[]
 }
 
 interface AuthStatus {
   authenticated: boolean
   user: AuthUser | null
+}
+
+function isAdmin(user: AuthUser | null | undefined): boolean {
+  return user?.role === 'ADMIN'
 }
 
 export function Layout() {
@@ -79,6 +85,11 @@ export function Layout() {
             <NavLink to={`/board/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
               Teams
             </NavLink>
+            {isAdmin(authStatus?.user) && (
+              <NavLink to="/board/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Settings
+              </NavLink>
+            )}
           </nav>
         </div>
         <div className="header-right">

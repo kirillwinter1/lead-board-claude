@@ -8,6 +8,7 @@ import { TeamMetricsPage } from './pages/TeamMetricsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { PlanningPokerPage } from './pages/PlanningPokerPage'
 import { PokerRoomPage } from './pages/PokerRoomPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { LandingPage } from './pages/landing/LandingPage'
 import './App.css'
 
@@ -26,6 +27,7 @@ function App() {
           <Route path="poker/room/:roomCode" element={<PokerRoomPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

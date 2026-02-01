@@ -1,10 +1,12 @@
 package com.leadboard.team;
 
+import com.leadboard.auth.AuthorizationService;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.team.dto.PlanningConfigDto;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,11 +19,14 @@ public class TeamController {
     private final TeamService teamService;
     private final TeamSyncService teamSyncService;
     private final JiraProperties jiraProperties;
+    private final AuthorizationService authorizationService;
 
-    public TeamController(TeamService teamService, TeamSyncService teamSyncService, JiraProperties jiraProperties) {
+    public TeamController(TeamService teamService, TeamSyncService teamSyncService,
+                          JiraProperties jiraProperties, AuthorizationService authorizationService) {
         this.teamService = teamService;
         this.teamSyncService = teamSyncService;
         this.jiraProperties = jiraProperties;
+        this.authorizationService = authorizationService;
     }
 
     // ==================== Config Endpoint ====================
@@ -42,6 +47,7 @@ public class TeamController {
     }
 
     @PostMapping("/sync/trigger")
+    @PreAuthorize("hasRole('ADMIN')")
     public TeamSyncService.TeamSyncStatus triggerSync() {
         return teamSyncService.syncTeams();
     }
@@ -59,18 +65,21 @@ public class TeamController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TeamDto> createTeam(@Valid @RequestBody CreateTeamRequest request) {
         TeamDto team = teamService.createTeam(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(team);
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("@authorizationService.canManageTeam(#id)")
     public TeamDto updateTeam(@PathVariable Long id, @Valid @RequestBody UpdateTeamRequest request) {
         return teamService.updateTeam(id, request);
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('ADMIN')")
     public void deactivateTeam(@PathVariable Long id) {
         teamService.deactivateTeam(id);
     }
@@ -83,6 +92,7 @@ public class TeamController {
     }
 
     @PostMapping("/{teamId}/members")
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
     public ResponseEntity<TeamMemberDto> addTeamMember(
             @PathVariable Long teamId,
             @Valid @RequestBody CreateTeamMemberRequest request) {
@@ -91,6 +101,7 @@ public class TeamController {
     }
 
     @PutMapping("/{teamId}/members/{memberId}")
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
     public TeamMemberDto updateTeamMember(
             @PathVariable Long teamId,
             @PathVariable Long memberId,
@@ -100,6 +111,7 @@ public class TeamController {
 
     @PostMapping("/{teamId}/members/{memberId}/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
     public void deactivateTeamMember(
             @PathVariable Long teamId,
             @PathVariable Long memberId) {
@@ -120,6 +132,7 @@ public class TeamController {
      * Обновить конфигурацию планирования команды.
      */
     @PutMapping("/{teamId}/planning-config")
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
     public PlanningConfigDto updatePlanningConfig(
             @PathVariable Long teamId,
             @RequestBody PlanningConfigDto config) {

@@ -23,6 +23,10 @@ public class UserEntity {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "app_role", nullable = false, length = 20)
+    private AppRole appRole = AppRole.MEMBER;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -106,5 +110,13 @@ public class UserEntity {
 
     public void setOauthToken(OAuthTokenEntity oauthToken) {
         this.oauthToken = oauthToken;
+    }
+
+    public AppRole getAppRole() {
+        return appRole;
+    }
+
+    public void setAppRole(AppRole appRole) {
+        this.appRole = appRole;
     }
 }

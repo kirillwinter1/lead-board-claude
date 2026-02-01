@@ -29,7 +29,7 @@
 | F24 | Team Metrics v2 (DSR Gauge, Forecast) | 🚧 | 2026-01-28 | [features/F22](features/F22_TEAM_METRICS.md) (объединён) |
 | F25 | Manual Order + Recommendations | 🚧 | 2026-01-30 | [features/F25](features/F25_MANUAL_ORDER.md) |
 | F26 | Employee Performance Dashboard | 📋 | — | — |
-| F27 | RBAC | 📋 | — | — |
+| F27 | RBAC | ✅ | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
 | F28 | RICE Scoring & AutoScore | 📋 | — | — |
 | F29 | Project-Level Management | 💡 | — | — |
 

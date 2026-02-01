@@ -183,7 +183,7 @@ public class TeamSyncService {
         }
 
         // Check if member exists in another team (by accountId)
-        Optional<TeamMemberEntity> existingElsewhere = memberRepository.findByJiraAccountIdAndActiveTrue(accountId);
+        Optional<TeamMemberEntity> existingElsewhere = memberRepository.findFirstByJiraAccountIdAndActiveTrue(accountId);
 
         // Create new member with defaults
         TeamMemberEntity member = new TeamMemberEntity();
