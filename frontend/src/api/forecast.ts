@@ -357,3 +357,58 @@ export async function getForecastSnapshot(teamId: number, date: string): Promise
   return response.data
 }
 
+// ==================== Role Load API ====================
+
+/**
+ * Статус утилизации роли.
+ */
+export type UtilizationStatus = 'OVERLOAD' | 'NORMAL' | 'IDLE' | 'NO_CAPACITY'
+
+/**
+ * Информация о загрузке для одной роли.
+ */
+export interface RoleLoadInfo {
+  memberCount: number
+  totalCapacityHours: number
+  totalAssignedHours: number
+  utilizationPercent: number
+  status: UtilizationStatus
+}
+
+/**
+ * Типы алертов загрузки.
+ */
+export type RoleLoadAlertType = 'ROLE_OVERLOAD' | 'ROLE_IDLE' | 'IMBALANCE' | 'NO_CAPACITY'
+
+/**
+ * Алерт о проблеме с загрузкой.
+ */
+export interface RoleLoadAlert {
+  type: RoleLoadAlertType
+  role: string | null
+  message: string
+}
+
+/**
+ * Ответ API с информацией о загрузке команды по ролям.
+ */
+export interface RoleLoadResponse {
+  teamId: number
+  planningDate: string
+  periodDays: number
+  sa: RoleLoadInfo
+  dev: RoleLoadInfo
+  qa: RoleLoadInfo
+  alerts: RoleLoadAlert[]
+}
+
+/**
+ * Получает загрузку команды по ролям.
+ */
+export async function getRoleLoad(teamId: number): Promise<RoleLoadResponse> {
+  const response = await axios.get<RoleLoadResponse>(
+    `/api/planning/role-load?teamId=${teamId}`
+  )
+  return response.data
+}
+

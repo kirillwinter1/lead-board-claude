@@ -1,0 +1,264 @@
+/* Role Load Block */
+.role-load-block {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dfe1e6;
+  padding: 20px;
+}
+
+.role-load-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.role-load-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #172b4d;
+  margin: 0;
+}
+
+.role-load-period {
+  font-size: 13px;
+  color: #6b778c;
+  background: #f4f5f7;
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.role-load-loading,
+.role-load-error {
+  text-align: center;
+  padding: 40px 20px;
+  color: #6b778c;
+}
+
+.role-load-error {
+  color: #de350b;
+}
+
+/* Role Cards Grid */
+.role-load-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .role-load-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Individual Role Card */
+.role-card {
+  background: #fafbfc;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #ebecf0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-card-sa {
+  border-left: 4px solid #669DF1;
+}
+
+.role-card-dev {
+  border-left: 4px solid #B55FEB;
+}
+
+.role-card-qa {
+  border-left: 4px solid #6CC3E0;
+}
+
+.role-card-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.role-card-sa .role-card-title {
+  color: #1558BC;
+}
+
+.role-card-dev .role-card-title {
+  color: #803FA5;
+}
+
+.role-card-qa .role-card-title {
+  color: #206A83;
+}
+
+.role-card-members {
+  font-size: 13px;
+  color: #6b778c;
+}
+
+/* Progress Bar */
+.role-card-bar-container {
+  width: 100%;
+  height: 12px;
+  background: #ebecf0;
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.role-card-bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.3s ease;
+}
+
+/* Progress bar uses role color */
+.role-card-sa .role-card-bar {
+  background: #669DF1;
+}
+
+.role-card-dev .role-card-bar {
+  background: #B55FEB;
+}
+
+.role-card-qa .role-card-bar {
+  background: #6CC3E0;
+}
+
+/* Override for overload status - show red */
+.role-card-bar.status-overload {
+  background: linear-gradient(90deg, #de350b, #ff5630) !important;
+}
+
+.role-card-bar.status-no-capacity {
+  background: #a5adba !important;
+}
+
+.role-card-bar-markers {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.role-card-bar-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.role-card-bar-marker-limit {
+  background: rgba(255, 255, 255, 0.8);
+  width: 3px;
+}
+
+/* Percent and Status */
+.role-card-percent {
+  font-size: 24px;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.role-card-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  text-transform: uppercase;
+}
+
+.role-card-status.status-normal {
+  background: #e3fcef;
+  color: #006644;
+}
+
+.role-card-status.status-overload {
+  background: #ffebe6;
+  color: #de350b;
+}
+
+.role-card-status.status-idle {
+  background: #fffae6;
+  color: #ff8b00;
+}
+
+.role-card-status.status-no-capacity {
+  background: #f4f5f7;
+  color: #6b778c;
+}
+
+.role-card-hours {
+  font-size: 12px;
+  color: #6b778c;
+}
+
+/* Alerts Section */
+.role-load-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #ebecf0;
+}
+
+.role-load-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.role-load-alert.alert-error {
+  background: #ffebe6;
+  color: #de350b;
+}
+
+.role-load-alert.alert-warning {
+  background: #fffae6;
+  color: #ff8b00;
+}
+
+.role-load-alert.alert-info {
+  background: #deebff;
+  color: #0052cc;
+}
+
+.role-load-alert-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.alert-error .role-load-alert-icon {
+  background: #de350b;
+  color: white;
+}
+
+.alert-warning .role-load-alert-icon {
+  background: #ff8b00;
+  color: white;
+}
+
+.alert-info .role-load-alert-icon {
+  background: #0052cc;
+  color: white;
+}
+
+.role-load-alert-message {
+  font-weight: 500;
+}

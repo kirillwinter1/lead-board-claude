@@ -355,7 +355,7 @@
 }
 
 .gantt-labels-header {
-  height: 40px;
+  min-height: 64px;
   padding: 10px 16px;
   font-size: 11px;
   font-weight: 600;
@@ -364,6 +364,9 @@
   letter-spacing: 0.5px;
   border-bottom: 1px solid #dfe1e6;
   background: #f4f5f7;
+  display: flex;
+  align-items: flex-end;
+  padding-bottom: 8px;
 }
 
 .gantt-label-row {
@@ -372,9 +375,10 @@
   gap: 2px;
   min-height: 48px;
   padding: 6px 12px;
-  border-bottom: 1px solid #ebecf0;
+  margin-bottom: 8px;
   justify-content: center;
   transition: background 0.15s;
+  background: white;
 }
 
 .gantt-label-row:hover {
@@ -495,17 +499,69 @@
   overflow-y: visible;
 }
 
-.gantt-header {
+/* Header container with two rows */
+.gantt-header-container {
   display: flex;
-  height: 40px;
+  flex-direction: column;
   border-bottom: 1px solid #dfe1e6;
   background: #f4f5f7;
 }
 
+/* Group header row (month/quarter) */
+.gantt-header-group {
+  display: flex;
+  height: 24px;
+  border-bottom: 1px solid #ebecf0;
+}
+
+/* Week header row (for day zoom) */
+.gantt-header-week {
+  display: flex;
+  height: 20px;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.gantt-header-week-cell {
+  padding: 2px 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b778c;
+  text-align: center;
+  border-right: 1px solid #ebecf0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gantt-header-week-cell:last-child {
+  border-right: none;
+}
+
+.gantt-header-group-cell {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #172b4d;
+  text-align: center;
+  border-right: 1px solid #dfe1e6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+}
+
+.gantt-header-group-cell:last-child {
+  border-right: none;
+}
+
+/* Unit header row (day/week/month) */
+.gantt-header {
+  display: flex;
+  height: 36px;
+}
+
 .gantt-header-cell {
-  flex: 1;
-  min-width: 40px;
-  padding: 10px 4px;
+  padding: 8px 4px;
   font-size: 10px;
   font-weight: 600;
   color: #6b778c;
@@ -520,18 +576,34 @@
   border-right: none;
 }
 
+.gantt-header-cell-weekend {
+  background: #fafbfc;
+  color: #c1c7d0;
+}
+
 .gantt-body {
   position: relative;
+  background-color: white;
+}
+
+/* Weekend column background */
+.gantt-weekend-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #fafbfc;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .gantt-row {
   min-height: 48px;
-  border-bottom: 1px solid #ebecf0;
+  margin-bottom: 8px;
   position: relative;
 }
 
 .gantt-row:hover {
-  background: #fafbfc;
+  background: rgba(250, 251, 252, 0.8);
 }
 
 .gantt-row-expanded {
@@ -548,6 +620,7 @@
   position: relative;
   height: 100%;
   width: 100%;
+  z-index: 2;
 }
 
 /* Unified bar (single bar per epic) */
@@ -651,20 +724,9 @@
   bottom: 0;
   width: 2px;
   background: #0052cc;
-  opacity: 0.6;
+  opacity: 0.5;
   z-index: 5;
   pointer-events: none;
-}
-
-.gantt-today-line::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -3px;
-  width: 8px;
-  height: 8px;
-  background: #0052cc;
-  border-radius: 50%;
 }
 
 /* Due date line */
@@ -674,20 +736,20 @@
   bottom: 0;
   width: 2px;
   background: #de350b;
+  opacity: 0.6;
   z-index: 4;
-  cursor: help;
+  pointer-events: none;
 }
 
 .gantt-due-line::before {
   content: '';
   position: absolute;
-  top: 0;
+  top: -4px;
   left: -3px;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 8px solid #de350b;
+  width: 8px;
+  height: 8px;
+  background: #de350b;
+  border-radius: 50%;
 }
 
 /* Tooltip */
@@ -1304,15 +1366,6 @@
   filter: brightness(1.1);
 }
 
-/* Due line hover effect */
-.gantt-due-line {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.gantt-due-line:hover {
-  transform: scaleX(1.5);
-  box-shadow: 0 0 12px rgba(222, 53, 11, 0.4);
-}
 
 /* Today line subtle pulse */
 .gantt-today-line {

@@ -186,12 +186,16 @@ class ForecastServiceTest {
                     aggregation,
                     "Developing",
                     null,
-                    null,
-                    null,
-                    null,
+                    0L,
+                    0L,
+                    0,
                     RoleProgressInfo.empty(),
                     1,
-                    1
+                    1,
+                    false,
+                    null,
+                    null,
+                    null
             );
 
             UnifiedPlanningResult unifiedResult = new UnifiedPlanningResult(
@@ -305,7 +309,8 @@ class ForecastServiceTest {
                             today.plusDays(2), today.plusDays(4),
                             today.plusDays(5), today.plusDays(5)
                     ),
-                    "Developing", null, null, null, null, RoleProgressInfo.empty(), 2, 2
+                    "Developing", null, 0L, 0L, 0, RoleProgressInfo.empty(), 2, 2,
+                    false, null, null, null
             );
 
             List<PlanningWarning> warnings = List.of(
@@ -533,12 +538,16 @@ class ForecastServiceTest {
                 aggregation,
                 "Developing",
                 null,
-                null,
-                null,
-                null,
+                0L,
+                0L,
+                0,
                 RoleProgressInfo.empty(),
                 1,
-                1
+                1,
+                false,
+                null,
+                null,
+                null
         );
     }
 }

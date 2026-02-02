@@ -18,6 +18,9 @@ SaaS-продукт для управления IT-доставкой повер
 | [RULES.md](RULES.md) | Бизнес-правила + правила разработки |
 | [TECH_DEBT.md](TECH_DEBT.md) | Технический долг и архитектурные проблемы |
 | [JIRA_WORKFLOWS.md](JIRA_WORKFLOWS.md) | Jira workflows (Epic, Story, Subtask) |
+| [JIRA_SETUP.md](JIRA_SETUP.md) | Настройка Jira Cloud (экраны, поля, схемы) |
+| [TEST_PYRAMID.md](TEST_PYRAMID.md) | Тестовая пирамида, покрытие, инструкции |
+| [TEST_PLAN.md](TEST_PLAN.md) | План покрытия тестами (Unit → Component → Integration) |
 | [API_PLANNING.md](API_PLANNING.md) | API Planning документация |
 | [ROADMAP_V2.md](ROADMAP_V2.md) | Роадмап будущих фич (F24-F29) |
 | [features/](features/) | Детальные спецификации фич (F14-F23) |

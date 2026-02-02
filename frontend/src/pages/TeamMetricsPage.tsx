@@ -11,6 +11,7 @@ import { ThroughputChart } from '../components/metrics/ThroughputChart'
 import { TimeInStatusChart } from '../components/metrics/TimeInStatusChart'
 import { AssigneeTable } from '../components/metrics/AssigneeTable'
 import { ForecastAccuracyChart } from '../components/metrics/ForecastAccuracyChart'
+import { RoleLoadBlock } from '../components/metrics/RoleLoadBlock'
 
 // --- WIP History Chart Component ---
 
@@ -384,6 +385,9 @@ export function TeamMetricsPage() {
                   tooltip="Процент эпиков с DSR ≤ 1.1 — завершённых в рамках оценки."
                 />
               </div>
+
+              {/* Role Load Block */}
+              <RoleLoadBlock teamId={selectedTeamId} />
 
               {/* Forecast Accuracy */}
               {forecastAccuracy && (

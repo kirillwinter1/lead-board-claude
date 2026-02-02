@@ -19,3 +19,10 @@ dist/
 
 # OS
 .DS_Store
+.env.prod
+
+# Production secrets
+.env.prod
+
+# Test coverage
+frontend/coverage/

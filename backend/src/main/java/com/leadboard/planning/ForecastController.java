@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.RoleBreakdown;
+import com.leadboard.planning.dto.RoleLoadResponse;
 import com.leadboard.planning.dto.StoryForecastResponse;
 import com.leadboard.planning.dto.StoryInfo;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
@@ -30,6 +31,7 @@ public class ForecastController {
     private final UnifiedPlanningService unifiedPlanningService;
     private final AutoScoreService autoScoreService;
     private final WipSnapshotService wipSnapshotService;
+    private final RoleLoadService roleLoadService;
     private final JiraIssueRepository issueRepository;
 
     public ForecastController(
@@ -38,6 +40,7 @@ public class ForecastController {
             UnifiedPlanningService unifiedPlanningService,
             AutoScoreService autoScoreService,
             WipSnapshotService wipSnapshotService,
+            RoleLoadService roleLoadService,
             JiraIssueRepository issueRepository
     ) {
         this.forecastService = forecastService;
@@ -45,6 +48,7 @@ public class ForecastController {
         this.unifiedPlanningService = unifiedPlanningService;
         this.autoScoreService = autoScoreService;
         this.wipSnapshotService = wipSnapshotService;
+        this.roleLoadService = roleLoadService;
         this.issueRepository = issueRepository;
     }
 
@@ -147,6 +151,17 @@ public class ForecastController {
                 "date", snapshot.getSnapshotDate().toString(),
                 "teamWip", snapshot.getTeamWipCurrent() + "/" + snapshot.getTeamWipLimit()
         ));
+    }
+
+    /**
+     * Получает загрузку команды по ролям (SA/DEV/QA).
+     *
+     * @param teamId ID команды
+     */
+    @GetMapping("/role-load")
+    public ResponseEntity<RoleLoadResponse> getRoleLoad(@RequestParam Long teamId) {
+        RoleLoadResponse roleLoad = roleLoadService.calculateRoleLoad(teamId);
+        return ResponseEntity.ok(roleLoad);
     }
 
     /**

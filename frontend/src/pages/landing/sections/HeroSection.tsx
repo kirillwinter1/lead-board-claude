@@ -21,17 +21,15 @@ export function HeroSection({ onRequestAudit }: HeroSectionProps) {
             <span>предсказуемыми</span>
           </h1>
           <p className="landing-hero-subtitle landing-hero-subtitle-left">
-            Lead Board превращает Jira-данные в управляемую приоритезацию, прогноз сроков,
-            видимость «бутылочных горлышек» по ролям.
+            Lead Board интегрируется с вашей Jira по API и превращает данные в наглядный дашборд:
+            прогресс по эпикам, прогноз сроков, загрузка по ролям и рекомендации для принятия решений.
           </p>
-          <div className="landing-hero-box">
-            <span className="landing-hero-box-icon">⚡</span>
-            <div>
-              <strong>Простое внедрение за 1 день</strong>, без изменения процессов.
-              <br />
-              Работает как SaaS, так и на внутренних серверах.
-            </div>
-          </div>
+          <ul className="landing-hero-features">
+            <li>Подключение за один день</li>
+            <li>Не требует изменения ваших Jira-процессов</li>
+            <li>Работает как SaaS, так и на ваших серверах, без выхода в сеть</li>
+            <li>Соответствует требованиям импортозамещения</li>
+          </ul>
           <div className="landing-hero-actions landing-hero-actions-left">
             <button
               onClick={onRequestAudit}

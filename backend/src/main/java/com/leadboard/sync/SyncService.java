@@ -322,7 +322,13 @@ public class SyncService {
         entity.setAutoScoreCalculatedAt(savedAutoScoreCalculatedAt);
         entity.setDoneAt(savedDoneAt);
 
-        // Detect status change and record to changelog
+        // Update done_at based on current status
+        statusChangelogService.updateDoneAtIfNeeded(entity);
+
+        // Save issue first (required for changelog foreign key)
+        issueRepository.save(entity);
+
+        // Detect status change and record to changelog AFTER saving issue
         if (!java.util.Objects.equals(previousStatus, entity.getStatus())) {
             // Create a temporary entity with old status for changelog detection
             JiraIssueEntity previousEntity = existing != null ? new JiraIssueEntity() : null;
@@ -332,11 +338,6 @@ public class SyncService {
             }
             statusChangelogService.detectAndRecordStatusChange(previousEntity, entity);
         }
-
-        // Update done_at based on current status
-        statusChangelogService.updateDoneAtIfNeeded(entity);
-
-        issueRepository.save(entity);
     }
 
     private LocalDate parseLocalDate(String dateStr) {

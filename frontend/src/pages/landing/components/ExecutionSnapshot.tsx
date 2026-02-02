@@ -3,7 +3,11 @@ import { useState } from 'react'
 
 function HintTooltip({ children }: { children: React.ReactNode }) {
   const [isVisible, setIsVisible] = useState(false)
-  const [position, setPosition] = useState({ top: 0, left: 0, right: 'auto' as number | 'auto' })
+  const [position, setPosition] = useState<{ top: number; left: number | 'auto'; right: number | 'auto' }>({
+    top: 0,
+    left: 0,
+    right: 'auto'
+  })
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLSpanElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -14,7 +18,7 @@ function HintTooltip({ children }: { children: React.ReactNode }) {
       // Не хватает места справа — рендерим слева
       setPosition({
         top: rect.bottom + 8,
-        left: 'auto' as unknown as number,
+        left: 'auto',
         right: window.innerWidth - rect.right
       })
     } else {
@@ -41,8 +45,8 @@ function HintTooltip({ children }: { children: React.ReactNode }) {
           className="results-snapshot-tooltip"
           style={{
             top: position.top,
-            left: position.left === 'auto' ? 'auto' : position.left,
-            right: position.right === 'auto' ? 'auto' : position.right
+            left: position.left,
+            right: position.right
           }}
         >
           {children}
@@ -92,7 +96,7 @@ const metrics: ResultMetric[] = [
   {
     before: '1,5',
     after: '4',
-    label: 'Увеличили пропускную способность',
+    label: 'Увеличили Throughput',
     tooltip: 'Throughput (пропускная способность) — сколько эпиков завершает команда за период.',
     detail: 'эпиков в месяц'
   },

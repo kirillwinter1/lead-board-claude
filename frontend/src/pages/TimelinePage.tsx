@@ -14,6 +14,13 @@ import subtaskIcon from '../icons/subtask.png'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 
+// Width per unit in pixels for each zoom level
+const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
+  day: 40,    // 40px per day - detailed view
+  week: 120,  // 120px per week - default view
+  month: 100  // 100px per month - overview
+}
+
 interface DateRange {
   start: Date
   end: Date
@@ -112,8 +119,18 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
   return { start: minDate, end: maxDate }
 }
 
-function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): { date: Date; label: string }[] {
-  const headers: { date: Date; label: string }[] = []
+interface TimelineHeader {
+  date: Date
+  label: string
+}
+
+interface GroupHeader {
+  label: string
+  span: number  // number of columns this group spans
+}
+
+function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): TimelineHeader[] {
+  const headers: TimelineHeader[] = []
   let current = new Date(range.start)
 
   if (zoom === 'day') {
@@ -139,6 +156,132 @@ function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): { date: Dat
   }
 
   return headers
+}
+
+// Generate group headers (month for day/week zoom, quarter for month zoom)
+function generateGroupHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupHeader[] {
+  if (headers.length === 0) return []
+
+  const groups: GroupHeader[] = []
+
+  if (zoom === 'day' || zoom === 'week') {
+    // Group by month
+    let currentMonth = -1
+    let currentYear = -1
+    let currentSpan = 0
+
+    for (const header of headers) {
+      const month = header.date.getMonth()
+      const year = header.date.getFullYear()
+
+      if (month !== currentMonth || year !== currentYear) {
+        if (currentSpan > 0) {
+          groups.push({
+            label: new Date(currentYear, currentMonth, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }),
+            span: currentSpan
+          })
+        }
+        currentMonth = month
+        currentYear = year
+        currentSpan = 1
+      } else {
+        currentSpan++
+      }
+    }
+
+    // Add last group
+    if (currentSpan > 0) {
+      groups.push({
+        label: new Date(currentYear, currentMonth, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }),
+        span: currentSpan
+      })
+    }
+  } else {
+    // Group by quarter for month zoom
+    let currentQuarter = -1
+    let currentYear = -1
+    let currentSpan = 0
+
+    for (const header of headers) {
+      const quarter = Math.floor(header.date.getMonth() / 3) + 1
+      const year = header.date.getFullYear()
+
+      if (quarter !== currentQuarter || year !== currentYear) {
+        if (currentSpan > 0) {
+          groups.push({
+            label: `Q${currentQuarter} ${currentYear}`,
+            span: currentSpan
+          })
+        }
+        currentQuarter = quarter
+        currentYear = year
+        currentSpan = 1
+      } else {
+        currentSpan++
+      }
+    }
+
+    // Add last group
+    if (currentSpan > 0) {
+      groups.push({
+        label: `Q${currentQuarter} ${currentYear}`,
+        span: currentSpan
+      })
+    }
+  }
+
+  return groups
+}
+
+// Generate week headers for day zoom (shows week numbers)
+function generateWeekHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupHeader[] {
+  if (zoom !== 'day' || headers.length === 0) return []
+
+  const weeks: GroupHeader[] = []
+  let currentWeekStart: Date | null = null
+  let currentSpan = 0
+
+  for (const header of headers) {
+    const weekStart = startOfWeek(header.date)
+
+    if (!currentWeekStart || weekStart.getTime() !== currentWeekStart.getTime()) {
+      if (currentSpan > 0 && currentWeekStart) {
+        weeks.push({
+          label: `Нед ${getWeekNumber(currentWeekStart)}`,
+          span: currentSpan
+        })
+      }
+      currentWeekStart = weekStart
+      currentSpan = 1
+    } else {
+      currentSpan++
+    }
+  }
+
+  // Add last week
+  if (currentSpan > 0 && currentWeekStart) {
+    weeks.push({
+      label: `Нед ${getWeekNumber(currentWeekStart)}`,
+      span: currentSpan
+    })
+  }
+
+  return weeks
+}
+
+// Get ISO week number
+function getWeekNumber(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNum = d.getUTCDay() || 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
+  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
+
+// Check if a date is a weekend (Saturday or Sunday)
+function isWeekend(date: Date): boolean {
+  const day = date.getDay()
+  return day === 0 || day === 6
 }
 
 // Phase colors - Atlassian Design System (300 level)
@@ -1071,7 +1214,6 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
 
 // --- Gantt Row ---
 interface GanttRowProps {
-  epic: EpicForecast | undefined
   plannedEpic: PlannedEpic
   stories: PlannedStory[]
   globalWarnings: PlanningWarning[]
@@ -1082,15 +1224,11 @@ interface GanttRowProps {
   shouldAnimate: boolean
 }
 
-function GanttRow({ epic, plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate }: GanttRowProps) {
+function GanttRow({ plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate }: GanttRowProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const todayOffset = daysBetween(dateRange.start, today)
-  const todayPercent = (todayOffset / totalDays) * 100
-
-  const dueDate = epic?.dueDate ? new Date(epic.dueDate) : null
+  // Due date line calculation
+  const dueDate = plannedEpic.dueDate ? new Date(plannedEpic.dueDate) : null
   const dueDateOffset = dueDate ? daysBetween(dateRange.start, dueDate) : null
   const dueDatePercent = dueDateOffset !== null ? (dueDateOffset / totalDays) * 100 : null
 
@@ -1108,11 +1246,6 @@ function GanttRow({ epic, plannedEpic, stories, globalWarnings, dateRange, jiraB
         className={`gantt-row-content ${shouldAnimate ? 'gantt-row-animate' : ''}`}
         style={{ position: 'relative', padding: '4px 0', ...animationStyle }}
       >
-        {/* Today line */}
-        {todayPercent >= 0 && todayPercent <= 100 && (
-          <div className="gantt-today-line" style={{ left: `${todayPercent}%` }} />
-        )}
-
         {/* Due date line */}
         {dueDatePercent !== null && dueDatePercent >= 0 && dueDatePercent <= 100 && (
           <div className="gantt-due-line" style={{ left: `${dueDatePercent}%` }} />
@@ -1302,6 +1435,21 @@ export function TimelinePage() {
     return generateTimelineHeaders(dateRange, zoom)
   }, [dateRange, zoom])
 
+  // Generate group headers (month/quarter)
+  const groupHeaders = useMemo(() => {
+    return generateGroupHeaders(headers, zoom)
+  }, [headers, zoom])
+
+  // Generate week headers for day zoom
+  const weekHeaders = useMemo(() => {
+    return generateWeekHeaders(headers, zoom)
+  }, [headers, zoom])
+
+  // Calculate total chart width based on zoom level
+  const chartWidth = useMemo(() => {
+    return headers.length * ZOOM_UNIT_WIDTH[zoom]
+  }, [headers.length, zoom])
+
   // Get epics from unified plan
   const epics = useMemo(() => {
     if (!unifiedPlan) return []
@@ -1322,6 +1470,15 @@ export function TimelinePage() {
     }
     return heights
   }, [epics])
+
+  // Calculate today line position
+  const todayPercent = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const totalDays = daysBetween(dateRange.start, dateRange.end)
+    const todayOffset = daysBetween(dateRange.start, today)
+    return (todayOffset / totalDays) * 100
+  }, [dateRange])
 
   return (
     <main className="main-content">
@@ -1428,22 +1585,81 @@ export function TimelinePage() {
           </div>
 
           <div className="gantt-chart" ref={chartRef}>
-            <div className="gantt-header">
-              {headers.map((header, i) => (
-                <div key={i} className="gantt-header-cell">
-                  {header.label}
+            <div className="gantt-header-container" style={{ width: `${chartWidth}px`, minWidth: `${chartWidth}px` }}>
+              {/* Group header row (month/quarter) */}
+              <div className="gantt-header-group">
+                {groupHeaders.map((group, i) => (
+                  <div
+                    key={i}
+                    className="gantt-header-group-cell"
+                    style={{ width: `${group.span * ZOOM_UNIT_WIDTH[zoom]}px`, minWidth: `${group.span * ZOOM_UNIT_WIDTH[zoom]}px`, flex: 'none' }}
+                  >
+                    {group.label}
+                  </div>
+                ))}
+              </div>
+              {/* Week header row (only for day zoom) */}
+              {zoom === 'day' && weekHeaders.length > 0 && (
+                <div className="gantt-header-week">
+                  {weekHeaders.map((week, i) => (
+                    <div
+                      key={i}
+                      className="gantt-header-week-cell"
+                      style={{ width: `${week.span * ZOOM_UNIT_WIDTH[zoom]}px`, minWidth: `${week.span * ZOOM_UNIT_WIDTH[zoom]}px`, flex: 'none' }}
+                    >
+                      {week.label}
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
+              {/* Unit header row (day/week/month) */}
+              <div className="gantt-header">
+                {headers.map((header, i) => (
+                  <div
+                    key={i}
+                    className={`gantt-header-cell ${zoom === 'day' && isWeekend(header.date) ? 'gantt-header-cell-weekend' : ''}`}
+                    style={{ width: `${ZOOM_UNIT_WIDTH[zoom]}px`, minWidth: `${ZOOM_UNIT_WIDTH[zoom]}px`, flex: 'none' }}
+                  >
+                    {header.label}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="gantt-body">
+            <div
+              className="gantt-body"
+              style={{
+                width: `${chartWidth}px`,
+                minWidth: `${chartWidth}px`,
+                backgroundImage: `repeating-linear-gradient(to right, transparent, transparent ${ZOOM_UNIT_WIDTH[zoom] - 1}px, #ebecf0 ${ZOOM_UNIT_WIDTH[zoom] - 1}px, #ebecf0 ${ZOOM_UNIT_WIDTH[zoom]}px)`,
+                backgroundSize: `${ZOOM_UNIT_WIDTH[zoom]}px 100%`,
+                position: 'relative'
+              }}
+            >
+              {/* Weekend columns overlay (only for day zoom) */}
+              {zoom === 'day' && headers.map((header, i) => (
+                isWeekend(header.date) && (
+                  <div
+                    key={`weekend-${i}`}
+                    className="gantt-weekend-column"
+                    style={{
+                      left: `${i * ZOOM_UNIT_WIDTH[zoom]}px`,
+                      width: `${ZOOM_UNIT_WIDTH[zoom]}px`
+                    }}
+                  />
+                )
+              ))}
+
+              {/* Today line - single continuous line */}
+              {todayPercent >= 0 && todayPercent <= 100 && (
+                <div className="gantt-today-line" style={{ left: `${todayPercent}%` }} />
+              )}
+
               {epics.map((epic, epicIndex) => {
-                const epicForecast = epicForecasts.get(epic.epicKey)
                 const rowHeight = rowHeights.get(epic.epicKey) || MIN_ROW_HEIGHT
                 return (
                   <GanttRow
                     key={epic.epicKey}
-                    epic={epicForecast}
                     plannedEpic={epic}
                     stories={epic.stories}
                     globalWarnings={unifiedPlan?.warnings || []}

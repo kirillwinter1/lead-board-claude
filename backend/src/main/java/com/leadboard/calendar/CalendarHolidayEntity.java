@@ -21,7 +21,7 @@ public class CalendarHolidayEntity {
     @Column(name = "country", nullable = false, length = 2)
     private String country = "RU";
 
-    @Column(name = "year", nullable = false)
+    @Column(name = "\"year\"", nullable = false)
     private Integer year;
 
     @Column(name = "created_at")

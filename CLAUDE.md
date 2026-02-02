@@ -79,6 +79,8 @@ DB_PASSWORD=leadboard
 | [RULES.md](ai-ru/RULES.md) | Бизнес-правила + правила разработки |
 | [TECH_DEBT.md](ai-ru/TECH_DEBT.md) | Технический долг и архитектурные проблемы |
 | [JIRA_WORKFLOWS.md](ai-ru/JIRA_WORKFLOWS.md) | Jira workflows (Epic, Story, Subtask) |
+| [JIRA_SETUP.md](ai-ru/JIRA_SETUP.md) | Настройка Jira Cloud (экраны, поля, схемы) |
+| [TEST_PYRAMID.md](ai-ru/TEST_PYRAMID.md) | Тестовая пирамида и инструкции по тестам |
 | [API_PLANNING.md](ai-ru/API_PLANNING.md) | API Planning документация |
 | [ROADMAP_V2.md](ai-ru/ROADMAP_V2.md) | Роадмап F24-F29 |
 | [features/](ai-ru/features/) | Детальные спецификации фич (F14-F23) |

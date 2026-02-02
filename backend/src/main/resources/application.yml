@@ -1,6 +1,10 @@
 server:
   port: 8080
 
+# CORS configuration
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+
 spring:
   application:
     name: lead-board
