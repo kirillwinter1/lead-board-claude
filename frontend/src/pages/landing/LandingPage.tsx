@@ -3,7 +3,6 @@ import { LandingHeader } from './components/LandingHeader'
 import { AuditModal } from './components/AuditModal'
 import { HeroSection } from './sections/HeroSection'
 import { ICPSection } from './sections/ICPSection'
-import { ProblemSection } from './sections/ProblemSection'
 import { MethodSection } from './sections/MethodSection'
 import { BaselineSection } from './sections/BaselineSection'
 import { AuditSection } from './sections/AuditSection'
@@ -23,7 +22,6 @@ export function LandingPage() {
       <LandingHeader onRequestAudit={openModal} />
       <HeroSection onRequestAudit={openModal} />
       <ICPSection />
-      <ProblemSection />
       <MethodSection onRequestDemo={openModal} />
       <BaselineSection />
       <AuditSection onRequestAudit={openModal} />
