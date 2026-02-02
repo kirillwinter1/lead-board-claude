@@ -2,9 +2,13 @@ package com.leadboard.integration;
 
 import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
+import com.leadboard.poker.repository.PokerSessionRepository;
+import com.leadboard.poker.repository.PokerStoryRepository;
+import com.leadboard.poker.repository.PokerVoteRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
+import com.leadboard.team.TeamMemberRepository;
 import com.leadboard.team.TeamRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,12 +60,29 @@ public abstract class IntegrationTestBase {
     protected TeamRepository teamRepository;
 
     @Autowired
+    protected TeamMemberRepository teamMemberRepository;
+
+    @Autowired
     protected StatusChangelogRepository changelogRepository;
+
+    @Autowired
+    protected PokerVoteRepository pokerVoteRepository;
+
+    @Autowired
+    protected PokerStoryRepository pokerStoryRepository;
+
+    @Autowired
+    protected PokerSessionRepository pokerSessionRepository;
 
     @BeforeEach
     void cleanUp() {
+        // Delete in correct order to respect FK constraints
+        pokerVoteRepository.deleteAll();
+        pokerStoryRepository.deleteAll();
+        pokerSessionRepository.deleteAll();
         changelogRepository.deleteAll();
         issueRepository.deleteAll();
+        teamMemberRepository.deleteAll();
         teamRepository.deleteAll();
     }
 
