@@ -7,7 +7,7 @@ interface HeroSectionProps {
 
 export function HeroSection({ onRequestAudit }: HeroSectionProps) {
   return (
-    <section className="landing-section landing-hero">
+    <section id="problem" className="landing-section landing-hero">
       <div className="landing-hero-split">
         <motion.div
           initial={{ opacity: 0, y: 20 }}

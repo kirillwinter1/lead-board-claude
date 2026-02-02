@@ -6,8 +6,6 @@ import { ICPSection } from './sections/ICPSection'
 import { MethodSection } from './sections/MethodSection'
 import { BaselineSection } from './sections/BaselineSection'
 import { AuditSection } from './sections/AuditSection'
-import { PilotSection } from './sections/PilotSection'
-import { DifferentiationSection } from './sections/DifferentiationSection'
 import { FounderSection } from './sections/FounderSection'
 import './LandingPage.css'
 
@@ -25,8 +23,6 @@ export function LandingPage() {
       <MethodSection onRequestDemo={openModal} />
       <BaselineSection />
       <AuditSection onRequestAudit={openModal} />
-      <PilotSection />
-      <DifferentiationSection />
       <FounderSection />
       <footer className="landing-footer">
         <p className="landing-footer-text">

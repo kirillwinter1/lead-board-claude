@@ -59,7 +59,7 @@ export function MethodSection({ onRequestDemo }: MethodSectionProps) {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            Как мы делаем поставку управляемой
+            Как Lead Board делает поставку управляемой
           </motion.h2>
 
           <div className="landing-method-tabs landing-method-tabs-left">

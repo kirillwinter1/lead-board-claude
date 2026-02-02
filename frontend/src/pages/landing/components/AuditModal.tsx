@@ -11,7 +11,6 @@ interface FormData {
   company: string
   role: string
   contact: string
-  jiraLink: string
 }
 
 export function AuditModal({ isOpen, onClose }: AuditModalProps) {
@@ -19,8 +18,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
     name: '',
     company: '',
     role: '',
-    contact: '',
-    jiraLink: ''
+    contact: ''
   })
   const [errors, setErrors] = useState<Partial<FormData>>({})
   const [submitted, setSubmitted] = useState(false)
@@ -55,7 +53,6 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
       company: formData.company,
       role: formData.role,
       contact: formData.contact,
-      jiraLink: formData.jiraLink,
       submittedAt: new Date().toISOString()
     }
 
@@ -69,7 +66,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
   }
 
   const handleClose = () => {
-    setFormData({ name: '', company: '', role: '', contact: '', jiraLink: '' })
+    setFormData({ name: '', company: '', role: '', contact: '' })
     setErrors({})
     setSubmitted(false)
     onClose()
@@ -152,47 +149,27 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
 
                   <div className="form-group">
                     <label className="form-label">Роль</label>
-                    <select
+                    <input
+                      type="text"
                       className="form-input"
+                      placeholder="Ваша роль в компании"
                       value={formData.role}
                       onChange={handleChange('role')}
-                    >
-                      <option value="">Выберите роль</option>
-                      <option value="cto">CTO / VP Engineering</option>
-                      <option value="engineering_manager">Engineering Manager</option>
-                      <option value="tech_lead">Tech Lead</option>
-                      <option value="product_manager">Product Manager</option>
-                      <option value="delivery_manager">Delivery Manager</option>
-                      <option value="other">Другое</option>
-                    </select>
+                    />
                   </div>
 
                   <div className="form-group">
                     <label className="form-label">
-                      Telegram или Email <span className="required">*</span>
+                      Telegram, телефон или Email <span className="required">*</span>
                     </label>
                     <input
                       type="text"
                       className={`form-input ${errors.contact ? 'error' : ''}`}
-                      placeholder="@username или email@company.com"
+                      placeholder="@username"
                       value={formData.contact}
                       onChange={handleChange('contact')}
                     />
                     {errors.contact && <span className="form-error">{errors.contact}</span>}
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Ссылка на Jira / проект</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="https://your-company.atlassian.net (опционально)"
-                      value={formData.jiraLink}
-                      onChange={handleChange('jiraLink')}
-                    />
-                    <span className="form-hint">
-                      Поможет подготовиться к разбору
-                    </span>
                   </div>
 
                   <button

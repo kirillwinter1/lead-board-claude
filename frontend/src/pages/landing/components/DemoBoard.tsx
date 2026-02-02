@@ -353,7 +353,7 @@ export function DemoBoard({ onHighlight }: DemoBoardProps) {
       <SuccessMessage show={showSuccess} />
       <div className="demo-board-hint">
         <img src={cursorHandIcon} alt="" className="demo-board-hint-icon" />
-        Перетащите эпики в таблице, чтобы мы уложились в сроки
+        Перетащите эпики в таблице, чтобы уложиться в сроки
       </div>
       <div
         className="demo-board-header"

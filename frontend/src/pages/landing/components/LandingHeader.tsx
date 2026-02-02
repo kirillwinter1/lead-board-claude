@@ -26,9 +26,8 @@ export function LandingHeader({ onRequestAudit }: LandingHeaderProps) {
         </Link>
         <nav className="landing-nav">
           <a href="#problem" className="landing-nav-link">Проблема</a>
-          <a href="#method" className="landing-nav-link">Метод</a>
-          <a href="#audit" className="landing-nav-link">Аудит</a>
-          <a href="#pilot" className="landing-nav-link">Пилот</a>
+          <a href="#method" className="landing-nav-link">Демо</a>
+          <a href="#audit" className="landing-nav-link">Аудит и пилот</a>
         </nav>
         <div className="landing-header-actions">
           <button
