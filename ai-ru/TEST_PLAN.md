@@ -376,10 +376,10 @@ dependencies {
 Unit:        429 тестов (29 файлов)    +139 новых
 Component:    32 теста (5 классов)     +32 новых
 Integration:  35 тестов (6 классов)   +35 новых
-E2E:           0 тестов
+E2E:           6 тестов (3 класса)    +6 новых
 ─────────────────────────────
-Total:       496 тестов
-Coverage:    ~72% (estimated)
+Total:       502 теста
+Coverage:    ~73% (estimated)
 ```
 
 ### Целевое состояние
@@ -431,9 +431,9 @@ Coverage:    ~70% (target)
 
 ### Фаза 4: E2E
 
-- [ ] FullSyncE2E
-- [ ] PlanningE2E
-- [ ] PokerE2E
+- [x] FullSyncE2E (2 теста) ✅
+- [x] PlanningE2E (2 теста) ✅
+- [x] PokerE2E (2 теста) ✅
 
 ---
 
@@ -467,3 +467,8 @@ Coverage:    ~70% (target)
 | 2026-02-02 | MetricsIntegrationTest готов (6 тестов) |
 | 2026-02-02 | PokerIntegrationTest готов (5 тестов) |
 | 2026-02-02 | **Фаза 3: Integration тесты полностью завершены (35 тестов)** |
+| 2026-02-02 | FullSyncE2ETest готов (2 теста) |
+| 2026-02-02 | PlanningE2ETest готов (2 теста) |
+| 2026-02-02 | PokerE2ETest готов (2 теста) |
+| 2026-02-02 | **Фаза 4: E2E тесты завершены (6 тестов)** |
+| 2026-02-02 | **TEST_PLAN.md ЗАВЕРШЁН: 502 теста** |
