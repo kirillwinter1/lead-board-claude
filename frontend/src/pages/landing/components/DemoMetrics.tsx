@@ -37,7 +37,7 @@ export function DemoMetrics() {
         />
         <MetricCard
           title="Story Lead Time"
-          value="3.2 дня"
+          value="12,3 дня"
           subtitle="среднее по stories"
           trend="down"
           tooltip="Среднее время выполнения story от создания до завершения"

@@ -2,27 +2,27 @@ import { motion } from 'framer-motion'
 
 const baselineMetrics = [
   {
-    value: '65%',
-    label: 'Forecast Accuracy',
-    detail: 'при целевом 85%',
+    value: '7+',
+    label: 'Эпиков в работе, при норме 2-3',
+    detail: 'Нарушение WIP лимитов, расфокус',
     status: 'warning'
   },
   {
-    value: '+18%',
-    label: 'Schedule Variance',
-    detail: 'среднее отклонение',
+    value: '6 из 10',
+    label: 'эпиков с нарушением сроков',
+    detail: 'Бизнес не получает ценность вовремя',
     status: 'danger'
   },
   {
-    value: '31',
-    label: 'Data Quality Issues',
-    detail: 'требуют внимания',
+    value: '50%',
+    label: 'времени в буфере',
+    detail: 'задачи ждут работы',
     status: 'danger'
   },
   {
-    value: '3 из 8',
-    label: 'Risk Epics',
-    detail: 'под угрозой срыва',
+    value: '—',
+    label: 'Delivery процессы',
+    detail: 'Слабо выстроены, требуют улучшений',
     status: 'warning'
   }
 ]
