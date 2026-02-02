@@ -265,7 +265,7 @@ export function DemoBoard({ onHighlight }: DemoBoardProps) {
           observer.disconnect()
         }
       },
-      { threshold: 0.3 }
+      { threshold: 0.5 }
     )
 
     if (boardRef.current) {

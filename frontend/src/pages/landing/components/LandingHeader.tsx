@@ -17,6 +17,14 @@ export function LandingHeader({ onRequestAudit }: LandingHeaderProps) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  const scrollToSection = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    e.preventDefault()
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   return (
     <header className={`landing-header ${scrolled ? 'scrolled' : ''}`}>
       <div className="landing-header-inner">
@@ -25,9 +33,9 @@ export function LandingHeader({ onRequestAudit }: LandingHeaderProps) {
           Lead Board
         </Link>
         <nav className="landing-nav">
-          <a href="#problem" className="landing-nav-link">Проблема</a>
-          <a href="#method" className="landing-nav-link">Демо</a>
-          <a href="#audit" className="landing-nav-link">Аудит и пилот</a>
+          <a href="#problem" className="landing-nav-link" onClick={(e) => scrollToSection(e, 'problem')}>Проблема</a>
+          <a href="#method" className="landing-nav-link" onClick={(e) => scrollToSection(e, 'method')}>Демо</a>
+          <a href="#audit" className="landing-nav-link" onClick={(e) => scrollToSection(e, 'audit')}>Аудит и пилот</a>
         </nav>
         <div className="landing-header-actions">
           <button
