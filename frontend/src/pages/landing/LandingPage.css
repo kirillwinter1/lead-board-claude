@@ -2563,7 +2563,7 @@
 
 .demo-board-header {
   display: grid;
-  grid-template-columns: 1fr 50px 130px 200px 120px;
+  grid-template-columns: 1fr 90px 155px 100px 180px 130px;
   gap: 12px;
   padding: 12px 20px;
   font-size: 0.6875rem;
@@ -2577,6 +2577,17 @@
 .demo-board-header > span {
   padding: 4px;
   margin: -4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.demo-board-header .results-snapshot-hint[data-tooltip]::after {
+  white-space: nowrap;
+  text-align: left;
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: normal;
 }
 
 .demo-board-body {
@@ -2587,7 +2598,7 @@
 /* Epic Row */
 .demo-epic-row {
   display: grid;
-  grid-template-columns: 1fr 50px 130px 200px 120px;
+  grid-template-columns: 1fr 90px 155px 100px 180px 130px;
   gap: 12px;
   padding: 16px 20px;
   align-items: center;
@@ -2628,6 +2639,8 @@
 
 .demo-epic-name {
   gap: 12px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Expander Button */
@@ -2780,7 +2793,7 @@
 .demo-stories-wrapper {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.2s ease-out;
+  transition: grid-template-rows 0.5s ease-out;
 }
 
 .demo-stories-wrapper.expanded {
@@ -3052,9 +3065,50 @@
   }
 }
 
-.demo-epic-rec {
+.demo-epic-priority {
   display: flex;
   justify-content: center;
+  cursor: grab;
+}
+
+.demo-epic-priority:active {
+  cursor: grabbing;
+}
+
+.demo-epic-priority[data-tooltip]::after {
+  white-space: pre-line;
+  text-align: center;
+  min-width: 200px;
+}
+
+/* Progress bar */
+.demo-epic-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-progress-bar-container {
+  flex: 1;
+  height: 6px;
+  background: #ebecf0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.demo-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0052cc, #4c9aff);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.demo-progress-percent {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--landing-text-secondary);
+  min-width: 32px;
+  text-align: right;
 }
 
 /* Demo Success Message */

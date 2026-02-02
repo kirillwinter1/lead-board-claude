@@ -1,4 +1,4 @@
-import { useState, Fragment } from 'react'
+import { useState, Fragment, useEffect, useRef } from 'react'
 import { mockEpics, DemoEpic, DemoStory } from '../mockData'
 import epicIcon from '../../../icons/epic.png'
 import storyIcon from '../../../icons/story.png'
@@ -7,6 +7,34 @@ const ROLE_NAMES = {
   SA: 'Системный анализ',
   DEV: 'Разработка',
   QA: 'Тестирование'
+}
+
+function RecommendationIndicator({ type }: { type: 'up' | 'down' | 'match' }) {
+  const config = {
+    up: { icon: '↑', className: 'suggest-up' },
+    down: { icon: '↓', className: 'suggest-down' },
+    match: { icon: '●', className: 'match' }
+  }
+  const { icon, className } = config[type]
+
+  return (
+    <span className={`demo-recommendation-indicator ${className}`}>
+      {icon}
+    </span>
+  )
+}
+
+function SuccessMessage({ show }: { show: boolean }) {
+  if (!show) return null
+
+  return (
+    <div className="demo-success-overlay">
+      <div className="demo-success-message">
+        <span className="demo-success-icon">👍</span>
+        <span className="demo-success-text">Красавчик, завершим всё вовремя!</span>
+      </div>
+    </div>
+  )
 }
 
 function RoleChip({ role, progress }: { role: 'SA' | 'DEV' | 'QA'; progress: number }) {
@@ -70,6 +98,9 @@ function DemoStoryRow({ story, onHighlight }: { story: DemoStory; onHighlight?: 
 
 function DemoEpicRow({
   epic,
+  currentPosition,
+  expectedDone,
+  variance,
   isExpanded,
   onToggle,
   isDragging,
@@ -78,9 +109,13 @@ function DemoEpicRow({
   onDragOver,
   onDrop,
   onDragEnd,
-  onHighlight
+  onHighlight,
+  recommendation
 }: {
   epic: DemoEpic
+  currentPosition: number
+  expectedDone: string
+  variance: number
   isExpanded: boolean
   onToggle: () => void
   isDragging: boolean
@@ -90,6 +125,7 @@ function DemoEpicRow({
   onDrop: (e: React.DragEvent) => void
   onDragEnd: () => void
   onHighlight?: (index: number | null) => void
+  recommendation: 'up' | 'down' | 'match'
 }) {
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -132,16 +168,28 @@ function DemoEpicRow({
         <span className="demo-epic-key">{epic.key}</span>
         <span className="demo-epic-title" data-tooltip={epic.title}>{epic.title}</span>
       </div>
+      <div
+        className="demo-epic-cell demo-epic-priority"
+        data-tooltip={`Перетащите для изменения приоритета\nРекомендуемая позиция ${epic.optimalPosition}, сейчас ${currentPosition}`}
+      >
+        <RecommendationIndicator type={recommendation} />
+      </div>
       <div className="demo-epic-cell demo-epic-date">
-        <span className="demo-expected-done-date">{epic.expectedDone}</span>
-        {epic.variance !== 0 && (
+        <span className="demo-expected-done-date">{expectedDone}</span>
+        {variance !== 0 && (
           <span
-            className={`demo-expected-done-delta ${epic.variance > 0 ? 'delta-late' : 'delta-early'}`}
-            data-tooltip={epic.variance > 0 ? `Опоздание на ${epic.variance} дней` : `Раньше срока на ${Math.abs(epic.variance)} дней`}
+            className={`demo-expected-done-delta ${variance > 0 ? 'delta-late' : 'delta-early'}`}
+            data-tooltip={variance > 0 ? `Опоздание на ${variance} дней` : `Раньше срока на ${Math.abs(variance)} дней`}
           >
-            {epic.variance > 0 ? `+${epic.variance}d` : `${epic.variance}d`}
+            {variance > 0 ? `+${variance}d` : `${variance}d`}
           </span>
         )}
+      </div>
+      <div className="demo-epic-cell demo-epic-progress">
+        <div className="demo-progress-bar-container">
+          <div className="demo-progress-bar-fill" style={{ width: `${epic.totalProgress}%` }} />
+        </div>
+        <span className="demo-progress-percent">{epic.totalProgress}%</span>
       </div>
       <div className="demo-epic-cell demo-epic-roles">
         <RoleChip role="SA" progress={epic.progress.sa} />
@@ -169,11 +217,86 @@ interface DemoBoardProps {
   onHighlight?: (index: number | null) => void
 }
 
+// Форматирование дня в дату (день 0 = 1 февраля)
+const formatDay = (day: number): string => {
+  const months = ['января', 'февраля', 'марта', 'апреля']
+  const baseDate = new Date(2026, 1, 1) // 1 февраля 2026
+  baseDate.setDate(baseDate.getDate() + day)
+  return `${baseDate.getDate()} ${months[baseDate.getMonth()]}`
+}
+
+// Расчёт прогнозируемого дня завершения на основе позиции
+const calculateExpectedDay = (epic: DemoEpic, currentPosition: number): number => {
+  const positionDiff = Math.abs(currentPosition - epic.optimalPosition)
+  // Каждая позиция от оптимума добавляет +4 дня
+  return epic.baseExpectedDay + positionDiff * 4
+}
+
+// Расчёт variance = прогноз - целевая дата
+const calculateVariance = (epic: DemoEpic, currentPosition: number): number => {
+  const expectedDay = calculateExpectedDay(epic, currentPosition)
+  return expectedDay - epic.targetDay
+}
+
 export function DemoBoard({ onHighlight }: DemoBoardProps) {
-  const [epics, setEpics] = useState<DemoEpic[]>(mockEpics)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set(['DEMO-001']))
+  // Храним только порядок эпиков, variance рассчитывается динамически
+  const [epics, setEpics] = useState<DemoEpic[]>(() => [...mockEpics])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [draggingKey, setDraggingKey] = useState<string | null>(null)
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [hasAnimated, setHasAnimated] = useState(false)
+  const boardRef = useRef<HTMLDivElement>(null)
+
+  // Авто-анимация: раскрываем первый эпик когда блок появляется на экране
+  useEffect(() => {
+    if (hasAnimated) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !hasAnimated) {
+          // Блок появился на экране — раскрываем эпик через небольшую задержку
+          setTimeout(() => {
+            setExpanded(new Set(['DEMO-001']))
+            setHasAnimated(true)
+          }, 500)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.3 }
+    )
+
+    if (boardRef.current) {
+      observer.observe(boardRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasAnimated])
+
+  // Проверяем все ли эпики вовремя (variance рассчитывается на основе текущей позиции)
+  const allOnTime = epics.every((epic, index) => calculateVariance(epic, index + 1) <= 0)
+
+  useEffect(() => {
+    if (allOnTime && !showSuccess) {
+      setShowSuccess(true)
+      // Скрываем через 3 секунды
+      const timer = setTimeout(() => setShowSuccess(false), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [allOnTime])
+
+  // Определяем рекомендации для каждого эпика на основе текущей и оптимальной позиции
+  const getRecommendation = (epic: DemoEpic, currentPosition: number): 'up' | 'down' | 'match' => {
+    const diff = currentPosition - epic.optimalPosition
+    if (diff > 0) {
+      // Эпик стоит ниже оптимальной позиции — рекомендуем поднять
+      return 'up'
+    } else if (diff < 0) {
+      // Эпик стоит выше оптимальной позиции — можно опустить
+      return 'down'
+    }
+    return 'match'
+  }
 
   const toggleExpand = (key: string) => {
     setExpanded(prev => {
@@ -208,23 +331,8 @@ export function DemoBoard({ onHighlight }: DemoBoardProps) {
       const dropIndex = epics.findIndex(ep => ep.key === targetKey)
 
       if (dragIndex !== -1 && dropIndex !== -1) {
-        const newEpics = [...epics].map(ep => ({ ...ep }))
+        const newEpics = [...epics]
         const [draggedEpic] = newEpics.splice(dragIndex, 1)
-
-        // При перетаскивании вверх — улучшаем сроки обоих эпиков
-        if (dragIndex > dropIndex) {
-          // Перетащили вверх — приоритет выше, сроки лучше
-          draggedEpic.variance = Math.min(draggedEpic.variance - 15, -3)
-          // Эпик на который бросили тоже улучшается (синергия)
-          const targetEpic = newEpics[dropIndex]
-          if (targetEpic) {
-            targetEpic.variance = Math.min(targetEpic.variance - 5, -2)
-          }
-        } else {
-          // Перетащили вниз — приоритет ниже, сроки хуже
-          draggedEpic.variance = draggedEpic.variance + 8
-        }
-
         newEpics.splice(dropIndex, 0, draggedEpic)
         setEpics(newEpics)
       }
@@ -239,29 +347,41 @@ export function DemoBoard({ onHighlight }: DemoBoardProps) {
   }
 
   return (
-    <div className="demo-board">
+    <div className="demo-board" ref={boardRef}>
+      <SuccessMessage show={showSuccess} />
       <div
         className="demo-board-header"
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
           const x = e.clientX - rect.left
           const percent = x / rect.width
-          if (percent < 0.45) onHighlight?.(0)
-          else if (percent < 0.58) onHighlight?.(1)
+          if (percent < 0.35) onHighlight?.(0)
+          else if (percent < 0.50) onHighlight?.(1)
           else onHighlight?.(2)
         }}
         onMouseLeave={() => onHighlight?.(null)}
       >
         <span className="demo-header-name">NAME</span>
-        <span className="demo-header-date">EXPECTED DONE</span>
+        <span className="demo-header-priority">
+          PRIORITY
+          <span className="results-snapshot-hint" data-tooltip="Рассчитываем приоритет, рекомендуем последовательность выполнения">?</span>
+        </span>
+        <span className="demo-header-date">
+          EXPECTED DONE
+          <span className="results-snapshot-hint" data-tooltip="Рассчитываем дату завершения эпика, показываем укладываемся ли в сроки">?</span>
+        </span>
+        <span className="demo-header-progress">PROGRESS</span>
         <span className="demo-header-roles">ROLE PROGRESS</span>
         <span className="demo-header-status">STATUS</span>
       </div>
       <div className="demo-board-body">
-        {epics.map(epic => (
+        {epics.map((epic, index) => (
           <Fragment key={epic.key}>
             <DemoEpicRow
               epic={epic}
+              currentPosition={index + 1}
+              expectedDone={formatDay(calculateExpectedDay(epic, index + 1))}
+              variance={calculateVariance(epic, index + 1)}
               isExpanded={expanded.has(epic.key)}
               onToggle={() => toggleExpand(epic.key)}
               isDragging={draggingKey === epic.key}
@@ -271,6 +391,7 @@ export function DemoBoard({ onHighlight }: DemoBoardProps) {
               onDrop={(e) => handleDrop(e, epic.key)}
               onDragEnd={handleDragEnd}
               onHighlight={onHighlight}
+              recommendation={getRecommendation(epic, index + 1)}
             />
             <div className={`demo-stories-wrapper ${expanded.has(epic.key) ? 'expanded' : ''}`}>
               <div className="demo-stories-container">

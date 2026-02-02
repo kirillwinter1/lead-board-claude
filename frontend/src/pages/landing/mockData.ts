@@ -14,20 +14,27 @@ export interface DemoEpic {
   status: string
   statusColor: string
   progress: { sa: number; dev: number; qa: number }
-  expectedDone: string
-  variance: number // дней: + опоздание, - раньше срока
+  totalProgress: number // общий прогресс в %
+  targetDay: number // целевая дата от бизнеса (дней от 1 февраля)
+  baseExpectedDay: number // прогноз завершения при оптимальной позиции (дней от 1 февраля)
+  optimalPosition: number // оптимальная позиция (1-based)
   stories: DemoStory[]
 }
 
+// Начальный порядок: пользователь должен переставить эпики чтобы все были вовремя
+// Оптимальный порядок: DEMO-004, DEMO-001, DEMO-005, DEMO-002, DEMO-003, DEMO-006
+// День 0 = 1 февраля 2026
 export const mockEpics: DemoEpic[] = [
   {
     key: 'DEMO-001',
     title: 'Интеграция с внешними системами',
-    status: 'В работе',
-    statusColor: '#0052cc',
+    status: 'Тестирование',
+    statusColor: '#00875a',
     progress: { sa: 100, dev: 65, qa: 20 },
-    expectedDone: '15 февраля',
-    variance: -5,
+    totalProgress: 70,
+    targetDay: 14, // 15 февраля - бизнес хочет к этой дате
+    baseExpectedDay: 10, // при оптимальной позиции завершим 11 февраля
+    optimalPosition: 2,
     stories: [
       { key: 'DEMO-101', title: 'API интеграция с CRM', status: 'Done', statusColor: '#00875a', role: 'DEV', assignee: 'Алексей К.', progress: 100 },
       { key: 'DEMO-102', title: 'Обработка webhook-ов', status: 'In Progress', statusColor: '#0052cc', role: 'DEV', assignee: 'Мария С.', progress: 70 },
@@ -40,8 +47,10 @@ export const mockEpics: DemoEpic[] = [
     status: 'Анализ',
     statusColor: '#6554c0',
     progress: { sa: 40, dev: 0, qa: 0 },
-    expectedDone: '28 февраля',
-    variance: 12,
+    totalProgress: 13,
+    targetDay: 28, // 1 марта
+    baseExpectedDay: 25, // при оптимальной позиции завершим 26 февраля
+    optimalPosition: 4,
     stories: [
       { key: 'DEMO-201', title: 'Анализ требований HR', status: 'In Progress', statusColor: '#0052cc', role: 'SA', assignee: 'Ольга Н.', progress: 60 },
       { key: 'DEMO-202', title: 'Проектирование БД сотрудников', status: 'To Do', statusColor: '#505f79', role: 'SA', assignee: 'Иван П.', progress: 0 },
@@ -52,11 +61,13 @@ export const mockEpics: DemoEpic[] = [
   {
     key: 'DEMO-003',
     title: 'Автоматизация отчётности',
-    status: 'Готово к разработке',
-    statusColor: '#00875a',
+    status: 'Анализ',
+    statusColor: '#6554c0',
     progress: { sa: 100, dev: 0, qa: 0 },
-    expectedDone: '10 марта',
-    variance: 0,
+    totalProgress: 33,
+    targetDay: 38, // 11 марта
+    baseExpectedDay: 33, // при оптимальной позиции завершим 6 марта
+    optimalPosition: 5,
     stories: [
       { key: 'DEMO-301', title: 'Шаблоны отчётов', status: 'To Do', statusColor: '#505f79', role: 'DEV', assignee: 'Мария С.', progress: 0 },
       { key: 'DEMO-302', title: 'Генерация PDF', status: 'To Do', statusColor: '#505f79', role: 'DEV', assignee: 'Иван П.', progress: 0 },
@@ -66,11 +77,13 @@ export const mockEpics: DemoEpic[] = [
   {
     key: 'DEMO-004',
     title: 'Дашборды и виджеты',
-    status: 'В работе',
-    statusColor: '#0052cc',
+    status: 'Тестирование',
+    statusColor: '#00875a',
     progress: { sa: 100, dev: 80, qa: 50 },
-    expectedDone: '5 февраля',
-    variance: -3,
+    totalProgress: 85,
+    targetDay: 7, // 8 февраля - ближайший дедлайн
+    baseExpectedDay: 4, // при оптимальной позиции завершим 5 февраля
+    optimalPosition: 1,
     stories: [
       { key: 'DEMO-401', title: 'Виджет KPI', status: 'Done', statusColor: '#00875a', role: 'DEV', assignee: 'Алексей К.', progress: 100 },
       { key: 'DEMO-402', title: 'График динамики', status: 'Done', statusColor: '#00875a', role: 'DEV', assignee: 'Мария С.', progress: 100 },
@@ -83,8 +96,10 @@ export const mockEpics: DemoEpic[] = [
     status: 'В работе',
     statusColor: '#0052cc',
     progress: { sa: 100, dev: 45, qa: 0 },
-    expectedDone: '20 февраля',
-    variance: 8,
+    totalProgress: 48,
+    targetDay: 21, // 22 февраля
+    baseExpectedDay: 18, // при оптимальной позиции завершим 19 февраля
+    optimalPosition: 3,
     stories: [
       { key: 'DEMO-501', title: 'Email уведомления', status: 'Done', statusColor: '#00875a', role: 'DEV', assignee: 'Иван П.', progress: 100 },
       { key: 'DEMO-502', title: 'Push уведомления', status: 'In Progress', statusColor: '#0052cc', role: 'DEV', assignee: 'Дмитрий К.', progress: 40 },
@@ -98,8 +113,10 @@ export const mockEpics: DemoEpic[] = [
     status: 'Анализ',
     statusColor: '#6554c0',
     progress: { sa: 60, dev: 0, qa: 0 },
-    expectedDone: '15 марта',
-    variance: 0,
+    totalProgress: 20,
+    targetDay: 45, // 18 марта
+    baseExpectedDay: 40, // при оптимальной позиции завершим 13 марта
+    optimalPosition: 6,
     stories: [
       { key: 'DEMO-601', title: 'Модель ролей и прав', status: 'In Progress', statusColor: '#0052cc', role: 'SA', assignee: 'Ольга Н.', progress: 80 },
       { key: 'DEMO-602', title: 'Интеграция с LDAP', status: 'To Do', statusColor: '#505f79', role: 'SA', assignee: 'Иван П.', progress: 0 }
