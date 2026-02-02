@@ -2,6 +2,8 @@ import { useState, Fragment, useEffect, useRef } from 'react'
 import { mockEpics, DemoEpic, DemoStory } from '../mockData'
 import epicIcon from '../../../icons/epic.png'
 import storyIcon from '../../../icons/story.png'
+import cursorHandIcon from '../../../icons/cursor-hand.png'
+import thumbsUpIcon from '../../../icons/thumbs-up.png'
 
 const ROLE_NAMES = {
   SA: 'Системный анализ',
@@ -30,7 +32,7 @@ function SuccessMessage({ show }: { show: boolean }) {
   return (
     <div className="demo-success-overlay">
       <div className="demo-success-message">
-        <span className="demo-success-icon">👍</span>
+        <img src={thumbsUpIcon} alt="" className="demo-success-icon" />
         <span className="demo-success-text">Красавчик, завершим всё вовремя!</span>
       </div>
     </div>
@@ -349,6 +351,10 @@ export function DemoBoard({ onHighlight }: DemoBoardProps) {
   return (
     <div className="demo-board" ref={boardRef}>
       <SuccessMessage show={showSuccess} />
+      <div className="demo-board-hint">
+        <img src={cursorHandIcon} alt="" className="demo-board-hint-icon" />
+        Перетащите эпики в таблице, чтобы мы уложились в сроки
+      </div>
       <div
         className="demo-board-header"
         onMouseMove={(e) => {

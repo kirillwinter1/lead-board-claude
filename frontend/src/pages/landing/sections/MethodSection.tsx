@@ -35,10 +35,10 @@ const methods = [
     id: 'metrics' as TabType,
     title: 'Metrics',
     values: [
-      'Forecast accuracy %',
-      'Schedule variance дней',
-      'Lead Time to Change',
-      'Data quality alerts'
+      'Все полезные метрики на одном экране',
+      'Эффективность команды',
+      'Эффективность сотрудника',
+      'Точность оценок'
     ]
   }
 ]
