@@ -64,7 +64,7 @@ export function Layout() {
       <header className="header">
         <div className="header-left">
           <NavLink to="/board" className="logo-link">
-            <img src={logo} alt="Lead Board" className="header-logo" />
+            <img src={logo} alt="OneLane" className="header-logo" />
           </NavLink>
           <nav className="nav-tabs">
             <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>

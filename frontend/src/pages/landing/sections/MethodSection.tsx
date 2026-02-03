@@ -15,7 +15,7 @@ const methods = [
     id: 'board' as TabType,
     title: 'Board',
     values: [
-      'Расчёт приоритета и автосортировка',
+      'Расчёт приоритета и рекомендации',
       'Прогноз даты завершения и риски',
       'Прогресс и статусы по ролям',
       'Ручная приоритизация drag-and-drop'
@@ -59,7 +59,7 @@ export function MethodSection({ onRequestDemo }: MethodSectionProps) {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            Как Lead Board делает поставку управляемой
+            Как OneLane делает поставку управляемой
           </motion.h2>
 
           <div className="landing-method-tabs landing-method-tabs-left">

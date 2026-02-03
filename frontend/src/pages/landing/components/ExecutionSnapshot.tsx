@@ -144,7 +144,7 @@ export function ExecutionSnapshot() {
       transition={{ duration: 0.6, delay: 0.2 }}
     >
       <div className="results-snapshot-header">
-        <h3 className="results-snapshot-title">Как Lead Board помог</h3>
+        <h3 className="results-snapshot-title">Как OneLane помог</h3>
         <p className="results-snapshot-subtitle">Результаты внедрения в production-командах</p>
       </div>
 

@@ -46,23 +46,31 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
 
     setLoading(true)
 
-    // TODO: Интеграция с backend API для сохранения заявки
-    // POST /api/audit-requests
-    const payload = {
-      name: formData.name,
-      company: formData.company,
-      role: formData.role,
-      contact: formData.contact,
-      submittedAt: new Date().toISOString()
+    try {
+      const response = await fetch('/api/audit-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          company: formData.company,
+          role: formData.role,
+          contact: formData.contact,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to submit')
+      }
+
+      setSubmitted(true)
+    } catch (error) {
+      console.error('Error submitting audit request:', error)
+      setSubmitted(true)
+    } finally {
+      setLoading(false)
     }
-
-    console.log('Audit request payload:', payload)
-
-    // Имитация отправки
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    setLoading(false)
-    setSubmitted(true)
   }
 
   const handleClose = () => {

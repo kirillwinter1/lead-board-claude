@@ -29,8 +29,7 @@ export function LandingHeader({ onRequestAudit }: LandingHeaderProps) {
     <header className={`landing-header ${scrolled ? 'scrolled' : ''}`}>
       <div className="landing-header-inner">
         <Link to="/" className="landing-logo">
-          <img src={logoIcon} alt="Lead Board" className="landing-logo-icon" />
-          Lead Board
+          <img src={logoIcon} alt="OneLane" className="landing-logo-icon" />
         </Link>
         <nav className="landing-nav">
           <a href="#problem" className="landing-nav-link" onClick={(e) => scrollToSection(e, 'problem')}>Проблема</a>

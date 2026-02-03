@@ -45,7 +45,7 @@ describe('Layout', () => {
       renderLayout()
 
       await waitFor(() => {
-        const logo = screen.getByAltText('Lead Board')
+        const logo = screen.getByAltText('OneLane')
         expect(logo).toBeInTheDocument()
       })
     })

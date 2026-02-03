@@ -42,6 +42,10 @@ jira:
     Testing: TESTING
     Sub-task: DEVELOPMENT
 
+telegram:
+  bot-token: ${TELEGRAM_BOT_TOKEN:}
+  chat-id: ${TELEGRAM_CHAT_ID:}
+
 atlassian:
   oauth:
     client-id: ${ATLASSIAN_CLIENT_ID:}

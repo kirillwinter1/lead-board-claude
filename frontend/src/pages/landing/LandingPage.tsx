@@ -26,7 +26,7 @@ export function LandingPage() {
       <FounderSection />
       <footer className="landing-footer">
         <p className="landing-footer-text">
-          Lead Board {new Date().getFullYear()}
+          OneLane {new Date().getFullYear()}
         </p>
       </footer>
       <AuditModal isOpen={isModalOpen} onClose={closeModal} />
