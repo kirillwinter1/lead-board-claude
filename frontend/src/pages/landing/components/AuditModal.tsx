@@ -124,7 +124,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
               </div>
             ) : (
               <>
-                <h2 className="modal-title">Запросить разбор</h2>
+                <h2 className="modal-title">Оставить заявку</h2>
                 <p className="modal-subtitle">
                   30 минут — разберём вашу ситуацию и покажем, как сделать сроки предсказуемыми
                 </p>

@@ -112,7 +112,7 @@ export function AuditSection({ onRequestAudit }: AuditSectionProps) {
             onClick={onRequestAudit}
             className="landing-btn landing-btn-primary landing-btn-large"
           >
-            Запросить разбор (30 минут)
+            Оставить заявку (30 минут)
           </button>
         </motion.div>
       </div>

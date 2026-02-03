@@ -41,7 +41,7 @@ export function LandingHeader({ onRequestAudit }: LandingHeaderProps) {
             onClick={onRequestAudit}
             className="landing-btn landing-btn-primary"
           >
-            Запросить разбор
+            Оставить заявку
           </button>
         </div>
       </div>

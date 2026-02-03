@@ -23,6 +23,7 @@ dist/
 
 # Production secrets
 .env.prod
+docker-compose.prod.yml
 
 # Test coverage
 frontend/coverage/

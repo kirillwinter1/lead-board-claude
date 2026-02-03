@@ -35,7 +35,7 @@ export function HeroSection({ onRequestAudit }: HeroSectionProps) {
               onClick={onRequestAudit}
               className="landing-btn landing-btn-primary landing-btn-large"
             >
-              Запросить разбор
+              Оставить заявку
             </button>
           </div>
         </motion.div>
