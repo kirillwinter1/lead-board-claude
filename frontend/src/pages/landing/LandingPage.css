@@ -2795,31 +2795,36 @@
 @media (max-width: 768px) {
   .landing-method-screen {
     overflow: hidden;
+    margin-left: -16px;
+    margin-right: -16px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 
   .landing-method-demo {
-    padding: 10px;
+    padding: 5px;
   }
 
   .demo-board {
-    transform: scale(0.55);
+    transform: scale(0.38);
     transform-origin: top left;
-    width: 182%;
-    margin-bottom: -45%;
+    width: 263%;
+    margin-bottom: -62%;
   }
 
   .demo-gantt {
-    transform: scale(0.55);
+    transform: scale(0.30);
     transform-origin: top left;
-    width: 182%;
-    margin-bottom: -45%;
+    width: 333%;
+    margin-bottom: -70%;
   }
 
   .demo-metrics {
-    transform: scale(0.65);
+    transform: scale(0.52);
     transform-origin: top left;
-    width: 154%;
-    margin-bottom: -35%;
+    width: 192%;
+    margin-bottom: -48%;
   }
 }
 
@@ -2865,13 +2870,14 @@
   }
 
   .landing-hero {
-    padding-top: 100px;
+    padding-top: 200px;
     padding-bottom: 40px;
   }
 
   .landing-hero-title {
     font-size: 1.5rem;
     margin-bottom: 20px;
+    margin-top: 85px;
   }
 
   .landing-hero-subtitle {
@@ -2939,21 +2945,7 @@
     text-align: center;
   }
 
-  /* Gantt - hide on very small screens, show simplified */
-  .demo-gantt-container {
-    flex-direction: column;
-  }
-
-  .demo-gantt-labels {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--landing-border);
-  }
-
-  .demo-gantt-chart {
-    display: none;
-  }
-
+  /* Gantt - scaled to fit on mobile */
   .demo-gantt-legend {
     flex-wrap: wrap;
     gap: 12px;
