@@ -1,10 +1,19 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts'
+import {
   getEpicBurndown,
   getEpicsForBurndown,
   EpicBurndownResponse,
-  EpicInfo,
-  BurndownPoint
+  EpicInfo
 } from '../../api/metrics'
 import './EpicBurndownChart.css'
 
@@ -26,7 +35,6 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
     getEpicsForBurndown(teamId)
       .then(data => {
         setEpics(data)
-        // Select first non-completed epic, or first epic
         const activeEpic = data.find(e => !e.completed) || data[0]
         if (activeEpic) {
           setSelectedEpicKey(activeEpic.key)
@@ -54,34 +62,23 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
   const chartData = useMemo(() => {
     if (!burndownData || burndownData.idealLine.length === 0) return null
 
-    const maxHours = burndownData.totalEstimateHours ||
-      Math.max(
-        ...burndownData.idealLine.map(p => p.remainingHours),
-        ...burndownData.actualLine.map(p => p.remainingHours)
-      )
+    // Create a map of actual values by date
+    const actualMap = new Map(
+      burndownData.actualLine.map(p => [p.date, p.remainingHours])
+    )
 
-    return {
-      maxHours: Math.ceil(maxHours / 10) * 10 || 10,
-      gridLines: 5
-    }
+    // Merge ideal and actual into single dataset
+    return burndownData.idealLine.map(point => ({
+      date: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      fullDate: point.date,
+      ideal: point.remainingHours,
+      actual: actualMap.get(point.date) ?? null
+    }))
   }, [burndownData])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  const generatePath = (points: BurndownPoint[], maxHours: number): string => {
-    if (points.length === 0) return ''
-
-    const width = 100
-    const height = 100
-
-    return points.map((point, i) => {
-      const x = (i / (points.length - 1)) * width
-      const y = height - (point.remainingHours / maxHours) * height
-      return `${i === 0 ? 'M' : 'L'} ${x.toFixed(2)},${y.toFixed(2)}`
-    }).join(' ')
   }
 
   if (epicsLoading) {
@@ -151,77 +148,57 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
             )}
           </div>
 
-          {chartData && burndownData.idealLine.length > 0 ? (
-            <>
-              {/* Chart */}
-              <div className="burndown-chart-container">
-                <div className="burndown-chart">
-                  {/* Y-axis */}
-                  <div className="burndown-y-axis">
-                    {[...Array(chartData.gridLines + 1)].map((_, i) => {
-                      const value = Math.round((chartData.maxHours / chartData.gridLines) * (chartData.gridLines - i))
-                      return <div key={i} className="burndown-y-label">{value}h</div>
-                    })}
-                  </div>
-
-                  {/* Chart Area */}
-                  <div className="burndown-chart-area">
-                    {/* Grid lines */}
-                    <div className="burndown-grid">
-                      {[...Array(chartData.gridLines + 1)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="burndown-grid-line-h"
-                          style={{ top: `${(i / chartData.gridLines) * 100}%` }}
-                        />
-                      ))}
-                    </div>
-
-                    {/* SVG Lines */}
-                    <svg className="burndown-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                      {/* Ideal line */}
-                      <path
-                        className="burndown-line-ideal"
-                        d={generatePath(burndownData.idealLine, chartData.maxHours)}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                      {/* Actual line */}
-                      <path
-                        className="burndown-line-actual"
-                        d={generatePath(burndownData.actualLine, chartData.maxHours)}
-                        vectorEffect="non-scaling-stroke"
-                      />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* X-axis labels */}
-                <div className="burndown-x-axis">
-                  {burndownData.idealLine.length > 0 && (
-                    <>
-                      <span className="burndown-x-label">
-                        {formatDate(burndownData.idealLine[0].date)}
-                      </span>
-                      <span className="burndown-x-label">
-                        {formatDate(burndownData.idealLine[burndownData.idealLine.length - 1].date)}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Legend */}
-              <div className="burndown-legend">
-                <div className="burndown-legend-item">
-                  <span className="burndown-legend-line burndown-legend-line-ideal" />
-                  Ideal (linear)
-                </div>
-                <div className="burndown-legend-item">
-                  <span className="burndown-legend-line burndown-legend-line-actual" />
-                  Actual
-                </div>
-              </div>
-            </>
+          {chartData && chartData.length > 0 ? (
+            <div className="burndown-chart-container">
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ebecf0" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: '#6b778c' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#dfe1e6' }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: '#6b778c' }}
+                    tickLine={false}
+                    axisLine={{ stroke: '#dfe1e6' }}
+                    tickFormatter={(value) => `${value}h`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#172b4d',
+                      border: 'none',
+                      borderRadius: 4,
+                      color: 'white',
+                      fontSize: 12
+                    }}
+                    labelStyle={{ color: 'white', fontWeight: 600 }}
+                    formatter={(value) => [`${value}h`]}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                  <Line
+                    type="monotone"
+                    dataKey="ideal"
+                    stroke="#97a0af"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    dot={false}
+                    name="Ideal"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="actual"
+                    stroke="#0065ff"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Actual"
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           ) : (
             <div className="burndown-empty">
               No burndown data available for this epic.

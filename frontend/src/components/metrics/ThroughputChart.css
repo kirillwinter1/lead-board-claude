@@ -21,7 +21,13 @@
   font-style: italic;
 }
 
-/* Throughput Chart */
+/* Chart Container for Recharts */
+.throughput-chart-container {
+  width: 100%;
+  height: 280px;
+}
+
+/* Legacy chart styles (can be removed) */
 .throughput-chart {
   display: flex;
   height: 250px;

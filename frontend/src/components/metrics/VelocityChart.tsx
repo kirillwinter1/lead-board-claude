@@ -1,4 +1,15 @@
 import { useState, useEffect } from 'react'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  Cell
+} from 'recharts'
 import { getVelocity, VelocityResponse } from '../../api/metrics'
 import './VelocityChart.css'
 
@@ -49,22 +60,18 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
     )
   }
 
-  const maxValue = Math.max(
-    ...data.byWeek.map(w => Math.max(w.capacityHours, w.loggedHours)),
-    1
-  )
-  const chartHeight = 200
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
   const getUtilizationColor = (percent: number) => {
     if (percent >= 85 && percent <= 110) return '#36B37E'
     if (percent >= 70 && percent <= 130) return '#FFAB00'
     return '#FF5630'
   }
+
+  const chartData = data.byWeek.map(week => ({
+    name: new Date(week.weekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    capacity: week.capacityHours,
+    logged: week.loggedHours,
+    utilization: week.utilizationPercent
+  }))
 
   return (
     <div className="velocity-section">
@@ -95,51 +102,48 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
       </div>
 
       {/* Chart */}
-      <div className="velocity-chart">
-        <div className="velocity-y-axis">
-          {[...Array(5)].map((_, i) => {
-            const value = Math.round((maxValue / 4) * (4 - i))
-            return <div key={i} className="velocity-y-label">{value}h</div>
-          })}
-        </div>
-        <div className="velocity-chart-area">
-          <div className="velocity-grid">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="velocity-grid-line" />
-            ))}
-          </div>
-          <div className="velocity-bars">
-            {data.byWeek.map((week, i) => {
-              const capacityHeight = (week.capacityHours / maxValue) * chartHeight
-              const loggedHeight = (week.loggedHours / maxValue) * chartHeight
-
-              return (
-                <div
-                  key={i}
-                  className="velocity-bar-group"
-                  title={`Week of ${formatDate(week.weekStart)}\nCapacity: ${week.capacityHours.toFixed(1)}h\nLogged: ${week.loggedHours.toFixed(1)}h\nUtilization: ${week.utilizationPercent.toFixed(0)}%`}
-                >
-                  <div className="velocity-bar-wrapper">
-                    <div
-                      className="velocity-bar velocity-bar-capacity"
-                      style={{ height: `${capacityHeight}px` }}
-                    />
-                    <div
-                      className="velocity-bar velocity-bar-logged"
-                      style={{ height: `${loggedHeight}px` }}
-                    />
-                  </div>
-                  <div className="velocity-bar-label">{formatDate(week.weekStart)}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="velocity-legend">
-        <span className="velocity-legend-item velocity-legend-capacity">Capacity</span>
-        <span className="velocity-legend-item velocity-legend-logged">Logged</span>
+      <div className="velocity-chart-container">
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#ebecf0" />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: 11, fill: '#6b778c' }}
+              tickLine={false}
+              axisLine={{ stroke: '#dfe1e6' }}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: '#6b778c' }}
+              tickLine={false}
+              axisLine={{ stroke: '#dfe1e6' }}
+              tickFormatter={(value) => `${value}h`}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: '#172b4d',
+                border: 'none',
+                borderRadius: 4,
+                color: 'white',
+                fontSize: 12
+              }}
+              labelStyle={{ color: 'white', fontWeight: 600 }}
+              formatter={(value, name) => [
+                `${Number(value).toFixed(1)}h`,
+                name === 'capacity' ? 'Capacity' : 'Logged'
+              ]}
+            />
+            <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+            <Bar dataKey="capacity" fill="#dfe1e6" name="Capacity" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="logged" name="Logged" radius={[4, 4, 0, 0]}>
+              {chartData.map((entry, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={getUtilizationColor(entry.utilization)}
+                />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   )
