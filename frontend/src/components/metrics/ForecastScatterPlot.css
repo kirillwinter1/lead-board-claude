@@ -1,0 +1,243 @@
+/* Forecast Scatter Plot */
+.scatter-plot-section {
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.scatter-plot-section h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.scatter-plot-description {
+  font-size: 13px;
+  color: #6b778c;
+  margin-bottom: 16px;
+}
+
+.scatter-plot-container {
+  position: relative;
+  width: 100%;
+  height: 320px;
+}
+
+.scatter-plot-chart {
+  display: flex;
+  height: 280px;
+}
+
+.scatter-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-right: 8px;
+  width: 50px;
+  text-align: right;
+}
+
+.scatter-y-label {
+  font-size: 11px;
+  color: #6b778c;
+  line-height: 1;
+}
+
+.scatter-y-title {
+  font-size: 11px;
+  color: #6b778c;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  margin-right: 8px;
+}
+
+.scatter-area {
+  flex: 1;
+  position: relative;
+  border-left: 1px solid #dfe1e6;
+  border-bottom: 1px solid #dfe1e6;
+  overflow: hidden;
+}
+
+.scatter-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.scatter-grid-line-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed #ebecf0;
+}
+
+.scatter-grid-line-v {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed #ebecf0;
+}
+
+.scatter-diagonal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.scatter-diagonal-line {
+  position: absolute;
+  background: #97a0af;
+  height: 1px;
+  transform-origin: 0 0;
+}
+
+.scatter-points {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.scatter-point {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  transform: translate(-50%, 50%);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.scatter-point:hover {
+  transform: translate(-50%, 50%) scale(1.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.scatter-point-green {
+  background-color: #36B37E;
+}
+
+.scatter-point-yellow {
+  background-color: #FFAB00;
+}
+
+.scatter-point-red {
+  background-color: #FF5630;
+}
+
+.scatter-x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+  padding-left: 50px;
+}
+
+.scatter-x-label {
+  font-size: 11px;
+  color: #6b778c;
+}
+
+.scatter-x-title {
+  text-align: center;
+  font-size: 11px;
+  color: #6b778c;
+  margin-top: 4px;
+  padding-left: 50px;
+}
+
+/* Legend */
+.scatter-legend {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.scatter-legend-item {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #6b778c;
+}
+
+.scatter-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.scatter-legend-dot-green {
+  background-color: #36B37E;
+}
+
+.scatter-legend-dot-yellow {
+  background-color: #FFAB00;
+}
+
+.scatter-legend-dot-red {
+  background-color: #FF5630;
+}
+
+.scatter-legend-line {
+  width: 20px;
+  height: 1px;
+  background-color: #97a0af;
+  margin-right: 6px;
+}
+
+/* Tooltip */
+.scatter-tooltip {
+  position: fixed;
+  background: #172b4d;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1000;
+  max-width: 250px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.scatter-tooltip-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.scatter-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scatter-tooltip-label {
+  color: #a5adba;
+}
+
+.scatter-tooltip-value {
+  font-weight: 500;
+}
+
+/* Empty state */
+.scatter-empty {
+  text-align: center;
+  color: #6b778c;
+  padding: 40px 20px;
+  font-style: italic;
+}

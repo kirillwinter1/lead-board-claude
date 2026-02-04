@@ -15,6 +15,7 @@ export interface ThroughputResponse {
   totalSubtasks: number
   total: number
   byPeriod: PeriodThroughput[]
+  movingAverage: number[]
 }
 
 export interface LeadTimeResponse {
@@ -48,6 +49,9 @@ export interface AssigneeMetrics {
   issuesClosed: number
   avgLeadTimeDays: number
   avgCycleTimeDays: number
+  personalDsr: number | null
+  velocityPercent: number | null
+  trend: 'UP' | 'DOWN' | 'STABLE' | null
 }
 
 export interface TeamMetricsSummary {
@@ -213,5 +217,68 @@ export async function getForecastAccuracy(
 ): Promise<ForecastAccuracyResponse> {
   const params = new URLSearchParams({ teamId: String(teamId), from, to })
   const response = await axios.get(`/api/metrics/forecast-accuracy?${params}`)
+  return response.data
+}
+
+// ==================== Velocity ====================
+
+export interface WeeklyVelocity {
+  weekStart: string
+  capacityHours: number
+  loggedHours: number
+  utilizationPercent: number
+}
+
+export interface VelocityResponse {
+  teamId: number
+  from: string
+  to: string
+  totalCapacityHours: number
+  totalLoggedHours: number
+  utilizationPercent: number
+  byWeek: WeeklyVelocity[]
+}
+
+export async function getVelocity(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<VelocityResponse> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/velocity?${params}`)
+  return response.data
+}
+
+// ==================== Epic Burndown ====================
+
+export interface BurndownPoint {
+  date: string
+  remainingHours: number
+}
+
+export interface EpicBurndownResponse {
+  epicKey: string
+  summary: string
+  startDate: string | null
+  endDate: string | null
+  totalEstimateHours: number
+  idealLine: BurndownPoint[]
+  actualLine: BurndownPoint[]
+}
+
+export interface EpicInfo {
+  key: string
+  summary: string
+  status: string
+  completed: boolean
+}
+
+export async function getEpicBurndown(epicKey: string): Promise<EpicBurndownResponse> {
+  const response = await axios.get(`/api/metrics/epic-burndown?epicKey=${encodeURIComponent(epicKey)}`)
+  return response.data
+}
+
+export async function getEpicsForBurndown(teamId: number): Promise<EpicInfo[]> {
+  const response = await axios.get(`/api/metrics/epics-for-burndown?teamId=${teamId}`)
   return response.data
 }

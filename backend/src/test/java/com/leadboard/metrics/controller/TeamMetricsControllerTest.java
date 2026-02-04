@@ -5,6 +5,8 @@ import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
 import com.leadboard.metrics.service.TeamMetricsService;
+import com.leadboard.metrics.service.VelocityService;
+import com.leadboard.metrics.service.EpicBurndownService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -39,6 +41,12 @@ class TeamMetricsControllerTest {
     private DsrService dsrService;
 
     @MockBean
+    private VelocityService velocityService;
+
+    @MockBean
+    private EpicBurndownService burndownService;
+
+    @MockBean
     private OAuthTokenRepository oAuthTokenRepository;
 
     @Test
@@ -48,7 +56,7 @@ class TeamMetricsControllerTest {
                 LocalDate.of(2024, 1, 1),
                 LocalDate.of(2024, 1, 31),
                 1L,
-                new ThroughputResponse(2, 10, 5, 17, Collections.emptyList()),
+                new ThroughputResponse(2, 10, 5, 17, Collections.emptyList(), Collections.emptyList()),
                 new LeadTimeResponse(
                         new BigDecimal("5.5"),
                         new BigDecimal("4.0"),
@@ -95,7 +103,8 @@ class TeamMetricsControllerTest {
                                 LocalDate.of(2024, 1, 7),
                                 1, 3, 2, 6
                         )
-                )
+                ),
+                Arrays.asList(new BigDecimal("6.0"))
         );
 
         when(metricsService.calculateThroughput(eq(1L), any(), any(), any(), any(), any()))
@@ -124,14 +133,20 @@ class TeamMetricsControllerTest {
                                 "John Doe",
                                 10,
                                 new BigDecimal("5.5"),
-                                new BigDecimal("3.2")
+                                new BigDecimal("3.2"),
+                                new BigDecimal("1.05"),
+                                new BigDecimal("95"),
+                                "UP"
                         ),
                         new AssigneeMetrics(
                                 "user2",
                                 "Jane Smith",
                                 8,
                                 new BigDecimal("4.0"),
-                                new BigDecimal("2.5")
+                                new BigDecimal("2.5"),
+                                new BigDecimal("0.92"),
+                                new BigDecimal("110"),
+                                "STABLE"
                         )
                 ));
 

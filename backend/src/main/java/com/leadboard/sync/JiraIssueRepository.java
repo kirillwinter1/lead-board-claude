@@ -22,6 +22,8 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     List<JiraIssueEntity> findByParentKey(String parentKey);
 
+    List<JiraIssueEntity> findByParentKeyIn(List<String> parentKeys);
+
     void deleteByProjectKey(String projectKey);
 
     // Методы для AutoScore

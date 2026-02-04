@@ -7,5 +7,8 @@ public record AssigneeMetrics(
     String displayName,
     int issuesClosed,
     BigDecimal avgLeadTimeDays,
-    BigDecimal avgCycleTimeDays
+    BigDecimal avgCycleTimeDays,
+    BigDecimal personalDsr,
+    BigDecimal velocityPercent,
+    String trend
 ) {}

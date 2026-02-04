@@ -26,7 +26,7 @@
 | F21 | Unified Planning Algorithm | ✅ | 2026-01-25 | [features/F21](features/F21_UNIFIED_PLANNING.md) |
 | F22 | Team Metrics + DSR + Forecast Accuracy | ✅ | 2026-01-26 | [features/F22](features/F22_TEAM_METRICS.md) |
 | F23 | Planning Poker | ✅ | 2026-01-28 | [features/F23](features/F23_PLANNING_POKER.md) |
-| F24 | Team Metrics v2 (DSR Gauge, Forecast) | 🚧 | 2026-01-28 | [features/F22](features/F22_TEAM_METRICS.md) (объединён) |
+| F24 | Team Metrics v2 (5 визуализаций) | ✅ | 2026-02-04 | [features/F24](features/F24_TEAM_METRICS_V2.md) |
 | F25 | Manual Order + Recommendations | 🚧 | 2026-01-30 | [features/F25](features/F25_MANUAL_ORDER.md) |
 | F26 | Employee Performance Dashboard | 📋 | — | — |
 | F27 | RBAC | ✅ | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
@@ -54,6 +54,14 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-04: F24 Team Metrics v2
+- Scatter Plot для Forecast Accuracy (plan vs fact)
+- Throughput Chart с Moving Average (4-week window)
+- Assignee Table Extended (personalDsr, velocityPercent, trend)
+- Team Velocity Chart (logged vs capacity by week)
+- Epic Burndown Chart (ideal vs actual)
+- Новые endpoints: `/api/metrics/velocity`, `/api/metrics/epic-burndown`, `/api/metrics/epics-for-burndown`
 
 ### 2026-01-30: F25 Manual Order + Recommendations
 - Порядок эпиков/сторей через `manual_order` (drag & drop)

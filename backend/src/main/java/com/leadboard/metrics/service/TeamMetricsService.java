@@ -78,10 +78,14 @@ public class TeamMetricsService {
         int totalStories = byPeriod.stream().mapToInt(PeriodThroughput::stories).sum();
         int totalSubtasks = byPeriod.stream().mapToInt(PeriodThroughput::subtasks).sum();
 
+        // Calculate moving average (4-week window)
+        List<BigDecimal> movingAverage = calculateMovingAverage(byPeriod, 4);
+
         return new ThroughputResponse(
                 totalEpics, totalStories, totalSubtasks,
                 totalEpics + totalStories + totalSubtasks,
-                byPeriod
+                byPeriod,
+                movingAverage
         );
     }
 
@@ -157,13 +161,18 @@ public class TeamMetricsService {
     }
 
     /**
-     * Calculate metrics by assignee.
+     * Calculate metrics by assignee with extended fields (DSR, velocity, trend).
      */
     public List<AssigneeMetrics> calculateByAssignee(Long teamId, LocalDate from, LocalDate to) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
-        List<Object[]> data = metricsRepository.getMetricsByAssignee(teamId, fromDt, toDt);
+        // Previous period of the same length for trend calculation
+        long periodDays = java.time.temporal.ChronoUnit.DAYS.between(from, to);
+        LocalDate prevFrom = from.minusDays(periodDays);
+        OffsetDateTime prevFromDt = prevFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        List<Object[]> data = metricsRepository.getExtendedMetricsByAssignee(teamId, fromDt, toDt, prevFromDt);
 
         return data.stream()
                 .map(row -> {
@@ -177,15 +186,55 @@ public class TeamMetricsService {
                             ? new BigDecimal(row[4].toString()).setScale(1, RoundingMode.HALF_UP)
                             : BigDecimal.ZERO;
 
+                    // Personal DSR (time_spent / original_estimate)
+                    BigDecimal personalDsr = row[5] != null
+                            ? new BigDecimal(row[5].toString()).setScale(2, RoundingMode.HALF_UP)
+                            : null;
+
+                    // Velocity = (time_spent / estimate) * 100
+                    BigDecimal velocityPercent = null;
+                    if (row[6] != null && row[7] != null) {
+                        BigDecimal timeSpent = new BigDecimal(row[6].toString());
+                        BigDecimal estimate = new BigDecimal(row[7].toString());
+                        if (estimate.compareTo(BigDecimal.ZERO) > 0) {
+                            velocityPercent = timeSpent.divide(estimate, 4, RoundingMode.HALF_UP)
+                                    .multiply(BigDecimal.valueOf(100))
+                                    .setScale(0, RoundingMode.HALF_UP);
+                        }
+                    }
+
+                    // Trend calculation (compare with previous period)
+                    int issuesPrev = row[8] != null ? ((Number) row[8]).intValue() : 0;
+                    String trend = calculateTrend(issuesClosed, issuesPrev);
+
                     return new AssigneeMetrics(
                             accountId,
                             displayName != null ? displayName : "Unknown",
                             issuesClosed,
                             avgLeadTime,
-                            avgCycleTime
+                            avgCycleTime,
+                            personalDsr,
+                            velocityPercent,
+                            trend
                     );
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Calculate trend based on current vs previous period.
+     */
+    private String calculateTrend(int current, int previous) {
+        if (previous == 0) {
+            return current > 0 ? "UP" : "STABLE";
+        }
+        double changePercent = ((double) (current - previous) / previous) * 100;
+        if (changePercent > 10) {
+            return "UP";
+        } else if (changePercent < -10) {
+            return "DOWN";
+        }
+        return "STABLE";
     }
 
     /**
@@ -203,6 +252,34 @@ public class TeamMetricsService {
                 from, to, teamId,
                 throughput, leadTime, cycleTime, timeInStatuses, byAssignee
         );
+    }
+
+    /**
+     * Calculate moving average for throughput data.
+     * @param byPeriod list of period throughputs
+     * @param window number of periods for the window
+     * @return list of moving average values (same length as input)
+     */
+    private List<BigDecimal> calculateMovingAverage(List<PeriodThroughput> byPeriod, int window) {
+        List<BigDecimal> result = new ArrayList<>();
+        if (byPeriod.isEmpty()) {
+            return result;
+        }
+
+        for (int i = 0; i < byPeriod.size(); i++) {
+            int start = Math.max(0, i - window + 1);
+            int count = i - start + 1;
+
+            BigDecimal sum = BigDecimal.ZERO;
+            for (int j = start; j <= i; j++) {
+                sum = sum.add(BigDecimal.valueOf(byPeriod.get(j).total()));
+            }
+
+            BigDecimal avg = sum.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+            result.add(avg);
+        }
+
+        return result;
     }
 
     private LeadTimeResponse calculateTimeStats(List<BigDecimal> sortedValues) {

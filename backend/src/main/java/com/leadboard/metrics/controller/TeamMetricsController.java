@@ -4,6 +4,8 @@ import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
 import com.leadboard.metrics.service.TeamMetricsService;
+import com.leadboard.metrics.service.VelocityService;
+import com.leadboard.metrics.service.EpicBurndownService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,15 +19,21 @@ public class TeamMetricsController {
     private final TeamMetricsService metricsService;
     private final ForecastAccuracyService forecastAccuracyService;
     private final DsrService dsrService;
+    private final VelocityService velocityService;
+    private final EpicBurndownService burndownService;
 
     public TeamMetricsController(
             TeamMetricsService metricsService,
             ForecastAccuracyService forecastAccuracyService,
-            DsrService dsrService
+            DsrService dsrService,
+            VelocityService velocityService,
+            EpicBurndownService burndownService
     ) {
         this.metricsService = metricsService;
         this.forecastAccuracyService = forecastAccuracyService;
         this.dsrService = dsrService;
+        this.velocityService = velocityService;
+        this.burndownService = burndownService;
     }
 
     @GetMapping("/throughput")
@@ -109,5 +117,32 @@ public class TeamMetricsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return dsrService.calculateDsr(teamId, from, to);
+    }
+
+    /**
+     * Get team velocity metrics (logged hours vs capacity).
+     */
+    @GetMapping("/velocity")
+    public VelocityResponse getVelocity(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return velocityService.calculateVelocity(teamId, from, to);
+    }
+
+    /**
+     * Get epic burndown chart data.
+     */
+    @GetMapping("/epic-burndown")
+    public EpicBurndownResponse getEpicBurndown(@RequestParam String epicKey) {
+        return burndownService.calculateBurndown(epicKey);
+    }
+
+    /**
+     * Get list of epics for burndown selector.
+     */
+    @GetMapping("/epics-for-burndown")
+    public List<EpicBurndownService.EpicInfo> getEpicsForBurndown(@RequestParam Long teamId) {
+        return burndownService.getEpicsForTeam(teamId);
     }
 }

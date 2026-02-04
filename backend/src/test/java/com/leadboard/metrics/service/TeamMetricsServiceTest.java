@@ -161,12 +161,16 @@ class TeamMetricsServiceTest {
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
+        // Extended query returns: account_id, display_name, issues_closed, avg_lead_time, avg_cycle_time,
+        // personal_dsr, total_time_spent_hours, total_estimate_hours, issues_prev_period
         List<Object[]> mockData = Arrays.asList(
-                new Object[]{"user1", "John Doe", 10L, new BigDecimal("5.5"), new BigDecimal("3.2")},
-                new Object[]{"user2", "Jane Smith", 8L, new BigDecimal("4.0"), new BigDecimal("2.5")}
+                new Object[]{"user1", "John Doe", 10L, new BigDecimal("5.5"), new BigDecimal("3.2"),
+                        new BigDecimal("1.05"), new BigDecimal("80"), new BigDecimal("76"), 8L},
+                new Object[]{"user2", "Jane Smith", 8L, new BigDecimal("4.0"), new BigDecimal("2.5"),
+                        new BigDecimal("0.92"), new BigDecimal("60"), new BigDecimal("65"), 8L}
         );
 
-        when(metricsRepository.getMetricsByAssignee(eq(teamId), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
                 .thenReturn(mockData);
 
         // When
@@ -181,6 +185,9 @@ class TeamMetricsServiceTest {
         assertEquals(10, first.issuesClosed());
         assertEquals(new BigDecimal("5.5"), first.avgLeadTimeDays());
         assertEquals(new BigDecimal("3.2"), first.avgCycleTimeDays());
+        assertEquals(new BigDecimal("1.05"), first.personalDsr());
+        assertNotNull(first.velocityPercent());
+        assertEquals("UP", first.trend());
     }
 
     @Test
@@ -224,7 +231,7 @@ class TeamMetricsServiceTest {
                 .thenReturn(Collections.emptyList());
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(metricsRepository.getMetricsByAssignee(eq(teamId), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         // When

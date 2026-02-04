@@ -11,6 +11,8 @@ import { ThroughputChart } from '../components/metrics/ThroughputChart'
 import { TimeInStatusChart } from '../components/metrics/TimeInStatusChart'
 import { AssigneeTable } from '../components/metrics/AssigneeTable'
 import { ForecastAccuracyChart } from '../components/metrics/ForecastAccuracyChart'
+import { VelocityChart } from '../components/metrics/VelocityChart'
+import { EpicBurndownChart } from '../components/metrics/EpicBurndownChart'
 import { RoleLoadBlock } from '../components/metrics/RoleLoadBlock'
 
 // --- WIP History Chart Component ---
@@ -395,13 +397,26 @@ export function TeamMetricsPage() {
               )}
 
               {/* Throughput Chart */}
-              <ThroughputChart data={metrics.throughput.byPeriod} />
+              <ThroughputChart
+                data={metrics.throughput.byPeriod}
+                movingAverage={metrics.throughput.movingAverage}
+              />
 
               {/* Time in Status Chart */}
               <TimeInStatusChart data={metrics.timeInStatuses} />
 
               {/* By Assignee Table */}
               <AssigneeTable data={metrics.byAssignee} />
+
+              {/* Team Velocity Chart */}
+              <VelocityChart
+                teamId={selectedTeamId}
+                from={dateRange.from}
+                to={dateRange.to}
+              />
+
+              {/* Epic Burndown Chart */}
+              <EpicBurndownChart teamId={selectedTeamId} />
             </>
           ) : (
             <div className="chart-empty">No metrics data available for this period</div>

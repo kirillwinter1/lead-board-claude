@@ -3,9 +3,10 @@ import './ThroughputChart.css'
 
 interface ThroughputChartProps {
   data: PeriodThroughput[]
+  movingAverage?: number[]
 }
 
-export function ThroughputChart({ data }: ThroughputChartProps) {
+export function ThroughputChart({ data, movingAverage }: ThroughputChartProps) {
   if (data.length === 0) {
     return (
       <div className="chart-section">
@@ -15,13 +16,33 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
     )
   }
 
-  const maxValue = Math.max(...data.map(d => d.total), 1)
+  const maxValue = Math.max(
+    ...data.map(d => d.total),
+    ...(movingAverage || []),
+    1
+  )
   const chartHeight = 200 // pixels for bar area
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
+
+  // Generate SVG path for moving average line
+  const generateMaPath = () => {
+    if (!movingAverage || movingAverage.length === 0) return null
+
+    const barWidth = 100 / data.length // percentage width per bar
+    const points = movingAverage.map((value, i) => {
+      const x = barWidth * i + barWidth / 2 // center of each bar
+      const y = 100 - (value / maxValue) * 100
+      return `${x},${y}`
+    })
+
+    return `M ${points.join(' L ')}`
+  }
+
+  const maPath = generateMaPath()
 
   return (
     <div className="chart-section">
@@ -50,7 +71,7 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
                 <div
                   key={i}
                   className="bar-group"
-                  title={`${formatDate(period.periodStart)}\nEpics: ${period.epics}\nStories: ${period.stories}\nSubtasks: ${period.subtasks}\nTotal: ${period.total}`}
+                  title={`${formatDate(period.periodStart)}\nEpics: ${period.epics}\nStories: ${period.stories}\nSubtasks: ${period.subtasks}\nTotal: ${period.total}${movingAverage ? `\nMA: ${movingAverage[i]?.toFixed(1)}` : ''}`}
                 >
                   <div className="stacked-bar" style={{ height: `${totalHeight}px` }}>
                     {epicHeight > 0 && (
@@ -77,12 +98,28 @@ export function ThroughputChart({ data }: ThroughputChartProps) {
               )
             })}
           </div>
+
+          {/* Moving Average Line */}
+          {maPath && (
+            <svg className="ma-line-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <path
+                d={maPath}
+                fill="none"
+                stroke="#ff5630"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+          )}
         </div>
       </div>
       <div className="chart-legend">
         <span className="legend-item legend-epic">Epics</span>
         <span className="legend-item legend-story">Stories</span>
         <span className="legend-item legend-subtask">Subtasks</span>
+        {movingAverage && movingAverage.length > 0 && (
+          <span className="legend-item legend-ma">4-Week MA</span>
+        )}
       </div>
     </div>
   )
