@@ -36,7 +36,7 @@
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
 | BF4 | RICE Scoring & AutoScore | 📋 Planned | — |
-| BF5 | Project-Level Management | 💡 Idea | — |
+| BF5 | Projects (Project-Level Management) | 📋 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
