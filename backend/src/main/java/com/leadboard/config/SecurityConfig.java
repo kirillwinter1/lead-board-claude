@@ -54,6 +54,9 @@ public class SecurityConfig {
                 // Sync trigger - require ADMIN role
                 .requestMatchers(HttpMethod.POST, "/api/sync/trigger").hasRole("ADMIN")
 
+                // Simulation - require ADMIN role
+                .requestMatchers("/api/simulation/**").hasRole("ADMIN")
+
                 // All other API endpoints - allow authenticated users
                 .requestMatchers("/api/**").permitAll()
 

@@ -254,6 +254,31 @@ public class OAuthService {
         return null;
     }
 
+    /**
+     * Get a valid access token for a specific user by their Atlassian account ID.
+     * Used by simulation to act on behalf of individual users.
+     */
+    @Transactional
+    public TokenInfo getValidAccessTokenForUser(String atlassianAccountId) {
+        Optional<OAuthTokenEntity> tokenOpt = tokenRepository.findByAtlassianAccountId(atlassianAccountId);
+        if (tokenOpt.isEmpty()) {
+            return null;
+        }
+
+        OAuthTokenEntity token = tokenOpt.get();
+
+        if (token.isExpired() && token.getRefreshToken() != null) {
+            log.info("Token expired for user {}, refreshing...", atlassianAccountId);
+            if (!refreshToken(token)) {
+                return null;
+            }
+        }
+
+        return new TokenInfo(token.getAccessToken(), token.getCloudId());
+    }
+
+    public record TokenInfo(String accessToken, String cloudId) {}
+
     public AuthStatus getAuthStatus() {
         Optional<OAuthTokenEntity> tokenOpt = tokenRepository.findLatestToken();
         if (tokenOpt.isEmpty()) {

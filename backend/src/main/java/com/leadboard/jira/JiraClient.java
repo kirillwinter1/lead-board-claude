@@ -11,6 +11,8 @@ import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -249,6 +251,71 @@ public class JiraClient {
                 .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey)
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    // ============================================================
+    // Simulation methods — explicit accessToken/cloudId per user
+    // ============================================================
+
+    /**
+     * Get available transitions for an issue using explicit OAuth credentials.
+     */
+    @SuppressWarnings("unchecked")
+    public List<JiraTransition> getTransitions(String issueKey, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        Map<String, Object> response = webClient.get()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+
+        if (response == null || !response.containsKey("transitions")) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> transitions = (List<Map<String, Object>>) response.get("transitions");
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        return transitions.stream()
+                .map(t -> mapper.convertValue(t, JiraTransition.class))
+                .toList();
+    }
+
+    /**
+     * Transition an issue using explicit OAuth credentials.
+     */
+    public void transitionIssue(String issueKey, String transitionId, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        webClient.post()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .bodyValue(Map.of("transition", Map.of("id", transitionId)))
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    /**
+     * Add a worklog to an issue using explicit OAuth credentials.
+     */
+    public void addWorklog(String issueKey, int timeSpentSeconds, LocalDate date,
+                           String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
+
+        webClient.post()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .bodyValue(Map.of(
+                        "timeSpentSeconds", timeSpentSeconds,
+                        "started", started
+                ))
                 .retrieve()
                 .toBodilessEntity()
                 .block();

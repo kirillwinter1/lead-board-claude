@@ -188,3 +188,15 @@ status-mapping:
       - Bug
       - Баг
       - Дефект
+
+# AI Simulation
+simulation:
+  enabled: ${SIMULATION_ENABLED:false}
+  cron: ${SIMULATION_CRON:0 0 19 * * MON-FRI}
+  team-ids: ${SIMULATION_TEAM_IDS:}
+  deviation:
+    daily-hours-variance: ${SIMULATION_DAILY_VARIANCE:0.3}
+    on-track-chance: ${SIMULATION_ON_TRACK_CHANCE:0.70}
+    early-chance: ${SIMULATION_EARLY_CHANCE:0.15}
+    delay-chance: ${SIMULATION_DELAY_CHANCE:0.10}
+    severe-delay-chance: ${SIMULATION_SEVERE_DELAY_CHANCE:0.05}
