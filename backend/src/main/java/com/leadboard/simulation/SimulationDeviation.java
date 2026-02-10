@@ -1,5 +1,6 @@
 package com.leadboard.simulation;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Random;
@@ -10,6 +11,7 @@ public class SimulationDeviation {
     private final SimulationProperties properties;
     private final Random random;
 
+    @Autowired
     public SimulationDeviation(SimulationProperties properties) {
         this.properties = properties;
         this.random = new Random();
