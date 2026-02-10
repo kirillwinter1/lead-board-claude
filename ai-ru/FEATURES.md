@@ -40,6 +40,7 @@
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | 📋 Planned | [backlog/BF8](backlog/BF8_SIMULATION.md) |
+| BF9 | Universal Workflow Configuration | 📋 Planned | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
