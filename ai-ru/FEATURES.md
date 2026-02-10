@@ -38,6 +38,7 @@
 | BF4 | RICE Scoring & AutoScore | 📋 Planned | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
 | BF5 | Projects (Project-Level Management) | 📋 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
+| BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
