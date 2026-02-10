@@ -35,7 +35,7 @@
 | BF1 | Manual Order + Recommendations | 🚧 В работе | [backlog/BF1](backlog/BF1_MANUAL_ORDER.md) |
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
-| BF4 | RICE Scoring & AutoScore | 📋 Planned | — |
+| BF4 | RICE Scoring & AutoScore | 📋 Planned | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
 | BF5 | Projects (Project-Level Management) | 📋 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 
