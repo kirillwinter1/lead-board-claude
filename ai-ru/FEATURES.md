@@ -41,6 +41,7 @@
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | 📋 Planned | [backlog/BF8](backlog/BF8_SIMULATION.md) |
 | BF9 | Universal Workflow Configuration | 📋 Planned | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
+| BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
