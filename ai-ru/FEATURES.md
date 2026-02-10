@@ -1,39 +1,45 @@
 # Список фич Lead Board
 
-## Статус реализации
+## Реализованные фичи (F)
 
-| # | Название | Статус | Дата | Спецификация |
-|---|----------|--------|------|-------------|
-| F1 | Bootstrap проекта | ✅ | 2026-01-22 | — |
-| F2 | Jira Integration MVP | ✅ | 2026-01-22 | — |
-| F3 | Jira Sync & Cache | ✅ | 2026-01-23 | — |
-| F4 | OAuth 2.0 (Atlassian 3LO) | ✅ | 2026-01-23 | — |
-| F5 | Team Management Backend | ✅ | 2026-01-23 | — |
-| F6 | Team Management UI | ✅ | 2026-01-23 | — |
-| F7 | Team Sync from Atlassian | ✅ | 2026-01-23 | — |
-| F8 | Board v2 (Epic root) | ✅ | 2026-01-23 | — |
-| F9 | Sub-task Estimates | ✅ | 2026-01-23 | — |
-| F10 | Epic-Team Mapping | ✅ | 2026-01-23 | — |
-| F11 | Rough Estimates для Epics | ✅ | 2026-01-23 | — |
-| F13 | Автопланирование (AutoScore + Expected Done) | ✅ | 2026-01-24 | [features/F21](features/F21_UNIFIED_PLANNING.md) (заменил F13) |
-| F14 | Timeline/Gantt | ✅ | 2026-01-24 | [features/F14](features/F14_TIMELINE.md) |
-| F15 | WIP Limits (Stage 1) | ✅ | 2026-01-24 | [features/F15](features/F15_WIP_LIMITS.md) |
-| F16 | Pipeline WIP + Stories | 📋 | — | [features/F16](features/F16_PIPELINE_WIP_STORIES.md) |
-| F17 | Configurable Status Mapping | ✅ | 2026-01-24 | [features/F17](features/F17_STATUS_MAPPING.md) |
-| F18 | Data Quality | ✅ | 2026-01-24 | [features/F18](features/F18_DATA_QUALITY.md) |
-| F19 | Story AutoScore & Prioritization | ✅ | 2026-01-25 | [features/F19](features/F19_STORY_AUTOSCORE.md) |
-| F20 | Story-Level Planning | ✅ | 2026-01-25 | [features/F20](features/F20_STORY_FORECAST.md) |
-| F21 | Unified Planning Algorithm | ✅ | 2026-01-25 | [features/F21](features/F21_UNIFIED_PLANNING.md) |
-| F22 | Team Metrics + DSR + Forecast Accuracy | ✅ | 2026-01-26 | [features/F22](features/F22_TEAM_METRICS.md) |
-| F23 | Planning Poker | ✅ | 2026-01-28 | [features/F23](features/F23_PLANNING_POKER.md) |
-| F24 | Team Metrics v2 (5 визуализаций) | ✅ | 2026-02-04 | [features/F24](features/F24_TEAM_METRICS_V2.md) |
-| F25 | Manual Order + Recommendations | 🚧 | 2026-01-30 | [features/F25](features/F25_MANUAL_ORDER.md) |
-| F26 | Employee Performance Dashboard | 📋 | — | — |
-| F27 | RBAC | ✅ | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
-| F28 | RICE Scoring & AutoScore | 📋 | — | — |
-| F29 | Project-Level Management | 💡 | — | — |
+| # | Название | Дата | Спецификация |
+|---|----------|------|-------------|
+| F1 | Bootstrap проекта | 2026-01-22 | [features/F1](features/F1_BOOTSTRAP.md) |
+| F2 | Jira Integration MVP | 2026-01-22 | [features/F2](features/F2_JIRA_INTEGRATION.md) |
+| F3 | Jira Sync & Cache | 2026-01-23 | [features/F3](features/F3_JIRA_SYNC.md) |
+| F4 | OAuth 2.0 (Atlassian 3LO) | 2026-01-23 | [features/F4](features/F4_OAUTH.md) |
+| F5 | Team Management Backend | 2026-01-23 | [features/F5](features/F5_TEAM_MANAGEMENT_BACKEND.md) |
+| F6 | Team Management UI | 2026-01-23 | [features/F6](features/F6_TEAM_MANAGEMENT_UI.md) |
+| F7 | Team Sync from Atlassian | 2026-01-23 | [features/F7](features/F7_TEAM_SYNC_ATLASSIAN.md) |
+| F8 | Board v2 (Epic root) | 2026-01-23 | [features/F8](features/F8_BOARD_V2.md) |
+| F9 | Sub-task Estimates | 2026-01-23 | [features/F9](features/F9_SUBTASK_ESTIMATES.md) |
+| F10 | Epic-Team Mapping | 2026-01-23 | [features/F10](features/F10_EPIC_TEAM_MAPPING.md) |
+| F11 | Rough Estimates для Epics | 2026-01-23 | [features/F11](features/F11_ROUGH_ESTIMATES.md) |
+| F13 | Автопланирование (AutoScore + Expected Done) | 2026-01-24 | [features/F13](features/F13_AUTOPLANNING.md) → заменён [F21](features/F21_UNIFIED_PLANNING.md) |
+| F14 | Timeline/Gantt | 2026-01-24 | [features/F14](features/F14_TIMELINE.md) |
+| F15 | WIP Limits (Stage 1) | 2026-01-24 | [features/F15](features/F15_WIP_LIMITS.md) |
+| F17 | Configurable Status Mapping | 2026-01-24 | [features/F17](features/F17_STATUS_MAPPING.md) |
+| F18 | Data Quality | 2026-01-24 | [features/F18](features/F18_DATA_QUALITY.md) |
+| F19 | Story AutoScore & Prioritization | 2026-01-25 | [features/F19](features/F19_STORY_AUTOSCORE.md) |
+| F20 | Story-Level Planning | 2026-01-25 | [features/F20](features/F20_STORY_FORECAST.md) |
+| F21 | Unified Planning Algorithm | 2026-01-25 | [features/F21](features/F21_UNIFIED_PLANNING.md) |
+| F22 | Team Metrics + DSR + Forecast Accuracy | 2026-01-26 | [features/F22](features/F22_TEAM_METRICS.md) |
+| F23 | Planning Poker | 2026-01-28 | [features/F23](features/F23_PLANNING_POKER.md) |
+| F24 | Team Metrics v2 (5 визуализаций) | 2026-02-04 | [features/F24](features/F24_TEAM_METRICS_V2.md) |
+| F27 | RBAC | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
 
-**Легенда:** ✅ Готово | 🚧 В работе | 📋 Planned | 💡 Idea
+## Бэклог (BF)
+
+| # | Название | Статус | Спецификация |
+|---|----------|--------|-------------|
+| BF1 | Manual Order + Recommendations | 🚧 В работе | [backlog/BF1](backlog/BF1_MANUAL_ORDER.md) |
+| BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
+| BF3 | Employee Performance Dashboard | 📋 Planned | — |
+| BF4 | RICE Scoring & AutoScore | 📋 Planned | — |
+| BF5 | Project-Level Management | 💡 Idea | — |
+| BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
+
+**Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
 ## Документация
 
@@ -41,10 +47,10 @@
 - [RULES.md](RULES.md) — бизнес-правила и правила разработки
 - [JIRA_WORKFLOWS.md](JIRA_WORKFLOWS.md) — Jira workflows (Epic, Story, Subtask)
 - [API_PLANNING.md](API_PLANNING.md) — API документация
-- [ROADMAP_V2.md](ROADMAP_V2.md) — роадмап F24-F29
+- [ROADMAP_V2.md](ROADMAP_V2.md) — роадмап
 - [TECH_DEBT.md](TECH_DEBT.md) — технический долг
 
-## Диаграмма зависимостей
+## Диаграмма зависимостей (реализованные)
 
 ```
 F1 → F2 → F3 → F8 → F9/F10 → F11 → F13 → F14/F15/F18
@@ -63,7 +69,7 @@ F22 → F24
 - Epic Burndown Chart (ideal vs actual)
 - Новые endpoints: `/api/metrics/velocity`, `/api/metrics/epic-burndown`, `/api/metrics/epics-for-burndown`
 
-### 2026-01-30: F25 Manual Order + Recommendations
+### 2026-01-30: BF1 Manual Order + Recommendations
 - Порядок эпиков/сторей через `manual_order` (drag & drop)
 - `autoScore` теперь только для рекомендаций
 - UI индикаторы: ↑ (выше по autoScore), ↓ (ниже), ● (соответствует)
