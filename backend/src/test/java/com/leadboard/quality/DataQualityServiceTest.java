@@ -392,6 +392,58 @@ class DataQualityServiceTest {
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.CHILD_IN_PROGRESS_EPIC_NOT));
         }
+
+        @Test
+        void subtaskDoneNoTimeLogged_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "Done", "TEST-2");
+            subtask.setOriginalEstimateSeconds(28800L); // 8 hours
+            subtask.setTimeSpentSeconds(null);
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_DONE_NO_TIME_LOGGED));
+        }
+
+        @Test
+        void subtaskDoneWithTimeLogged_shouldNotReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "Done", "TEST-2");
+            subtask.setOriginalEstimateSeconds(28800L); // 8 hours
+            subtask.setTimeSpentSeconds(25200L); // 7 hours
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_DONE_NO_TIME_LOGGED));
+        }
+
+        @Test
+        void subtaskTimeLoggedButTodo_shouldReturnError() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "New", "TEST-2");
+            subtask.setOriginalEstimateSeconds(14400L); // 4 hours
+            subtask.setTimeSpentSeconds(14000L); // ~3.9 hours
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_TIME_LOGGED_BUT_TODO));
+        }
+
+        @Test
+        void subtaskTimeLoggedInProgress_shouldNotReturnError() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(14400L);
+            subtask.setTimeSpentSeconds(14000L);
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_TIME_LOGGED_BUT_TODO));
+        }
     }
 
     // ==================== Blocking Errors Tests ====================

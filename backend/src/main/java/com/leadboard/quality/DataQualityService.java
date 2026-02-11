@@ -319,6 +319,32 @@ public class DataQualityService {
             }
         }
 
+        // SUBTASK_DONE_NO_TIME_LOGGED - Subtask is Done but has no time logged
+        if (statusMappingService.isDone(subtask.getStatus(), statusMapping)) {
+            boolean noTimeLogged = subtask.getTimeSpentSeconds() == null || subtask.getTimeSpentSeconds() == 0;
+            if (noTimeLogged) {
+                double estimateHours = subtask.getOriginalEstimateSeconds() != null
+                        ? subtask.getOriginalEstimateSeconds() / 3600.0 : 0;
+                violations.add(DataQualityViolation.of(
+                        DataQualityRule.SUBTASK_DONE_NO_TIME_LOGGED,
+                        estimateHours
+                ));
+            }
+        }
+
+        // SUBTASK_TIME_LOGGED_BUT_TODO - Subtask has time logged but still in TODO status
+        if (subtask.getTimeSpentSeconds() != null && subtask.getTimeSpentSeconds() > 0) {
+            boolean isTodo = !statusMappingService.isInProgress(subtask.getStatus(), statusMapping)
+                    && !statusMappingService.isDone(subtask.getStatus(), statusMapping);
+            if (isTodo) {
+                double loggedHours = subtask.getTimeSpentSeconds() / 3600.0;
+                violations.add(DataQualityViolation.of(
+                        DataQualityRule.SUBTASK_TIME_LOGGED_BUT_TODO,
+                        loggedHours
+                ));
+            }
+        }
+
         // CHILD_IN_PROGRESS_EPIC_NOT - Subtask in progress but Epic not in Developing/E2E Testing
         if (statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
             if (epic != null && !statusMappingService.isEpicInProgress(epic.getStatus(), statusMapping)) {

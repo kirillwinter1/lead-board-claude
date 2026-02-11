@@ -122,6 +122,18 @@ public enum DataQualityRule {
     SUBTASK_ACTIVE_STORY_NOT_INPROGRESS(
             DataQualitySeverity.WARNING,
             "Subtask is in active status but parent story is not in progress"
+    ),
+
+    // Subtask done without time logged
+    SUBTASK_DONE_NO_TIME_LOGGED(
+            DataQualitySeverity.WARNING,
+            "Subtask is Done but has no time logged (estimate: %.1f hours)"
+    ),
+
+    // Subtask has time logged but still in TODO status
+    SUBTASK_TIME_LOGGED_BUT_TODO(
+            DataQualitySeverity.ERROR,
+            "Subtask has time logged (%.1f hours) but is still in TODO status"
     );
 
     private final DataQualitySeverity severity;
