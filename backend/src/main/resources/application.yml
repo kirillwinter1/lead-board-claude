@@ -157,8 +157,10 @@ status-mapping:
     in-progress-statuses:
       - In Progress
       - Review
+      - Verification
       - В работе
       - Ревью
+      - Проверка
     done-statuses:
       - Done
       - Готово

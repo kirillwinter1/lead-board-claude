@@ -58,6 +58,7 @@
 | BF23 | Sprint Retrospective (Easy Retro) | 📋 Planned | [backlog/BF23](backlog/BF23_SPRINT_RETROSPECTIVE.md) |
 | BF24 | Quarterly Planning / OKR | 💡 Idea | — |
 | BF25 | Quality Metrics & Bug Management | 💡 Idea | — |
+| BF26 | Team Lead Recommendations | 💡 Idea | — |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 

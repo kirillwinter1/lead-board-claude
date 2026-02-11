@@ -1,11 +1,13 @@
 package com.leadboard.simulation;
 
-import com.leadboard.auth.OAuthService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraTransition;
 import com.leadboard.simulation.dto.SimulationAction;
-import com.leadboard.team.TeamMemberEntity;
-import com.leadboard.team.TeamMemberRepository;
+import com.leadboard.status.StatusCategory;
+import com.leadboard.status.StatusMappingConfig;
+import com.leadboard.status.StatusMappingService;
+import com.leadboard.team.TeamService;
+import com.leadboard.team.dto.PlanningConfigDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -13,7 +15,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -23,14 +24,15 @@ public class SimulationExecutor {
     private static final long RATE_LIMIT_DELAY_MS = 100;
 
     private final JiraClient jiraClient;
-    private final OAuthService oauthService;
-    private final TeamMemberRepository memberRepository;
+    private final StatusMappingService statusMappingService;
+    private final TeamService teamService;
 
-    public SimulationExecutor(JiraClient jiraClient, OAuthService oauthService,
-                              TeamMemberRepository memberRepository) {
+    public SimulationExecutor(JiraClient jiraClient,
+                              StatusMappingService statusMappingService,
+                              TeamService teamService) {
         this.jiraClient = jiraClient;
-        this.oauthService = oauthService;
-        this.memberRepository = memberRepository;
+        this.statusMappingService = statusMappingService;
+        this.teamService = teamService;
     }
 
     /**
@@ -38,19 +40,15 @@ public class SimulationExecutor {
      * Each action is executed using the assigned user's OAuth token.
      */
     public List<SimulationAction> execute(List<SimulationAction> plannedActions, LocalDate simDate, Long teamId) {
-        // Build map: displayName → jiraAccountId
-        Map<String, String> nameToAccountId = memberRepository.findByTeamIdAndActiveTrue(teamId).stream()
-                .collect(Collectors.toMap(
-                        TeamMemberEntity::getDisplayName,
-                        TeamMemberEntity::getJiraAccountId,
-                        (a, b) -> a  // keep first on duplicate
-                ));
+        // Load status mapping for category-based transition matching
+        PlanningConfigDto config = teamService.getPlanningConfig(teamId);
+        StatusMappingConfig statusMapping = config.statusMapping();
 
         List<SimulationAction> results = new ArrayList<>();
 
         for (SimulationAction action : plannedActions) {
             try {
-                SimulationAction result = executeAction(action, simDate, nameToAccountId);
+                SimulationAction result = executeAction(action, simDate, statusMapping);
                 results.add(result);
                 Thread.sleep(RATE_LIMIT_DELAY_MS);
             } catch (InterruptedException e) {
@@ -68,34 +66,17 @@ public class SimulationExecutor {
     }
 
     private SimulationAction executeAction(SimulationAction action, LocalDate simDate,
-                                           Map<String, String> nameToAccountId) {
+                                           StatusMappingConfig statusMapping) {
         if (action.type() == SimulationAction.ActionType.SKIP) {
             return action;
         }
 
-        // Resolve account ID from assignee display name
-        String accountId = resolveAccountId(action.assignee(), nameToAccountId);
-        if (accountId == null) {
-            // For epic/story transitions without assignee, use any available token
-            if (action.assignee() == null) {
-                accountId = nameToAccountId.values().stream().findFirst().orElse(null);
-            }
-            if (accountId == null) {
-                return action.withError("No OAuth token: cannot resolve user '" + action.assignee() + "'");
-            }
-        }
-
-        OAuthService.TokenInfo tokenInfo = oauthService.getValidAccessTokenForUser(accountId);
-        if (tokenInfo == null) {
-            return action.withError("No OAuth token for user: " + action.assignee());
-        }
-
         switch (action.type()) {
             case TRANSITION -> {
-                return executeTransition(action, tokenInfo);
+                return executeTransition(action, statusMapping);
             }
             case WORKLOG -> {
-                return executeWorklog(action, simDate, tokenInfo);
+                return executeWorklog(action, simDate);
             }
             default -> {
                 return action;
@@ -103,19 +84,12 @@ public class SimulationExecutor {
         }
     }
 
-    private SimulationAction executeTransition(SimulationAction action, OAuthService.TokenInfo tokenInfo) {
-        // Find the target transition
-        List<JiraTransition> transitions = jiraClient.getTransitions(
-                action.issueKey(), tokenInfo.accessToken(), tokenInfo.cloudId());
+    private SimulationAction executeTransition(SimulationAction action,
+                                               StatusMappingConfig statusMapping) {
+        // Use Basic Auth (system API token) for reliable write access
+        List<JiraTransition> transitions = jiraClient.getTransitionsBasicAuth(action.issueKey());
 
-        JiraTransition target = transitions.stream()
-                .filter(t -> {
-                    String targetStatus = action.toStatus();
-                    return targetStatus.equalsIgnoreCase(t.name())
-                            || (t.to() != null && targetStatus.equalsIgnoreCase(t.to().name()));
-                })
-                .findFirst()
-                .orElse(null);
+        JiraTransition target = findBestTransition(transitions, action, statusMapping);
 
         if (target == null) {
             String available = transitions.stream()
@@ -125,38 +99,82 @@ public class SimulationExecutor {
                     + "' not found. Available: [" + available + "]");
         }
 
-        jiraClient.transitionIssue(action.issueKey(), target.id(),
-                tokenInfo.accessToken(), tokenInfo.cloudId());
+        jiraClient.transitionIssueBasicAuth(action.issueKey(), target.id());
 
-        log.info("Simulation: transitioned {} from '{}' to '{}'",
-                action.issueKey(), action.fromStatus(), action.toStatus());
+        String actualTarget = target.to() != null ? target.to().name() : target.name();
+        log.info("Simulation: transitioned {} from '{}' to '{}' (requested '{}')",
+                action.issueKey(), action.fromStatus(), actualTarget, action.toStatus());
         return action.withExecuted();
     }
 
-    private SimulationAction executeWorklog(SimulationAction action, LocalDate simDate,
-                                            OAuthService.TokenInfo tokenInfo) {
+    /**
+     * Finds the best matching transition using multi-level strategy:
+     * 1. Exact name match (transition name or target status name)
+     * 2. Category-based match (IN_PROGRESS, DONE categories via StatusMappingService)
+     * 3. Forward fallback: if target is DONE but unavailable, pick any forward transition
+     */
+    private JiraTransition findBestTransition(List<JiraTransition> transitions,
+                                               SimulationAction action,
+                                               StatusMappingConfig statusMapping) {
+        String targetStatus = action.toStatus();
+
+        // 1. Exact match by transition name or target status name
+        for (JiraTransition t : transitions) {
+            if (targetStatus.equalsIgnoreCase(t.name())
+                    || (t.to() != null && targetStatus.equalsIgnoreCase(t.to().name()))) {
+                return t;
+            }
+        }
+
+        // 2. Category-based match
+        StatusCategory targetCategory = resolveTargetCategory(targetStatus);
+        if (targetCategory != null) {
+            for (JiraTransition t : transitions) {
+                if (t.to() != null) {
+                    StatusCategory transCategory = statusMappingService.categorize(
+                            t.to().name(), action.issueType(), statusMapping);
+                    if (transCategory == targetCategory) {
+                        return t;
+                    }
+                }
+            }
+
+            // 3. Forward fallback: if targeting DONE but no DONE transition available,
+            //    pick the first transition that moves forward (not back to TODO)
+            if (targetCategory == StatusCategory.DONE) {
+                for (JiraTransition t : transitions) {
+                    if (t.to() != null) {
+                        StatusCategory transCategory = statusMappingService.categorize(
+                                t.to().name(), action.issueType(), statusMapping);
+                        if (transCategory == StatusCategory.IN_PROGRESS) {
+                            log.info("Simulation: no DONE transition for {}, using forward transition '{}' → '{}'",
+                                    action.issueKey(), t.name(), t.to().name());
+                            return t;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private StatusCategory resolveTargetCategory(String targetStatus) {
+        if (targetStatus == null) return null;
+        String lower = targetStatus.toLowerCase();
+        if (lower.contains("progress") || lower.contains("работ")) return StatusCategory.IN_PROGRESS;
+        if (lower.contains("done") || lower.contains("готов") || lower.contains("closed")) return StatusCategory.DONE;
+        return null;
+    }
+
+    private SimulationAction executeWorklog(SimulationAction action, LocalDate simDate) {
         int timeSpentSeconds = (int) (action.hoursLogged() * 3600);
 
-        jiraClient.addWorklog(action.issueKey(), timeSpentSeconds, simDate,
-                tokenInfo.accessToken(), tokenInfo.cloudId());
+        jiraClient.addWorklogBasicAuth(action.issueKey(), timeSpentSeconds, simDate);
 
         log.info("Simulation: logged {}h on {} for {}",
                 action.hoursLogged(), action.issueKey(), action.assignee());
         return action.withExecuted();
     }
 
-    private String resolveAccountId(String displayName, Map<String, String> nameToAccountId) {
-        if (displayName == null) return null;
-        // Exact match
-        String accountId = nameToAccountId.get(displayName);
-        if (accountId != null) return accountId;
-
-        // Case-insensitive match
-        for (Map.Entry<String, String> entry : nameToAccountId.entrySet()) {
-            if (entry.getKey().equalsIgnoreCase(displayName)) {
-                return entry.getValue();
-            }
-        }
-        return null;
-    }
 }

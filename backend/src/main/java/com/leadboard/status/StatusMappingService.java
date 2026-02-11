@@ -77,10 +77,22 @@ public class StatusMappingService {
         if (typeLower.contains("epic") || typeLower.contains("эпик")) {
             return categorizeEpic(status, teamOverride);
         }
-        if (typeLower.contains("sub-task") || typeLower.contains("подзадача")) {
+        if (typeLower.contains("sub-task") || typeLower.contains("подзадача")
+                || isSubtaskRoleType(typeLower)) {
             return categorizeSubtask(status, teamOverride);
         }
         return categorizeStory(status, teamOverride);
+    }
+
+    /**
+     * Checks if the issue type is a subtask role type (Аналитика, Разработка, Тестирование).
+     * These are custom Jira subtask types used for SA/DEV/QA pipeline.
+     */
+    private boolean isSubtaskRoleType(String typeLower) {
+        return typeLower.contains("аналитик") || typeLower.contains("разработк")
+                || typeLower.contains("тестирован")
+                || typeLower.equals("analytics") || typeLower.equals("development")
+                || typeLower.equals("testing");
     }
 
     /**

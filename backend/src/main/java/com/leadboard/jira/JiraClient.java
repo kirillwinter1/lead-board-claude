@@ -334,6 +334,73 @@ public class JiraClient {
                 .block();
     }
 
+    // ============================================================
+    // Simulation methods — Basic Auth fallback (system API token)
+    // ============================================================
+
+    /**
+     * Get available transitions using Basic Auth (system API token).
+     */
+    @SuppressWarnings("unchecked")
+    public List<JiraTransition> getTransitionsBasicAuth(String issueKey) {
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        Map<String, Object> response = webClient.get()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block();
+
+        if (response == null || !response.containsKey("transitions")) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> transitions = (List<Map<String, Object>>) response.get("transitions");
+        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        return transitions.stream()
+                .map(t -> mapper.convertValue(t, JiraTransition.class))
+                .toList();
+    }
+
+    /**
+     * Transition an issue using Basic Auth (system API token).
+     */
+    public void transitionIssueBasicAuth(String issueKey, String transitionId) {
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        webClient.post()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .bodyValue(Map.of("transition", Map.of("id", transitionId)))
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    /**
+     * Add a worklog using Basic Auth (system API token).
+     */
+    public void addWorklogBasicAuth(String issueKey, int timeSpentSeconds, LocalDate date) {
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
+
+        webClient.post()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .bodyValue(Map.of(
+                        "timeSpentSeconds", timeSpentSeconds,
+                        "started", started
+                ))
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
     private String formatTimeEstimate(int seconds) {
         int hours = seconds / 3600;
         if (hours >= 8) {

@@ -1,6 +1,7 @@
 package com.leadboard.planning;
 
 import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -11,6 +12,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -39,6 +41,12 @@ import java.util.Map;
 public class AutoScoreCalculator {
 
     private static final Logger log = LoggerFactory.getLogger(AutoScoreCalculator.class);
+
+    private final JiraIssueRepository issueRepository;
+
+    public AutoScoreCalculator(JiraIssueRepository issueRepository) {
+        this.issueRepository = issueRepository;
+    }
 
     // Веса факторов (обновлены 2026-01-26)
     private static final BigDecimal WEIGHT_PROGRESS = new BigDecimal("10");
@@ -145,19 +153,34 @@ public class AutoScoreCalculator {
     }
 
     /**
-     * Прогресс: (logged / estimate) * 15
-     * Чем ближе к завершению, тем выше приоритет (быстрее закрыть)
+     * Прогресс: (logged / estimate) * 10
+     * Агрегирует данные из subtask'ов (Epic → Story → Subtask).
+     * Чем ближе к завершению, тем выше приоритет (быстрее закрыть).
      */
     private BigDecimal calculateProgressScore(JiraIssueEntity epic) {
-        Long estimate = epic.getOriginalEstimateSeconds();
-        Long logged = epic.getTimeSpentSeconds();
-
-        if (estimate == null || estimate == 0) {
+        // Find stories under this epic
+        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epic.getIssueKey());
+        if (stories.isEmpty()) {
             return BigDecimal.ZERO;
         }
 
-        long loggedValue = logged != null ? logged : 0;
-        double progress = Math.min(1.0, (double) loggedValue / estimate);
+        // Find subtasks under all stories
+        List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+
+        long totalEstimate = 0;
+        long totalLogged = 0;
+
+        for (JiraIssueEntity subtask : subtasks) {
+            totalEstimate += subtask.getEffectiveEstimateSeconds();
+            totalLogged += subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+        }
+
+        if (totalEstimate == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        double progress = Math.min(1.0, (double) totalLogged / totalEstimate);
 
         return BigDecimal.valueOf(progress)
                 .multiply(WEIGHT_PROGRESS)

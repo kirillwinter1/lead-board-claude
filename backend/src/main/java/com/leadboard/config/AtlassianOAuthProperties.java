@@ -8,7 +8,7 @@ public class AtlassianOAuthProperties {
     private String clientId;
     private String clientSecret;
     private String redirectUri;
-    private String scopes = "read:me read:jira-user read:jira-work offline_access";
+    private String scopes = "read:me read:jira-user read:jira-work write:jira-work offline_access";
     private String siteBaseUrl;
 
     // OAuth endpoints

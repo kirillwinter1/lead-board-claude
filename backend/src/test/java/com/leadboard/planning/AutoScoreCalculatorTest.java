@@ -1,23 +1,33 @@
 package com.leadboard.planning;
 
 import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
+@ExtendWith(MockitoExtension.class)
 class AutoScoreCalculatorTest {
+
+    @Mock private JiraIssueRepository issueRepository;
 
     private AutoScoreCalculator calculator;
 
     @BeforeEach
     void setUp() {
-        calculator = new AutoScoreCalculator();
+        calculator = new AutoScoreCalculator(issueRepository);
     }
 
     // ==================== Status Factor Tests (Updated 2026-01-26) ====================
@@ -137,8 +147,11 @@ class AutoScoreCalculatorTest {
     @Test
     void progressHalfwayGivesHalfScore() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setOriginalEstimateSeconds(100L * 3600); // 100 hours
-        epic.setTimeSpentSeconds(50L * 3600); // 50 hours logged
+        JiraIssueEntity story = createStory("TEST-200", "TEST-123");
+        JiraIssueEntity subtask = createSubtask("TEST-300", "TEST-200", 100L * 3600, 50L * 3600);
+
+        when(issueRepository.findByParentKey("TEST-123")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("TEST-200"))).thenReturn(List.of(subtask));
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -148,8 +161,11 @@ class AutoScoreCalculatorTest {
     @Test
     void progressZeroGivesZeroScore() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setOriginalEstimateSeconds(100L * 3600);
-        epic.setTimeSpentSeconds(0L);
+        JiraIssueEntity story = createStory("TEST-200", "TEST-123");
+        JiraIssueEntity subtask = createSubtask("TEST-300", "TEST-200", 100L * 3600, 0L);
+
+        when(issueRepository.findByParentKey("TEST-123")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("TEST-200"))).thenReturn(List.of(subtask));
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -159,8 +175,11 @@ class AutoScoreCalculatorTest {
     @Test
     void progressOverHundredPercentCappedAtMax() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setOriginalEstimateSeconds(100L * 3600);
-        epic.setTimeSpentSeconds(150L * 3600); // Overrun
+        JiraIssueEntity story = createStory("TEST-200", "TEST-123");
+        JiraIssueEntity subtask = createSubtask("TEST-300", "TEST-200", 100L * 3600, 150L * 3600);
+
+        when(issueRepository.findByParentKey("TEST-123")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("TEST-200"))).thenReturn(List.of(subtask));
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -168,10 +187,24 @@ class AutoScoreCalculatorTest {
     }
 
     @Test
-    void progressNoEstimateGivesZeroScore() {
+    void progressNoSubtasksGivesZeroScore() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setOriginalEstimateSeconds(null);
-        epic.setTimeSpentSeconds(50L * 3600);
+
+        when(issueRepository.findByParentKey("TEST-123")).thenReturn(Collections.emptyList());
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("progress"));
+    }
+
+    @Test
+    void progressNoEstimateOnSubtasksGivesZeroScore() {
+        JiraIssueEntity epic = createBasicEpic();
+        JiraIssueEntity story = createStory("TEST-200", "TEST-123");
+        JiraIssueEntity subtask = createSubtask("TEST-300", "TEST-200", 0L, 50L * 3600);
+
+        when(issueRepository.findByParentKey("TEST-123")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("TEST-200"))).thenReturn(List.of(subtask));
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -467,12 +500,20 @@ class AutoScoreCalculatorTest {
     @Test
     void almostDoneEpicScoresHigherThanJustStarted() {
         JiraIssueEntity almostDone = createBasicEpic();
-        almostDone.setOriginalEstimateSeconds(100L * 3600);
-        almostDone.setTimeSpentSeconds(90L * 3600); // 90% done
+        almostDone.setIssueKey("EPIC-1");
+        JiraIssueEntity story1 = createStory("STORY-1", "EPIC-1");
+        JiraIssueEntity subtask1 = createSubtask("SUB-1", "STORY-1", 100L * 3600, 90L * 3600);
+
+        when(issueRepository.findByParentKey("EPIC-1")).thenReturn(List.of(story1));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1"))).thenReturn(List.of(subtask1));
 
         JiraIssueEntity justStarted = createBasicEpic();
-        justStarted.setOriginalEstimateSeconds(100L * 3600);
-        justStarted.setTimeSpentSeconds(10L * 3600); // 10% done
+        justStarted.setIssueKey("EPIC-2");
+        JiraIssueEntity story2 = createStory("STORY-2", "EPIC-2");
+        JiraIssueEntity subtask2 = createSubtask("SUB-2", "STORY-2", 100L * 3600, 10L * 3600);
+
+        when(issueRepository.findByParentKey("EPIC-2")).thenReturn(List.of(story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-2"))).thenReturn(List.of(subtask2));
 
         BigDecimal almostDoneScore = calculator.calculate(almostDone);
         BigDecimal justStartedScore = calculator.calculate(justStarted);
@@ -527,5 +568,33 @@ class AutoScoreCalculatorTest {
         epic.setCreatedAt(OffsetDateTime.now().minusDays(30));
         epic.setUpdatedAt(OffsetDateTime.now());
         return epic;
+    }
+
+    private JiraIssueEntity createStory(String key, String parentKey) {
+        JiraIssueEntity story = new JiraIssueEntity();
+        story.setIssueKey(key);
+        story.setIssueId(key);
+        story.setProjectKey("TEST");
+        story.setSummary("Test Story");
+        story.setStatus("Done");
+        story.setIssueType("Story");
+        story.setParentKey(parentKey);
+        story.setSubtask(false);
+        return story;
+    }
+
+    private JiraIssueEntity createSubtask(String key, String parentKey, long estimateSeconds, long loggedSeconds) {
+        JiraIssueEntity subtask = new JiraIssueEntity();
+        subtask.setIssueKey(key);
+        subtask.setIssueId(key);
+        subtask.setProjectKey("TEST");
+        subtask.setSummary("Test Subtask");
+        subtask.setStatus("Done");
+        subtask.setIssueType("Sub-task");
+        subtask.setParentKey(parentKey);
+        subtask.setSubtask(true);
+        subtask.setOriginalEstimateSeconds(estimateSeconds);
+        subtask.setTimeSpentSeconds(loggedSeconds);
+        return subtask;
     }
 }
