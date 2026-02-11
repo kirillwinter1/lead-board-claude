@@ -21,15 +21,20 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class SyncService {
 
     private static final Logger log = LoggerFactory.getLogger(SyncService.class);
+    private static final int RECONCILE_EVERY_N_SYNCS = 12;
+
+    private int scheduledSyncCount = 0;
 
     private final JiraClient jiraClient;
     private final JiraProperties jiraProperties;
@@ -66,6 +71,11 @@ public class SyncService {
         }
         log.info("Starting scheduled sync for project: {}", projectKey);
         syncProject(projectKey);
+
+        scheduledSyncCount++;
+        if (scheduledSyncCount % RECONCILE_EVERY_N_SYNCS == 0) {
+            reconcileDeletedIssues(projectKey);
+        }
     }
 
     @Transactional
@@ -81,8 +91,11 @@ public class SyncService {
                     state.getLastSyncIssuesCount(), "Sync already in progress");
         }
 
-        // Run sync asynchronously
-        new Thread(() -> syncProject(projectKey)).start();
+        // Run sync + reconciliation asynchronously
+        new Thread(() -> {
+            syncProject(projectKey);
+            reconcileDeletedIssues(projectKey);
+        }).start();
 
         return new SyncStatus(true, OffsetDateTime.now(), state.getLastSyncCompletedAt(),
                 state.getLastSyncIssuesCount(), null);
@@ -424,6 +437,55 @@ public class SyncService {
                lowerStatus.contains("in review") ||
                lowerStatus.contains("in qa") ||
                lowerStatus.contains("in testing");
+    }
+
+    @Transactional
+    public void reconcileDeletedIssues(String projectKey) {
+        try {
+            log.info("Starting reconciliation of deleted issues for project: {}", projectKey);
+
+            // Fetch all issue keys from Jira (lightweight, only keys)
+            Set<String> jiraKeys = new HashSet<>();
+            String jql = String.format("project = %s ORDER BY key ASC", projectKey);
+            String nextPageToken = null;
+
+            while (true) {
+                JiraSearchResponse response = jiraClient.searchKeysOnly(jql, 100, nextPageToken);
+                List<JiraIssue> issues = response.getIssues();
+
+                if (issues == null || issues.isEmpty()) {
+                    break;
+                }
+
+                for (JiraIssue issue : issues) {
+                    jiraKeys.add(issue.getKey());
+                }
+
+                if (response.isLast() || response.getNextPageToken() == null) {
+                    break;
+                }
+                nextPageToken = response.getNextPageToken();
+            }
+
+            // Get all keys from DB
+            List<String> dbKeys = issueRepository.findAllIssueKeysByProjectKey(projectKey);
+
+            // Find orphaned keys (in DB but not in Jira)
+            List<String> orphanedKeys = dbKeys.stream()
+                    .filter(key -> !jiraKeys.contains(key))
+                    .toList();
+
+            if (!orphanedKeys.isEmpty()) {
+                log.info("Found {} deleted issues to remove: {}", orphanedKeys.size(), orphanedKeys);
+                issueRepository.deleteByIssueKeyIn(orphanedKeys);
+                log.info("Removed {} orphaned issues from database", orphanedKeys.size());
+            } else {
+                log.info("No deleted issues found during reconciliation");
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to reconcile deleted issues for project: {}", projectKey, e);
+        }
     }
 
     public record SyncStatus(

@@ -362,6 +362,13 @@ public class BoardService {
 
     private void aggregateProgress(BoardNode node) {
         if (node.getChildren().isEmpty()) {
+            // Epic with no children: don't use epic's own estimate (estimates are only on subtasks)
+            if (isEpic(node.getIssueType())) {
+                node.setEstimateSeconds(0L);
+                node.setLoggedSeconds(0L);
+                node.setProgress(0);
+                return;
+            }
             // Leaf node - calculate own progress
             Long estimate = node.getEstimateSeconds();
             Long logged = node.getLoggedSeconds();

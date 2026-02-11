@@ -1,9 +1,11 @@
 package com.leadboard.sync;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -25,6 +27,14 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     List<JiraIssueEntity> findByParentKeyIn(List<String> parentKeys);
 
     void deleteByProjectKey(String projectKey);
+
+    @Query("SELECT e.issueKey FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")
+    List<String> findAllIssueKeysByProjectKey(@Param("projectKey") String projectKey);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM JiraIssueEntity e WHERE e.issueKey IN :issueKeys")
+    void deleteByIssueKeyIn(@Param("issueKeys") List<String> issueKeys);
 
     // Методы для AutoScore
     List<JiraIssueEntity> findByIssueType(String issueType);

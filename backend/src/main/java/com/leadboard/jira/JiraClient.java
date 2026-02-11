@@ -65,6 +65,19 @@ public class JiraClient {
         return searchWithBasicAuth(jql, maxResults, nextPageToken, fields);
     }
 
+    /**
+     * Lightweight search that fetches only issue keys (for reconciliation of deleted issues).
+     */
+    public JiraSearchResponse searchKeysOnly(String jql, int maxResults, String nextPageToken) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        if (accessToken != null && cloudId != null) {
+            return searchWithOAuth(jql, maxResults, nextPageToken, accessToken, cloudId, "key");
+        }
+        return searchWithBasicAuth(jql, maxResults, nextPageToken, "key");
+    }
+
     private String buildFieldsList() {
         String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,assignee,flagged,issuelinks";
         String teamFieldId = jiraProperties.getTeamFieldId();
