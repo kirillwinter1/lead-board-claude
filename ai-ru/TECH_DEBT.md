@@ -74,6 +74,12 @@
 - [ ] Нет общего Loading/Error state компонента
 - [ ] Нет стейт-менеджмента (всё в useState, props drilling)
 
+### Рефакторинг метрик (из плана работ)
+
+- TeamMetricsService — монолит, считает всё в одном месте (throughput, lead time, cycle time, DSR, velocity, by-assignee)
+- MetricsQueryRepository — сложные SQL запросы, дублирование фильтрации
+- Рекомендация: выделить отдельные калькуляторы (ThroughputCalculator, LeadTimeCalculator, VelocityCalculator), общий MetricsFilter для переиспользования параметров фильтрации (teamId, from, to, issueType, epicKey, assigneeAccountId)
+
 ## Приоритеты исправления
 
 1. **CRITICAL**: Шифрование OAuth токенов, CSRF

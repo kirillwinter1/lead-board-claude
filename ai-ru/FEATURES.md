@@ -45,6 +45,19 @@
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
 | BF11 | Competency Matrix | 📋 Planned | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
 | BF12 | Sprint Integration | 📋 Planned | [backlog/BF12](backlog/BF12_SPRINT_INTEGRATION.md) |
+| BF13 | Export & Reporting | 💡 Idea | — |
+| BF14 | Time Off / Calendar | 💡 Idea | — |
+| BF15 | Release Management | 💡 Idea | — |
+| BF16 | Cross-team Roadmap | 💡 Idea | — |
+| BF17 | Public API & Webhooks | 💡 Idea | — |
+| BF18 | Billing & Subscriptions (Free/PRO/MAX) | 💡 Idea | — |
+| BF19 | Multi-tenancy & SaaS Packaging | 💡 Idea | — |
+| BF20 | Planning Poker v2 | 💡 Idea | — |
+| BF21 | Smart Hints & Onboarding | 💡 Idea | — |
+| BF22 | UI Redesign (Sidebar Navigation) | 💡 Idea | — |
+| BF23 | Sprint Retrospective (Easy Retro) | 💡 Idea | — |
+| BF24 | Quarterly Planning / OKR | 💡 Idea | — |
+| BF25 | Quality Metrics & Bug Management | 💡 Idea | — |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
