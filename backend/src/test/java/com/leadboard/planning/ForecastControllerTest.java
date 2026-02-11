@@ -1,6 +1,7 @@
 package com.leadboard.planning;
 
-import com.leadboard.auth.OAuthTokenRepository;
+import com.leadboard.auth.SessionRepository;
+import com.leadboard.config.AppProperties;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.Role;
@@ -33,7 +34,9 @@ class ForecastControllerTest {
     private ForecastService forecastService;
 
     @MockBean
-    private OAuthTokenRepository oAuthTokenRepository;
+    private SessionRepository sessionRepository;
+    @MockBean
+    private AppProperties appProperties;
 
     @MockBean
     private StoryForecastService storyForecastService;

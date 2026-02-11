@@ -6,6 +6,7 @@ import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
 import com.leadboard.metrics.service.StatusChangelogService;
 import com.leadboard.planning.AutoScoreService;
+import com.leadboard.planning.IssueOrderService;
 import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
@@ -44,6 +45,7 @@ public class SyncService {
     private final AutoScoreService autoScoreService;
     private final StoryAutoScoreService storyAutoScoreService;
     private final StatusChangelogService statusChangelogService;
+    private final IssueOrderService issueOrderService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
@@ -52,7 +54,8 @@ public class SyncService {
                        TeamRepository teamRepository,
                        AutoScoreService autoScoreService,
                        StoryAutoScoreService storyAutoScoreService,
-                       StatusChangelogService statusChangelogService) {
+                       StatusChangelogService statusChangelogService,
+                       IssueOrderService issueOrderService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
@@ -61,6 +64,7 @@ public class SyncService {
         this.autoScoreService = autoScoreService;
         this.storyAutoScoreService = storyAutoScoreService;
         this.statusChangelogService = statusChangelogService;
+        this.issueOrderService = issueOrderService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -166,7 +170,7 @@ public class SyncService {
                 }
 
                 for (JiraIssue issue : issues) {
-                    saveOrUpdateIssue(issue, projectKey);
+                    JiraIssueEntity saved = saveOrUpdateIssue(issue, projectKey);
                     totalSynced++;
                 }
 
@@ -185,6 +189,29 @@ public class SyncService {
 
             log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
                     lastSync != null ? "incremental" : "full");
+
+            // Normalize manual_order for ALL teams and epics (not just synced ones)
+            // This fixes gaps, zeros, and NULLs accumulated from previous syncs
+            try {
+                List<Long> allTeamIds = teamRepository.findByActiveTrue().stream()
+                        .map(TeamEntity::getId)
+                        .toList();
+                for (Long teamId : allTeamIds) {
+                    issueOrderService.normalizeTeamEpicOrders(teamId);
+                }
+
+                // Collect all epic keys that have children (stories/bugs)
+                Set<String> allEpicKeys = issueRepository.findByProjectKey(projectKey).stream()
+                        .filter(e -> e.getParentKey() != null)
+                        .map(JiraIssueEntity::getParentKey)
+                        .collect(Collectors.toSet());
+                for (String epicKey : allEpicKeys) {
+                    issueOrderService.normalizeStoryOrders(epicKey);
+                }
+                log.info("Normalized manual_order for {} teams and {} epics", allTeamIds.size(), allEpicKeys.size());
+            } catch (Exception e) {
+                log.error("Failed to normalize manual_order after sync", e);
+            }
 
             // Recalculate AutoScore for all epics and stories after sync
             try {
@@ -205,7 +232,7 @@ public class SyncService {
         }
     }
 
-    private void saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
+    private JiraIssueEntity saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
         JiraIssueEntity existing = issueRepository.findByIssueKey(jiraIssue.getKey())
                 .orElse(null);
         JiraIssueEntity entity = existing != null ? existing : new JiraIssueEntity();
@@ -341,6 +368,9 @@ public class SyncService {
         // Save issue first (required for changelog foreign key)
         issueRepository.save(entity);
 
+        // Assign manual_order to new issues that don't have one yet
+        issueOrderService.assignOrderIfMissing(entity);
+
         // Detect status change and record to changelog AFTER saving issue
         if (!java.util.Objects.equals(previousStatus, entity.getStatus())) {
             // Create a temporary entity with old status for changelog detection
@@ -351,6 +381,8 @@ public class SyncService {
             }
             statusChangelogService.detectAndRecordStatusChange(previousEntity, entity);
         }
+
+        return entity;
     }
 
     private LocalDate parseLocalDate(String dateStr) {

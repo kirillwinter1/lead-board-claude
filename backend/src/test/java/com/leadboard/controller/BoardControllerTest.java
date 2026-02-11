@@ -12,7 +12,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
-import com.leadboard.auth.OAuthTokenRepository;
+import com.leadboard.auth.SessionRepository;
+import com.leadboard.config.AppProperties;
 
 import java.util.List;
 
@@ -41,7 +42,9 @@ class BoardControllerTest {
     @MockBean
     private JiraIssueRepository jiraIssueRepository;
     @MockBean
-    private OAuthTokenRepository oAuthTokenRepository;
+    private SessionRepository sessionRepository;
+    @MockBean
+    private AppProperties appProperties;
 
     // ForecastController dependencies (loaded by WebMvcTest)
     @MockBean

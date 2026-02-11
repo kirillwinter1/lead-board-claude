@@ -6,6 +6,7 @@ import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
 import com.leadboard.metrics.service.StatusChangelogService;
 import com.leadboard.planning.AutoScoreService;
+import com.leadboard.planning.IssueOrderService;
 import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
@@ -60,6 +61,9 @@ class SyncServiceTest {
     @Mock
     private StatusChangelogService statusChangelogService;
 
+    @Mock
+    private IssueOrderService issueOrderService;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -72,7 +76,8 @@ class SyncServiceTest {
                 teamRepository,
                 autoScoreService,
                 storyAutoScoreService,
-                statusChangelogService
+                statusChangelogService,
+                issueOrderService
         );
 
         // Common setup

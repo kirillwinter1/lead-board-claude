@@ -388,6 +388,133 @@ class IssueOrderServiceTest {
         }
     }
 
+    // ==================== Normalize Epic Orders Tests ====================
+
+    @Nested
+    class NormalizeTeamEpicOrdersTests {
+
+        @Test
+        void normalizeTeamEpicOrders_fixesGapsAndZeros() {
+            // Given: epics with orders [0, 2, NULL] — zero, gap, and null
+            Long teamId = 1L;
+            JiraIssueEntity epic1 = createEpic("EPIC-1", teamId, 0);
+            JiraIssueEntity epic2 = createEpic("EPIC-2", teamId, 2);
+            JiraIssueEntity epic3 = createEpic("EPIC-3", teamId, null);
+
+            // ASC with NULL LAST: 0, 2, NULL
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+                .thenReturn(new ArrayList<>(List.of(epic1, epic2, epic3)));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // When
+            service.normalizeTeamEpicOrders(teamId);
+
+            // Then: should be [1, 2, 3]
+            assertEquals(1, epic1.getManualOrder());
+            assertEquals(2, epic2.getManualOrder());
+            assertEquals(3, epic3.getManualOrder());
+        }
+
+        @Test
+        void normalizeTeamEpicOrders_preservesExistingOrder() {
+            // Given: epics already in correct order [1, 2, 3]
+            Long teamId = 1L;
+            JiraIssueEntity epic1 = createEpic("EPIC-1", teamId, 1);
+            JiraIssueEntity epic2 = createEpic("EPIC-2", teamId, 2);
+            JiraIssueEntity epic3 = createEpic("EPIC-3", teamId, 3);
+
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+                .thenReturn(new ArrayList<>(List.of(epic1, epic2, epic3)));
+
+            // When
+            service.normalizeTeamEpicOrders(teamId);
+
+            // Then: no saves needed — orders already correct
+            verify(issueRepository, never()).save(any());
+            assertEquals(1, epic1.getManualOrder());
+            assertEquals(2, epic2.getManualOrder());
+            assertEquals(3, epic3.getManualOrder());
+        }
+
+        @Test
+        void normalizeTeamEpicOrders_nullTeamId_doesNothing() {
+            service.normalizeTeamEpicOrders(null);
+
+            verify(issueRepository, never()).findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), any());
+        }
+
+        @Test
+        void normalizeTeamEpicOrders_emptyList_doesNothing() {
+            Long teamId = 1L;
+            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+                .thenReturn(new ArrayList<>());
+
+            service.normalizeTeamEpicOrders(teamId);
+
+            verify(issueRepository, never()).save(any());
+        }
+    }
+
+    // ==================== Normalize Story Orders Tests ====================
+
+    @Nested
+    class NormalizeStoryOrdersTests {
+
+        @Test
+        void normalizeStoryOrders_fixesNulls() {
+            // Given: stories with orders [NULL, NULL, 1] — nulls should go to end
+            String parentKey = "EPIC-1";
+            JiraIssueEntity story1 = createStory("STORY-1", parentKey, 1);
+            JiraIssueEntity story2 = createStory("STORY-2", parentKey, null);
+            JiraIssueEntity story3 = createStory("STORY-3", parentKey, null);
+
+            // ASC with NULL LAST: 1, NULL, NULL
+            when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
+                .thenReturn(new ArrayList<>(List.of(story1, story2, story3)));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // When
+            service.normalizeStoryOrders(parentKey);
+
+            // Then: should be [1, 2, 3]
+            assertEquals(1, story1.getManualOrder());
+            assertEquals(2, story2.getManualOrder());
+            assertEquals(3, story3.getManualOrder());
+        }
+
+        @Test
+        void normalizeStoryOrders_skipsSubtasks() {
+            // Given: parent has stories and subtasks mixed
+            String parentKey = "EPIC-1";
+            JiraIssueEntity story1 = createStory("STORY-1", parentKey, 1);
+            JiraIssueEntity subtask = new JiraIssueEntity();
+            subtask.setIssueKey("SUB-1");
+            subtask.setIssueType("Sub-task");
+            subtask.setParentKey(parentKey);
+            subtask.setManualOrder(null);
+            JiraIssueEntity story2 = createStory("STORY-2", parentKey, 3);
+
+            when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
+                .thenReturn(new ArrayList<>(List.of(story1, subtask, story2)));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            // When
+            service.normalizeStoryOrders(parentKey);
+
+            // Then: stories get [1, 2], subtask is untouched
+            assertEquals(1, story1.getManualOrder());
+            assertEquals(2, story2.getManualOrder());
+            assertNull(subtask.getManualOrder()); // not touched
+        }
+
+        @Test
+        void normalizeStoryOrders_nullParentKey_doesNothing() {
+            service.normalizeStoryOrders(null);
+
+            verify(issueRepository, never()).findByParentKeyOrderByManualOrderAsc(any());
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     private JiraIssueEntity createEpic(String key, Long teamId, Integer manualOrder) {

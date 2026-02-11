@@ -1,5 +1,6 @@
 package com.leadboard.auth;
 
+import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -10,12 +11,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -26,22 +27,33 @@ class OAuthServiceTest {
     private AtlassianOAuthProperties oauthProperties;
 
     @Mock
+    private AppProperties appProperties;
+
+    @Mock
     private UserRepository userRepository;
 
     @Mock
     private OAuthTokenRepository tokenRepository;
 
+    @Mock
+    private SessionRepository sessionRepository;
+
     private OAuthService oAuthService;
 
     @BeforeEach
     void setUp() {
-        oAuthService = new OAuthService(oauthProperties, userRepository, tokenRepository);
+        oAuthService = new OAuthService(oauthProperties, appProperties, userRepository, tokenRepository, sessionRepository);
 
         // Setup default properties
         when(oauthProperties.getAuthorizationUri()).thenReturn("https://auth.atlassian.com/authorize");
         when(oauthProperties.getClientId()).thenReturn("test-client-id");
         when(oauthProperties.getScopes()).thenReturn("read:jira-user read:jira-work");
         when(oauthProperties.getRedirectUri()).thenReturn("http://localhost:8080/oauth/callback");
+
+        AppProperties.Session sessionProps = new AppProperties.Session();
+        when(appProperties.getSession()).thenReturn(sessionProps);
+
+        SecurityContextHolder.clearContext();
     }
 
     // ==================== getAuthorizationUrl() Tests ====================
@@ -78,6 +90,24 @@ class OAuthServiceTest {
 
             assertTrue(url.contains("prompt=consent"));
         }
+
+        @Test
+        @DisplayName("should generate unique states for concurrent flows")
+        void shouldGenerateUniqueStates() {
+            String url1 = oAuthService.getAuthorizationUrl();
+            String url2 = oAuthService.getAuthorizationUrl();
+
+            String state1 = extractParam(url1, "state");
+            String state2 = extractParam(url2, "state");
+
+            assertNotEquals(state1, state2);
+        }
+
+        private String extractParam(String url, String param) {
+            int start = url.indexOf(param + "=") + param.length() + 1;
+            int end = url.indexOf("&", start);
+            return end > 0 ? url.substring(start, end) : url.substring(start);
+        }
     }
 
     // ==================== handleCallback() Tests ====================
@@ -89,10 +119,9 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should reject invalid state")
         void shouldRejectInvalidState() {
-            // Generate a state first
             oAuthService.getAuthorizationUrl();
 
-            OAuthService.AuthResult result = oAuthService.handleCallback("code", "wrong-state");
+            OAuthService.CallbackResult result = oAuthService.handleCallback("code", "wrong-state");
 
             assertFalse(result.success());
             assertEquals("Invalid state parameter", result.error());
@@ -101,7 +130,7 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should reject when no state generated")
         void shouldRejectWhenNoState() {
-            OAuthService.AuthResult result = oAuthService.handleCallback("code", "any-state");
+            OAuthService.CallbackResult result = oAuthService.handleCallback("code", "any-state");
 
             assertFalse(result.success());
             assertEquals("Invalid state parameter", result.error());
@@ -174,10 +203,8 @@ class OAuthServiceTest {
     class GetAuthStatusTests {
 
         @Test
-        @DisplayName("should return not authenticated when no token")
+        @DisplayName("should return not authenticated when no SecurityContext")
         void shouldReturnNotAuthenticated() {
-            when(tokenRepository.findLatestToken()).thenReturn(Optional.empty());
-
             OAuthService.AuthStatus status = oAuthService.getAuthStatus();
 
             assertFalse(status.authenticated());
@@ -185,7 +212,7 @@ class OAuthServiceTest {
         }
 
         @Test
-        @DisplayName("should return authenticated with user info")
+        @DisplayName("should return authenticated with user info from SecurityContext")
         void shouldReturnAuthenticatedWithUser() {
             UserEntity user = new UserEntity();
             user.setId(1L);
@@ -194,10 +221,8 @@ class OAuthServiceTest {
             user.setEmail("john@test.com");
             user.setAvatarUrl("https://avatar.url");
 
-            OAuthTokenEntity tokenEntity = createValidToken();
-            tokenEntity.setUser(user);
-
-            when(tokenRepository.findLatestToken()).thenReturn(Optional.of(tokenEntity));
+            LeadBoardAuthentication auth = new LeadBoardAuthentication(user);
+            SecurityContextHolder.getContext().setAuthentication(auth);
 
             OAuthService.AuthStatus status = oAuthService.getAuthStatus();
 
@@ -215,11 +240,19 @@ class OAuthServiceTest {
     class LogoutTests {
 
         @Test
-        @DisplayName("should delete all tokens")
-        void shouldDeleteAllTokens() {
-            oAuthService.logout();
+        @DisplayName("should delete session by id")
+        void shouldDeleteSessionById() {
+            oAuthService.logout("session-123");
 
-            verify(tokenRepository).deleteAll();
+            verify(sessionRepository).deleteById("session-123");
+        }
+
+        @Test
+        @DisplayName("should not delete when sessionId is null")
+        void shouldNotDeleteWhenSessionIdNull() {
+            oAuthService.logout(null);
+
+            verify(sessionRepository, never()).deleteById(any());
         }
     }
 

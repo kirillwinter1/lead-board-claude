@@ -7,8 +7,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
@@ -57,11 +59,16 @@ public class SecurityConfig {
                 // Simulation - require ADMIN role
                 .requestMatchers("/api/simulation/**").hasRole("ADMIN")
 
-                // All other API endpoints - allow authenticated users
-                .requestMatchers("/api/**").permitAll()
+                // All other API endpoints - require authentication
+                .requestMatchers("/api/**").authenticated()
 
                 // Allow all other requests (frontend resources)
                 .anyRequest().permitAll()
+            )
+
+            // Return 401 JSON instead of redirect to login form
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
             );
 
         return http.build();

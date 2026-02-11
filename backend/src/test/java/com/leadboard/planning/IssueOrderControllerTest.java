@@ -1,6 +1,7 @@
 package com.leadboard.planning;
 
-import com.leadboard.auth.OAuthTokenRepository;
+import com.leadboard.auth.SessionRepository;
+import com.leadboard.config.AppProperties;
 import com.leadboard.sync.JiraIssueEntity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,9 @@ class IssueOrderControllerTest {
     private IssueOrderService orderService;
 
     @MockBean
-    private OAuthTokenRepository oAuthTokenRepository;
+    private SessionRepository sessionRepository;
+    @MockBean
+    private AppProperties appProperties;
 
     // ==================== Epic Order Tests ====================
 

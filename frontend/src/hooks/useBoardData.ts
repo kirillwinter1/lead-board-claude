@@ -38,7 +38,7 @@ export function useBoardData() {
       .catch(() => {})
   }, [])
 
-  const triggerSync = () => {
+  const triggerSync = (onComplete?: () => void) => {
     setSyncing(true)
     axios.post<SyncStatus>('/api/sync/trigger')
       .then(() => {
@@ -50,6 +50,7 @@ export function useBoardData() {
                 setSyncing(false)
                 clearInterval(pollInterval)
                 fetchBoard()
+                onComplete?.()
               }
             })
         }, 2000)

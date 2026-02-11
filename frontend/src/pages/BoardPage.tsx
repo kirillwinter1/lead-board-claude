@@ -41,6 +41,10 @@ export function BoardPage() {
     loadForecasts,
   } = useBoardForecasts(allTeamIds)
 
+  const handleSync = useCallback(() => {
+    triggerSync(loadForecasts)
+  }, [triggerSync, loadForecasts])
+
   // Handle reorder via drag & drop - simple position-based API
   // Pattern: Optimistic UI + Backend Reconciliation
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
@@ -130,7 +134,7 @@ export function BoardPage() {
         onClearFilters={clearFilters}
         syncStatus={syncStatus}
         syncing={syncing}
-        onSync={triggerSync}
+        onSync={handleSync}
       />
 
       <main className="main-content">

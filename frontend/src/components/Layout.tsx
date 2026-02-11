@@ -66,31 +66,33 @@ export function Layout() {
           <NavLink to="/board" className="logo-link">
             <img src={logo} alt="OneLane" className="header-logo" />
           </NavLink>
-          <nav className="nav-tabs">
-            <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
-              Board
-            </NavLink>
-            <NavLink to={`/board/timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-              Timeline
-            </NavLink>
-            <NavLink to={`/board/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-              Metrics
-            </NavLink>
-            <NavLink to={`/board/data-quality${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-              Data Quality
-            </NavLink>
-            <NavLink to={`/board/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-              Poker
-            </NavLink>
-            <NavLink to={`/board/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-              Teams
-            </NavLink>
-            {isAdmin(authStatus?.user) && (
-              <NavLink to="/board/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-                Settings
+          {authStatus?.authenticated && (
+            <nav className="nav-tabs">
+              <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
+                Board
               </NavLink>
-            )}
-          </nav>
+              <NavLink to={`/board/timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Timeline
+              </NavLink>
+              <NavLink to={`/board/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Metrics
+              </NavLink>
+              <NavLink to={`/board/data-quality${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Data Quality
+              </NavLink>
+              <NavLink to={`/board/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Poker
+              </NavLink>
+              <NavLink to={`/board/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Teams
+              </NavLink>
+              {isAdmin(authStatus?.user) && (
+                <NavLink to="/board/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                  Settings
+                </NavLink>
+              )}
+            </nav>
+          )}
         </div>
         <div className="header-right">
           <div className="auth-status">
@@ -112,7 +114,17 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <Outlet />
+      {authStatus?.authenticated ? (
+        <Outlet />
+      ) : authStatus !== null ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 56px)', gap: '16px' }}>
+          <h2 style={{ margin: 0, color: '#333' }}>Log in to continue</h2>
+          <p style={{ margin: 0, color: '#666' }}>You need to authenticate with Atlassian to access the board</p>
+          <button className="btn btn-secondary" onClick={handleLogin} style={{ fontSize: '16px', padding: '10px 24px' }}>
+            Login with Atlassian
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }

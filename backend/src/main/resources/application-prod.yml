@@ -33,6 +33,9 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
 
+app:
+  frontend-url: ${APP_FRONTEND_URL:https://onelane.ru}
+
 # CORS - настраивается через env
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:}

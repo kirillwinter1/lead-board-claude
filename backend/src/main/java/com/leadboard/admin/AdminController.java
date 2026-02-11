@@ -1,10 +1,12 @@
 package com.leadboard.admin;
 
 import com.leadboard.auth.AppRole;
+import com.leadboard.auth.LeadBoardAuthentication;
 import com.leadboard.auth.UserEntity;
 import com.leadboard.auth.UserRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -41,6 +43,14 @@ public class AdminController {
     public ResponseEntity<UserDto> updateUserRole(
             @PathVariable Long id,
             @RequestBody UpdateRoleRequest request) {
+
+        // Prevent admin from changing their own role (self-lockout protection)
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof LeadBoardAuthentication lbAuth) {
+            if (lbAuth.getUser().getId().equals(id)) {
+                throw new InvalidRoleException("Cannot change your own role");
+            }
+        }
 
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + id));

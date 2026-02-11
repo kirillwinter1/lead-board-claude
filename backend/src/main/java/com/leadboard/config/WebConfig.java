@@ -37,6 +37,13 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedHeaders("*")
                 .allowCredentials(true);
 
+        // OAuth endpoints (status, logout called from frontend)
+        registry.addMapping("/oauth/**")
+                .allowedOrigins(origins.toArray(new String[0]))
+                .allowedMethods("GET", "POST", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true);
+
         // WebSocket для Planning Poker
         registry.addMapping("/ws/**")
                 .allowedOrigins(origins.toArray(new String[0]))

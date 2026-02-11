@@ -2,20 +2,25 @@ package com.leadboard.auth;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class OAuthService {
@@ -23,31 +28,41 @@ public class OAuthService {
     private static final Logger log = LoggerFactory.getLogger(OAuthService.class);
 
     private final AtlassianOAuthProperties oauthProperties;
+    private final AppProperties appProperties;
     private final UserRepository userRepository;
     private final OAuthTokenRepository tokenRepository;
+    private final SessionRepository sessionRepository;
     private final WebClient webClient;
 
-    // Simple state storage (in production, use Redis or database)
-    private String currentState;
+    // Support concurrent OAuth flows (multiple users logging in simultaneously)
+    private final ConcurrentHashMap<String, Instant> pendingStates = new ConcurrentHashMap<>();
 
     public OAuthService(AtlassianOAuthProperties oauthProperties,
+                        AppProperties appProperties,
                         UserRepository userRepository,
-                        OAuthTokenRepository tokenRepository) {
+                        OAuthTokenRepository tokenRepository,
+                        SessionRepository sessionRepository) {
         this.oauthProperties = oauthProperties;
+        this.appProperties = appProperties;
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
+        this.sessionRepository = sessionRepository;
         this.webClient = WebClient.builder().build();
     }
 
     public String getAuthorizationUrl() {
-        currentState = UUID.randomUUID().toString();
+        String state = UUID.randomUUID().toString();
+        pendingStates.put(state, Instant.now().plusSeconds(600)); // 10 min TTL
+
+        // Cleanup expired states
+        pendingStates.entrySet().removeIf(e -> e.getValue().isBefore(Instant.now()));
 
         return UriComponentsBuilder.fromUriString(oauthProperties.getAuthorizationUri())
                 .queryParam("audience", "api.atlassian.com")
                 .queryParam("client_id", oauthProperties.getClientId())
                 .queryParam("scope", oauthProperties.getScopes())
                 .queryParam("redirect_uri", oauthProperties.getRedirectUri())
-                .queryParam("state", currentState)
+                .queryParam("state", state)
                 .queryParam("response_type", "code")
                 .queryParam("prompt", "consent")
                 .build()
@@ -55,25 +70,25 @@ public class OAuthService {
     }
 
     @Transactional
-    public AuthResult handleCallback(String code, String state) {
-        // Verify state
-        if (currentState == null || !currentState.equals(state)) {
-            log.warn("Invalid OAuth state. Expected: {}, Got: {}", currentState, state);
-            return new AuthResult(false, "Invalid state parameter", null);
+    public CallbackResult handleCallback(String code, String state) {
+        // Verify and consume state
+        Instant expiry = pendingStates.remove(state);
+        if (expiry == null || expiry.isBefore(Instant.now())) {
+            log.warn("Invalid or expired OAuth state: {}", state);
+            return new CallbackResult(false, "Invalid state parameter", null);
         }
-        currentState = null;
 
         try {
             // Exchange code for tokens
             TokenResponse tokenResponse = exchangeCodeForTokens(code);
             if (tokenResponse == null) {
-                return new AuthResult(false, "Failed to exchange code for tokens", null);
+                return new CallbackResult(false, "Failed to exchange code for tokens", null);
             }
 
             // Get user info
             UserInfo userInfo = getUserInfo(tokenResponse.accessToken);
             if (userInfo == null) {
-                return new AuthResult(false, "Failed to get user info", null);
+                return new CallbackResult(false, "Failed to get user info", null);
             }
 
             // Get cloud ID for the site
@@ -112,21 +127,20 @@ public class OAuthService {
 
             tokenRepository.save(token);
 
+            // Create session
+            SessionEntity session = new SessionEntity();
+            session.setId(UUID.randomUUID().toString());
+            session.setUser(user);
+            session.setExpiresAt(OffsetDateTime.now().plusDays(appProperties.getSession().getMaxAgeDays()));
+            sessionRepository.save(session);
+
             log.info("OAuth successful for user: {} ({})", user.getDisplayName(), user.getEmail());
 
-            return new AuthResult(true, null, new AuthenticatedUser(
-                    user.getId(),
-                    user.getAtlassianAccountId(),
-                    user.getDisplayName(),
-                    user.getEmail(),
-                    user.getAvatarUrl(),
-                    user.getAppRole().name(),
-                    user.getAppRole().getPermissions()
-            ));
+            return new CallbackResult(true, null, session.getId());
 
         } catch (Exception e) {
             log.error("OAuth callback failed", e);
-            return new AuthResult(false, e.getMessage(), null);
+            return new CallbackResult(false, e.getMessage(), null);
         }
     }
 
@@ -144,7 +158,7 @@ public class OAuthService {
                     .bodyToMono(String.class)
                     .block();
 
-            log.info("Token response: {}", responseBody);
+            log.info("Token response received");
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             return mapper.readValue(responseBody, TokenResponse.class);
@@ -219,7 +233,7 @@ public class OAuthService {
                     .bodyToMono(String.class)
                     .block();
 
-            log.info("User info response: {}", responseBody);
+            log.info("User info response received");
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             return mapper.readValue(responseBody, UserInfo.class);
@@ -238,7 +252,7 @@ public class OAuthService {
                     .bodyToMono(String.class)
                     .block();
 
-            log.info("Accessible resources response: {}", responseBody);
+            log.info("Accessible resources response received");
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
             List<AccessibleResource> resources = mapper.readValue(responseBody,
@@ -280,29 +294,28 @@ public class OAuthService {
     public record TokenInfo(String accessToken, String cloudId) {}
 
     public AuthStatus getAuthStatus() {
-        Optional<OAuthTokenEntity> tokenOpt = tokenRepository.findLatestToken();
-        if (tokenOpt.isEmpty()) {
-            return new AuthStatus(false, null);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof LeadBoardAuthentication leadAuth) {
+            UserEntity user = leadAuth.getUser();
+            return new AuthStatus(true, new AuthenticatedUser(
+                    user.getId(),
+                    user.getAtlassianAccountId(),
+                    user.getDisplayName(),
+                    user.getEmail(),
+                    user.getAvatarUrl(),
+                    user.getAppRole().name(),
+                    user.getAppRole().getPermissions()
+            ));
         }
-
-        OAuthTokenEntity token = tokenOpt.get();
-        UserEntity user = token.getUser();
-
-        return new AuthStatus(true, new AuthenticatedUser(
-                user.getId(),
-                user.getAtlassianAccountId(),
-                user.getDisplayName(),
-                user.getEmail(),
-                user.getAvatarUrl(),
-                user.getAppRole().name(),
-                user.getAppRole().getPermissions()
-        ));
+        return new AuthStatus(false, null);
     }
 
     @Transactional
-    public void logout() {
-        tokenRepository.deleteAll();
-        log.info("User logged out, all tokens deleted");
+    public void logout(String sessionId) {
+        if (sessionId != null) {
+            sessionRepository.deleteById(sessionId);
+            log.info("Session {} deleted", sessionId);
+        }
     }
 
     // DTOs
@@ -351,7 +364,7 @@ public class OAuthService {
         public String url;
     }
 
-    public record AuthResult(boolean success, String error, AuthenticatedUser user) {}
+    public record CallbackResult(boolean success, String error, String sessionId) {}
 
     public record AuthenticatedUser(
             Long id,

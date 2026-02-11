@@ -2,7 +2,8 @@ package com.leadboard.team;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadboard.auth.AuthorizationService;
-import com.leadboard.auth.OAuthTokenRepository;
+import com.leadboard.auth.SessionRepository;
+import com.leadboard.config.AppProperties;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.planning.AutoScoreService;
 import org.junit.jupiter.api.Test;
@@ -52,7 +53,9 @@ class TeamControllerTest {
     private AuthorizationService authorizationService;
 
     @MockBean
-    private OAuthTokenRepository oAuthTokenRepository;
+    private SessionRepository sessionRepository;
+    @MockBean
+    private AppProperties appProperties;
 
     @BeforeEach
     void setUp() {

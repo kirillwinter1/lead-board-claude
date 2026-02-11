@@ -157,6 +157,49 @@ public class IssueOrderService {
         }
     }
 
+    /**
+     * Normalize epic orders for a team: fix gaps, zeros, and NULLs into contiguous 1-based sequence.
+     * Preserves existing relative order. NULLs go to the end.
+     */
+    @Transactional
+    public void normalizeTeamEpicOrders(Long teamId) {
+        if (teamId == null) return;
+
+        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(EPIC_TYPES, teamId);
+        if (epics.isEmpty()) return;
+
+        int index = 1;
+        for (JiraIssueEntity epic : epics) {
+            if (!java.util.Objects.equals(epic.getManualOrder(), index)) {
+                epic.setManualOrder(index);
+                issueRepository.save(epic);
+            }
+            index++;
+        }
+    }
+
+    /**
+     * Normalize story/bug orders within a parent epic: fix gaps, zeros, and NULLs into contiguous 1-based sequence.
+     * Preserves existing relative order. NULLs go to the end. Subtasks are skipped.
+     */
+    @Transactional
+    public void normalizeStoryOrders(String parentKey) {
+        if (parentKey == null) return;
+
+        List<JiraIssueEntity> children = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
+        if (children.isEmpty()) return;
+
+        int index = 1;
+        for (JiraIssueEntity child : children) {
+            if (!isStory(child.getIssueType())) continue;
+            if (!java.util.Objects.equals(child.getManualOrder(), index)) {
+                child.setManualOrder(index);
+                issueRepository.save(child);
+            }
+            index++;
+        }
+    }
+
     private void shiftEpicsDown(Long teamId, int fromPosition, int toPosition) {
         List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(EPIC_TYPES, teamId);
         for (JiraIssueEntity e : epics) {

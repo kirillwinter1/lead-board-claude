@@ -1,6 +1,7 @@
 package com.leadboard.metrics.controller;
 
-import com.leadboard.auth.OAuthTokenRepository;
+import com.leadboard.auth.SessionRepository;
+import com.leadboard.config.AppProperties;
 import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
@@ -47,7 +48,9 @@ class TeamMetricsControllerTest {
     private EpicBurndownService burndownService;
 
     @MockBean
-    private OAuthTokenRepository oAuthTokenRepository;
+    private SessionRepository sessionRepository;
+    @MockBean
+    private AppProperties appProperties;
 
     @Test
     void getSummary_returnsAllMetrics() throws Exception {
