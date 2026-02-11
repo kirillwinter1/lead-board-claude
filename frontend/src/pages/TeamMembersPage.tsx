@@ -215,7 +215,7 @@ export function TeamMembersPage() {
     <main className="main-content">
       <div className="page-header">
         <div className="page-header-left">
-          <Link to="/teams" className="back-link">&larr; Back to Teams</Link>
+          <Link to="/board/teams" className="back-link">&larr; Back to Teams</Link>
           <h2>{team.name}</h2>
           {team.jiraTeamValue && (
             <span className="team-jira-value">{team.jiraTeamValue}</span>
@@ -245,7 +245,9 @@ export function TeamMembersPage() {
               {members.map(member => (
                 <tr key={member.id}>
                   <td className="cell-name">
-                    {member.displayName || <span className="cell-muted">Not set</span>}
+                    <Link to={`/board/teams/${teamId}/member/${member.id}`} className="team-name-link">
+                      {member.displayName || <span className="cell-muted">Not set</span>}
+                    </Link>
                   </td>
                   <td className="cell-account-id">{member.jiraAccountId}</td>
                   <td>

@@ -1,0 +1,404 @@
+/* =====================================================
+   MEMBER PROFILE PAGE
+   ===================================================== */
+
+/* Profile Header */
+.member-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.member-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #0052cc;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.member-info {
+  flex: 1;
+}
+
+.member-info h2 {
+  margin: 0 0 6px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.member-info-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.member-info-team {
+  font-size: 13px;
+  color: #6b778c;
+}
+
+.member-profile-period {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.member-profile-period label {
+  font-size: 13px;
+  color: #6b778c;
+}
+
+.member-profile-period input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid #dfe1e6;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #172b4d;
+}
+
+.member-profile-period span {
+  color: #6b778c;
+}
+
+/* Summary Cards Row */
+.member-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Two column layout */
+.member-profile-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.member-profile-grid .full-width {
+  grid-column: 1 / -1;
+}
+
+/* Section Card */
+.profile-section {
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.profile-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.profile-section-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.profile-section-header .section-badge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #ebecf0;
+  color: #42526e;
+}
+
+/* Tasks Table */
+.profile-tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.profile-tasks-table th {
+  padding: 10px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #fafbfc;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.profile-tasks-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f4f5f7;
+  font-size: 13px;
+  color: #172b4d;
+}
+
+.profile-tasks-table tr:hover {
+  background: #f4f5f7;
+}
+
+.task-key {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  color: #0052cc;
+  font-weight: 500;
+}
+
+.task-summary-cell {
+  max-width: 300px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-epic-label {
+  font-size: 11px;
+  color: #6b778c;
+  display: block;
+  margin-top: 2px;
+}
+
+.task-hours {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+}
+
+.task-hours.over {
+  color: #de350b;
+}
+
+.task-hours.under {
+  color: #00875a;
+}
+
+/* DSR per task badge */
+.dsr-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dsr-badge.good {
+  background: #e3fcef;
+  color: #006644;
+}
+
+.dsr-badge.warning {
+  background: #fffae6;
+  color: #ff8b00;
+}
+
+.dsr-badge.bad {
+  background: #ffebe6;
+  color: #bf2600;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.done {
+  background: #e3fcef;
+  color: #006644;
+}
+
+.status-badge.in-progress {
+  background: #deebff;
+  color: #0747a6;
+}
+
+.status-badge.todo {
+  background: #f4f5f7;
+  color: #42526e;
+}
+
+/* Trend Chart (SVG) */
+.trend-chart-container {
+  padding: 20px;
+}
+
+.trend-chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.trend-chart-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b778c;
+}
+
+.trend-chart-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.trend-chart-svg {
+  width: 100%;
+  height: 180px;
+}
+
+/* Stats row within section */
+.profile-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: #ebecf0;
+}
+
+.profile-stat {
+  background: white;
+  padding: 16px 20px;
+  text-align: center;
+}
+
+.profile-stat-label {
+  font-size: 11px;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.profile-stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.profile-stat-value.good {
+  color: #00875a;
+}
+
+.profile-stat-value.warning {
+  color: #ff8b00;
+}
+
+.profile-stat-value.bad {
+  color: #de350b;
+}
+
+.profile-stat-hint {
+  font-size: 11px;
+  color: #97a0af;
+  margin-top: 4px;
+}
+
+/* Workload bar */
+.workload-bar-container {
+  padding: 20px;
+}
+
+.workload-day {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.workload-day-label {
+  width: 90px;
+  font-size: 12px;
+  color: #6b778c;
+  flex-shrink: 0;
+}
+
+.workload-bar-bg {
+  flex: 1;
+  height: 20px;
+  background: #f4f5f7;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.workload-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.workload-bar-fill.light {
+  background: #4c9aff;
+}
+
+.workload-bar-fill.medium {
+  background: #ff991f;
+}
+
+.workload-bar-fill.heavy {
+  background: #de350b;
+}
+
+.workload-day-hours {
+  width: 50px;
+  font-size: 12px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  color: #42526e;
+  text-align: right;
+}
+
+/* Summary totals row */
+.tasks-totals-row {
+  background: #fafbfc;
+  font-weight: 600;
+}
+
+.tasks-totals-row td {
+  border-top: 2px solid #dfe1e6;
+  border-bottom: none;
+  font-size: 13px;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .member-summary-cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .member-profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .member-summary-cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .member-profile-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .member-profile-period {
+    flex-wrap: wrap;
+  }
+}
