@@ -27,22 +27,24 @@
 | F23 | Planning Poker | 2026-01-28 | [features/F23](features/F23_PLANNING_POKER.md) |
 | F24 | Team Metrics v2 (5 визуализаций) | 2026-02-04 | [features/F24](features/F24_TEAM_METRICS_V2.md) |
 | F27 | RBAC | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
+| F28 | AI Simulation | 2026-02-08 | [features/F28](features/F28_SIMULATION.md) |
 
 ## Бэклог (BF)
 
 | # | Название | Статус | Спецификация |
 |---|----------|--------|-------------|
-| BF1 | Manual Order + Recommendations | 🚧 В работе | [backlog/BF1](backlog/BF1_MANUAL_ORDER.md) |
+| BF1 | Manual Order + Recommendations | ✅ Done | [backlog/BF1](backlog/BF1_MANUAL_ORDER.md) |
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
 | BF4 | RICE Scoring & AutoScore | 📋 Planned | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
 | BF5 | Projects (Project-Level Management) | 📋 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
-| BF8 | AI Simulation | 📋 Planned | [backlog/BF8](backlog/BF8_SIMULATION.md) |
+| BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |
 | BF9 | Universal Workflow Configuration | 📋 Planned | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
 | BF11 | Competency Matrix | 📋 Planned | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
+| BF12 | Sprint Integration | 📋 Planned | [backlog/BF12](backlog/BF12_SPRINT_INTEGRATION.md) |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
