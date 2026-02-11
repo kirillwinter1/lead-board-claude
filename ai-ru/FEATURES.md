@@ -55,7 +55,7 @@
 | BF20 | Planning Poker v2 | 💡 Idea | — |
 | BF21 | Smart Hints & Onboarding | 💡 Idea | — |
 | BF22 | UI Redesign (Sidebar Navigation) | 💡 Idea | — |
-| BF23 | Sprint Retrospective (Easy Retro) | 💡 Idea | — |
+| BF23 | Sprint Retrospective (Easy Retro) | 📋 Planned | [backlog/BF23](backlog/BF23_SPRINT_RETROSPECTIVE.md) |
 | BF24 | Quarterly Planning / OKR | 💡 Idea | — |
 | BF25 | Quality Metrics & Bug Management | 💡 Idea | — |
 
