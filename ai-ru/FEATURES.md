@@ -42,6 +42,7 @@
 | BF8 | AI Simulation | 📋 Planned | [backlog/BF8](backlog/BF8_SIMULATION.md) |
 | BF9 | Universal Workflow Configuration | 📋 Planned | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
+| BF11 | Competency Matrix | 📋 Planned | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
 
 **Легенда:** 🚧 В работе | 📋 Planned | 💡 Idea
 
