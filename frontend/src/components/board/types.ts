@@ -1,5 +1,7 @@
 import { EpicForecast } from '../../api/forecast'
+import { PlannedStory } from '../../api/forecast'
 import { RoughEstimateConfig } from '../../api/epics'
+import { ScoreBreakdown } from '../../api/board'
 
 export interface RoleMetrics {
   estimateSeconds: number
@@ -68,4 +70,72 @@ export interface DragHandleProps {
 
 export type RoughEstimateUpdateFn = (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
 
-export type { EpicForecast, RoughEstimateConfig }
+// Component prop types
+
+export interface ProgressCellProps {
+  loggedSeconds: number | null
+  estimateSeconds: number | null
+  progress: number | null
+}
+
+export interface EpicRoleChipProps {
+  label: string
+  role: 'sa' | 'dev' | 'qa'
+  metrics: RoleMetrics
+  epicInTodo: boolean
+  epicKey: string
+  config: RoughEstimateConfig | null
+  onUpdate: RoughEstimateUpdateFn
+}
+
+export interface RoleChipsProps {
+  node: BoardNode
+  config: RoughEstimateConfig | null
+  onRoughEstimateUpdate: RoughEstimateUpdateFn
+}
+
+export interface PriorityCellProps {
+  node: BoardNode
+  recommendedPosition?: number
+  actualPosition?: number
+}
+
+export interface StoryExpectedDoneCellProps {
+  endDate: string | null
+  assignee: string | null
+  storyPlanning: PlannedStory | null
+}
+
+export interface ExpectedDoneCellProps {
+  forecast: EpicForecast | null
+}
+
+export interface BoardRowProps {
+  node: BoardNode
+  level: number
+  expanded: boolean
+  onToggle: () => void
+  hasChildren: boolean
+  roughEstimateConfig: RoughEstimateConfig | null
+  onRoughEstimateUpdate: RoughEstimateUpdateFn
+  forecast: EpicForecast | null
+  canReorder: boolean
+  isJustDropped: boolean
+  actualPosition?: number
+  recommendedPosition?: number
+  dragHandleProps?: Record<string, unknown>
+  storyPlanning?: PlannedStory | null
+}
+
+export interface BoardTableProps {
+  items: BoardNode[]
+  roughEstimateConfig: RoughEstimateConfig | null
+  onRoughEstimateUpdate: RoughEstimateUpdateFn
+  forecastMap: Map<string, EpicForecast>
+  storyPlanningMap: Map<string, PlannedStory>
+  canReorder: boolean
+  onReorder: (epicKey: string, newIndex: number) => Promise<void>
+  onStoryReorder: (storyKey: string, parentEpicKey: string, newIndex: number) => Promise<void>
+}
+
+export type { EpicForecast, RoughEstimateConfig, PlannedStory, ScoreBreakdown }
