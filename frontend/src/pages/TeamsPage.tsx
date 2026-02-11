@@ -192,7 +192,7 @@ export function TeamsPage() {
               {teams.map(team => (
                 <tr key={team.id}>
                   <td>
-                    <Link to={`/teams/${team.id}`} className="team-name-link">
+                    <Link to={`/board/teams/${team.id}`} className="team-name-link">
                       {team.name}
                     </Link>
                   </td>

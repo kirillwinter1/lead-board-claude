@@ -1976,30 +1976,42 @@ export function BoardPage() {
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
 
-    // Optimistic update: immediately reorder in UI
+    // Optimistic update: reorder within the selected team only
     setBoard(prevBoard => {
-      const items = [...prevBoard]
-      const oldIndex = items.findIndex(e => e.issueKey === epicKey)
+      const epicToMove = prevBoard.find(e => e.issueKey === epicKey)
+      if (!epicToMove) return prevBoard
+      const teamId = epicToMove.teamId
+
+      // Extract only this team's items in their current order
+      const teamItems = prevBoard.filter(e => e.teamId === teamId)
+      const oldIndex = teamItems.findIndex(e => e.issueKey === epicKey)
       if (oldIndex === -1 || oldIndex === targetIndex) return prevBoard
 
-      const [movedItem] = items.splice(oldIndex, 1)
-      items.splice(targetIndex, 0, movedItem)
+      // Reorder within team
+      const [movedItem] = teamItems.splice(oldIndex, 1)
+      teamItems.splice(targetIndex, 0, movedItem)
 
-      // Update manualOrder for all affected items
-      return items.map((item, idx) => ({
+      // Update manualOrder for team items
+      const reorderedTeam = teamItems.map((item, idx) => ({
         ...item,
         manualOrder: idx + 1
       }))
+
+      // Reconstruct full board, replacing team items in place
+      let teamIdx = 0
+      return prevBoard.map(item => {
+        if (item.teamId === teamId) {
+          return reorderedTeam[teamIdx++]
+        }
+        return item
+      })
     })
 
     try {
       await updateEpicOrder(epicKey, newPosition)
-      // Silent fetch to reconcile with backend (no loading state)
-      fetchBoard(true)
       loadForecasts()
     } catch (err) {
       console.error('Failed to reorder epic:', err)
-      // On error, fetch to restore correct state
       await fetchBoard()
     }
   }, [fetchBoard, loadForecasts])
@@ -2033,8 +2045,8 @@ export function BoardPage() {
 
     try {
       await updateStoryOrder(storyKey, newPosition)
-      // Silent fetch to reconcile with backend (no loading state)
-      fetchBoard(true)
+      // Optimistic update already applied — no need to refetch board
+      // Only reload forecasts since order may affect them
       loadForecasts()
     } catch (err) {
       console.error('Failed to reorder story:', err)
