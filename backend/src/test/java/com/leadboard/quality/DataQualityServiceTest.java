@@ -123,7 +123,7 @@ class DataQualityServiceTest {
 
         @Test
         void epicNoDueDate_shouldReturnInfo() {
-            JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
+            JiraIssueEntity epic = createEpic("TEST-1", "Planned");
             epic.setTeamId(1L);
             epic.setDueDate(null);
 
@@ -165,7 +165,7 @@ class DataQualityServiceTest {
 
         @Test
         void epicNoEstimate_shouldReturnWarning() {
-            JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
+            JiraIssueEntity epic = createEpic("TEST-1", "Planned");
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().plusDays(30));
 
@@ -243,9 +243,13 @@ class DataQualityServiceTest {
             epic.setRoughEstimateDevDays(new java.math.BigDecimal("5.0"));
 
             JiraIssueEntity story = createStory("TEST-2", "In Progress", "TEST-1");
-            story.setTimeSpentSeconds(3600L);
+
+            // Subtask under story with logged time
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setTimeSpentSeconds(3600L);
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
+            when(issueRepository.findByParentKeyIn(List.of("TEST-2"))).thenReturn(List.of(subtask));
 
             List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(story), statusMapping);
 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import axios from 'axios'
 import { getConfig } from '../api/config'
+import { teamsApi, TeamMember } from '../api/teams'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -18,6 +20,21 @@ import { usePokerWebSocket } from '../hooks/usePokerWebSocket'
 
 const VOTE_OPTIONS = [2, 4, 8, 12, 16, 24, 32, 40, -1] // -1 = "?"
 
+interface AuthUser {
+  id: number
+  accountId: string
+  displayName: string
+  email: string
+  avatarUrl: string | null
+  role: string
+  permissions: string[]
+}
+
+interface AuthStatus {
+  authenticated: boolean
+  user: AuthUser | null
+}
+
 export function PokerRoomPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
   const navigate = useNavigate()
@@ -27,17 +44,21 @@ export function PokerRoomPage() {
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState('')
 
-  // User info (in production, get from OAuth context)
-  const [userAccountId] = useState('user-' + Math.random().toString(36).substr(2, 9))
-  const [userDisplayName] = useState('User')
-  const [userRole] = useState<'SA' | 'DEV' | 'QA'>('DEV')
-  const [isFacilitator] = useState(true) // TODO: determine from OAuth
+  // Auth state
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [userRole, setUserRole] = useState<'SA' | 'DEV' | 'QA' | null>(null)
+  const [showRoleSelector, setShowRoleSelector] = useState(false)
+  const [isFacilitator, setIsFacilitator] = useState(false)
 
   // Room state
   const [participants, setParticipants] = useState<ParticipantInfo[]>([])
   const [currentStoryId, setCurrentStoryId] = useState<number | null>(null)
   const [stories, setStories] = useState<PokerStory[]>([])
   const [myVote, setMyVote] = useState<number | null>(null)
+
+  // Copy room code
+  const [copied, setCopied] = useState(false)
 
   // Add story modal
   const [showAddStory, setShowAddStory] = useState(false)
@@ -57,28 +78,64 @@ export function PokerRoomPage() {
   const [finalDev, setFinalDev] = useState<string>('')
   const [finalQa, setFinalQa] = useState<string>('')
 
-  // Load initial session
+  // Fetch auth status
   useEffect(() => {
-    if (!roomCode) return
+    axios.get<AuthStatus>('/oauth/atlassian/status')
+      .then(response => {
+        if (response.data.authenticated && response.data.user) {
+          setAuthUser(response.data.user)
+        } else {
+          setError('Необходимо авторизоваться для участия в сессии')
+        }
+        setAuthLoading(false)
+      })
+      .catch(() => {
+        setError('Не удалось проверить авторизацию')
+        setAuthLoading(false)
+      })
+  }, [])
+
+  // Load session + determine role once auth is ready
+  useEffect(() => {
+    if (!roomCode || !authUser) return
 
     Promise.all([
       getSessionByRoomCode(roomCode),
       getConfig()
     ])
-      .then(([sessionData, config]) => {
+      .then(async ([sessionData, config]) => {
         setSession(sessionData)
         setStories(sessionData.stories)
         setCurrentStoryId(sessionData.currentStoryId)
         setJiraBaseUrl(config.jiraBaseUrl)
-        // TODO: Check if current user is facilitator via OAuth
-        // setIsFacilitator(sessionData.facilitatorAccountId === userAccountId)
+
+        // Determine facilitator (fallback: "system" means legacy session — treat creator as facilitator)
+        const isFac = sessionData.facilitatorAccountId === authUser.accountId
+          || sessionData.facilitatorAccountId === 'system'
+        setIsFacilitator(isFac)
+
+        // Determine team role
+        try {
+          const members: TeamMember[] = await teamsApi.getMembers(sessionData.teamId)
+          const me = members.find(m => m.jiraAccountId === authUser.accountId)
+          if (me) {
+            setUserRole(me.role)
+          } else {
+            // User not in team - show role selector
+            setShowRoleSelector(true)
+          }
+        } catch {
+          // Fallback: show role selector
+          setShowRoleSelector(true)
+        }
+
         setLoading(false)
       })
       .catch(err => {
-        setError('Failed to load session: ' + err.message)
+        setError('Не удалось загрузить сессию: ' + err.message)
         setLoading(false)
       })
-  }, [roomCode, userAccountId])
+  }, [roomCode, authUser])
 
   // WebSocket callbacks
   const handleStateUpdate = useCallback((state: SessionState) => {
@@ -174,7 +231,8 @@ export function PokerRoomPage() {
     setError(message)
   }, [])
 
-  // WebSocket connection
+  // WebSocket connection — only connect when we have auth + role
+  const wsReady = !!authUser && !!userRole
   const {
     connected,
     sendVote,
@@ -183,10 +241,10 @@ export function PokerRoomPage() {
     sendNextStory,
     sendStartSession,
   } = usePokerWebSocket({
-    roomCode: roomCode || '',
-    accountId: userAccountId,
-    displayName: userDisplayName,
-    role: userRole,
+    roomCode: wsReady ? (roomCode || '') : '',
+    accountId: authUser?.accountId || '',
+    displayName: authUser?.displayName || '',
+    role: userRole || 'DEV',
     isFacilitator,
     onStateUpdate: handleStateUpdate,
     onParticipantJoined: handleParticipantJoined,
@@ -227,6 +285,19 @@ export function PokerRoomPage() {
 
   const handleStartSession = () => {
     sendStartSession()
+  }
+
+  const handleCopyRoomCode = () => {
+    if (!session) return
+    navigator.clipboard.writeText(session.roomCode).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  const handleSelectRole = (role: 'SA' | 'DEV' | 'QA') => {
+    setUserRole(role)
+    setShowRoleSelector(false)
   }
 
   const handleAddStory = async () => {
@@ -312,9 +383,13 @@ export function PokerRoomPage() {
   // Current story
   const currentStory = stories.find(s => s.id === currentStoryId)
 
+  // Progress stats
+  const completedCount = stories.filter(s => s.status === 'COMPLETED').length
+
   // Check if user can vote on current story
   const canVote = currentStory &&
     currentStory.status === 'VOTING' &&
+    userRole &&
     ((userRole === 'SA' && currentStory.needsSa) ||
      (userRole === 'DEV' && currentStory.needsDev) ||
      (userRole === 'QA' && currentStory.needsQa))
@@ -322,7 +397,6 @@ export function PokerRoomPage() {
   // Get votes for display
   const getVotesDisplay = (story: PokerStory) => {
     if (story.status === 'VOTING') {
-      // Show who has voted but not the values
       const saVoted = story.votes.filter(v => v.voterRole === 'SA' && v.hasVoted).length
       const devVoted = story.votes.filter(v => v.voterRole === 'DEV' && v.hasVoted).length
       const qaVoted = story.votes.filter(v => v.voterRole === 'QA' && v.hasVoted).length
@@ -339,7 +413,8 @@ export function PokerRoomPage() {
     return null
   }
 
-  if (loading) {
+  // Loading states
+  if (authLoading || loading) {
     return <main className="main-content"><div className="loading">Загрузка комнаты...</div></main>
   }
 
@@ -347,7 +422,7 @@ export function PokerRoomPage() {
     return (
       <main className="main-content">
         <div className="error">{error}</div>
-        <button className="btn btn-secondary" onClick={() => navigate('/poker')}>
+        <button className="btn btn-secondary" onClick={() => navigate('/board/poker')}>
           Назад к списку
         </button>
       </main>
@@ -358,101 +433,156 @@ export function PokerRoomPage() {
     return <main className="main-content"><div className="error">Сессия не найдена</div></main>
   }
 
+  // Role selector modal
+  if (showRoleSelector && !userRole) {
+    return (
+      <main className="main-content">
+        <div className="modal-overlay" style={{ position: 'relative', background: 'transparent' }}>
+          <div className="modal-content" style={{ marginTop: 80 }}>
+            <h3>Выберите роль</h3>
+            <p style={{ color: '#6b778c', marginBottom: 16 }}>
+              Вы не привязаны к команде. Выберите роль для голосования:
+            </p>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <button className="btn btn-primary poker-role-select-btn sa" onClick={() => handleSelectRole('SA')}>
+                SA
+              </button>
+              <button className="btn btn-primary poker-role-select-btn dev" onClick={() => handleSelectRole('DEV')}>
+                DEV
+              </button>
+              <button className="btn btn-primary poker-role-select-btn qa" onClick={() => handleSelectRole('QA')}>
+                QA
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
   return (
     <main className="main-content poker-room">
       {/* Header */}
       <div className="poker-header">
         <div className="poker-header-left">
-          <button className="btn btn-secondary" onClick={() => navigate('/poker')}>
+          <button className="btn btn-secondary" onClick={() => navigate('/board/poker')}>
             ← Назад
           </button>
           <h2>
-            Planning Poker
             <a
               href={`${jiraBaseUrl}${session.epicKey}`}
               target="_blank"
               rel="noopener noreferrer"
               className="issue-key"
-              style={{ marginLeft: 12 }}
             >
               {session.epicKey}
             </a>
+            <span className="poker-header-separator">/</span>
+            <span className="poker-header-title">Planning Poker</span>
           </h2>
         </div>
         <div className="poker-header-right">
-          <div className="room-code">
-            Код: <code>{session.roomCode}</code>
-          </div>
-          <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
-            {connected ? '● Подключено' : '○ Отключено'}
-          </div>
+          <button
+            className={`poker-copy-code-btn ${copied ? 'copied' : ''}`}
+            onClick={handleCopyRoomCode}
+            title="Скопировать код комнаты"
+          >
+            <code>{session.roomCode}</code>
+            <span className="copy-icon">{copied ? '✓' : '⎘'}</span>
+          </button>
+          <div className={`poker-connection-dot ${connected ? 'connected' : 'disconnected'}`} title={connected ? 'Подключено' : 'Отключено'} />
+          {authUser && (
+            <div className="poker-user-badge">
+              <span className="poker-user-name">{authUser.displayName}</span>
+              {userRole && (
+                <span className={`participant-role role-${userRole.toLowerCase()}`}>{userRole}</span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {error && <div className="error" style={{ marginBottom: 16 }}>{error}</div>}
+      {error && <div className="error" style={{ marginBottom: 16, marginLeft: 24, marginRight: 24 }}>{error}</div>}
 
       <div className="poker-layout">
         {/* Left sidebar - Stories list */}
         <div className="poker-sidebar">
           <div className="poker-sidebar-header">
-            <h3>Стори ({stories.length})</h3>
-            {session.status === 'PREPARING' && (
+            <div>
+              <h3>Стори ({stories.length})</h3>
+              {stories.length > 0 && (
+                <span className="poker-stories-progress">{completedCount}/{stories.length} оценено</span>
+              )}
+            </div>
+            {isFacilitator && session.status === 'PREPARING' && (
               <div style={{ display: 'flex', gap: 4 }}>
                 <button
                   className="btn btn-secondary btn-small"
                   onClick={handleOpenImportStories}
                   title="Импорт из Jira"
                 >
-                  ↓
+                  ↓ Импорт
                 </button>
                 <button className="btn btn-primary btn-small" onClick={() => setShowAddStory(true)} title="Создать новую">
-                  +
+                  + Новая
                 </button>
               </div>
             )}
           </div>
 
           <div className="poker-stories-list">
-            {stories.map(story => (
-              <div
-                key={story.id}
-                className={`poker-story-item ${story.id === currentStoryId ? 'active' : ''} ${story.status.toLowerCase()}`}
-              >
-                <div className="poker-story-header">
-                  {story.storyKey && (
-                    <a
-                      href={`${jiraBaseUrl}${story.storyKey}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="issue-key"
-                    >
-                      {story.storyKey}
-                    </a>
-                  )}
-                  <span className={`story-status story-status-${story.status.toLowerCase()}`}>
-                    {story.status === 'PENDING' && '○'}
-                    {story.status === 'VOTING' && '●'}
-                    {story.status === 'REVEALED' && '◐'}
-                    {story.status === 'COMPLETED' && '✓'}
-                  </span>
-                </div>
-                <div className="poker-story-title">{story.title}</div>
-                {story.status === 'COMPLETED' && (
-                  <div className="poker-story-estimates">
-                    {story.needsSa && <span className="estimate-badge sa">SA: {story.finalSaHours}ч</span>}
-                    {story.needsDev && <span className="estimate-badge dev">DEV: {story.finalDevHours}ч</span>}
-                    {story.needsQa && <span className="estimate-badge qa">QA: {story.finalQaHours}ч</span>}
-                  </div>
+            {stories.length === 0 ? (
+              <div className="poker-stories-empty">
+                <div className="poker-stories-empty-icon">📋</div>
+                <p>Пока нет сторей</p>
+                {isFacilitator && session.status === 'PREPARING' && (
+                  <small>Импортируйте из Jira или создайте вручную</small>
                 )}
               </div>
-            ))}
+            ) : (
+              stories.map(story => (
+                <div
+                  key={story.id}
+                  className={`poker-story-item ${story.id === currentStoryId ? 'active' : ''} ${story.status.toLowerCase()}`}
+                >
+                  <div className="poker-story-header">
+                    {story.storyKey && (
+                      <a
+                        href={`${jiraBaseUrl}${story.storyKey}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="issue-key"
+                      >
+                        {story.storyKey}
+                      </a>
+                    )}
+                    <span className={`story-status story-status-${story.status.toLowerCase()}`}>
+                      {story.status === 'PENDING' && '○'}
+                      {story.status === 'VOTING' && '●'}
+                      {story.status === 'REVEALED' && '◐'}
+                      {story.status === 'COMPLETED' && '✓'}
+                    </span>
+                  </div>
+                  <div className="poker-story-title">{story.title}</div>
+                  {story.status === 'COMPLETED' && (
+                    <div className="poker-story-estimates">
+                      {story.needsSa && <span className="estimate-badge sa">SA: {story.finalSaHours}ч</span>}
+                      {story.needsDev && <span className="estimate-badge dev">DEV: {story.finalDevHours}ч</span>}
+                      {story.needsQa && <span className="estimate-badge qa">QA: {story.finalQaHours}ч</span>}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
 
           {/* Session controls */}
-          {session.status === 'PREPARING' && stories.length > 0 && (
-            <button className="btn btn-primary" style={{ width: '100%', marginTop: 16 }} onClick={handleStartSession}>
-              Начать сессию
-            </button>
+          {isFacilitator && session.status === 'PREPARING' && stories.length > 0 && (
+            <div className="poker-sidebar-footer">
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleStartSession}>
+                Начать сессию
+              </button>
+            </div>
           )}
         </div>
 
@@ -460,13 +590,42 @@ export function PokerRoomPage() {
         <div className="poker-main">
           {session.status === 'PREPARING' ? (
             <div className="poker-preparing">
+              <div className="poker-preparing-icon">🃏</div>
               <h3>Подготовка сессии</h3>
-              <p>Добавьте стори для оценки и нажмите "Начать сессию"</p>
+              {isFacilitator ? (
+                <div className="poker-preparing-steps">
+                  <div className="poker-step">
+                    <span className="poker-step-num">1</span>
+                    <span>Импортируйте стори из Jira или добавьте вручную</span>
+                  </div>
+                  <div className="poker-step">
+                    <span className="poker-step-num">2</span>
+                    <span>Дождитесь подключения участников</span>
+                  </div>
+                  <div className="poker-step">
+                    <span className="poker-step-num">3</span>
+                    <span>Нажмите «Начать сессию»</span>
+                  </div>
+                  {stories.length === 0 && (
+                    <div className="poker-preparing-actions">
+                      <button className="btn btn-secondary" onClick={handleOpenImportStories}>
+                        ↓ Импорт из Jira
+                      </button>
+                      <button className="btn btn-primary" onClick={() => setShowAddStory(true)}>
+                        + Новая стори
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p>Ведущий готовит стори для оценки. Подождите начала сессии.</p>
+              )}
             </div>
           ) : session.status === 'COMPLETED' ? (
             <div className="poker-completed">
+              <div className="poker-completed-icon">✅</div>
               <h3>Сессия завершена</h3>
-              <p>Все стори оценены</p>
+              <p>Все стори оценены ({completedCount} из {stories.length})</p>
             </div>
           ) : currentStory ? (
             <>
@@ -666,17 +825,30 @@ export function PokerRoomPage() {
         <div className="poker-participants">
           <h3>Участники ({participants.length})</h3>
           <div className="participants-list">
-            {participants.map(p => (
-              <div key={p.accountId} className={`participant-item ${p.isOnline ? 'online' : 'offline'}`}>
-                <span className="participant-name">
-                  {p.displayName}
-                  {p.isFacilitator && ' 👑'}
-                </span>
-                <span className={`participant-role role-${p.role.toLowerCase()}`}>
-                  {p.role}
-                </span>
+            {participants.length === 0 ? (
+              <div className="poker-participants-empty">
+                <p>Ожидание участников</p>
+                <div className="poker-participants-share">
+                  <small>Поделитесь кодом комнаты:</small>
+                  <button className="poker-share-code-btn" onClick={handleCopyRoomCode}>
+                    <code>{session.roomCode}</code>
+                    <span>{copied ? '✓' : '⎘'}</span>
+                  </button>
+                </div>
               </div>
-            ))}
+            ) : (
+              participants.map(p => (
+                <div key={p.accountId} className={`participant-item ${p.isOnline ? 'online' : 'offline'}`}>
+                  <span className="participant-name">
+                    {p.displayName}
+                    {p.isFacilitator && ' 👑'}
+                  </span>
+                  <span className={`participant-role role-${p.role.toLowerCase()}`}>
+                    {p.role}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

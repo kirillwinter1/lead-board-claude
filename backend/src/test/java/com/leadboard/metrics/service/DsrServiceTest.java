@@ -59,12 +59,19 @@ class DsrServiceTest {
         JiraIssueEntity epic = createEpic("PROJ-1", "Test Epic",
                 OffsetDateTime.of(2025, 1, 6, 0, 0, 0, 0, ZoneOffset.UTC),
                 OffsetDateTime.of(2025, 1, 17, 0, 0, 0, 0, ZoneOffset.UTC));
-        epic.setOriginalEstimateSeconds(10L * 8 * 3600); // 10 days estimate
+
+        // Stories and subtasks with estimates (10 days = 80 hours = 288000 seconds)
+        JiraIssueEntity story = new JiraIssueEntity();
+        story.setIssueKey("PROJ-1-S1");
+        JiraIssueEntity subtask = new JiraIssueEntity();
+        subtask.setOriginalEstimateSeconds(10L * 8 * 3600); // 10 days estimate
 
         when(issueRepository.findCompletedEpicsInPeriod(any(), any(), any()))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKey("PROJ-1"))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1-S1")))
+                .thenReturn(List.of(subtask));
         when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         when(workCalendarService.countWorkdays(any(LocalDate.class), any(LocalDate.class)))
@@ -90,12 +97,19 @@ class DsrServiceTest {
         epic.setDoneAt(OffsetDateTime.of(2025, 1, 20, 0, 0, 0, 0, ZoneOffset.UTC));
         epic.setStartedAt(null);
         epic.setJiraCreatedAt(OffsetDateTime.of(2025, 1, 10, 0, 0, 0, 0, ZoneOffset.UTC));
-        epic.setOriginalEstimateSeconds(5L * 8 * 3600);
+
+        // Stories and subtasks with estimates (5 days = 40 hours)
+        JiraIssueEntity story = new JiraIssueEntity();
+        story.setIssueKey("PROJ-2-S1");
+        JiraIssueEntity subtask = new JiraIssueEntity();
+        subtask.setOriginalEstimateSeconds(5L * 8 * 3600);
 
         when(issueRepository.findCompletedEpicsInPeriod(any(), any(), any()))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKey("PROJ-2"))
-                .thenReturn(Collections.emptyList());
+                .thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-2-S1")))
+                .thenReturn(List.of(subtask));
         when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         when(workCalendarService.countWorkdays(
@@ -120,6 +134,11 @@ class DsrServiceTest {
         // Epic has no estimate
         epic.setOriginalEstimateSeconds(null);
 
+        // Story under epic
+        JiraIssueEntity story = new JiraIssueEntity();
+        story.setIssueKey("PROJ-3-S1");
+
+        // Subtasks under story
         JiraIssueEntity sub1 = new JiraIssueEntity();
         sub1.setOriginalEstimateSeconds(2L * 8 * 3600);
         JiraIssueEntity sub2 = new JiraIssueEntity();
@@ -128,6 +147,8 @@ class DsrServiceTest {
         when(issueRepository.findCompletedEpicsInPeriod(any(), any(), any()))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKey("PROJ-3"))
+                .thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-3-S1")))
                 .thenReturn(List.of(sub1, sub2));
         when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
                 .thenReturn(Collections.emptyList());

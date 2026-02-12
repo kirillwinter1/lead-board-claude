@@ -158,15 +158,20 @@ public class JiraClient {
     private String createIssueWithOAuth(Map<String, Object> body, String accessToken, String cloudId) {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
 
-        Map<String, Object> response = webClient.post()
-                .uri(baseUrl + "/rest/api/3/issue")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
-                .bodyValue(body)
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
+        try {
+            Map<String, Object> response = webClient.post()
+                    .uri(baseUrl + "/rest/api/3/issue")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
 
-        return (String) response.get("key");
+            return (String) response.get("key");
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+            log.error("Jira API error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw e;
+        }
     }
 
     private String createIssueWithBasicAuth(Map<String, Object> body) {

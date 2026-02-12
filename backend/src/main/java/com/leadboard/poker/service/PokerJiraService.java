@@ -3,6 +3,7 @@ package com.leadboard.poker.service;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.poker.entity.PokerStoryEntity;
 import com.leadboard.poker.repository.PokerStoryRepository;
+import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,55 +20,72 @@ public class PokerJiraService {
 
     private final JiraClient jiraClient;
     private final PokerStoryRepository storyRepository;
+    private final JiraIssueRepository issueRepository;
 
     @Value("${jira.project-key:}")
     private String projectKey;
 
-    public PokerJiraService(JiraClient jiraClient, PokerStoryRepository storyRepository) {
+    public PokerJiraService(JiraClient jiraClient, PokerStoryRepository storyRepository, JiraIssueRepository issueRepository) {
         this.jiraClient = jiraClient;
         this.storyRepository = storyRepository;
+        this.issueRepository = issueRepository;
     }
 
     /**
-     * Create a Story in Jira with subtasks for required roles.
-     * Returns the created Story key.
+     * Create a Story in Jira with subtasks. Returns the Jira story key.
+     * Does NOT save anything to local DB — Jira is the single source of truth.
      */
+    public String createStoryInJira(String epicKey, String title,
+                                     boolean needsSa, boolean needsDev, boolean needsQa) {
+        String storyTypeName = detectStoryTypeName();
+        log.info("Creating story in Jira: type='{}', epic={}, title='{}'", storyTypeName, epicKey, title);
+
+        String storyKey = jiraClient.createIssue(projectKey, storyTypeName, title, epicKey);
+        log.info("Created Jira Story: {}", storyKey);
+
+        if (needsSa) {
+            String subtaskKey = jiraClient.createSubtask(storyKey, "Анализ", projectKey);
+            log.info("Created SA subtask: {}", subtaskKey);
+        }
+        if (needsDev) {
+            String subtaskKey = jiraClient.createSubtask(storyKey, "Разработка", projectKey);
+            log.info("Created DEV subtask: {}", subtaskKey);
+        }
+        if (needsQa) {
+            String subtaskKey = jiraClient.createSubtask(storyKey, "Тестирование", projectKey);
+            log.info("Created QA subtask: {}", subtaskKey);
+        }
+
+        return storyKey;
+    }
+
+    /**
+     * @deprecated Use {@link #createStoryInJira} instead. Kept for backward compatibility.
+     */
+    @Deprecated
     @Transactional
     public String createStoryWithSubtasks(PokerStoryEntity pokerStory, String epicKey) {
-        try {
-            // Create Story
-            String storyKey = jiraClient.createIssue(
-                    projectKey,
-                    "Story",
-                    pokerStory.getTitle(),
-                    epicKey
-            );
+        String storyKey = createStoryInJira(epicKey, pokerStory.getTitle(),
+                pokerStory.isNeedsSa(), pokerStory.isNeedsDev(), pokerStory.isNeedsQa());
+        pokerStory.setStoryKey(storyKey);
+        storyRepository.save(pokerStory);
+        return storyKey;
+    }
 
-            log.info("Created Jira Story: {}", storyKey);
-
-            // Create Subtasks
-            if (pokerStory.isNeedsSa()) {
-                String subtaskKey = jiraClient.createSubtask(storyKey, "Анализ", projectKey);
-                log.info("Created SA subtask: {}", subtaskKey);
+    /**
+     * Detect the correct Story issue type name from synced data.
+     * Different Jira projects may use "Story", "История", "Стори" etc.
+     */
+    private String detectStoryTypeName() {
+        // Look at existing stories in the project to determine the correct issue type name
+        List<String> storyTypes = List.of("История", "Story", "Стори");
+        for (String typeName : storyTypes) {
+            if (!issueRepository.findByProjectKeyAndIssueType(projectKey, typeName).isEmpty()) {
+                return typeName;
             }
-            if (pokerStory.isNeedsDev()) {
-                String subtaskKey = jiraClient.createSubtask(storyKey, "Разработка", projectKey);
-                log.info("Created DEV subtask: {}", subtaskKey);
-            }
-            if (pokerStory.isNeedsQa()) {
-                String subtaskKey = jiraClient.createSubtask(storyKey, "Тестирование", projectKey);
-                log.info("Created QA subtask: {}", subtaskKey);
-            }
-
-            // Update poker story with Jira key
-            pokerStory.setStoryKey(storyKey);
-            storyRepository.save(pokerStory);
-
-            return storyKey;
-        } catch (Exception e) {
-            log.error("Failed to create story in Jira: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to create story in Jira: " + e.getMessage(), e);
         }
+        // Default fallback
+        return "История";
     }
 
     /**

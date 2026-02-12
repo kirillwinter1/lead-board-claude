@@ -8,8 +8,12 @@ import com.leadboard.poker.service.PokerJiraService;
 import com.leadboard.poker.service.PokerSessionService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.auth.LeadBoardAuthentication;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +23,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/poker")
 public class PokerController {
+
+    private static final Logger log = LoggerFactory.getLogger(PokerController.class);
 
     private final PokerSessionService sessionService;
     private final PokerJiraService jiraService;
@@ -148,11 +154,13 @@ public class PokerController {
 
     @PostMapping("/sessions")
     public ResponseEntity<SessionResponse> createSession(
-            @Valid @RequestBody CreateSessionRequest request,
-            @RequestHeader(value = "X-User-Account-Id", required = false) String userAccountId) {
+            @Valid @RequestBody CreateSessionRequest request) {
 
-        // In production, get from OAuth token
-        String facilitatorId = userAccountId != null ? userAccountId : "system";
+        String facilitatorId = "system";
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof LeadBoardAuthentication lbAuth) {
+            facilitatorId = lbAuth.getAtlassianAccountId();
+        }
 
         PokerSessionEntity session = sessionService.createSession(
                 request.teamId(),
@@ -207,14 +215,21 @@ public class PokerController {
             @Valid @RequestBody AddStoryRequest request,
             @RequestParam(defaultValue = "false") boolean createInJira) {
 
-        PokerStoryEntity story = sessionService.addStory(sessionId, request);
-
-        if (createInJira && story.getStoryKey() == null) {
+        if (createInJira) {
+            // Create in Jira FIRST — Jira is the single source of truth
             PokerSessionEntity session = sessionService.getSession(sessionId)
                     .orElseThrow(() -> new IllegalArgumentException("Session not found"));
-            jiraService.createStoryWithSubtasks(story, session.getEpicKey());
+            String storyKey = jiraService.createStoryInJira(session.getEpicKey(), request.title(),
+                    request.needsSa(), request.needsDev(), request.needsQa());
+            // Only save to poker session after Jira succeeds
+            AddStoryRequest enriched = new AddStoryRequest(request.title(),
+                    request.needsSa(), request.needsDev(), request.needsQa(), storyKey);
+            PokerStoryEntity story = sessionService.addStory(sessionId, enriched);
+            return ResponseEntity.ok(StoryResponse.from(story));
         }
 
+        // Import existing story (already in Jira)
+        PokerStoryEntity story = sessionService.addStory(sessionId, request);
         return ResponseEntity.ok(StoryResponse.from(story));
     }
 

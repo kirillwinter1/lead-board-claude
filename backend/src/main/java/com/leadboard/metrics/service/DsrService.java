@@ -151,21 +151,34 @@ public class DsrService {
     }
 
     private BigDecimal calculateEstimateDays(JiraIssueEntity epic) {
-        // Sum subtask estimates
-        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(epic.getIssueKey());
-        long totalEstimateSeconds = subtasks.stream()
-                .mapToLong(st -> st.getOriginalEstimateSeconds() != null ? st.getOriginalEstimateSeconds() : 0)
-                .sum();
+        // 1. Try subtask estimates (Epic → Story → Subtask)
+        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epic.getIssueKey());
+        if (!stories.isEmpty()) {
+            List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
+            List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+            long totalEstimateSeconds = subtasks.stream()
+                    .mapToLong(st -> st.getOriginalEstimateSeconds() != null ? st.getOriginalEstimateSeconds() : 0)
+                    .sum();
 
-        // Fallback to epic's own estimate
-        if (totalEstimateSeconds == 0 && epic.getOriginalEstimateSeconds() != null) {
-            totalEstimateSeconds = epic.getOriginalEstimateSeconds();
+            if (totalEstimateSeconds > 0) {
+                return BigDecimal.valueOf(totalEstimateSeconds)
+                        .divide(BigDecimal.valueOf(3600 * 8), 2, RoundingMode.HALF_UP);
+            }
         }
 
-        if (totalEstimateSeconds <= 0) return null;
+        // 2. Fallback to rough estimates on epic
+        BigDecimal sa = epic.getRoughEstimateSaDays();
+        BigDecimal dev = epic.getRoughEstimateDevDays();
+        BigDecimal qa = epic.getRoughEstimateQaDays();
+        if (sa != null || dev != null || qa != null) {
+            BigDecimal total = BigDecimal.ZERO;
+            if (sa != null) total = total.add(sa);
+            if (dev != null) total = total.add(dev);
+            if (qa != null) total = total.add(qa);
+            if (total.compareTo(BigDecimal.ZERO) > 0) return total;
+        }
 
-        return BigDecimal.valueOf(totalEstimateSeconds)
-                .divide(BigDecimal.valueOf(3600 * 8), 2, RoundingMode.HALF_UP);
+        return null;
     }
 
     private BigDecimal calculateForecastDays(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate) {

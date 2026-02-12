@@ -42,6 +42,7 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const connect = useCallback(() => {
+    if (!roomCode) return
     if (wsRef.current?.readyState === WebSocket.OPEN) return
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'

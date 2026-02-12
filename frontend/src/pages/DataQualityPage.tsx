@@ -39,6 +39,38 @@ interface Team {
   name: string
 }
 
+// Human-readable Russian names for rules
+const ruleLabels: Record<string, string> = {
+  TIME_LOGGED_WRONG_EPIC_STATUS: 'Списание времени при неверном статусе эпика',
+  TIME_LOGGED_NOT_IN_SUBTASK: 'Время списано не в подзадачу',
+  CHILD_IN_PROGRESS_EPIC_NOT: 'Дочерняя задача в работе, эпик — нет',
+  SUBTASK_IN_PROGRESS_STORY_NOT: 'Подзадача в работе, стори — нет',
+  EPIC_NO_ESTIMATE: 'Эпик без оценки',
+  SUBTASK_NO_ESTIMATE: 'Подзадача без оценки',
+  SUBTASK_WORK_NO_ESTIMATE: 'Списано время без оценки',
+  SUBTASK_OVERRUN: 'Превышение оценки подзадачи',
+  EPIC_NO_TEAM: 'Эпик без команды',
+  EPIC_TEAM_NO_MEMBERS: 'Команда эпика без участников',
+  EPIC_NO_DUE_DATE: 'Эпик без дедлайна',
+  EPIC_OVERDUE: 'Эпик просрочен',
+  EPIC_FORECAST_LATE: 'Прогноз позже дедлайна',
+  EPIC_DONE_OPEN_CHILDREN: 'Эпик закрыт, есть открытые дочерние',
+  STORY_DONE_OPEN_CHILDREN: 'Стори закрыта, есть открытые подзадачи',
+  EPIC_IN_PROGRESS_NO_STORIES: 'Эпик в работе без сторей',
+  STORY_IN_PROGRESS_NO_SUBTASKS: 'Стори в работе без подзадач',
+  STORY_NO_SUBTASK_ESTIMATES: 'Стори без оценок в подзадачах',
+  STORY_BLOCKED_BY_MISSING: 'Блокировщик не найден',
+  STORY_CIRCULAR_DEPENDENCY: 'Циклическая зависимость',
+  STORY_BLOCKED_NO_PROGRESS: 'Блокировка без прогресса >30 дней',
+  SUBTASK_ACTIVE_STORY_NOT_INPROGRESS: 'Подзадача активна, стори не в работе',
+  SUBTASK_DONE_NO_TIME_LOGGED: 'Подзадача закрыта без списания времени',
+  SUBTASK_TIME_LOGGED_BUT_TODO: 'Списано время, но подзадача в TODO',
+}
+
+function getRuleLabel(rule: string): string {
+  return ruleLabels[rule] || rule
+}
+
 // Severity badge colors
 const severityColors: Record<string, { bg: string; text: string; border: string }> = {
   ERROR: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },
@@ -112,8 +144,7 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
           <td colSpan={6}>
             <div className="violation-detail">
               <SeverityBadge severity={v.severity} />
-              <span className="violation-rule">{v.rule}</span>
-              <span className="violation-message">{v.message}</span>
+              <span className="violation-rule">{getRuleLabel(v.rule)}</span>
             </div>
           </td>
         </tr>
@@ -223,13 +254,13 @@ export function DataQualityPage() {
     <div className="data-quality-page">
       <div className="filter-panel">
         <div className="filter-group">
-          <label className="filter-label">Team</label>
+          <label className="filter-label">Команда</label>
           <select
             value={selectedTeamId || ''}
             onChange={e => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
             className="filter-select"
           >
-            <option value="">All teams</option>
+            <option value="">Все команды</option>
             {teams.map(team => (
               <option key={team.id} value={team.id}>{team.name}</option>
             ))}
@@ -237,7 +268,7 @@ export function DataQualityPage() {
         </div>
 
         <div className="filter-group">
-          <label className="filter-label">Severity</label>
+          <label className="filter-label">Критичность</label>
           <div className="filter-checkboxes">
             {['ERROR', 'WARNING', 'INFO'].map(severity => (
               <label key={severity} className="filter-checkbox">
@@ -253,48 +284,48 @@ export function DataQualityPage() {
         </div>
 
         <div className="filter-group">
-          <label className="filter-label">Rule</label>
+          <label className="filter-label">Правило</label>
           <select
             value={ruleFilter || ''}
             onChange={e => setRuleFilter(e.target.value || null)}
             className="filter-select"
           >
-            <option value="">All rules</option>
+            <option value="">Все правила</option>
             {allRules.map(rule => (
-              <option key={rule} value={rule}>{rule}</option>
+              <option key={rule} value={rule}>{getRuleLabel(rule)}</option>
             ))}
           </select>
         </div>
 
         <button className="btn btn-primary btn-refresh" onClick={fetchData} disabled={loading}>
-          {loading ? 'Loading...' : 'Refresh'}
+          {loading ? 'Загрузка...' : 'Обновить'}
         </button>
       </div>
 
       <main className="main-content">
-        {loading && <div className="loading">Loading data quality report...</div>}
-        {error && <div className="error">Error: {error}</div>}
+        {loading && <div className="loading">Загрузка отчёта...</div>}
+        {error && <div className="error">Ошибка: {error}</div>}
 
         {!loading && !error && data && (
           <>
             <div className="summary-cards">
-              <SummaryCard title="Total Issues" value={data.summary.totalIssues} color="#6b7280" />
-              <SummaryCard title="Errors" value={data.summary.issuesWithErrors} color="#dc2626" />
-              <SummaryCard title="Warnings" value={data.summary.issuesWithWarnings} color="#d97706" />
-              <SummaryCard title="Info" value={data.summary.issuesWithInfo} color="#9ca3af" />
+              <SummaryCard title="Всего задач" value={data.summary.totalIssues} color="#6b7280" />
+              <SummaryCard title="Ошибки" value={data.summary.issuesWithErrors} color="#dc2626" />
+              <SummaryCard title="Предупреждения" value={data.summary.issuesWithWarnings} color="#d97706" />
+              <SummaryCard title="Информация" value={data.summary.issuesWithInfo} color="#9ca3af" />
             </div>
 
             <div className="report-meta">
-              Generated: {formatDate(data.generatedAt)}
+              Сформировано: {formatDate(data.generatedAt)}
               {' | '}
-              Showing {filteredViolations.length} of {data.violations.length} issues
+              Показано {filteredViolations.length} из {data.violations.length} задач
             </div>
 
             {filteredViolations.length === 0 ? (
               <div className="empty">
                 {data.violations.length === 0
-                  ? 'No data quality issues found!'
-                  : 'No issues match the current filters'}
+                  ? 'Проблем с качеством данных не найдено!'
+                  : 'Нет задач, соответствующих фильтрам'}
               </div>
             ) : (
               <div className="violations-table-container">
@@ -302,12 +333,12 @@ export function DataQualityPage() {
                   <thead>
                     <tr>
                       <th className="th-expand"></th>
-                      <th className="th-key">KEY</th>
-                      <th className="th-type">TYPE</th>
-                      <th className="th-summary">SUMMARY</th>
-                      <th className="th-status">STATUS</th>
-                      <th className="th-severity">SEVERITY</th>
-                      <th className="th-count">ISSUES</th>
+                      <th className="th-key">КЛЮЧ</th>
+                      <th className="th-type">ТИП</th>
+                      <th className="th-summary">НАЗВАНИЕ</th>
+                      <th className="th-status">СТАТУС</th>
+                      <th className="th-severity">КРИТИЧНОСТЬ</th>
+                      <th className="th-count">ПРОБЛЕМЫ</th>
                     </tr>
                   </thead>
                   <tbody>

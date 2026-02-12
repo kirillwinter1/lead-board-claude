@@ -304,10 +304,11 @@ public class AutoScoreCalculator {
     }
 
     /**
-     * Получает общую оценку в днях (rough estimate или original estimate).
+     * Получает общую оценку в днях.
+     * Приоритет: rough estimate → агрегация из subtasks → original estimate на эпике.
      */
     private BigDecimal getTotalEstimateDays(JiraIssueEntity epic) {
-        // Сначала пробуем rough estimate
+        // 1. Rough estimate на эпике
         BigDecimal sa = epic.getRoughEstimateSaDays();
         BigDecimal dev = epic.getRoughEstimateDevDays();
         BigDecimal qa = epic.getRoughEstimateQaDays();
@@ -320,11 +321,21 @@ public class AutoScoreCalculator {
             return total;
         }
 
-        // Fallback на original estimate (в секундах -> дни, 8 часов = 1 день)
-        Long estimateSeconds = epic.getOriginalEstimateSeconds();
-        if (estimateSeconds != null && estimateSeconds > 0) {
-            return BigDecimal.valueOf(estimateSeconds / 3600.0 / 8.0)
-                    .setScale(1, RoundingMode.HALF_UP);
+        // 2. Агрегация original estimate из subtasks (Epic → Story → Subtask)
+        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epic.getIssueKey());
+        if (!stories.isEmpty()) {
+            List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
+            List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+
+            long totalEstimateSeconds = 0;
+            for (JiraIssueEntity subtask : subtasks) {
+                totalEstimateSeconds += subtask.getEffectiveEstimateSeconds();
+            }
+
+            if (totalEstimateSeconds > 0) {
+                return BigDecimal.valueOf(totalEstimateSeconds / 3600.0 / 8.0)
+                        .setScale(1, RoundingMode.HALF_UP);
+            }
         }
 
         return null;

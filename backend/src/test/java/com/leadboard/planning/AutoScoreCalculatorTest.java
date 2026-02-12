@@ -393,10 +393,14 @@ class AutoScoreCalculatorTest {
     }
 
     @Test
-    void sizeFallsBackToOriginalEstimate() {
+    void sizeFallsBackToSubtaskEstimates() {
         JiraIssueEntity epic = createBasicEpic();
-        // No rough estimate, but has original estimate
-        epic.setOriginalEstimateSeconds(16L * 3600); // 16 hours = 2 days
+        // No rough estimate, but subtasks have estimates
+        JiraIssueEntity story = createStory("TEST-200", "TEST-123");
+        JiraIssueEntity subtask = createSubtask("TEST-300", "TEST-200", 16L * 3600, 0L); // 16 hours = 2 days
+
+        when(issueRepository.findByParentKey("TEST-123")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("TEST-200"))).thenReturn(List.of(subtask));
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 

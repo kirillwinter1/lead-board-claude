@@ -267,39 +267,26 @@ public class ForecastController {
                     // Агрегируем время и эстимейты из подзадач
                     List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(issue.getIssueKey());
 
-                    Long totalEstimate = issue.getOriginalEstimateSeconds();
-                    Long totalSpent = issue.getTimeSpentSeconds();
-
-                    // Role breakdown accumulators
+                    // All estimates and time logging come only from subtasks
                     long saEstimate = 0, saLogged = 0;
                     long devEstimate = 0, devLogged = 0;
                     long qaEstimate = 0, qaLogged = 0;
 
-                    if (!subtasks.isEmpty()) {
-                        // Группируем подзадачи по ролям и суммируем
-                        for (JiraIssueEntity subtask : subtasks) {
-                            String role = StoryInfo.determineRole(subtask.getIssueType());
-                            long est = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
-                            long spent = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+                    for (JiraIssueEntity subtask : subtasks) {
+                        String role = StoryInfo.determineRole(subtask.getIssueType());
+                        long est = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
+                        long spent = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
 
-                            switch (role) {
-                                case "SA" -> { saEstimate += est; saLogged += spent; }
-                                case "QA" -> { qaEstimate += est; qaLogged += spent; }
-                                default -> { devEstimate += est; devLogged += spent; }
-                            }
-                        }
-
-                        long subtaskEstimate = saEstimate + devEstimate + qaEstimate;
-                        long subtaskSpent = saLogged + devLogged + qaLogged;
-
-                        // Используем сумму подзадач если она больше или у родителя нет данных
-                        if (subtaskEstimate > 0 && (totalEstimate == null || subtaskEstimate > totalEstimate)) {
-                            totalEstimate = subtaskEstimate;
-                        }
-                        if (subtaskSpent > 0) {
-                            totalSpent = (totalSpent != null ? totalSpent : 0) + subtaskSpent;
+                        switch (role) {
+                            case "SA" -> { saEstimate += est; saLogged += spent; }
+                            case "QA" -> { qaEstimate += est; qaLogged += spent; }
+                            default -> { devEstimate += est; devLogged += spent; }
                         }
                     }
+
+                    Long totalEstimate = saEstimate + devEstimate + qaEstimate;
+                    Long totalSpent = saLogged + devLogged + qaLogged;
+                    if (totalEstimate == 0) totalEstimate = null;
 
                     // Build role breakdowns (null if no data)
                     RoleBreakdown saBreakdown = (saEstimate > 0 || saLogged > 0)

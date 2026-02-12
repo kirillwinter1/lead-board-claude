@@ -1,5 +1,6 @@
 package com.leadboard.quality;
 
+import com.leadboard.status.StatusCategory;
 import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -66,8 +67,10 @@ public class DataQualityService {
             }
         }
 
-        // EPIC_NO_DUE_DATE - Epic without due date
-        if (epic.getDueDate() == null) {
+        // EPIC_NO_DUE_DATE - Epic without due date (only for epics in Planned or later)
+        StatusCategory epicCategory = statusMappingService.categorizeEpic(epic.getStatus(), statusMapping);
+        boolean epicPastTodo = epicCategory == StatusCategory.IN_PROGRESS || epicCategory == StatusCategory.DONE;
+        if (epicPastTodo && epic.getDueDate() == null) {
             violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_DUE_DATE));
         }
 
@@ -81,23 +84,27 @@ public class DataQualityService {
             }
         }
 
-        // EPIC_NO_ESTIMATE - Epic without rough estimate and without detailed subtasks
-        boolean hasRoughEstimate = epic.getRoughEstimateSaDays() != null
-                || epic.getRoughEstimateDevDays() != null
-                || epic.getRoughEstimateQaDays() != null;
+        // EPIC_NO_ESTIMATE - Epic without rough estimate and without detailed subtasks (only for epics in Planned or later)
+        if (epicPastTodo) {
+            boolean hasRoughEstimate = epic.getRoughEstimateSaDays() != null
+                    || epic.getRoughEstimateDevDays() != null
+                    || epic.getRoughEstimateQaDays() != null;
 
-        if (!hasRoughEstimate) {
-            // Check if children have estimates
-            boolean hasChildEstimates = hasEstimatesInHierarchy(children);
-            if (!hasChildEstimates) {
-                violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_ESTIMATE));
+            if (!hasRoughEstimate) {
+                // Check if children have estimates
+                boolean hasChildEstimates = hasEstimatesInHierarchy(children);
+                if (!hasChildEstimates) {
+                    violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_ESTIMATE));
+                }
             }
         }
 
-        // TIME_LOGGED_WRONG_EPIC_STATUS - Time logged on children when epic not in Developing/E2E Testing
+        // TIME_LOGGED_WRONG_EPIC_STATUS - Time logged on subtasks when epic not in Developing/E2E Testing
         if (!statusMappingService.isTimeLoggingAllowed(epic.getStatus(), statusMapping)) {
-            boolean hasLoggedTime = children.stream()
-                    .anyMatch(c -> c.getTimeSpentSeconds() != null && c.getTimeSpentSeconds() > 0);
+            List<String> childKeys = children.stream().map(JiraIssueEntity::getIssueKey).toList();
+            List<JiraIssueEntity> subtasks = childKeys.isEmpty() ? List.of() : issueRepository.findByParentKeyIn(childKeys);
+            boolean hasLoggedTime = subtasks.stream()
+                    .anyMatch(st -> st.getTimeSpentSeconds() != null && st.getTimeSpentSeconds() > 0);
             if (hasLoggedTime) {
                 violations.add(DataQualityViolation.of(DataQualityRule.TIME_LOGGED_WRONG_EPIC_STATUS));
             }
@@ -234,10 +241,13 @@ public class DataQualityService {
                         Optional<JiraIssueEntity> blocker = issueRepository.findByIssueKey(blockerKey);
                         if (blocker.isPresent()) {
                             JiraIssueEntity blockerIssue = blocker.get();
-                            // If blocker is not done and has no time logged, no progress
+                            // If blocker is not done and has no time logged in subtasks, no progress
                             if (!statusMappingService.isDone(blockerIssue.getStatus(), statusMapping)) {
-                                Long blockerTimeSpent = blockerIssue.getTimeSpentSeconds();
-                                if (blockerTimeSpent == null || blockerTimeSpent == 0) {
+                                List<JiraIssueEntity> blockerSubtasks = issueRepository.findByParentKey(blockerKey);
+                                long blockerTimeSpent = blockerSubtasks.stream()
+                                        .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
+                                        .sum();
+                                if (blockerTimeSpent == 0) {
                                     violations.add(DataQualityViolation.of(
                                             DataQualityRule.STORY_BLOCKED_NO_PROGRESS,
                                             blockerKey

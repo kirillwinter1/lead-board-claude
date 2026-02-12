@@ -262,8 +262,11 @@ public class BoardService {
                 jiraUrl
         );
 
-        node.setEstimateSeconds(entity.getEffectiveEstimateSeconds());
-        node.setLoggedSeconds(entity.getTimeSpentSeconds());
+        // Estimates and time logging only from subtasks; for epics/stories these are set by aggregateProgress()
+        if (entity.isSubtask()) {
+            node.setEstimateSeconds(entity.getEffectiveEstimateSeconds());
+            node.setLoggedSeconds(entity.getTimeSpentSeconds());
+        }
 
         // Set team info
         if (entity.getTeamId() != null) {
@@ -328,27 +331,21 @@ public class BoardService {
             node.setAssigneeAccountId(entity.getAssigneeAccountId());
             node.setAssigneeDisplayName(entity.getAssigneeDisplayName());
 
-            // Calculate expected done date based on remaining work
-            Long remaining = entity.getRemainingEstimateSeconds();
-            if (remaining != null && remaining > 0) {
-                // Use explicit remaining estimate from Jira
-                double remainingHours = remaining / 3600.0;
-                int workDays = (int) Math.ceil(remainingHours / 8.0);
-                node.setExpectedDone(LocalDate.now().plusDays(workDays));
-            } else {
-                // Fallback to original estimate - spent
-                Long estimate = entity.getOriginalEstimateSeconds();
-                Long spent = entity.getTimeSpentSeconds();
-                if (estimate != null && estimate > 0) {
-                    long remainingSeconds = estimate - (spent != null ? spent : 0);
-                    if (remainingSeconds > 0) {
-                        double remainingHours = remainingSeconds / 3600.0;
-                        int workDays = (int) Math.ceil(remainingHours / 8.0);
-                        node.setExpectedDone(LocalDate.now().plusDays(workDays));
-                    } else {
-                        // Already completed
-                        node.setExpectedDone(LocalDate.now());
-                    }
+            // Calculate expected done date from subtask estimates (not from story itself)
+            List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(entity.getIssueKey());
+            long subtaskEstimate = 0;
+            long subtaskSpent = 0;
+            for (JiraIssueEntity st : subtasks) {
+                subtaskEstimate += st.getEffectiveEstimateSeconds();
+                subtaskSpent += st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0;
+            }
+            if (subtaskEstimate > 0) {
+                long remainingSeconds = subtaskEstimate - subtaskSpent;
+                if (remainingSeconds > 0) {
+                    int workDays = (int) Math.ceil(remainingSeconds / 3600.0 / 8.0);
+                    node.setExpectedDone(LocalDate.now().plusDays(workDays));
+                } else {
+                    node.setExpectedDone(LocalDate.now());
                 }
             }
         }

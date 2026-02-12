@@ -94,7 +94,7 @@ export function PlanningPokerPage() {
       const session = await createSession(selectedTeamId, selectedEpicKey)
       setShowCreateModal(false)
       setSelectedEpicKey('')
-      navigate(`/poker/room/${session.roomCode}`)
+      navigate(`/board/poker/room/${session.roomCode}`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError('Failed to create session: ' + message)
@@ -105,7 +105,7 @@ export function PlanningPokerPage() {
 
   const handleJoinRoom = () => {
     if (joinRoomCode.trim()) {
-      navigate(`/poker/room/${joinRoomCode.trim().toUpperCase()}`)
+      navigate(`/board/poker/room/${joinRoomCode.trim().toUpperCase()}`)
     }
   }
 
@@ -218,7 +218,7 @@ export function PlanningPokerPage() {
                   <td>
                     <button
                       className="btn btn-secondary"
-                      onClick={() => navigate(`/poker/room/${session.roomCode}`)}
+                      onClick={() => navigate(`/board/poker/room/${session.roomCode}`)}
                     >
                       {session.status === 'COMPLETED' ? 'Просмотр' : 'Войти'}
                     </button>
