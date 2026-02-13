@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -16,13 +17,13 @@ import java.util.List;
 public class IssueOrderService {
 
     private static final Logger log = LoggerFactory.getLogger(IssueOrderService.class);
-    private static final List<String> EPIC_TYPES = List.of("Epic", "Эпик");
-    private static final List<String> STORY_TYPES = List.of("Story", "История", "Bug", "Баг");
 
     private final JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
-    public IssueOrderService(JiraIssueRepository issueRepository) {
+    public IssueOrderService(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -37,7 +38,7 @@ public class IssueOrderService {
         JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
                 .orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicKey));
 
-        if (!isEpic(epic.getIssueType())) {
+        if (!workflowConfigService.isEpic(epic.getIssueType())) {
             throw new IllegalArgumentException("Issue is not an epic: " + epicKey);
         }
 
@@ -48,7 +49,7 @@ public class IssueOrderService {
 
         Integer currentOrder = epic.getManualOrder();
         if (currentOrder == null) {
-            currentOrder = issueRepository.findMaxEpicOrderForTeam(teamId, EPIC_TYPES) + 1;
+            currentOrder = issueRepository.findMaxEpicOrderForTeam(teamId) + 1;
         }
 
         if (newPosition < 1) {
@@ -56,7 +57,7 @@ public class IssueOrderService {
         }
 
         // Get max order to cap the position
-        int maxOrder = issueRepository.findMaxEpicOrderForTeam(teamId, EPIC_TYPES);
+        int maxOrder = issueRepository.findMaxEpicOrderForTeam(teamId);
         if (newPosition > maxOrder) {
             newPosition = maxOrder;
         }
@@ -92,7 +93,7 @@ public class IssueOrderService {
         JiraIssueEntity story = issueRepository.findByIssueKey(storyKey)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found: " + storyKey));
 
-        if (!isStory(story.getIssueType())) {
+        if (!workflowConfigService.isStory(story.getIssueType())) {
             throw new IllegalArgumentException("Issue is not a story/bug: " + storyKey);
         }
 
@@ -103,7 +104,7 @@ public class IssueOrderService {
 
         Integer currentOrder = story.getManualOrder();
         if (currentOrder == null) {
-            currentOrder = issueRepository.findMaxStoryOrderForParent(parentKey, STORY_TYPES) + 1;
+            currentOrder = issueRepository.findMaxStoryOrderForParent(parentKey, workflowConfigService.getStoryTypeNames()) + 1;
         }
 
         if (newPosition < 1) {
@@ -111,7 +112,7 @@ public class IssueOrderService {
         }
 
         // Get max order to cap the position
-        int maxOrder = issueRepository.findMaxStoryOrderForParent(parentKey, STORY_TYPES);
+        int maxOrder = issueRepository.findMaxStoryOrderForParent(parentKey, workflowConfigService.getStoryTypeNames());
         if (newPosition > maxOrder) {
             newPosition = maxOrder;
         }
@@ -144,13 +145,13 @@ public class IssueOrderService {
             return;
         }
 
-        if (isEpic(issue.getIssueType()) && issue.getTeamId() != null) {
-            int maxOrder = issueRepository.findMaxEpicOrderForTeam(issue.getTeamId(), EPIC_TYPES);
+        if (workflowConfigService.isEpic(issue.getIssueType()) && issue.getTeamId() != null) {
+            int maxOrder = issueRepository.findMaxEpicOrderForTeam(issue.getTeamId());
             issue.setManualOrder(maxOrder + 1);
             issueRepository.save(issue);
             log.debug("Assigned order {} to new epic {}", issue.getManualOrder(), issue.getIssueKey());
-        } else if (isStory(issue.getIssueType()) && issue.getParentKey() != null) {
-            int maxOrder = issueRepository.findMaxStoryOrderForParent(issue.getParentKey(), STORY_TYPES);
+        } else if (workflowConfigService.isStory(issue.getIssueType()) && issue.getParentKey() != null) {
+            int maxOrder = issueRepository.findMaxStoryOrderForParent(issue.getParentKey(), workflowConfigService.getStoryTypeNames());
             issue.setManualOrder(maxOrder + 1);
             issueRepository.save(issue);
             log.debug("Assigned order {} to new story {}", issue.getManualOrder(), issue.getIssueKey());
@@ -165,7 +166,7 @@ public class IssueOrderService {
     public void normalizeTeamEpicOrders(Long teamId) {
         if (teamId == null) return;
 
-        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(EPIC_TYPES, teamId);
+        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamOrderByManualOrder(teamId);
         if (epics.isEmpty()) return;
 
         int index = 1;
@@ -191,7 +192,7 @@ public class IssueOrderService {
 
         int index = 1;
         for (JiraIssueEntity child : children) {
-            if (!isStory(child.getIssueType())) continue;
+            if (!workflowConfigService.isStory(child.getIssueType())) continue;
             if (!java.util.Objects.equals(child.getManualOrder(), index)) {
                 child.setManualOrder(index);
                 issueRepository.save(child);
@@ -201,7 +202,7 @@ public class IssueOrderService {
     }
 
     private void shiftEpicsDown(Long teamId, int fromPosition, int toPosition) {
-        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(EPIC_TYPES, teamId);
+        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamOrderByManualOrder(teamId);
         for (JiraIssueEntity e : epics) {
             Integer order = e.getManualOrder();
             if (order != null && order >= fromPosition && order < toPosition) {
@@ -212,7 +213,7 @@ public class IssueOrderService {
     }
 
     private void shiftEpicsUp(Long teamId, int fromPosition, int toPosition) {
-        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(EPIC_TYPES, teamId);
+        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamOrderByManualOrder(teamId);
         for (JiraIssueEntity e : epics) {
             Integer order = e.getManualOrder();
             if (order != null && order > fromPosition && order <= toPosition) {
@@ -225,7 +226,7 @@ public class IssueOrderService {
     private void shiftStoriesDown(String parentKey, int fromPosition, int toPosition) {
         List<JiraIssueEntity> stories = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
         for (JiraIssueEntity s : stories) {
-            if (!isStory(s.getIssueType())) continue;
+            if (!workflowConfigService.isStory(s.getIssueType())) continue;
             Integer order = s.getManualOrder();
             if (order != null && order >= fromPosition && order < toPosition) {
                 s.setManualOrder(order + 1);
@@ -237,7 +238,7 @@ public class IssueOrderService {
     private void shiftStoriesUp(String parentKey, int fromPosition, int toPosition) {
         List<JiraIssueEntity> stories = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
         for (JiraIssueEntity s : stories) {
-            if (!isStory(s.getIssueType())) continue;
+            if (!workflowConfigService.isStory(s.getIssueType())) continue;
             Integer order = s.getManualOrder();
             if (order != null && order > fromPosition && order <= toPosition) {
                 s.setManualOrder(order - 1);
@@ -246,11 +247,4 @@ public class IssueOrderService {
         }
     }
 
-    private boolean isEpic(String issueType) {
-        return EPIC_TYPES.stream().anyMatch(t -> t.equalsIgnoreCase(issueType));
-    }
-
-    private boolean isStory(String issueType) {
-        return STORY_TYPES.stream().anyMatch(t -> t.equalsIgnoreCase(issueType));
-    }
 }

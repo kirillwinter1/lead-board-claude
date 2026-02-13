@@ -1,19 +1,17 @@
 package com.leadboard.simulation;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
 import com.leadboard.simulation.dto.SimulationAction;
 import com.leadboard.status.StatusCategory;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.Role;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
-import com.leadboard.team.TeamService;
-import com.leadboard.team.dto.PlanningConfigDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,8 +37,7 @@ class SimulationPlannerTest {
     @Mock private UnifiedPlanningService planningService;
     @Mock private JiraIssueRepository issueRepository;
     @Mock private TeamMemberRepository memberRepository;
-    @Mock private StatusMappingService statusMappingService;
-    @Mock private TeamService teamService;
+    @Mock private WorkflowConfigService workflowConfigService;
     @Mock private WorkCalendarService calendarService;
     @Mock private SimulationDeviation deviation;
 
@@ -53,15 +50,11 @@ class SimulationPlannerTest {
     void setUp() {
         planner = new SimulationPlanner(
                 planningService, issueRepository, memberRepository,
-                statusMappingService, teamService, calendarService, deviation
+                workflowConfigService, calendarService, deviation
         );
 
         // Default: today is a workday
         when(calendarService.isWorkday(TODAY)).thenReturn(true);
-
-        // Default planning config
-        when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(
-                new PlanningConfigDto(null, null, null, null, null));
 
         // Default deviation: return base hours
         when(deviation.applyDailyDeviation(anyDouble())).thenAnswer(inv -> inv.getArgument(0));
@@ -103,13 +96,13 @@ class SimulationPlannerTest {
         when(planningService.calculatePlan(TEAM_ID)).thenReturn(
                 new UnifiedPlanningResult(TEAM_ID, OffsetDateTime.now(), List.of(epic), List.of(), Map.of()));
 
-        // Setup subtask in TODO status
+        // Setup subtask in NEW status
         JiraIssueEntity subtask = createSubtask("PROJ-11", "New", "Разработка", 28800L, 0L);
         when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
-        when(statusMappingService.determinePhase(eq("New"), eq("Разработка"), any())).thenReturn("DEV");
-        when(statusMappingService.categorizeSubtask(eq("New"), any())).thenReturn(StatusCategory.TODO);
-        when(statusMappingService.isDone(eq("New"), any())).thenReturn(false);
-        when(statusMappingService.isDone(eq("Developing"), any())).thenReturn(false);
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.categorize("New", "Разработка")).thenReturn(StatusCategory.NEW);
+        when(workflowConfigService.isDone(eq("New"), anyString())).thenReturn(false);
+        when(workflowConfigService.isDone(eq("Developing"), anyString())).thenReturn(false);
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 
@@ -136,9 +129,9 @@ class SimulationPlannerTest {
         JiraIssueEntity subtask = createSubtask("PROJ-11", "In Progress", "Разработка", 28800L, 7200L);
         subtask.setRemainingEstimateSeconds(21600L); // 6h remaining
         when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
-        when(statusMappingService.determinePhase(eq("In Progress"), eq("Разработка"), any())).thenReturn("DEV");
-        when(statusMappingService.categorizeSubtask(eq("In Progress"), any())).thenReturn(StatusCategory.IN_PROGRESS);
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.categorize("In Progress", "Разработка")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 
@@ -165,9 +158,9 @@ class SimulationPlannerTest {
         JiraIssueEntity subtask = createSubtask("PROJ-11", "In Progress", "Разработка", 28800L, 28800L);
         subtask.setRemainingEstimateSeconds(0L);
         when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
-        when(statusMappingService.determinePhase(eq("In Progress"), eq("Разработка"), any())).thenReturn("DEV");
-        when(statusMappingService.categorizeSubtask(eq("In Progress"), any())).thenReturn(StatusCategory.IN_PROGRESS);
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.categorize("In Progress", "Разработка")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 
@@ -190,7 +183,7 @@ class SimulationPlannerTest {
 
         when(planningService.calculatePlan(TEAM_ID)).thenReturn(
                 new UnifiedPlanningResult(TEAM_ID, OffsetDateTime.now(), List.of(epic), List.of(), Map.of()));
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 
@@ -213,11 +206,11 @@ class SimulationPlannerTest {
         // All subtasks already done
         JiraIssueEntity subtask = createSubtask("PROJ-11", "Done", "Разработка", 28800L, 28800L);
         when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
-        when(statusMappingService.determinePhase(eq("Done"), eq("Разработка"), any())).thenReturn("DEV");
-        when(statusMappingService.categorizeSubtask(eq("Done"), any())).thenReturn(StatusCategory.DONE);
-        when(statusMappingService.isDone(eq("Done"), any())).thenReturn(true);
-        when(statusMappingService.isDone(eq("In Progress"), any())).thenReturn(false);
-        when(statusMappingService.isDone(eq("Developing"), any())).thenReturn(false);
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.categorize("Done", "Разработка")).thenReturn(StatusCategory.DONE);
+        when(workflowConfigService.isDone("Done", "Разработка")).thenReturn(true);
+        when(workflowConfigService.isDone("In Progress", "Story")).thenReturn(false);
+        when(workflowConfigService.isDone("Developing", "Epic")).thenReturn(false);
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 

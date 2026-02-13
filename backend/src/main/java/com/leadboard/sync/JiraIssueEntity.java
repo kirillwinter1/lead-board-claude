@@ -1,10 +1,15 @@
 package com.leadboard.sync;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "jira_issues")
@@ -53,14 +58,9 @@ public class JiraIssueEntity {
     @Column(name = "team_id")
     private Long teamId;
 
-    @Column(name = "rough_estimate_sa_days", precision = 10, scale = 1)
-    private BigDecimal roughEstimateSaDays;
-
-    @Column(name = "rough_estimate_dev_days", precision = 10, scale = 1)
-    private BigDecimal roughEstimateDevDays;
-
-    @Column(name = "rough_estimate_qa_days", precision = 10, scale = 1)
-    private BigDecimal roughEstimateQaDays;
+    @Column(name = "rough_estimates", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, BigDecimal> roughEstimates;
 
     @Column(name = "rough_estimate_updated_at")
     private OffsetDateTime roughEstimateUpdatedAt;
@@ -110,6 +110,12 @@ public class JiraIssueEntity {
     @Column(name = "jira_updated_at")
     private OffsetDateTime jiraUpdatedAt;
 
+    @Column(name = "board_category", length = 20)
+    private String boardCategory;
+
+    @Column(name = "workflow_role", length = 50)
+    private String workflowRole;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -127,305 +133,192 @@ public class JiraIssueEntity {
         updatedAt = OffsetDateTime.now();
     }
 
-    // Getters and Setters
-    public Long getId() {
-        return id;
+    // ==================== Rough Estimate Helpers ====================
+
+    public BigDecimal getRoughEstimate(String roleCode) {
+        if (roughEstimates == null || roleCode == null) return null;
+        return roughEstimates.get(roleCode);
     }
 
-    public void setId(Long id) {
-        this.id = id;
+    public void setRoughEstimate(String roleCode, BigDecimal days) {
+        if (roughEstimates == null) {
+            roughEstimates = new HashMap<>();
+        }
+        if (days == null || days.compareTo(BigDecimal.ZERO) == 0) {
+            roughEstimates.remove(roleCode);
+        } else {
+            roughEstimates.put(roleCode, days);
+        }
     }
 
-    public String getIssueKey() {
-        return issueKey;
-    }
-
-    public void setIssueKey(String issueKey) {
-        this.issueKey = issueKey;
-    }
-
-    public String getIssueId() {
-        return issueId;
-    }
-
-    public void setIssueId(String issueId) {
-        this.issueId = issueId;
-    }
-
-    public String getProjectKey() {
-        return projectKey;
-    }
-
-    public void setProjectKey(String projectKey) {
-        this.projectKey = projectKey;
-    }
-
-    public String getSummary() {
-        return summary;
-    }
-
-    public void setSummary(String summary) {
-        this.summary = summary;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getIssueType() {
-        return issueType;
-    }
-
-    public void setIssueType(String issueType) {
-        this.issueType = issueType;
-    }
-
-    public boolean isSubtask() {
-        return subtask;
-    }
-
-    public void setSubtask(boolean subtask) {
-        this.subtask = subtask;
-    }
-
-    public String getParentKey() {
-        return parentKey;
-    }
-
-    public void setParentKey(String parentKey) {
-        this.parentKey = parentKey;
-    }
-
-    public Long getOriginalEstimateSeconds() {
-        return originalEstimateSeconds;
-    }
-
-    public void setOriginalEstimateSeconds(Long originalEstimateSeconds) {
-        this.originalEstimateSeconds = originalEstimateSeconds;
-    }
-
-    public Long getRemainingEstimateSeconds() {
-        return remainingEstimateSeconds;
-    }
-
-    public void setRemainingEstimateSeconds(Long remainingEstimateSeconds) {
-        this.remainingEstimateSeconds = remainingEstimateSeconds;
-    }
-
-    public Long getTimeSpentSeconds() {
-        return timeSpentSeconds;
-    }
-
-    public void setTimeSpentSeconds(Long timeSpentSeconds) {
-        this.timeSpentSeconds = timeSpentSeconds;
-    }
-
-    public String getTeamFieldValue() {
-        return teamFieldValue;
-    }
-
-    public void setTeamFieldValue(String teamFieldValue) {
-        this.teamFieldValue = teamFieldValue;
-    }
-
-    public Long getTeamId() {
-        return teamId;
-    }
-
-    public void setTeamId(Long teamId) {
-        this.teamId = teamId;
-    }
-
+    /**
+     * Legacy getter for backward compatibility.
+     * @deprecated Use getRoughEstimate("SA") instead.
+     */
+    @Deprecated
     public BigDecimal getRoughEstimateSaDays() {
-        return roughEstimateSaDays;
+        return getRoughEstimate("SA");
     }
 
-    public void setRoughEstimateSaDays(BigDecimal roughEstimateSaDays) {
-        this.roughEstimateSaDays = roughEstimateSaDays;
+    /**
+     * Legacy setter for backward compatibility.
+     * @deprecated Use setRoughEstimate("SA", value) instead.
+     */
+    @Deprecated
+    public void setRoughEstimateSaDays(BigDecimal value) {
+        setRoughEstimate("SA", value);
     }
 
+    /**
+     * Legacy getter for backward compatibility.
+     * @deprecated Use getRoughEstimate("DEV") instead.
+     */
+    @Deprecated
     public BigDecimal getRoughEstimateDevDays() {
-        return roughEstimateDevDays;
+        return getRoughEstimate("DEV");
     }
 
-    public void setRoughEstimateDevDays(BigDecimal roughEstimateDevDays) {
-        this.roughEstimateDevDays = roughEstimateDevDays;
+    /**
+     * Legacy setter for backward compatibility.
+     * @deprecated Use setRoughEstimate("DEV", value) instead.
+     */
+    @Deprecated
+    public void setRoughEstimateDevDays(BigDecimal value) {
+        setRoughEstimate("DEV", value);
     }
 
+    /**
+     * Legacy getter for backward compatibility.
+     * @deprecated Use getRoughEstimate("QA") instead.
+     */
+    @Deprecated
     public BigDecimal getRoughEstimateQaDays() {
-        return roughEstimateQaDays;
+        return getRoughEstimate("QA");
     }
 
-    public void setRoughEstimateQaDays(BigDecimal roughEstimateQaDays) {
-        this.roughEstimateQaDays = roughEstimateQaDays;
+    /**
+     * Legacy setter for backward compatibility.
+     * @deprecated Use setRoughEstimate("QA", value) instead.
+     */
+    @Deprecated
+    public void setRoughEstimateQaDays(BigDecimal value) {
+        setRoughEstimate("QA", value);
     }
 
-    public OffsetDateTime getRoughEstimateUpdatedAt() {
-        return roughEstimateUpdatedAt;
-    }
+    // ==================== Getters and Setters ====================
 
-    public void setRoughEstimateUpdatedAt(OffsetDateTime roughEstimateUpdatedAt) {
-        this.roughEstimateUpdatedAt = roughEstimateUpdatedAt;
-    }
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
-    public String getRoughEstimateUpdatedBy() {
-        return roughEstimateUpdatedBy;
-    }
+    public String getIssueKey() { return issueKey; }
+    public void setIssueKey(String issueKey) { this.issueKey = issueKey; }
 
-    public void setRoughEstimateUpdatedBy(String roughEstimateUpdatedBy) {
-        this.roughEstimateUpdatedBy = roughEstimateUpdatedBy;
-    }
+    public String getIssueId() { return issueId; }
+    public void setIssueId(String issueId) { this.issueId = issueId; }
 
-    public OffsetDateTime getJiraUpdatedAt() {
-        return jiraUpdatedAt;
-    }
+    public String getProjectKey() { return projectKey; }
+    public void setProjectKey(String projectKey) { this.projectKey = projectKey; }
 
-    public void setJiraUpdatedAt(OffsetDateTime jiraUpdatedAt) {
-        this.jiraUpdatedAt = jiraUpdatedAt;
-    }
+    public String getSummary() { return summary; }
+    public void setSummary(String summary) { this.summary = summary; }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public void setCreatedAt(OffsetDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    public String getIssueType() { return issueType; }
+    public void setIssueType(String issueType) { this.issueType = issueType; }
 
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
+    public boolean isSubtask() { return subtask; }
+    public void setSubtask(boolean subtask) { this.subtask = subtask; }
 
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
+    public String getParentKey() { return parentKey; }
+    public void setParentKey(String parentKey) { this.parentKey = parentKey; }
 
-    public String getPriority() {
-        return priority;
-    }
+    public Long getOriginalEstimateSeconds() { return originalEstimateSeconds; }
+    public void setOriginalEstimateSeconds(Long originalEstimateSeconds) { this.originalEstimateSeconds = originalEstimateSeconds; }
 
-    public void setPriority(String priority) {
-        this.priority = priority;
-    }
+    public Long getRemainingEstimateSeconds() { return remainingEstimateSeconds; }
+    public void setRemainingEstimateSeconds(Long remainingEstimateSeconds) { this.remainingEstimateSeconds = remainingEstimateSeconds; }
 
-    public LocalDate getDueDate() {
-        return dueDate;
-    }
+    public Long getTimeSpentSeconds() { return timeSpentSeconds; }
+    public void setTimeSpentSeconds(Long timeSpentSeconds) { this.timeSpentSeconds = timeSpentSeconds; }
 
-    public void setDueDate(LocalDate dueDate) {
-        this.dueDate = dueDate;
-    }
+    public String getTeamFieldValue() { return teamFieldValue; }
+    public void setTeamFieldValue(String teamFieldValue) { this.teamFieldValue = teamFieldValue; }
 
-    public OffsetDateTime getJiraCreatedAt() {
-        return jiraCreatedAt;
-    }
+    public Long getTeamId() { return teamId; }
+    public void setTeamId(Long teamId) { this.teamId = teamId; }
 
-    public void setJiraCreatedAt(OffsetDateTime jiraCreatedAt) {
-        this.jiraCreatedAt = jiraCreatedAt;
-    }
+    public Map<String, BigDecimal> getRoughEstimates() { return roughEstimates; }
+    public void setRoughEstimates(Map<String, BigDecimal> roughEstimates) { this.roughEstimates = roughEstimates; }
 
-    public BigDecimal getAutoScore() {
-        return autoScore;
-    }
+    public OffsetDateTime getRoughEstimateUpdatedAt() { return roughEstimateUpdatedAt; }
+    public void setRoughEstimateUpdatedAt(OffsetDateTime roughEstimateUpdatedAt) { this.roughEstimateUpdatedAt = roughEstimateUpdatedAt; }
 
-    public void setAutoScore(BigDecimal autoScore) {
-        this.autoScore = autoScore;
-    }
+    public String getRoughEstimateUpdatedBy() { return roughEstimateUpdatedBy; }
+    public void setRoughEstimateUpdatedBy(String roughEstimateUpdatedBy) { this.roughEstimateUpdatedBy = roughEstimateUpdatedBy; }
 
-    public OffsetDateTime getAutoScoreCalculatedAt() {
-        return autoScoreCalculatedAt;
-    }
+    public OffsetDateTime getJiraUpdatedAt() { return jiraUpdatedAt; }
+    public void setJiraUpdatedAt(OffsetDateTime jiraUpdatedAt) { this.jiraUpdatedAt = jiraUpdatedAt; }
 
-    public void setAutoScoreCalculatedAt(OffsetDateTime autoScoreCalculatedAt) {
-        this.autoScoreCalculatedAt = autoScoreCalculatedAt;
-    }
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
 
-    public Boolean getFlagged() {
-        return flagged;
-    }
+    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 
-    public void setFlagged(Boolean flagged) {
-        this.flagged = flagged;
-    }
+    public String getPriority() { return priority; }
+    public void setPriority(String priority) { this.priority = priority; }
 
-    public List<String> getBlocks() {
-        return blocks;
-    }
+    public LocalDate getDueDate() { return dueDate; }
+    public void setDueDate(LocalDate dueDate) { this.dueDate = dueDate; }
 
-    public void setBlocks(List<String> blocks) {
-        this.blocks = blocks;
-    }
+    public OffsetDateTime getJiraCreatedAt() { return jiraCreatedAt; }
+    public void setJiraCreatedAt(OffsetDateTime jiraCreatedAt) { this.jiraCreatedAt = jiraCreatedAt; }
 
-    public List<String> getIsBlockedBy() {
-        return isBlockedBy;
-    }
+    public BigDecimal getAutoScore() { return autoScore; }
+    public void setAutoScore(BigDecimal autoScore) { this.autoScore = autoScore; }
 
-    public void setIsBlockedBy(List<String> isBlockedBy) {
-        this.isBlockedBy = isBlockedBy;
-    }
+    public OffsetDateTime getAutoScoreCalculatedAt() { return autoScoreCalculatedAt; }
+    public void setAutoScoreCalculatedAt(OffsetDateTime autoScoreCalculatedAt) { this.autoScoreCalculatedAt = autoScoreCalculatedAt; }
 
-    public String getAssigneeAccountId() {
-        return assigneeAccountId;
-    }
+    public Boolean getFlagged() { return flagged; }
+    public void setFlagged(Boolean flagged) { this.flagged = flagged; }
 
-    public void setAssigneeAccountId(String assigneeAccountId) {
-        this.assigneeAccountId = assigneeAccountId;
-    }
+    public List<String> getBlocks() { return blocks; }
+    public void setBlocks(List<String> blocks) { this.blocks = blocks; }
 
-    public String getAssigneeDisplayName() {
-        return assigneeDisplayName;
-    }
+    public List<String> getIsBlockedBy() { return isBlockedBy; }
+    public void setIsBlockedBy(List<String> isBlockedBy) { this.isBlockedBy = isBlockedBy; }
 
-    public void setAssigneeDisplayName(String assigneeDisplayName) {
-        this.assigneeDisplayName = assigneeDisplayName;
-    }
+    public String getAssigneeAccountId() { return assigneeAccountId; }
+    public void setAssigneeAccountId(String assigneeAccountId) { this.assigneeAccountId = assigneeAccountId; }
 
-    public OffsetDateTime getStartedAt() {
-        return startedAt;
-    }
+    public String getAssigneeDisplayName() { return assigneeDisplayName; }
+    public void setAssigneeDisplayName(String assigneeDisplayName) { this.assigneeDisplayName = assigneeDisplayName; }
 
-    public void setStartedAt(OffsetDateTime startedAt) {
-        this.startedAt = startedAt;
-    }
+    public OffsetDateTime getStartedAt() { return startedAt; }
+    public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }
 
-    public OffsetDateTime getDoneAt() {
-        return doneAt;
-    }
+    public OffsetDateTime getDoneAt() { return doneAt; }
+    public void setDoneAt(OffsetDateTime doneAt) { this.doneAt = doneAt; }
 
-    public void setDoneAt(OffsetDateTime doneAt) {
-        this.doneAt = doneAt;
-    }
+    public Integer getManualOrder() { return manualOrder; }
+    public void setManualOrder(Integer manualOrder) { this.manualOrder = manualOrder; }
 
-    public Integer getManualOrder() {
-        return manualOrder;
-    }
+    public String getBoardCategory() { return boardCategory; }
+    public void setBoardCategory(String boardCategory) { this.boardCategory = boardCategory; }
 
-    public void setManualOrder(Integer manualOrder) {
-        this.manualOrder = manualOrder;
-    }
+    public String getWorkflowRole() { return workflowRole; }
+    public void setWorkflowRole(String workflowRole) { this.workflowRole = workflowRole; }
 
     // ==================== Derived/Computed Methods ====================
 
-    /**
-     * Calculate effective estimate for this issue.
-     * If remainingEstimateSeconds is set, use (timeSpent + remaining) as the effective total.
-     * Otherwise fall back to originalEstimateSeconds.
-     *
-     * This is the single source of truth for estimate calculations across the application.
-     *
-     * @return effective estimate in seconds, or 0 if no estimate available
-     */
     public long getEffectiveEstimateSeconds() {
         if (remainingEstimateSeconds != null) {
-            // Effective estimate = spent + remaining
             long spent = timeSpentSeconds != null ? timeSpentSeconds : 0;
             return spent + remainingEstimateSeconds;
         }
-        // Fallback to original estimate
         return originalEstimateSeconds != null ? originalEstimateSeconds : 0;
     }
 }

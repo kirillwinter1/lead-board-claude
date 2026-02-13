@@ -1,8 +1,7 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -15,7 +14,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Service for story-level scheduling with assignee-based capacity allocation.
@@ -42,7 +40,7 @@ public class StoryForecastService {
     private final TeamService teamService;
     private final TeamMemberRepository memberRepository;
     private final WorkCalendarService calendarService;
-    private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
     private final StoryAutoScoreService storyAutoScoreService;
     private final StoryDependencyService storyDependencyService;
 
@@ -51,7 +49,7 @@ public class StoryForecastService {
             TeamService teamService,
             TeamMemberRepository memberRepository,
             WorkCalendarService calendarService,
-            StatusMappingService statusMappingService,
+            WorkflowConfigService workflowConfigService,
             StoryAutoScoreService storyAutoScoreService,
             StoryDependencyService storyDependencyService
     ) {
@@ -59,7 +57,7 @@ public class StoryForecastService {
         this.teamService = teamService;
         this.memberRepository = memberRepository;
         this.calendarService = calendarService;
-        this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
         this.storyAutoScoreService = storyAutoScoreService;
         this.storyDependencyService = storyDependencyService;
     }
@@ -77,7 +75,6 @@ public class StoryForecastService {
         PlanningConfigDto.GradeCoefficients gradeCoefficients = config.gradeCoefficients() != null
                 ? config.gradeCoefficients()
                 : PlanningConfigDto.GradeCoefficients.defaults();
-        StatusMappingConfig statusMapping = config.statusMapping();
 
         // Get team members
         List<TeamMemberEntity> members = memberRepository.findByTeamIdAndActiveTrue(teamId);
@@ -96,15 +93,14 @@ public class StoryForecastService {
         List<JiraIssueEntity> sortedStories = storyDependencyService.topologicalSort(stories, storyScores);
 
         // Build assignee schedules
-        Map<String, AssigneeSchedule> assigneeSchedules = buildAssigneeSchedules(members, gradeCoefficients);
+        Map<String, AssigneeScheduleInner> assigneeSchedules = buildAssigneeSchedules(members, gradeCoefficients);
 
         // Calculate story schedules
-        LocalDate epicStartDate = determineEpicStartDate(epic, statusMapping);
+        LocalDate epicStartDate = determineEpicStartDate(epic);
         List<StorySchedule> schedules = calculateStorySchedules(
                 sortedStories,
                 assigneeSchedules,
-                epicStartDate,
-                statusMapping
+                epicStartDate
         );
 
         // Calculate assignee utilization
@@ -121,11 +117,11 @@ public class StoryForecastService {
     /**
      * Build assignee schedule map for capacity tracking.
      */
-    private Map<String, AssigneeSchedule> buildAssigneeSchedules(
+    private Map<String, AssigneeScheduleInner> buildAssigneeSchedules(
             List<TeamMemberEntity> members,
             PlanningConfigDto.GradeCoefficients gradeCoefficients
     ) {
-        Map<String, AssigneeSchedule> schedules = new HashMap<>();
+        Map<String, AssigneeScheduleInner> schedules = new HashMap<>();
         LocalDate today = LocalDate.now();
 
         for (TeamMemberEntity member : members) {
@@ -142,10 +138,10 @@ public class StoryForecastService {
 
             schedules.put(
                     member.getJiraAccountId(),
-                    new AssigneeSchedule(
+                    new AssigneeScheduleInner(
                             member.getJiraAccountId(),
                             member.getDisplayName(),
-                            member.getRole(),
+                            member.getRoleCode(),
                             effectiveHoursPerDay,
                             today // Start from today
                     )
@@ -160,9 +156,8 @@ public class StoryForecastService {
      */
     private List<StorySchedule> calculateStorySchedules(
             List<JiraIssueEntity> stories,
-            Map<String, AssigneeSchedule> assigneeSchedules,
-            LocalDate epicStartDate,
-            StatusMappingConfig statusMapping
+            Map<String, AssigneeScheduleInner> assigneeSchedules,
+            LocalDate epicStartDate
     ) {
         List<StorySchedule> schedules = new ArrayList<>();
         Map<String, LocalDate> storyEndDates = new HashMap<>(); // For dependency tracking
@@ -172,8 +167,7 @@ public class StoryForecastService {
                     story,
                     assigneeSchedules,
                     epicStartDate,
-                    storyEndDates,
-                    statusMapping
+                    storyEndDates
             );
             schedules.add(schedule);
             storyEndDates.put(story.getIssueKey(), schedule.endDate());
@@ -187,10 +181,9 @@ public class StoryForecastService {
      */
     private StorySchedule calculateSingleStorySchedule(
             JiraIssueEntity story,
-            Map<String, AssigneeSchedule> assigneeSchedules,
+            Map<String, AssigneeScheduleInner> assigneeSchedules,
             LocalDate epicStartDate,
-            Map<String, LocalDate> storyEndDates,
-            StatusMappingConfig statusMapping
+            Map<String, LocalDate> storyEndDates
     ) {
         String storyKey = story.getIssueKey();
 
@@ -220,7 +213,7 @@ public class StoryForecastService {
             );
         }
 
-        AssigneeSchedule assigneeSchedule = assigneeSchedules.get(assigneeAccountId);
+        AssigneeScheduleInner assigneeSchedule = assigneeSchedules.get(assigneeAccountId);
 
         // Check dependencies
         List<String> blockingStories = new ArrayList<>();
@@ -271,16 +264,16 @@ public class StoryForecastService {
      * Find best assignee for unassigned story.
      * Prefers earliest available member with matching role.
      */
-    private String findBestAssignee(JiraIssueEntity story, Map<String, AssigneeSchedule> assigneeSchedules) {
+    private String findBestAssignee(JiraIssueEntity story, Map<String, AssigneeScheduleInner> assigneeSchedules) {
         // Determine required role based on story estimate distribution
-        Role requiredRole = determineRequiredRole(story);
+        String requiredRole = determineRequiredRole(story);
 
         // Find earliest available member with matching role
         String bestAssignee = null;
         LocalDate earliestDate = null;
 
-        for (AssigneeSchedule schedule : assigneeSchedules.values()) {
-            if (schedule.role() == requiredRole) {
+        for (AssigneeScheduleInner schedule : assigneeSchedules.values()) {
+            if (schedule.roleCode().equals(requiredRole)) {
                 if (bestAssignee == null || schedule.nextAvailableDate().isBefore(earliestDate)) {
                     bestAssignee = schedule.jiraAccountId();
                     earliestDate = schedule.nextAvailableDate();
@@ -290,7 +283,7 @@ public class StoryForecastService {
 
         // Fallback: any earliest available member
         if (bestAssignee == null) {
-            for (AssigneeSchedule schedule : assigneeSchedules.values()) {
+            for (AssigneeScheduleInner schedule : assigneeSchedules.values()) {
                 if (bestAssignee == null || schedule.nextAvailableDate().isBefore(earliestDate)) {
                     bestAssignee = schedule.jiraAccountId();
                     earliestDate = schedule.nextAvailableDate();
@@ -303,19 +296,40 @@ public class StoryForecastService {
 
     /**
      * Determine required role based on story estimate distribution.
+     * Uses dynamic roughEstimates Map with fallback to legacy fields.
      */
-    private Role determineRequiredRole(JiraIssueEntity story) {
+    private String determineRequiredRole(JiraIssueEntity story) {
+        // Try dynamic rough estimates first
+        Map<String, BigDecimal> roughEstimates = story.getRoughEstimates();
+        if (roughEstimates != null && !roughEstimates.isEmpty()) {
+            String maxRole = null;
+            BigDecimal maxValue = BigDecimal.ZERO;
+
+            for (Map.Entry<String, BigDecimal> entry : roughEstimates.entrySet()) {
+                BigDecimal value = entry.getValue() != null ? entry.getValue() : BigDecimal.ZERO;
+                if (maxRole == null || value.compareTo(maxValue) > 0) {
+                    maxRole = entry.getKey();
+                    maxValue = value;
+                }
+            }
+
+            if (maxRole != null) {
+                return maxRole;
+            }
+        }
+
+        // Fallback to legacy fields
         BigDecimal saDays = story.getRoughEstimateSaDays() != null ? story.getRoughEstimateSaDays() : BigDecimal.ZERO;
         BigDecimal devDays = story.getRoughEstimateDevDays() != null ? story.getRoughEstimateDevDays() : BigDecimal.ZERO;
         BigDecimal qaDays = story.getRoughEstimateQaDays() != null ? story.getRoughEstimateQaDays() : BigDecimal.ZERO;
 
         // Return role with highest estimate
         if (saDays.compareTo(devDays) >= 0 && saDays.compareTo(qaDays) >= 0) {
-            return Role.SA;
+            return "SA";
         } else if (qaDays.compareTo(devDays) >= 0) {
-            return Role.QA;
+            return "QA";
         } else {
-            return Role.DEV;
+            return "DEV";
         }
     }
 
@@ -348,10 +362,12 @@ public class StoryForecastService {
 
     /**
      * Determine epic start date based on current status.
+     * Uses WorkflowConfigService for dynamic status categorization.
      */
-    private LocalDate determineEpicStartDate(JiraIssueEntity epic, StatusMappingConfig statusMapping) {
+    private LocalDate determineEpicStartDate(JiraIssueEntity epic) {
         String status = epic.getStatus();
-        boolean isInProgress = statusMappingService.isInProgress(status, statusMapping);
+        String issueType = epic.getIssueType();
+        boolean isInProgress = workflowConfigService.isInProgress(status, issueType);
 
         if (isInProgress) {
             return LocalDate.now();
@@ -364,7 +380,7 @@ public class StoryForecastService {
      * Calculate assignee utilization.
      */
     private Map<String, AssigneeUtilization> calculateAssigneeUtilization(
-            Map<String, AssigneeSchedule> assigneeSchedules,
+            Map<String, AssigneeScheduleInner> assigneeSchedules,
             List<StorySchedule> schedules
     ) {
         Map<String, BigDecimal> workDaysAssigned = new HashMap<>();
@@ -377,16 +393,16 @@ public class StoryForecastService {
         }
 
         Map<String, AssigneeUtilization> utilization = new HashMap<>();
-        for (Map.Entry<String, AssigneeSchedule> entry : assigneeSchedules.entrySet()) {
+        for (Map.Entry<String, AssigneeScheduleInner> entry : assigneeSchedules.entrySet()) {
             String assigneeId = entry.getKey();
-            AssigneeSchedule schedule = entry.getValue();
+            AssigneeScheduleInner schedule = entry.getValue();
             BigDecimal assigned = workDaysAssigned.getOrDefault(assigneeId, BigDecimal.ZERO);
 
             utilization.put(
                     assigneeId,
                     new AssigneeUtilization(
                             schedule.displayName(),
-                            schedule.role(),
+                            schedule.roleCode(),
                             assigned,
                             schedule.effectiveHoursPerDay()
                     )
@@ -401,27 +417,28 @@ public class StoryForecastService {
     }
 
     /**
-     * Assignee schedule tracking.
+     * Inner assignee schedule tracking (distinct from top-level AssigneeSchedule class).
+     * Uses String roleCode instead of Role enum for dynamic role support.
      */
-    private static class AssigneeSchedule {
+    private static class AssigneeScheduleInner {
         private final String jiraAccountId;
         private final String displayName;
-        private final Role role;
+        private final String roleCode;
         private final BigDecimal effectiveHoursPerDay;
         private LocalDate nextAvailableDate;
 
-        public AssigneeSchedule(String jiraAccountId, String displayName, Role role,
+        public AssigneeScheduleInner(String jiraAccountId, String displayName, String roleCode,
                                 BigDecimal effectiveHoursPerDay, LocalDate nextAvailableDate) {
             this.jiraAccountId = jiraAccountId;
             this.displayName = displayName;
-            this.role = role;
+            this.roleCode = roleCode;
             this.effectiveHoursPerDay = effectiveHoursPerDay;
             this.nextAvailableDate = nextAvailableDate;
         }
 
         public String jiraAccountId() { return jiraAccountId; }
         public String displayName() { return displayName; }
-        public Role role() { return role; }
+        public String roleCode() { return roleCode; }
         public BigDecimal effectiveHoursPerDay() { return effectiveHoursPerDay; }
         public LocalDate nextAvailableDate() { return nextAvailableDate; }
         public void setNextAvailableDate(LocalDate date) { this.nextAvailableDate = date; }
@@ -454,10 +471,11 @@ public class StoryForecastService {
 
     /**
      * Assignee utilization info.
+     * Uses String roleCode instead of Role enum.
      */
     public record AssigneeUtilization(
             String displayName,
-            Role role,
+            String roleCode,
             BigDecimal workDaysAssigned,
             BigDecimal effectiveHoursPerDay
     ) {}

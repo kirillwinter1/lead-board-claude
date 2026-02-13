@@ -4,7 +4,6 @@ import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
-import com.leadboard.team.Role;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -80,7 +79,7 @@ class ForecastControllerTest {
         StoryForecastService.AssigneeUtilization utilization =
                 new StoryForecastService.AssigneeUtilization(
                         "John Doe",
-                        Role.DEV,
+                        "DEV",
                         new BigDecimal("2.0"),
                         new BigDecimal("6.0")
                 );
@@ -120,7 +119,7 @@ class ForecastControllerTest {
                 .andExpect(jsonPath("$.stories[0].autoScore").value(75.0))
                 .andExpect(jsonPath("$.stories[0].status").value("To Do"))
                 .andExpect(jsonPath("$.assigneeUtilization['user-123'].displayName").value("John Doe"))
-                .andExpect(jsonPath("$.assigneeUtilization['user-123'].role").value("DEV"))
+                .andExpect(jsonPath("$.assigneeUtilization['user-123'].roleCode").value("DEV"))
                 .andExpect(jsonPath("$.assigneeUtilization['user-123'].workDaysAssigned").value(2.0))
                 .andExpect(jsonPath("$.assigneeUtilization['user-123'].effectiveHoursPerDay").value(6.0));
     }
@@ -284,7 +283,7 @@ class ForecastControllerTest {
         StoryForecastService.AssigneeUtilization utilization =
                 new StoryForecastService.AssigneeUtilization(
                         "Senior Dev",
-                        Role.DEV,
+                        "DEV",
                         new BigDecimal("10.5"),
                         new BigDecimal("7.5")
                 );
@@ -312,7 +311,7 @@ class ForecastControllerTest {
                 .andExpect(jsonPath("$.assigneeUtilization").isMap())
                 .andExpect(jsonPath("$.assigneeUtilization['user-123']").exists())
                 .andExpect(jsonPath("$.assigneeUtilization['user-123'].displayName").value("Senior Dev"))
-                .andExpect(jsonPath("$.assigneeUtilization['user-123'].role").value("DEV"))
+                .andExpect(jsonPath("$.assigneeUtilization['user-123'].roleCode").value("DEV"))
                 .andExpect(jsonPath("$.assigneeUtilization['user-123'].workDaysAssigned").value(10.5))
                 .andExpect(jsonPath("$.assigneeUtilization['user-123'].effectiveHoursPerDay").value(7.5));
     }

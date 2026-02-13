@@ -1,8 +1,8 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -41,7 +41,7 @@ class StoryForecastServiceTest {
     private WorkCalendarService calendarService;
 
     @Mock
-    private StatusMappingService statusMappingService;
+    private WorkflowConfigService workflowConfigService;
 
     @Mock
     private StoryAutoScoreService storyAutoScoreService;
@@ -58,7 +58,7 @@ class StoryForecastServiceTest {
                 teamService,
                 memberRepository,
                 calendarService,
-                statusMappingService,
+                workflowConfigService,
                 storyAutoScoreService,
                 storyDependencyService
         );
@@ -84,7 +84,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(member));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         // Simulate work calendar: today is workday, add 1 workday = tomorrow
         LocalDate today = LocalDate.now();
@@ -126,7 +126,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(member));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         LocalDate today = LocalDate.now();
         when(calendarService.addWorkdays(any(LocalDate.class), anyInt())).thenAnswer(inv -> {
@@ -166,7 +166,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(member));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenReturn(List.of(story1, story2)); // Sorted by deps
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         LocalDate today = LocalDate.now();
         when(calendarService.addWorkdays(any(LocalDate.class), anyInt())).thenAnswer(inv -> {
@@ -216,7 +216,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(devMember, qaMember));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         LocalDate today = LocalDate.now();
         when(calendarService.addWorkdays(any(LocalDate.class), anyInt())).thenAnswer(inv -> {
@@ -266,7 +266,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(member));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         LocalDate today = LocalDate.now();
         when(calendarService.addWorkdays(any(LocalDate.class), anyInt())).thenAnswer(inv -> {
@@ -308,7 +308,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(seniorMember));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         LocalDate today = LocalDate.now();
         when(calendarService.addWorkdays(any(LocalDate.class), anyInt())).thenAnswer(inv -> {
@@ -344,7 +344,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(member));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         // When
         StoryForecastService.StoryForecast forecast = service.calculateStoryForecast(epicKey, teamId);
@@ -371,7 +371,7 @@ class StoryForecastServiceTest {
         when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of(member));
         when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
         when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
-        when(statusMappingService.isInProgress(anyString(), any())).thenReturn(false);
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
 
         LocalDate today = LocalDate.now();
         when(calendarService.addWorkdays(any(LocalDate.class), anyInt())).thenAnswer(inv -> {

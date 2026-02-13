@@ -235,7 +235,7 @@ public class ForecastController {
                         Map.Entry::getKey,
                         e -> new StoryForecastResponse.AssigneeUtilizationDto(
                                 e.getValue().displayName(),
-                                e.getValue().role(),
+                                e.getValue().roleCode(),
                                 e.getValue().workDaysAssigned(),
                                 e.getValue().effectiveHoursPerDay()
                         )

@@ -1,26 +1,33 @@
 package com.leadboard.quality;
 
+import com.leadboard.config.repository.*;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingProperties;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class DataQualityServiceTest {
 
     @Mock
@@ -29,14 +36,29 @@ class DataQualityServiceTest {
     @Mock
     private TeamMemberRepository memberRepository;
 
+    @Mock
+    private ProjectConfigurationRepository configRepo;
+    @Mock
+    private WorkflowRoleRepository roleRepo;
+    @Mock
+    private IssueTypeMappingRepository issueTypeRepo;
+    @Mock
+    private StatusMappingRepository statusMappingRepo;
+    @Mock
+    private LinkTypeMappingRepository linkTypeRepo;
+
+    private WorkflowConfigService workflowConfigService;
     private StatusMappingService statusMappingService;
     private DataQualityService dataQualityService;
     private StatusMappingConfig statusMapping;
 
     @BeforeEach
     void setUp() {
-        StatusMappingProperties properties = new StatusMappingProperties();
-        statusMappingService = new StatusMappingService(properties);
+        // Real WorkflowConfigService with empty caches - fallback substring matching works
+        workflowConfigService = new WorkflowConfigService(
+                configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper()
+        );
+        statusMappingService = new StatusMappingService(workflowConfigService);
         statusMapping = statusMappingService.getDefaultConfig();
         dataQualityService = new DataQualityService(issueRepository, memberRepository, statusMappingService);
     }

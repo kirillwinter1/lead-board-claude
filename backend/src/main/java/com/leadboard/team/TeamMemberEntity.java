@@ -94,6 +94,14 @@ public class TeamMemberEntity {
         this.role = role;
     }
 
+    /**
+     * Returns role as a String code (e.g., "SA", "DEV", "QA").
+     * Used by dynamic workflow configuration.
+     */
+    public String getRoleCode() {
+        return role != null ? role.name() : "DEV";
+    }
+
     public Grade getGrade() {
         return grade;
     }

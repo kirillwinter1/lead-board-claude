@@ -1,5 +1,6 @@
 package com.leadboard.poker.service;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.poker.entity.PokerStoryEntity;
 import com.leadboard.poker.repository.PokerStoryRepository;
@@ -21,14 +22,17 @@ public class PokerJiraService {
     private final JiraClient jiraClient;
     private final PokerStoryRepository storyRepository;
     private final JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
     @Value("${jira.project-key:}")
     private String projectKey;
 
-    public PokerJiraService(JiraClient jiraClient, PokerStoryRepository storyRepository, JiraIssueRepository issueRepository) {
+    public PokerJiraService(JiraClient jiraClient, PokerStoryRepository storyRepository,
+                            JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
         this.jiraClient = jiraClient;
         this.storyRepository = storyRepository;
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -37,22 +41,25 @@ public class PokerJiraService {
      */
     public String createStoryInJira(String epicKey, String title,
                                      boolean needsSa, boolean needsDev, boolean needsQa) {
-        String storyTypeName = detectStoryTypeName();
+        String storyTypeName = workflowConfigService.getStoryTypeName();
         log.info("Creating story in Jira: type='{}', epic={}, title='{}'", storyTypeName, epicKey, title);
 
         String storyKey = jiraClient.createIssue(projectKey, storyTypeName, title, epicKey);
         log.info("Created Jira Story: {}", storyKey);
 
         if (needsSa) {
-            String subtaskKey = jiraClient.createSubtask(storyKey, "Анализ", projectKey);
+            String saSubtaskName = workflowConfigService.getSubtaskTypeName("SA");
+            String subtaskKey = jiraClient.createSubtask(storyKey, saSubtaskName != null ? saSubtaskName : "Анализ", projectKey);
             log.info("Created SA subtask: {}", subtaskKey);
         }
         if (needsDev) {
-            String subtaskKey = jiraClient.createSubtask(storyKey, "Разработка", projectKey);
+            String devSubtaskName = workflowConfigService.getSubtaskTypeName("DEV");
+            String subtaskKey = jiraClient.createSubtask(storyKey, devSubtaskName != null ? devSubtaskName : "Разработка", projectKey);
             log.info("Created DEV subtask: {}", subtaskKey);
         }
         if (needsQa) {
-            String subtaskKey = jiraClient.createSubtask(storyKey, "Тестирование", projectKey);
+            String qaSubtaskName = workflowConfigService.getSubtaskTypeName("QA");
+            String subtaskKey = jiraClient.createSubtask(storyKey, qaSubtaskName != null ? qaSubtaskName : "Тестирование", projectKey);
             log.info("Created QA subtask: {}", subtaskKey);
         }
 
@@ -73,24 +80,9 @@ public class PokerJiraService {
     }
 
     /**
-     * Detect the correct Story issue type name from synced data.
-     * Different Jira projects may use "Story", "История", "Стори" etc.
-     */
-    private String detectStoryTypeName() {
-        // Look at existing stories in the project to determine the correct issue type name
-        List<String> storyTypes = List.of("История", "Story", "Стори");
-        for (String typeName : storyTypes) {
-            if (!issueRepository.findByProjectKeyAndIssueType(projectKey, typeName).isEmpty()) {
-                return typeName;
-            }
-        }
-        // Default fallback
-        return "История";
-    }
-
-    /**
      * Update estimates on subtasks after voting is complete.
      */
+    @SuppressWarnings("unchecked")
     public void updateSubtaskEstimates(String storyKey, Integer saHours, Integer devHours, Integer qaHours) {
         try {
             List<Map<String, Object>> subtasks = jiraClient.getSubtasks(storyKey);
@@ -98,22 +90,35 @@ public class PokerJiraService {
             for (Map<String, Object> subtask : subtasks) {
                 String subtaskKey = (String) subtask.get("key");
                 Map<String, Object> fields = (Map<String, Object>) subtask.get("fields");
-                String summary = (String) fields.get("summary");
+
+                // Determine role from issue type (preferred) or summary (fallback)
+                String roleCode = null;
+                Map<String, Object> issueTypeMap = (Map<String, Object>) fields.get("issuetype");
+                if (issueTypeMap != null && issueTypeMap.get("name") != null) {
+                    roleCode = workflowConfigService.getSubtaskRole((String) issueTypeMap.get("name"));
+                }
+
+                // Fallback to summary-based detection if issuetype not available
+                if (roleCode == null) {
+                    String summary = (String) fields.get("summary");
+                    if (summary != null) {
+                        roleCode = workflowConfigService.getSubtaskRole(summary);
+                    }
+                }
 
                 Integer hours = null;
-                if (summary != null) {
-                    if (summary.contains("Анализ") && saHours != null) {
-                        hours = saHours;
-                    } else if (summary.contains("Разработка") && devHours != null) {
-                        hours = devHours;
-                    } else if (summary.contains("Тестирование") && qaHours != null) {
-                        hours = qaHours;
-                    }
+                if (roleCode != null) {
+                    hours = switch (roleCode) {
+                        case "SA" -> saHours;
+                        case "DEV" -> devHours;
+                        case "QA" -> qaHours;
+                        default -> null;
+                    };
                 }
 
                 if (hours != null && hours > 0) {
                     jiraClient.updateEstimate(subtaskKey, hours * 3600); // Convert hours to seconds
-                    log.info("Updated estimate for {}: {} hours", subtaskKey, hours);
+                    log.info("Updated estimate for {} (role={}): {} hours", subtaskKey, roleCode, hours);
                 }
             }
         } catch (Exception e) {

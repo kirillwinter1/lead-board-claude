@@ -1,6 +1,7 @@
 package com.leadboard.epic;
 
 import com.leadboard.config.RoughEstimateProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,18 +33,25 @@ class EpicServiceTest {
     @Mock
     private RoughEstimateProperties roughEstimateProperties;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private EpicService epicService;
 
     @BeforeEach
     void setUp() {
-        epicService = new EpicService(issueRepository, roughEstimateProperties);
+        epicService = new EpicService(issueRepository, roughEstimateProperties, workflowConfigService);
 
         // Common setup
         when(roughEstimateProperties.isEnabled()).thenReturn(true);
-        when(roughEstimateProperties.getAllowedEpicStatuses()).thenReturn(List.of("Новое", "Requirements", "Rough Estimate"));
         when(roughEstimateProperties.getStepDays()).thenReturn(BigDecimal.valueOf(0.5));
         when(roughEstimateProperties.getMinDays()).thenReturn(BigDecimal.ZERO);
         when(roughEstimateProperties.getMaxDays()).thenReturn(BigDecimal.valueOf(100));
+
+        // WorkflowConfigService setup
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(workflowConfigService.isEpic("Эпик")).thenReturn(true);
+        when(workflowConfigService.isEpic("Story")).thenReturn(false);
     }
 
     // ==================== getRoughEstimateConfig() Tests ====================
@@ -58,7 +66,7 @@ class EpicServiceTest {
             RoughEstimateConfigDto config = epicService.getRoughEstimateConfig();
 
             assertTrue(config.enabled());
-            assertEquals(List.of("Новое", "Requirements", "Rough Estimate"), config.allowedEpicStatuses());
+            assertEquals(List.of(), config.allowedEpicStatuses());
             assertEquals(BigDecimal.valueOf(0.5), config.stepDays());
             assertEquals(BigDecimal.ZERO, config.minDays());
             assertEquals(BigDecimal.valueOf(100), config.maxDays());
@@ -78,7 +86,7 @@ class EpicServiceTest {
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(5), "user@test.com");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(issueRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             RoughEstimateResponseDto response = epicService.updateRoughEstimate("LB-1", "sa", request);
@@ -96,7 +104,7 @@ class EpicServiceTest {
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(10), "user@test.com");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(issueRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             RoughEstimateResponseDto response = epicService.updateRoughEstimate("LB-1", "dev", request);
@@ -112,7 +120,7 @@ class EpicServiceTest {
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(3), "user@test.com");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(issueRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             RoughEstimateResponseDto response = epicService.updateRoughEstimate("LB-1", "qa", request);
@@ -178,7 +186,7 @@ class EpicServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Test Epic", "Готово");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Готово")).thenReturn(false);
+            when(workflowConfigService.isAllowedForRoughEstimate("Готово")).thenReturn(false);
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(5), "user");
 
             RoughEstimateException exception = assertThrows(RoughEstimateException.class, () ->
@@ -193,7 +201,7 @@ class EpicServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Test Epic", "Новое");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(roughEstimateProperties.getMinDays()).thenReturn(BigDecimal.ONE);
 
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(0.5), "user");
@@ -210,7 +218,7 @@ class EpicServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Test Epic", "Новое");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(roughEstimateProperties.getMaxDays()).thenReturn(BigDecimal.valueOf(50));
 
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(100), "user");
@@ -230,7 +238,7 @@ class EpicServiceTest {
             epic.setStatus("Новое");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(issueRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(5), "user");
@@ -246,7 +254,7 @@ class EpicServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Test Epic", "Новое");
 
             when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
-            when(roughEstimateProperties.isStatusAllowed("Новое")).thenReturn(true);
+            when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
             when(issueRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
             RoughEstimateRequestDto request = new RoughEstimateRequestDto(BigDecimal.valueOf(5), "user@test.com");

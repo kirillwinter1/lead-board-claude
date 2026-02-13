@@ -1,5 +1,6 @@
 package com.leadboard.poker.controller;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
 import com.leadboard.poker.entity.PokerStoryEntity;
@@ -30,6 +31,7 @@ public class PokerController {
     private final PokerJiraService jiraService;
     private final JiraIssueRepository issueRepository;
     private final PokerSessionRepository pokerSessionRepository;
+    private final WorkflowConfigService workflowConfigService;
 
     // Статусы эпиков, подходящие для Planning Poker
     private static final List<String> ELIGIBLE_STATUSES = List.of(
@@ -43,11 +45,13 @@ public class PokerController {
             PokerSessionService sessionService,
             PokerJiraService jiraService,
             JiraIssueRepository issueRepository,
-            PokerSessionRepository pokerSessionRepository) {
+            PokerSessionRepository pokerSessionRepository,
+            WorkflowConfigService workflowConfigService) {
         this.sessionService = sessionService;
         this.jiraService = jiraService;
         this.issueRepository = issueRepository;
         this.pokerSessionRepository = pokerSessionRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     // ===== Eligible Epics =====
@@ -59,9 +63,7 @@ public class PokerController {
         List<JiraIssueEntity> stories = issueRepository.findByParentKey(epicKey);
 
         List<EpicStoryResponse> response = stories.stream()
-                .filter(s -> "Story".equalsIgnoreCase(s.getIssueType())
-                        || "Стори".equalsIgnoreCase(s.getIssueType())
-                        || "История".equalsIgnoreCase(s.getIssueType()))
+                .filter(s -> workflowConfigService.isStory(s.getIssueType()))
                 .map(story -> {
                     // Load subtasks for this story
                     List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
@@ -73,18 +75,18 @@ public class PokerController {
                         String type = subtask.getIssueType();
                         if (type == null) continue;
 
-                        String typeLower = type.toLowerCase();
-                        if (typeLower.contains("аналитик") || typeLower.contains("analyst") || typeLower.equals("sa")) {
+                        String roleCode = workflowConfigService.getSubtaskRole(type);
+                        if ("SA".equals(roleCode)) {
                             hasSa = true;
                             if (subtask.getOriginalEstimateSeconds() != null) {
                                 saEstimate = (int) (subtask.getOriginalEstimateSeconds() / 3600); // seconds to hours
                             }
-                        } else if (typeLower.contains("разработ") || typeLower.contains("develop") || typeLower.equals("dev")) {
+                        } else if ("DEV".equals(roleCode)) {
                             hasDev = true;
                             if (subtask.getOriginalEstimateSeconds() != null) {
                                 devEstimate = (int) (subtask.getOriginalEstimateSeconds() / 3600);
                             }
-                        } else if (typeLower.contains("тестир") || typeLower.contains("test") || typeLower.contains("qa")) {
+                        } else if ("QA".equals(roleCode)) {
                             hasQa = true;
                             if (subtask.getOriginalEstimateSeconds() != null) {
                                 qaEstimate = (int) (subtask.getOriginalEstimateSeconds() / 3600);

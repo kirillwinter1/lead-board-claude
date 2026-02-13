@@ -3,6 +3,7 @@ package com.leadboard.controller;
 import com.leadboard.board.BoardNode;
 import com.leadboard.board.BoardResponse;
 import com.leadboard.board.BoardService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.*;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueRepository;
@@ -39,6 +40,8 @@ class BoardControllerTest {
     private StoryAutoScoreService storyAutoScoreService;
     @MockBean
     private StatusMappingService statusMappingService;
+    @MockBean
+    private WorkflowConfigService workflowConfigService;
     @MockBean
     private JiraIssueRepository jiraIssueRepository;
     @MockBean

@@ -1,11 +1,9 @@
 package com.leadboard.simulation;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraTransition;
 import com.leadboard.simulation.dto.SimulationAction;
-import com.leadboard.status.StatusMappingService;
-import com.leadboard.team.TeamService;
-import com.leadboard.team.dto.PlanningConfigDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,8 +24,7 @@ import static org.mockito.Mockito.*;
 class SimulationExecutorTest {
 
     @Mock private JiraClient jiraClient;
-    @Mock private StatusMappingService statusMappingService;
-    @Mock private TeamService teamService;
+    @Mock private WorkflowConfigService workflowConfigService;
 
     private SimulationExecutor executor;
 
@@ -36,12 +33,7 @@ class SimulationExecutorTest {
 
     @BeforeEach
     void setUp() {
-        executor = new SimulationExecutor(jiraClient, statusMappingService, teamService);
-
-        // Default: status mapping config
-        PlanningConfigDto planningConfig = mock(PlanningConfigDto.class);
-        when(planningConfig.statusMapping()).thenReturn(null);
-        when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(planningConfig);
+        executor = new SimulationExecutor(jiraClient, workflowConfigService);
     }
 
     @Test

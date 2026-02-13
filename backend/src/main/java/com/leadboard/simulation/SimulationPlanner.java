@@ -1,19 +1,16 @@
 package com.leadboard.simulation;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
 import com.leadboard.simulation.dto.SimulationAction;
 import com.leadboard.status.StatusCategory;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
-import com.leadboard.team.TeamService;
-import com.leadboard.team.dto.PlanningConfigDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -30,8 +27,7 @@ public class SimulationPlanner {
     private final UnifiedPlanningService planningService;
     private final JiraIssueRepository issueRepository;
     private final TeamMemberRepository memberRepository;
-    private final StatusMappingService statusMappingService;
-    private final TeamService teamService;
+    private final WorkflowConfigService workflowConfigService;
     private final WorkCalendarService calendarService;
     private final SimulationDeviation deviation;
 
@@ -39,16 +35,14 @@ public class SimulationPlanner {
             UnifiedPlanningService planningService,
             JiraIssueRepository issueRepository,
             TeamMemberRepository memberRepository,
-            StatusMappingService statusMappingService,
-            TeamService teamService,
+            WorkflowConfigService workflowConfigService,
             WorkCalendarService calendarService,
             SimulationDeviation deviation
     ) {
         this.planningService = planningService;
         this.issueRepository = issueRepository;
         this.memberRepository = memberRepository;
-        this.statusMappingService = statusMappingService;
-        this.teamService = teamService;
+        this.workflowConfigService = workflowConfigService;
         this.calendarService = calendarService;
         this.deviation = deviation;
     }
@@ -67,10 +61,6 @@ public class SimulationPlanner {
         // Get the unified plan
         UnifiedPlanningResult plan = planningService.calculatePlan(teamId);
 
-        // Load team config for status mapping
-        PlanningConfigDto config = teamService.getPlanningConfig(teamId);
-        StatusMappingConfig statusMapping = config.statusMapping();
-
         // Build member map: jiraAccountId → TeamMemberEntity
         Map<String, TeamMemberEntity> memberMap = new HashMap<>();
         for (TeamMemberEntity m : memberRepository.findByTeamIdAndActiveTrue(teamId)) {
@@ -84,19 +74,19 @@ public class SimulationPlanner {
                 PlannedPhases phases = story.phases();
 
                 // Process each phase
-                processPhase(phases.sa(), "SA", story, today, memberMap, statusMapping, actions);
-                processPhase(phases.dev(), "DEV", story, today, memberMap, statusMapping, actions);
-                processPhase(phases.qa(), "QA", story, today, memberMap, statusMapping, actions);
+                processPhase(phases.sa(), "SA", story, today, memberMap, actions);
+                processPhase(phases.dev(), "DEV", story, today, memberMap, actions);
+                processPhase(phases.qa(), "QA", story, today, memberMap, actions);
             }
 
             // Check for epic auto-transitions
-            planEpicTransition(epic, statusMapping, actions);
+            planEpicTransition(epic, actions);
         }
 
         // Check for story auto-transitions
         for (PlannedEpic epic : plan.epics()) {
             for (PlannedStory story : epic.stories()) {
-                planStoryTransition(story, statusMapping, actions);
+                planStoryTransition(story, actions);
             }
         }
 
@@ -114,7 +104,6 @@ public class SimulationPlanner {
             PlannedStory story,
             LocalDate today,
             Map<String, TeamMemberEntity> memberMap,
-            StatusMappingConfig statusMapping,
             List<SimulationAction> actions
     ) {
         if (phase == null || phase.startDate() == null || phase.endDate() == null) {
@@ -143,7 +132,7 @@ public class SimulationPlanner {
         List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.storyKey());
         List<JiraIssueEntity> phaseSubtasks = subtasks.stream()
                 .filter(st -> phaseName.equals(
-                        statusMappingService.determinePhase(st.getStatus(), st.getIssueType(), statusMapping)))
+                        workflowConfigService.getSubtaskRole(st.getIssueType())))
                 .toList();
 
         if (phaseSubtasks.isEmpty()) {
@@ -151,11 +140,11 @@ public class SimulationPlanner {
         }
 
         for (JiraIssueEntity subtask : phaseSubtasks) {
-            StatusCategory category = statusMappingService.categorizeSubtask(
-                    subtask.getStatus(), statusMapping);
+            StatusCategory category = workflowConfigService.categorize(
+                    subtask.getStatus(), subtask.getIssueType());
 
             switch (category) {
-                case TODO -> {
+                case NEW -> {
                     // Transition to "In Progress"
                     actions.add(SimulationAction.transition(
                             subtask.getIssueKey(),
@@ -235,10 +224,9 @@ public class SimulationPlanner {
      */
     private void planStoryTransition(
             PlannedStory story,
-            StatusMappingConfig statusMapping,
             List<SimulationAction> actions
     ) {
-        if (statusMappingService.isDone(story.status(), statusMapping)) {
+        if (workflowConfigService.isDone(story.status(), story.issueType())) {
             return;
         }
 
@@ -257,7 +245,7 @@ public class SimulationPlanner {
         }
 
         boolean allDone = subtasks.stream().allMatch(st ->
-                statusMappingService.isDone(st.getStatus(), statusMapping)
+                workflowConfigService.isDone(st.getStatus(), st.getIssueType())
                         || willBeDone.contains(st.getIssueKey()));
 
         if (allDone) {
@@ -277,10 +265,9 @@ public class SimulationPlanner {
      */
     private void planEpicTransition(
             PlannedEpic epic,
-            StatusMappingConfig statusMapping,
             List<SimulationAction> actions
     ) {
-        if (statusMappingService.isDone(epic.status(), statusMapping)) {
+        if (workflowConfigService.isDone(epic.status(), "Epic")) {
             return;
         }
 
@@ -298,7 +285,7 @@ public class SimulationPlanner {
         }
 
         boolean allStoriesDone = epic.stories().stream().allMatch(st ->
-                statusMappingService.isDone(st.status(), statusMapping)
+                workflowConfigService.isDone(st.status(), st.issueType())
                         || willBeDone.contains(st.storyKey()));
 
         if (allStoriesDone) {

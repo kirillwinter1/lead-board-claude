@@ -1,5 +1,7 @@
 package com.leadboard.status;
 
+import com.leadboard.config.entity.BoardCategory;
+import com.leadboard.config.service.WorkflowConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -7,306 +9,122 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 /**
- * Сервис для определения категории и фазы статуса.
- * Использует конфигурацию из application.yml как базу и позволяет
- * переопределять на уровне команды.
+ * Facade adapter: delegates all calls to WorkflowConfigService.
+ * Preserves the existing API so callers don't need immediate changes.
+ * The teamOverride parameter is ignored — all config comes from DB now.
  */
 @Service
 public class StatusMappingService {
 
     private static final Logger log = LoggerFactory.getLogger(StatusMappingService.class);
 
-    private final StatusMappingProperties properties;
-    private final StatusMappingConfig defaultConfig;
+    private final WorkflowConfigService workflowConfigService;
 
-    public StatusMappingService(StatusMappingProperties properties) {
-        this.properties = properties;
-        // Мержим дефолты из кода с конфигурацией из YAML
-        this.defaultConfig = StatusMappingConfig.defaults().merge(properties.toConfig());
+    public StatusMappingService(WorkflowConfigService workflowConfigService) {
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
-     * Возвращает дефолтную конфигурацию (код + application.yml).
+     * Returns a dummy default config for backward compatibility.
+     * Callers should migrate to WorkflowConfigService directly.
      */
     public StatusMappingConfig getDefaultConfig() {
-        return defaultConfig;
+        // Build from DB-backed data
+        List<String> epicTodo = workflowConfigService.getStatusNames(BoardCategory.EPIC, StatusCategory.NEW);
+        List<String> epicReq = workflowConfigService.getStatusNames(BoardCategory.EPIC, StatusCategory.REQUIREMENTS);
+        List<String> epicTodoAll = new java.util.ArrayList<>(epicTodo);
+        epicTodoAll.addAll(epicReq);
+
+        List<String> epicPlanned = workflowConfigService.getStatusNames(BoardCategory.EPIC, StatusCategory.PLANNED);
+        List<String> epicInProgress = workflowConfigService.getStatusNames(BoardCategory.EPIC, StatusCategory.IN_PROGRESS);
+        List<String> epicInProgressAll = new java.util.ArrayList<>(epicPlanned);
+        epicInProgressAll.addAll(epicInProgress);
+
+        List<String> epicDone = workflowConfigService.getStatusNames(BoardCategory.EPIC, StatusCategory.DONE);
+
+        List<String> storyTodo = workflowConfigService.getStatusNames(BoardCategory.STORY, StatusCategory.NEW);
+        List<String> storyInProgress = workflowConfigService.getStatusNames(BoardCategory.STORY, StatusCategory.IN_PROGRESS);
+        List<String> storyDone = workflowConfigService.getStatusNames(BoardCategory.STORY, StatusCategory.DONE);
+
+        List<String> subtaskTodo = workflowConfigService.getStatusNames(BoardCategory.SUBTASK, StatusCategory.NEW);
+        List<String> subtaskInProgress = workflowConfigService.getStatusNames(BoardCategory.SUBTASK, StatusCategory.IN_PROGRESS);
+        List<String> subtaskDone = workflowConfigService.getStatusNames(BoardCategory.SUBTASK, StatusCategory.DONE);
+
+        return new StatusMappingConfig(
+                new WorkflowConfig(epicTodoAll, epicInProgressAll, epicDone),
+                new WorkflowConfig(storyTodo, storyInProgress, storyDone),
+                new WorkflowConfig(subtaskTodo, subtaskInProgress, subtaskDone),
+                PhaseMapping.empty(),
+                epicInProgressAll,
+                epicInProgress
+        );
     }
 
-    /**
-     * Возвращает итоговую конфигурацию после мержа с override команды.
-     */
     public StatusMappingConfig getEffectiveConfig(StatusMappingConfig teamOverride) {
-        if (teamOverride == null) {
-            return defaultConfig;
-        }
-        return defaultConfig.merge(teamOverride);
+        // teamOverride is ignored — all config from DB
+        return getDefaultConfig();
     }
 
-    /**
-     * Определяет категорию статуса (TODO/IN_PROGRESS/DONE) для Epic.
-     */
     public StatusCategory categorizeEpic(String status, StatusMappingConfig teamOverride) {
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        return categorize(status, config.epicWorkflow());
+        StatusCategory cat = workflowConfigService.categorizeEpic(status);
+        return normalizeForLegacy(cat);
     }
 
-    /**
-     * Определяет категорию статуса (TODO/IN_PROGRESS/DONE) для Story.
-     */
     public StatusCategory categorizeStory(String status, StatusMappingConfig teamOverride) {
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        return categorize(status, config.storyWorkflow());
+        StatusCategory cat = workflowConfigService.categorizeStory(status);
+        return normalizeForLegacy(cat);
     }
 
-    /**
-     * Определяет категорию статуса (TODO/IN_PROGRESS/DONE) для Subtask.
-     */
     public StatusCategory categorizeSubtask(String status, StatusMappingConfig teamOverride) {
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        return categorize(status, config.subtaskWorkflow());
+        StatusCategory cat = workflowConfigService.categorizeSubtask(status);
+        return normalizeForLegacy(cat);
     }
 
-    /**
-     * Определяет категорию по типу задачи (Epic/Story/Sub-task).
-     */
     public StatusCategory categorize(String status, String issueType, StatusMappingConfig teamOverride) {
-        if (issueType == null) {
-            return categorizeStory(status, teamOverride);
-        }
-        String typeLower = issueType.toLowerCase();
-        if (typeLower.contains("epic") || typeLower.contains("эпик")) {
-            return categorizeEpic(status, teamOverride);
-        }
-        if (typeLower.contains("sub-task") || typeLower.contains("подзадача")
-                || isSubtaskRoleType(typeLower)) {
-            return categorizeSubtask(status, teamOverride);
-        }
-        return categorizeStory(status, teamOverride);
+        StatusCategory cat = workflowConfigService.categorize(status, issueType);
+        return normalizeForLegacy(cat);
     }
 
-    /**
-     * Checks if the issue type is a subtask role type (Аналитика, Разработка, Тестирование).
-     * These are custom Jira subtask types used for SA/DEV/QA pipeline.
-     */
-    private boolean isSubtaskRoleType(String typeLower) {
-        return typeLower.contains("аналитик") || typeLower.contains("разработк")
-                || typeLower.contains("тестирован")
-                || typeLower.equals("analytics") || typeLower.equals("development")
-                || typeLower.equals("testing");
-    }
-
-    /**
-     * Определяет фазу (SA/DEV/QA) по статусу и типу задачи.
-     */
     public String determinePhase(String status, String issueType, StatusMappingConfig teamOverride) {
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        PhaseMapping pm = config.phaseMapping();
-
-        String statusLower = status != null ? status.toLowerCase() : "";
-        String typeLower = issueType != null ? issueType.toLowerCase() : "";
-
-        // Сначала проверяем по типу задачи (приоритетнее)
-        if (matchesAny(typeLower, pm.saIssueTypes())) {
-            return "SA";
-        }
-        if (matchesAny(typeLower, pm.qaIssueTypes())) {
-            return "QA";
-        }
-
-        // Затем проверяем по статусу
-        // Точное совпадение
-        if (containsIgnoreCase(pm.saStatuses(), status)) {
-            return "SA";
-        }
-        if (containsIgnoreCase(pm.qaStatuses(), status)) {
-            return "QA";
-        }
-        if (containsIgnoreCase(pm.devStatuses(), status)) {
-            return "DEV";
-        }
-
-        // Fallback: substring matching (для обратной совместимости)
-        if (statusLower.contains("analysis") || statusLower.contains("анализ") || statusLower.contains("аналитик") ||
-            typeLower.contains("analysis") || typeLower.contains("анализ") || typeLower.contains("аналитик")) {
-            return "SA";
-        }
-        if (statusLower.contains("test") || statusLower.contains("qa") ||
-            statusLower.contains("тест") || statusLower.contains("review") ||
-            typeLower.contains("test") || typeLower.contains("qa") || typeLower.contains("тест") ||
-            typeLower.contains("bug") || typeLower.contains("баг") || typeLower.contains("дефект")) {
-            return "QA";
-        }
-
-        return "DEV";
+        return workflowConfigService.determinePhase(status, issueType);
     }
 
-    /**
-     * Проверяет, является ли статус "Done" (завершённым).
-     * Использует конфигурацию для Story workflow.
-     */
     public boolean isDone(String status, StatusMappingConfig teamOverride) {
-        if (status == null) return false;
-
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        WorkflowConfig workflow = config.storyWorkflow();
-
-        // Точное совпадение
-        if (containsIgnoreCase(workflow.doneStatuses(), status)) {
-            return true;
-        }
-
-        // Fallback: substring matching (для обратной совместимости)
-        String s = status.toLowerCase();
-        return s.contains("done") || s.contains("closed") || s.contains("resolved")
-                || s.contains("завершен") || s.contains("готов") || s.contains("выполнен");
+        // isDone checks Story workflow by default
+        return workflowConfigService.categorizeStory(status) == StatusCategory.DONE;
     }
 
-    /**
-     * Проверяет, является ли статус "In Progress".
-     * Использует конфигурацию для Story workflow.
-     */
     public boolean isInProgress(String status, StatusMappingConfig teamOverride) {
-        if (status == null) return false;
-
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        WorkflowConfig workflow = config.storyWorkflow();
-
-        // Точное совпадение
-        if (containsIgnoreCase(workflow.inProgressStatuses(), status)) {
-            return true;
-        }
-
-        // Fallback: substring matching (для обратной совместимости)
-        String s = status.toLowerCase();
-        return s.contains("progress") || s.contains("work") || s.contains("review")
-                || s.contains("test") || s.contains("в работе") || s.contains("ревью");
+        StatusCategory cat = workflowConfigService.categorizeStory(status);
+        return cat == StatusCategory.IN_PROGRESS;
     }
 
-    /**
-     * Проверяет, является ли статус эпика допустимым для rough estimate.
-     * Эпик должен быть в TODO статусах epic workflow.
-     */
     public boolean isAllowedForRoughEstimate(String status, StatusMappingConfig teamOverride) {
-        if (status == null) return false;
-
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        WorkflowConfig workflow = config.epicWorkflow();
-
-        return containsIgnoreCase(workflow.todoStatuses(), status);
+        return workflowConfigService.isAllowedForRoughEstimate(status);
     }
 
-    /**
-     * Проверяет, является ли статус эпика допустимым для планирования (Expected Done).
-     * Эпик должен быть в планируемых статусах (Planned, Developing, E2E Testing).
-     */
     public boolean isPlanningAllowed(String status, StatusMappingConfig teamOverride) {
-        if (status == null) return false;
-
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        List<String> allowedStatuses = config.planningAllowedStatuses();
-
-        // Exact match first
-        if (containsIgnoreCase(allowedStatuses, status)) {
-            return true;
-        }
-
-        // Fallback: check against in-progress statuses from epic workflow
-        WorkflowConfig workflow = config.epicWorkflow();
-        return containsIgnoreCase(workflow.inProgressStatuses(), status);
+        return workflowConfigService.isPlanningAllowed(status);
     }
 
-    /**
-     * Проверяет, является ли статус эпика допустимым для логирования времени.
-     * Время можно логировать только в детях эпиков в статусах Developing/E2E Testing.
-     */
     public boolean isTimeLoggingAllowed(String status, StatusMappingConfig teamOverride) {
-        if (status == null) return false;
+        return workflowConfigService.isTimeLoggingAllowed(status);
+    }
 
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        List<String> allowedStatuses = config.timeLoggingAllowedStatuses();
-
-        // Exact match first
-        if (containsIgnoreCase(allowedStatuses, status)) {
-            return true;
-        }
-
-        // Fallback: substring matching
-        String s = status.toLowerCase();
-        return s.contains("developing") || s.contains("e2e test")
-                || s.contains("в разработке") || s.contains("e2e тест");
+    public boolean isEpicInProgress(String status, StatusMappingConfig teamOverride) {
+        return workflowConfigService.isEpicInProgress(status);
     }
 
     /**
-     * Проверяет, является ли статус эпика "In Progress" для data quality checks.
-     * Используется для проверки CHILD_IN_PROGRESS_EPIC_NOT.
+     * Maps new fine-grained categories back to legacy TODO/IN_PROGRESS/DONE
+     * so existing callers keep working.
      */
-    public boolean isEpicInProgress(String status, StatusMappingConfig teamOverride) {
-        if (status == null) return false;
-
-        StatusMappingConfig config = getEffectiveConfig(teamOverride);
-        List<String> timeLoggingStatuses = config.timeLoggingAllowedStatuses();
-
-        // Time logging allowed = epic is in active development phase
-        if (containsIgnoreCase(timeLoggingStatuses, status)) {
-            return true;
-        }
-
-        // Fallback
-        String s = status.toLowerCase();
-        return s.contains("developing") || s.contains("e2e test")
-                || s.contains("в разработке") || s.contains("e2e тест");
-    }
-
-    private StatusCategory categorize(String status, WorkflowConfig workflow) {
-        if (status == null) {
-            log.warn("Status is null, defaulting to TODO");
-            return StatusCategory.TODO;
-        }
-
-        // Точное совпадение (case-insensitive)
-        if (containsIgnoreCase(workflow.doneStatuses(), status)) {
-            return StatusCategory.DONE;
-        }
-        if (containsIgnoreCase(workflow.inProgressStatuses(), status)) {
-            return StatusCategory.IN_PROGRESS;
-        }
-        if (containsIgnoreCase(workflow.todoStatuses(), status)) {
-            return StatusCategory.TODO;
-        }
-
-        // Fallback: substring matching для обратной совместимости
-        String s = status.toLowerCase();
-
-        // Done keywords
-        if (s.contains("done") || s.contains("closed") || s.contains("resolved")
-                || s.contains("завершен") || s.contains("готов") || s.contains("выполнен")) {
-            return StatusCategory.DONE;
-        }
-
-        // In Progress keywords
-        if (s.contains("progress") || s.contains("work") || s.contains("review")
-                || s.contains("test") || s.contains("develop") || s.contains("analysis")
-                || s.contains("в работе") || s.contains("ревью") || s.contains("разработ")
-                || s.contains("анализ") || s.contains("тест")) {
-            return StatusCategory.IN_PROGRESS;
-        }
-
-        // Default to TODO with warning
-        log.warn("Unknown status '{}', defaulting to TODO", status);
-        return StatusCategory.TODO;
-    }
-
-    private boolean containsIgnoreCase(List<String> list, String value) {
-        if (list == null || value == null) {
-            return false;
-        }
-        return list.stream().anyMatch(item -> item.equalsIgnoreCase(value));
-    }
-
-    private boolean matchesAny(String value, List<String> patterns) {
-        if (patterns == null || value == null) {
-            return false;
-        }
-        return patterns.stream().anyMatch(pattern -> value.contains(pattern.toLowerCase()));
+    private StatusCategory normalizeForLegacy(StatusCategory cat) {
+        if (cat == null) return StatusCategory.TODO;
+        return switch (cat) {
+            case NEW, REQUIREMENTS, TODO -> StatusCategory.TODO;
+            case PLANNED, IN_PROGRESS -> StatusCategory.IN_PROGRESS;
+            case DONE -> StatusCategory.DONE;
+        };
     }
 }

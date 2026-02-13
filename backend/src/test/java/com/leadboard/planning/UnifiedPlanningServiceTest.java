@@ -1,9 +1,9 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
-import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -41,6 +41,8 @@ class UnifiedPlanningServiceTest {
     @Mock
     private StatusMappingService statusMappingService;
     @Mock
+    private WorkflowConfigService workflowConfigService;
+    @Mock
     private StoryDependencyService dependencyService;
 
     private UnifiedPlanningService service;
@@ -55,6 +57,7 @@ class UnifiedPlanningServiceTest {
                 memberRepository,
                 calendarService,
                 statusMappingService,
+                workflowConfigService,
                 dependencyService
         );
 
@@ -64,7 +67,7 @@ class UnifiedPlanningServiceTest {
                 new BigDecimal("0.2"),
                 PlanningConfigDto.WipLimits.defaults(),
                 PlanningConfigDto.StoryDuration.defaults(),
-                StatusMappingConfig.defaults()
+                null
         ));
 
         // Calendar always returns workdays
@@ -74,6 +77,15 @@ class UnifiedPlanningServiceTest {
             int days = invocation.getArgument(1);
             return date.plusDays(days);
         });
+
+        // WorkflowConfigService defaults
+        when(workflowConfigService.getRoleCodesInPipelineOrder()).thenReturn(List.of("SA", "DEV", "QA"));
+        when(workflowConfigService.isStory("Story")).thenReturn(true);
+        when(workflowConfigService.getSubtaskRole("Analysis")).thenReturn("SA");
+        when(workflowConfigService.getSubtaskRole("Development")).thenReturn("DEV");
+        when(workflowConfigService.getSubtaskRole("Testing")).thenReturn("QA");
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isPlanningAllowed(anyString())).thenReturn(true);
     }
 
     @Test
@@ -85,7 +97,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity devSubtask = createSubtask("SUB-2", "DEV Task", "STORY-1", "Development", 16 * 3600L, 0L);
         JiraIssueEntity qaSubtask = createSubtask("SUB-3", "QA Task", "STORY-1", "Testing", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask, devSubtask, qaSubtask));
@@ -96,11 +108,6 @@ class UnifiedPlanningServiceTest {
                 createMember("qa-1", "Carol QA", Role.QA, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
-        when(statusMappingService.determinePhase(any(), eq("Analysis"), any())).thenReturn("SA");
-        when(statusMappingService.determinePhase(any(), eq("Development"), any())).thenReturn("DEV");
-        when(statusMappingService.determinePhase(any(), eq("Testing"), any())).thenReturn("QA");
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
@@ -137,7 +144,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 8 * 3600L, 0L);
         JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
@@ -149,9 +156,6 @@ class UnifiedPlanningServiceTest {
                 createMember("sa-2", "Dan SA", Role.SA, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
-        when(statusMappingService.determinePhase(any(), eq("Analysis"), any())).thenReturn("SA");
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
@@ -185,7 +189,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 4 * 3600L, 0L);
         JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 4 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
@@ -196,9 +200,6 @@ class UnifiedPlanningServiceTest {
                 createMember("sa-1", "Anna SA", Role.SA, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
-        when(statusMappingService.determinePhase(any(), eq("Analysis"), any())).thenReturn("SA");
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
@@ -227,7 +228,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity epic = createEpic("EPIC-1", "Test Epic", new BigDecimal("80"));
         JiraIssueEntity story = createStory("STORY-1", "No Estimate Story", "EPIC-1", new BigDecimal("50"));
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of()); // No subtasks
@@ -236,8 +237,6 @@ class UnifiedPlanningServiceTest {
                 createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
@@ -265,7 +264,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity dev1 = createSubtask("SUB-1", "DEV Task", "STORY-1", "Development", 8 * 3600L, 0L);
         JiraIssueEntity dev2 = createSubtask("SUB-2", "DEV Task", "STORY-2", "Development", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(dev1));
@@ -275,9 +274,6 @@ class UnifiedPlanningServiceTest {
                 createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
-        when(statusMappingService.determinePhase(any(), eq("Development"), any())).thenReturn("DEV");
         // Topological sort: story1 before story2
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenReturn(List.of(story1, story2));
 
@@ -308,7 +304,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 8 * 3600L, 0L);
         JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic1, epic2)); // Sorted by manual_order ASC
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-2")).thenReturn(List.of(story2));
@@ -320,9 +316,6 @@ class UnifiedPlanningServiceTest {
                 createMember("sa-1", "Anna SA", Role.SA, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
-        when(statusMappingService.determinePhase(any(), eq("Analysis"), any())).thenReturn("SA");
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // When
@@ -358,7 +351,7 @@ class UnifiedPlanningServiceTest {
         JiraIssueEntity story = createStory("STORY-1", "Story", "EPIC-1", new BigDecimal("50"));
         JiraIssueEntity saSubtask = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 8 * 3600L, 0L);
 
-        when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(TEAM_ID)))
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask));
@@ -368,9 +361,6 @@ class UnifiedPlanningServiceTest {
                 createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8"))
         ));
 
-        when(statusMappingService.isDone(anyString(), any())).thenReturn(false);
-        when(statusMappingService.isPlanningAllowed(anyString(), any())).thenReturn(true);
-        when(statusMappingService.determinePhase(any(), eq("Analysis"), any())).thenReturn("SA");
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
 
         // When

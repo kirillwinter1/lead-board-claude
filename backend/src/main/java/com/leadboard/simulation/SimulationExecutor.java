@@ -1,13 +1,10 @@
 package com.leadboard.simulation;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraTransition;
 import com.leadboard.simulation.dto.SimulationAction;
 import com.leadboard.status.StatusCategory;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
-import com.leadboard.team.TeamService;
-import com.leadboard.team.dto.PlanningConfigDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -24,15 +21,12 @@ public class SimulationExecutor {
     private static final long RATE_LIMIT_DELAY_MS = 100;
 
     private final JiraClient jiraClient;
-    private final StatusMappingService statusMappingService;
-    private final TeamService teamService;
+    private final WorkflowConfigService workflowConfigService;
 
     public SimulationExecutor(JiraClient jiraClient,
-                              StatusMappingService statusMappingService,
-                              TeamService teamService) {
+                              WorkflowConfigService workflowConfigService) {
         this.jiraClient = jiraClient;
-        this.statusMappingService = statusMappingService;
-        this.teamService = teamService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -40,15 +34,11 @@ public class SimulationExecutor {
      * Each action is executed using the assigned user's OAuth token.
      */
     public List<SimulationAction> execute(List<SimulationAction> plannedActions, LocalDate simDate, Long teamId) {
-        // Load status mapping for category-based transition matching
-        PlanningConfigDto config = teamService.getPlanningConfig(teamId);
-        StatusMappingConfig statusMapping = config.statusMapping();
-
         List<SimulationAction> results = new ArrayList<>();
 
         for (SimulationAction action : plannedActions) {
             try {
-                SimulationAction result = executeAction(action, simDate, statusMapping);
+                SimulationAction result = executeAction(action, simDate);
                 results.add(result);
                 Thread.sleep(RATE_LIMIT_DELAY_MS);
             } catch (InterruptedException e) {
@@ -65,15 +55,14 @@ public class SimulationExecutor {
         return results;
     }
 
-    private SimulationAction executeAction(SimulationAction action, LocalDate simDate,
-                                           StatusMappingConfig statusMapping) {
+    private SimulationAction executeAction(SimulationAction action, LocalDate simDate) {
         if (action.type() == SimulationAction.ActionType.SKIP) {
             return action;
         }
 
         switch (action.type()) {
             case TRANSITION -> {
-                return executeTransition(action, statusMapping);
+                return executeTransition(action);
             }
             case WORKLOG -> {
                 return executeWorklog(action, simDate);
@@ -84,12 +73,11 @@ public class SimulationExecutor {
         }
     }
 
-    private SimulationAction executeTransition(SimulationAction action,
-                                               StatusMappingConfig statusMapping) {
+    private SimulationAction executeTransition(SimulationAction action) {
         // Use Basic Auth (system API token) for reliable write access
         List<JiraTransition> transitions = jiraClient.getTransitionsBasicAuth(action.issueKey());
 
-        JiraTransition target = findBestTransition(transitions, action, statusMapping);
+        JiraTransition target = findBestTransition(transitions, action);
 
         if (target == null) {
             String available = transitions.stream()
@@ -110,12 +98,11 @@ public class SimulationExecutor {
     /**
      * Finds the best matching transition using multi-level strategy:
      * 1. Exact name match (transition name or target status name)
-     * 2. Category-based match (IN_PROGRESS, DONE categories via StatusMappingService)
+     * 2. Category-based match (IN_PROGRESS, DONE categories via WorkflowConfigService)
      * 3. Forward fallback: if target is DONE but unavailable, pick any forward transition
      */
     private JiraTransition findBestTransition(List<JiraTransition> transitions,
-                                               SimulationAction action,
-                                               StatusMappingConfig statusMapping) {
+                                               SimulationAction action) {
         String targetStatus = action.toStatus();
 
         // 1. Exact match by transition name or target status name
@@ -131,8 +118,8 @@ public class SimulationExecutor {
         if (targetCategory != null) {
             for (JiraTransition t : transitions) {
                 if (t.to() != null) {
-                    StatusCategory transCategory = statusMappingService.categorize(
-                            t.to().name(), action.issueType(), statusMapping);
+                    StatusCategory transCategory = workflowConfigService.categorize(
+                            t.to().name(), action.issueType());
                     if (transCategory == targetCategory) {
                         return t;
                     }
@@ -144,8 +131,8 @@ public class SimulationExecutor {
             if (targetCategory == StatusCategory.DONE) {
                 for (JiraTransition t : transitions) {
                     if (t.to() != null) {
-                        StatusCategory transCategory = statusMappingService.categorize(
-                                t.to().name(), action.issueType(), statusMapping);
+                        StatusCategory transCategory = workflowConfigService.categorize(
+                                t.to().name(), action.issueType());
                         if (transCategory == StatusCategory.IN_PROGRESS) {
                             log.info("Simulation: no DONE transition for {}, using forward transition '{}' → '{}'",
                                     action.issueKey(), t.name(), t.to().name());

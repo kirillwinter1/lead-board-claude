@@ -2,6 +2,7 @@ package com.leadboard.controller;
 
 import com.leadboard.board.BoardResponse;
 import com.leadboard.board.BoardService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.AutoScoreService;
 import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.status.StatusMappingConfig;
@@ -29,17 +30,20 @@ public class BoardController {
     private final AutoScoreService autoScoreService;
     private final StoryAutoScoreService storyAutoScoreService;
     private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
     private final JiraIssueRepository issueRepository;
 
     public BoardController(BoardService boardService,
                           AutoScoreService autoScoreService,
                           StoryAutoScoreService storyAutoScoreService,
                           StatusMappingService statusMappingService,
+                          WorkflowConfigService workflowConfigService,
                           JiraIssueRepository issueRepository) {
         this.boardService = boardService;
         this.autoScoreService = autoScoreService;
         this.storyAutoScoreService = storyAutoScoreService;
         this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
         this.issueRepository = issueRepository;
     }
 
@@ -77,7 +81,7 @@ public class BoardController {
         response.put("totalScore", issue.getAutoScore());
 
         // Check if epic
-        if (issueType != null && (issueType.equals("Epic") || issueType.equals("Эпик"))) {
+        if (issueType != null && workflowConfigService.isEpic(issueType)) {
             AutoScoreService.AutoScoreDetails details = autoScoreService.getScoreDetails(issueKey);
             if (details != null) {
                 response.put("breakdown", details.factors());

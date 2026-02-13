@@ -1,7 +1,5 @@
 package com.leadboard.planning.dto;
 
-import com.leadboard.team.Role;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -36,7 +34,7 @@ public record StoryForecastResponse(
 
     public record AssigneeUtilizationDto(
             String displayName,
-            Role role,
+            String roleCode,
             BigDecimal workDaysAssigned,
             BigDecimal effectiveHoursPerDay
     ) {}

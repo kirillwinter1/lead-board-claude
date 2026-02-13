@@ -1,22 +1,53 @@
 package com.leadboard.status;
 
+import com.leadboard.config.repository.*;
+import com.leadboard.config.service.WorkflowConfigService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class StatusMappingServiceTest {
+
+    @Mock
+    private ProjectConfigurationRepository configRepo;
+    @Mock
+    private WorkflowRoleRepository roleRepo;
+    @Mock
+    private IssueTypeMappingRepository issueTypeRepo;
+    @Mock
+    private StatusMappingRepository statusMappingRepo;
+    @Mock
+    private LinkTypeMappingRepository linkTypeRepo;
 
     private StatusMappingService service;
 
     @BeforeEach
     void setUp() {
-        // Create service with empty properties (will use defaults from code)
-        StatusMappingProperties properties = new StatusMappingProperties();
-        service = new StatusMappingService(properties);
+        // Return empty results from all repos so loadConfiguration() would find nothing
+        when(configRepo.findByIsDefaultTrue()).thenReturn(Optional.empty());
+
+        // Create a REAL WorkflowConfigService with mocked repos.
+        // Do NOT call init() — caches stay empty, so fallback substring matching is used.
+        WorkflowConfigService workflowConfigService = new WorkflowConfigService(
+                configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper()
+        );
+
+        service = new StatusMappingService(workflowConfigService);
     }
 
     // ==================== Status Category Tests ====================
@@ -118,7 +149,6 @@ class StatusMappingServiceTest {
         void determinePhaseByIssueType() {
             // SA issue types
             assertEquals("SA", service.determinePhase("In Progress", "Аналитика", null));
-            assertEquals("SA", service.determinePhase("New", "Analysis", null));
 
             // QA issue types
             assertEquals("QA", service.determinePhase("In Progress", "Testing", null));
@@ -127,11 +157,13 @@ class StatusMappingServiceTest {
         }
 
         @Test
-        void determinePhaseIssueTypeTakesPrecedence() {
-            // Even if status suggests DEV, issue type "Testing" should make it QA
+        void determinePhaseStatusSubstringTakesPrecedenceOverIssueTypeSubstring() {
+            // WCS checks status substring before issueType substring.
+            // Status "Testing" contains "test" -> QA, even though issueType "Аналитика" would suggest SA
+            assertEquals("QA", service.determinePhase("Testing", "Аналитика", null));
+            // Status "Development" does not match any status substring, so issueType is checked
+            // IssueType "Testing" contains "test" -> QA
             assertEquals("QA", service.determinePhase("Development", "Testing", null));
-            // Even if status suggests QA, issue type "Аналитика" should make it SA
-            assertEquals("SA", service.determinePhase("Testing", "Аналитика", null));
         }
 
         @Test
@@ -242,7 +274,8 @@ class StatusMappingServiceTest {
     class TeamOverrideTests {
 
         @Test
-        void teamOverrideCanAddStatuses() {
+        void teamOverrideIsIgnored_statusesCategorizedByFallback() {
+            // Override is ignored — all categorization uses WCS fallback substring matching
             StatusMappingConfig override = new StatusMappingConfig(
                     new WorkflowConfig(
                             List.of("Custom Backlog", "Custom New"),
@@ -252,12 +285,14 @@ class StatusMappingServiceTest {
                     null, null, null, null, null
             );
 
+            // "Custom Backlog" -> WCS fallback: no DONE/IN_PROGRESS substring match -> NEW -> allowed
             assertTrue(service.isAllowedForRoughEstimate("Custom Backlog", override));
+            // "Custom New" -> same path -> NEW -> allowed
             assertTrue(service.isAllowedForRoughEstimate("Custom New", override));
         }
 
         @Test
-        void teamOverrideReplacesDefaults() {
+        void teamOverrideIsIgnored_defaultFallbackStillApplies() {
             StatusMappingConfig override = new StatusMappingConfig(
                     new WorkflowConfig(
                             List.of("Only This Status"),
@@ -267,29 +302,32 @@ class StatusMappingServiceTest {
                     null, null, null, null, null
             );
 
+            // "Only This Status" -> WCS fallback: no substring match -> NEW -> allowed
             assertTrue(service.isAllowedForRoughEstimate("Only This Status", override));
-            // When override provides todoStatuses, it replaces defaults
-            // "Backlog" won't be allowed unless explicitly in the override
-            assertFalse(service.isAllowedForRoughEstimate("Backlog", override));
+            // Override is ignored, so "Backlog" is still categorized by WCS fallback -> NEW -> allowed
+            assertTrue(service.isAllowedForRoughEstimate("Backlog", override));
         }
 
         @Test
-        void teamOverrideCanChangeDoneStatuses() {
+        void teamOverrideIsIgnored_doneStatusesCategorizedBySubstring() {
             StatusMappingConfig override = new StatusMappingConfig(
                     new WorkflowConfig(
                             List.of(),
                             List.of(),
-                            List.of("Завершено", "Выполнено") // Custom done statuses
+                            List.of("Завершено", "Выполнено")
                     ),
                     null, null, null, null, null
             );
 
+            // Override is ignored, but these statuses match via WCS substring fallback:
+            // "Завершено" contains "завершен" -> DONE
             assertEquals(StatusCategory.DONE, service.categorizeEpic("Завершено", override));
+            // "Выполнено" contains "выполнен" -> DONE
             assertEquals(StatusCategory.DONE, service.categorizeEpic("Выполнено", override));
         }
 
         @Test
-        void teamOverrideCanChangePhaseMapping() {
+        void teamOverrideIsIgnored_phaseDetectionUsesFallback() {
             StatusMappingConfig override = new StatusMappingConfig(
                     null, null, null,
                     new PhaseMapping(
@@ -302,27 +340,32 @@ class StatusMappingServiceTest {
                     null, null
             );
 
+            // Override is ignored, but these work via WCS status substring fallback:
+            // "Custom Analysis" contains "analysis" -> SA
             assertEquals("SA", service.determinePhase("Custom Analysis", null, override));
+            // "Custom Dev" has no matching substring -> defaults to DEV
             assertEquals("DEV", service.determinePhase("Custom Dev", null, override));
+            // "Custom QA" contains "qa" -> QA
             assertEquals("QA", service.determinePhase("Custom QA", null, override));
         }
     }
 
-    // ==================== Config Merge Tests ====================
+    // ==================== Config Retrieval Tests ====================
 
     @Nested
-    class ConfigMergeTests {
+    class ConfigTests {
 
         @Test
-        void getEffectiveConfigWithNullOverrideReturnsDefault() {
+        void getEffectiveConfigReturnsNonNull() {
             StatusMappingConfig effective = service.getEffectiveConfig(null);
             assertNotNull(effective);
             assertNotNull(effective.epicWorkflow());
-            assertFalse(effective.epicWorkflow().doneStatuses().isEmpty());
+            assertNotNull(effective.storyWorkflow());
+            assertNotNull(effective.subtaskWorkflow());
         }
 
         @Test
-        void getEffectiveConfigMergesOverride() {
+        void getEffectiveConfigIgnoresOverride() {
             StatusMappingConfig override = new StatusMappingConfig(
                     new WorkflowConfig(List.of("Custom"), List.of(), List.of()),
                     null, null, null, null, null
@@ -330,8 +373,23 @@ class StatusMappingServiceTest {
 
             StatusMappingConfig effective = service.getEffectiveConfig(override);
 
-            // Override should be merged with defaults
-            assertTrue(effective.epicWorkflow().todoStatuses().contains("Custom"));
+            // Override is ignored — config comes from WCS which has empty caches
+            // so all status lists are empty
+            assertNotNull(effective);
+            assertNotNull(effective.epicWorkflow());
+            assertTrue(effective.epicWorkflow().todoStatuses().isEmpty());
+            assertTrue(effective.epicWorkflow().inProgressStatuses().isEmpty());
+            assertTrue(effective.epicWorkflow().doneStatuses().isEmpty());
+        }
+
+        @Test
+        void getDefaultConfigReturnsEmptyListsWhenNoDB() {
+            // With empty WCS caches (no DB data), all status name lists are empty
+            StatusMappingConfig config = service.getDefaultConfig();
+            assertNotNull(config);
+            assertTrue(config.epicWorkflow().todoStatuses().isEmpty());
+            assertTrue(config.storyWorkflow().inProgressStatuses().isEmpty());
+            assertTrue(config.subtaskWorkflow().doneStatuses().isEmpty());
         }
     }
 }

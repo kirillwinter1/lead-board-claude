@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -38,10 +39,14 @@ public class StoryAutoScoreService {
 
     private final StatusMappingService statusMappingService;
     private final JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
-    public StoryAutoScoreService(StatusMappingService statusMappingService, JiraIssueRepository issueRepository) {
+    public StoryAutoScoreService(StatusMappingService statusMappingService,
+                                  JiraIssueRepository issueRepository,
+                                  WorkflowConfigService workflowConfigService) {
         this.statusMappingService = statusMappingService;
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -115,42 +120,35 @@ public class StoryAutoScoreService {
 
         String status = story.getStatus();
 
-        // Story workflow statuses with step 10
-        // From 0 (New) to 100 (Ready to Release)
-        // Based on workflow: НОВОЕ → ГОТОВО → ANALYSIS → ... → READY TO RELEASE → ГОТОВО
+        // Use WorkflowConfigService DB-driven sort order (scaled to 0-100 range)
+        int sortOrder = workflowConfigService.getStoryStatusSortOrder(status);
+        if (sortOrder > 0) {
+            // Sort order maps directly to weight (e.g., 10, 20, 30, ..., 100)
+            return BigDecimal.valueOf(sortOrder);
+        }
 
-        // Initial statuses
+        // Fallback: hardcoded matching for unmapped statuses
         if (matchesStatus(status, "New", "Новое", "Новый")) return BigDecimal.ZERO;
         if (matchesStatus(status, "Ready", "Готово (к работе)", "Готов")) return BigDecimal.valueOf(10);
-
-        // Analysis phase
         if (matchesStatus(status, "Analysis", "Анализ")) return BigDecimal.valueOf(20);
         if (matchesStatus(status, "Analysis Review", "Ревью анализа")) return BigDecimal.valueOf(30);
-
-        // Development phase
         if (matchesStatus(status, "Waiting Dev", "Ожидает разработки")) return BigDecimal.valueOf(40);
         if (matchesStatus(status, "Development", "Разработка")) return BigDecimal.valueOf(50);
         if (matchesStatus(status, "Dev Review", "Ревью разработки")) return BigDecimal.valueOf(60);
-
-        // Testing phase
         if (matchesStatus(status, "Waiting QA", "Ожидает тестирования")) return BigDecimal.valueOf(70);
         if (matchesStatus(status, "Testing", "Тестирование")) return BigDecimal.valueOf(80);
         if (matchesStatus(status, "Test Review", "Ревью тестирования")) return BigDecimal.valueOf(90);
-
-        // Ready to release - maximum priority
         if (matchesStatus(status, "Ready to Release", "Готов к релизу")) return BigDecimal.valueOf(100);
-
-        // Completed - not planned, zero priority
         if (matchesStatus(status, "Done", "Готово")) return BigDecimal.ZERO;
 
         // Fallback: check using StatusMappingService
         if (statusMappingService.isDone(status, teamConfig)) {
             return BigDecimal.ZERO;
         } else if (statusMappingService.isInProgress(status, teamConfig)) {
-            return BigDecimal.valueOf(50); // Default IN_PROGRESS weight
+            return BigDecimal.valueOf(50);
         }
 
-        return BigDecimal.ZERO; // Default for unknown statuses
+        return BigDecimal.ZERO;
     }
 
     private BigDecimal calculateProgressWeight(JiraIssueEntity story) {
@@ -279,8 +277,6 @@ public class StoryAutoScoreService {
 
     // ==================== Batch Recalculation Methods ====================
 
-    private static final List<String> STORY_TYPES = List.of("Story", "История", "Task", "Задача");
-
     /**
      * Recalculate AutoScore for all stories.
      *
@@ -290,15 +286,13 @@ public class StoryAutoScoreService {
         int count = 0;
         StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
 
-        for (String storyType : STORY_TYPES) {
-            List<JiraIssueEntity> stories = issueRepository.findByIssueType(storyType);
-            for (JiraIssueEntity story : stories) {
-                BigDecimal score = calculateAutoScore(story, defaultConfig);
-                story.setAutoScore(score);
-                story.setAutoScoreCalculatedAt(OffsetDateTime.now());
-                issueRepository.save(story);
-                count++;
-            }
+        List<JiraIssueEntity> stories = issueRepository.findByBoardCategory("STORY");
+        for (JiraIssueEntity story : stories) {
+            BigDecimal score = calculateAutoScore(story, defaultConfig);
+            story.setAutoScore(score);
+            story.setAutoScoreCalculatedAt(OffsetDateTime.now());
+            issueRepository.save(story);
+            count++;
         }
 
         log.info("Recalculated AutoScore for {} stories", count);
@@ -383,6 +377,6 @@ public class StoryAutoScoreService {
 
     private boolean isStoryType(String issueType) {
         if (issueType == null) return false;
-        return STORY_TYPES.stream().anyMatch(type -> type.equalsIgnoreCase(issueType));
+        return workflowConfigService.isStory(issueType);
     }
 }

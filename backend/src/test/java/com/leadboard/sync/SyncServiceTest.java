@@ -1,6 +1,7 @@
 package com.leadboard.sync;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
@@ -64,6 +65,9 @@ class SyncServiceTest {
     @Mock
     private IssueOrderService issueOrderService;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -77,7 +81,8 @@ class SyncServiceTest {
                 autoScoreService,
                 storyAutoScoreService,
                 statusChangelogService,
-                issueOrderService
+                issueOrderService,
+                workflowConfigService
         );
 
         // Common setup

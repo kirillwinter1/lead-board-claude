@@ -1,13 +1,13 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.RoleLoadResponse;
 import com.leadboard.planning.dto.RoleLoadResponse.*;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PhaseSchedule;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedEpic;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedStory;
-import com.leadboard.team.Role;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import org.slf4j.Logger;
@@ -18,12 +18,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Сервис расчёта загрузки команды по ролям.
  * Анализирует запланированные задачи и capacity членов команды
- * для определения утилизации SA/DEV/QA.
+ * для определения утилизации по динамическим ролям из WorkflowConfigService.
  */
 @Service
 public class RoleLoadService {
@@ -38,15 +40,18 @@ public class RoleLoadService {
     private final TeamMemberRepository memberRepository;
     private final UnifiedPlanningService planningService;
     private final WorkCalendarService calendarService;
+    private final WorkflowConfigService workflowConfigService;
 
     public RoleLoadService(
             TeamMemberRepository memberRepository,
             UnifiedPlanningService planningService,
-            WorkCalendarService calendarService
+            WorkCalendarService calendarService,
+            WorkflowConfigService workflowConfigService
     ) {
         this.memberRepository = memberRepository;
         this.planningService = planningService;
         this.calendarService = calendarService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -65,30 +70,44 @@ public class RoleLoadService {
         // Получаем членов команды
         List<TeamMemberEntity> members = memberRepository.findByTeamIdAndActiveTrue(teamId);
 
-        // Рассчитываем capacity по ролям
-        RoleCapacity saCapacity = calculateRoleCapacity(members, Role.SA, workdays);
-        RoleCapacity devCapacity = calculateRoleCapacity(members, Role.DEV, workdays);
-        RoleCapacity qaCapacity = calculateRoleCapacity(members, Role.QA, workdays);
+        // Получаем динамические роли из конфигурации
+        List<String> roleCodes = workflowConfigService.getRoleCodesInPipelineOrder();
+
+        // Рассчитываем capacity по ролям динамически
+        Map<String, RoleCapacity> capacityMap = new LinkedHashMap<>();
+        for (String roleCode : roleCodes) {
+            capacityMap.put(roleCode, calculateRoleCapacity(members, roleCode, workdays));
+        }
 
         // Получаем unified planning для расчёта assigned hours
         UnifiedPlanningResult planning = planningService.calculatePlan(teamId);
 
         // Рассчитываем assigned hours по ролям (только в пределах периода)
-        RoleAssigned assigned = calculateAssignedHours(planning, today, periodEnd);
+        Map<String, BigDecimal> assignedHoursMap = calculateAssignedHours(planning, today, periodEnd);
 
         // Создаём RoleLoadInfo для каждой роли
-        RoleLoadInfo saInfo = createRoleLoadInfo(saCapacity, assigned.saHours);
-        RoleLoadInfo devInfo = createRoleLoadInfo(devCapacity, assigned.devHours);
-        RoleLoadInfo qaInfo = createRoleLoadInfo(qaCapacity, assigned.qaHours);
+        Map<String, RoleLoadInfo> roleInfoMap = new LinkedHashMap<>();
+        for (String roleCode : roleCodes) {
+            RoleCapacity capacity = capacityMap.getOrDefault(roleCode, new RoleCapacity(0, BigDecimal.ZERO));
+            BigDecimal assignedHours = assignedHoursMap.getOrDefault(roleCode, BigDecimal.ZERO);
+            roleInfoMap.put(roleCode, createRoleLoadInfo(capacity, assignedHours));
+        }
 
-        // Генерируем алерты
-        List<RoleLoadAlert> alerts = generateAlerts(saInfo, devInfo, qaInfo);
+        // Генерируем алерты динамически
+        List<RoleLoadAlert> alerts = generateAlerts(roleInfoMap);
 
-        log.info("Role load calculated for team {}: SA={}%, DEV={}%, QA={}%",
-                teamId,
-                saInfo.utilizationPercent(),
-                devInfo.utilizationPercent(),
-                qaInfo.utilizationPercent());
+        // Логируем утилизацию
+        StringBuilder utilizationLog = new StringBuilder();
+        for (Map.Entry<String, RoleLoadInfo> entry : roleInfoMap.entrySet()) {
+            if (utilizationLog.length() > 0) utilizationLog.append(", ");
+            utilizationLog.append(entry.getKey()).append("=").append(entry.getValue().utilizationPercent()).append("%");
+        }
+        log.info("Role load calculated for team {}: {}", teamId, utilizationLog);
+
+        // Populate backward-compatible RoleLoadResponse with fixed sa/dev/qa fields
+        RoleLoadInfo saInfo = roleInfoMap.getOrDefault("SA", RoleLoadInfo.empty());
+        RoleLoadInfo devInfo = roleInfoMap.getOrDefault("DEV", RoleLoadInfo.empty());
+        RoleLoadInfo qaInfo = roleInfoMap.getOrDefault("QA", RoleLoadInfo.empty());
 
         return new RoleLoadResponse(
                 teamId,
@@ -102,11 +121,11 @@ public class RoleLoadService {
     }
 
     /**
-     * Рассчитывает capacity для роли.
+     * Рассчитывает capacity для роли по коду.
      */
-    private RoleCapacity calculateRoleCapacity(List<TeamMemberEntity> members, Role role, int workdays) {
+    private RoleCapacity calculateRoleCapacity(List<TeamMemberEntity> members, String roleCode, int workdays) {
         List<TeamMemberEntity> roleMembers = members.stream()
-                .filter(m -> m.getRole() == role)
+                .filter(m -> m.getRoleCode().equals(roleCode))
                 .toList();
 
         BigDecimal totalHoursPerDay = BigDecimal.ZERO;
@@ -121,36 +140,33 @@ public class RoleLoadService {
 
     /**
      * Рассчитывает назначенные часы по ролям из unified planning.
+     * Maps the fixed PlannedPhases fields (sa/dev/qa) to role codes for backward compatibility.
      */
-    private RoleAssigned calculateAssignedHours(UnifiedPlanningResult planning, LocalDate periodStart, LocalDate periodEnd) {
-        BigDecimal saHours = BigDecimal.ZERO;
-        BigDecimal devHours = BigDecimal.ZERO;
-        BigDecimal qaHours = BigDecimal.ZERO;
+    private Map<String, BigDecimal> calculateAssignedHours(UnifiedPlanningResult planning, LocalDate periodStart, LocalDate periodEnd) {
+        Map<String, BigDecimal> assignedHours = new LinkedHashMap<>();
 
         for (PlannedEpic epic : planning.epics()) {
             for (PlannedStory story : epic.stories()) {
-                // SA phase
-                if (story.phases().sa() != null) {
-                    saHours = saHours.add(
-                            calculateHoursInPeriod(story.phases().sa(), periodStart, periodEnd)
-                    );
-                }
-                // DEV phase
-                if (story.phases().dev() != null) {
-                    devHours = devHours.add(
-                            calculateHoursInPeriod(story.phases().dev(), periodStart, periodEnd)
-                    );
-                }
-                // QA phase
-                if (story.phases().qa() != null) {
-                    qaHours = qaHours.add(
-                            calculateHoursInPeriod(story.phases().qa(), periodStart, periodEnd)
-                    );
-                }
+                // Map fixed phase accessors to role codes for backward compatibility
+                // PlannedPhases has sa(), dev(), qa() fields
+                addPhaseHours(assignedHours, "SA", story.phases().sa(), periodStart, periodEnd);
+                addPhaseHours(assignedHours, "DEV", story.phases().dev(), periodStart, periodEnd);
+                addPhaseHours(assignedHours, "QA", story.phases().qa(), periodStart, periodEnd);
             }
         }
 
-        return new RoleAssigned(saHours, devHours, qaHours);
+        return assignedHours;
+    }
+
+    /**
+     * Adds phase hours for a role code to the assigned hours map.
+     */
+    private void addPhaseHours(Map<String, BigDecimal> assignedHours, String roleCode,
+                               PhaseSchedule phase, LocalDate periodStart, LocalDate periodEnd) {
+        if (phase != null) {
+            BigDecimal hours = calculateHoursInPeriod(phase, periodStart, periodEnd);
+            assignedHours.merge(roleCode, hours, BigDecimal::add);
+        }
     }
 
     /**
@@ -236,95 +252,50 @@ public class RoleLoadService {
     }
 
     /**
-     * Генерирует алерты на основе RoleLoadInfo.
+     * Генерирует алерты динамически на основе ролей из конфигурации.
      */
-    private List<RoleLoadAlert> generateAlerts(RoleLoadInfo sa, RoleLoadInfo dev, RoleLoadInfo qa) {
+    private List<RoleLoadAlert> generateAlerts(Map<String, RoleLoadInfo> roleInfoMap) {
         List<RoleLoadAlert> alerts = new ArrayList<>();
 
-        // Проверяем перегрузку
-        if (sa.status() == UtilizationStatus.OVERLOAD) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.ROLE_OVERLOAD,
-                    "SA",
-                    String.format("SA перегружены: %s%%", sa.utilizationPercent())
-            ));
-        }
-        if (dev.status() == UtilizationStatus.OVERLOAD) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.ROLE_OVERLOAD,
-                    "DEV",
-                    String.format("DEV перегружены: %s%%", dev.utilizationPercent())
-            ));
-        }
-        if (qa.status() == UtilizationStatus.OVERLOAD) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.ROLE_OVERLOAD,
-                    "QA",
-                    String.format("QA перегружены: %s%%", qa.utilizationPercent())
-            ));
-        }
+        // Проверяем перегрузку, простой и отсутствие capacity для каждой роли
+        for (Map.Entry<String, RoleLoadInfo> entry : roleInfoMap.entrySet()) {
+            String roleCode = entry.getKey();
+            RoleLoadInfo info = entry.getValue();
 
-        // Проверяем простой
-        if (sa.status() == UtilizationStatus.IDLE) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.ROLE_IDLE,
-                    "SA",
-                    String.format("SA недозагружены: %s%%", sa.utilizationPercent())
-            ));
-        }
-        if (dev.status() == UtilizationStatus.IDLE) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.ROLE_IDLE,
-                    "DEV",
-                    String.format("DEV недозагружены: %s%%", dev.utilizationPercent())
-            ));
-        }
-        if (qa.status() == UtilizationStatus.IDLE) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.ROLE_IDLE,
-                    "QA",
-                    String.format("QA недозагружены: %s%%", qa.utilizationPercent())
-            ));
-        }
+            if (info.status() == UtilizationStatus.OVERLOAD) {
+                alerts.add(new RoleLoadAlert(
+                        AlertType.ROLE_OVERLOAD,
+                        roleCode,
+                        String.format("%s перегружены: %s%%", roleCode, info.utilizationPercent())
+                ));
+            }
 
-        // Проверяем отсутствие capacity
-        if (sa.status() == UtilizationStatus.NO_CAPACITY && sa.totalAssignedHours().compareTo(BigDecimal.ZERO) > 0) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.NO_CAPACITY,
-                    "SA",
-                    "Нет SA в команде, но есть назначенная работа"
-            ));
-        }
-        if (dev.status() == UtilizationStatus.NO_CAPACITY && dev.totalAssignedHours().compareTo(BigDecimal.ZERO) > 0) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.NO_CAPACITY,
-                    "DEV",
-                    "Нет DEV в команде, но есть назначенная работа"
-            ));
-        }
-        if (qa.status() == UtilizationStatus.NO_CAPACITY && qa.totalAssignedHours().compareTo(BigDecimal.ZERO) > 0) {
-            alerts.add(new RoleLoadAlert(
-                    AlertType.NO_CAPACITY,
-                    "QA",
-                    "Нет QA в команде, но есть назначенная работа"
-            ));
+            if (info.status() == UtilizationStatus.IDLE) {
+                alerts.add(new RoleLoadAlert(
+                        AlertType.ROLE_IDLE,
+                        roleCode,
+                        String.format("%s недозагружены: %s%%", roleCode, info.utilizationPercent())
+                ));
+            }
+
+            if (info.status() == UtilizationStatus.NO_CAPACITY && info.totalAssignedHours().compareTo(BigDecimal.ZERO) > 0) {
+                alerts.add(new RoleLoadAlert(
+                        AlertType.NO_CAPACITY,
+                        roleCode,
+                        String.format("Нет %s в команде, но есть назначенная работа", roleCode)
+                ));
+            }
         }
 
         // Проверяем дисбаланс между ролями (только для ролей с capacity)
         List<BigDecimal> activeUtilizations = new ArrayList<>();
         List<String> activeRoles = new ArrayList<>();
 
-        if (sa.status() != UtilizationStatus.NO_CAPACITY) {
-            activeUtilizations.add(sa.utilizationPercent());
-            activeRoles.add("SA");
-        }
-        if (dev.status() != UtilizationStatus.NO_CAPACITY) {
-            activeUtilizations.add(dev.utilizationPercent());
-            activeRoles.add("DEV");
-        }
-        if (qa.status() != UtilizationStatus.NO_CAPACITY) {
-            activeUtilizations.add(qa.utilizationPercent());
-            activeRoles.add("QA");
+        for (Map.Entry<String, RoleLoadInfo> entry : roleInfoMap.entrySet()) {
+            if (entry.getValue().status() != UtilizationStatus.NO_CAPACITY) {
+                activeUtilizations.add(entry.getValue().utilizationPercent());
+                activeRoles.add(entry.getKey());
+            }
         }
 
         if (activeUtilizations.size() >= 2) {
@@ -356,9 +327,4 @@ public class RoleLoadService {
      * Вспомогательный record для capacity роли.
      */
     private record RoleCapacity(int memberCount, BigDecimal totalHours) {}
-
-    /**
-     * Вспомогательный record для assigned hours.
-     */
-    private record RoleAssigned(BigDecimal saHours, BigDecimal devHours, BigDecimal qaHours) {}
 }

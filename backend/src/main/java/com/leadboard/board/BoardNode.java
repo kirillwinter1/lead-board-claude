@@ -5,7 +5,9 @@ import com.leadboard.quality.DataQualityViolation;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class BoardNode {
 
@@ -25,6 +27,7 @@ public class BoardNode {
     private BigDecimal roughEstimateSaDays; // rough estimate for SA (Epic only, for editing)
     private BigDecimal roughEstimateDevDays; // rough estimate for DEV (Epic only, for editing)
     private BigDecimal roughEstimateQaDays; // rough estimate for QA (Epic only, for editing)
+    private Map<String, BigDecimal> roughEstimates; // dynamic rough estimates by role code
     private BigDecimal autoScore; // AutoScore for prioritization (Epic and Story)
     private Integer manualOrder; // Manual order position (1 = first)
     private Boolean flagged; // Impediment flag (Story only)
@@ -33,6 +36,7 @@ public class BoardNode {
     private LocalDate expectedDone; // Expected completion date (Story only, calculated)
     private String assigneeAccountId; // Assignee Jira account ID (Story only)
     private String assigneeDisplayName; // Assignee display name (Story only)
+    private Map<String, RoleMetrics> roleProgressMap; // dynamic role progress by role code
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
@@ -175,6 +179,14 @@ public class BoardNode {
         this.roughEstimateQaDays = roughEstimateQaDays;
     }
 
+    public Map<String, BigDecimal> getRoughEstimates() {
+        return roughEstimates;
+    }
+
+    public void setRoughEstimates(Map<String, BigDecimal> roughEstimates) {
+        this.roughEstimates = roughEstimates;
+    }
+
     public BigDecimal getAutoScore() {
         return autoScore;
     }
@@ -237,6 +249,14 @@ public class BoardNode {
 
     public void setAssigneeDisplayName(String assigneeDisplayName) {
         this.assigneeDisplayName = assigneeDisplayName;
+    }
+
+    public Map<String, RoleMetrics> getRoleProgressMap() {
+        return roleProgressMap;
+    }
+
+    public void setRoleProgressMap(Map<String, RoleMetrics> roleProgressMap) {
+        this.roleProgressMap = roleProgressMap;
     }
 
     public List<DataQualityViolation> getAlerts() {

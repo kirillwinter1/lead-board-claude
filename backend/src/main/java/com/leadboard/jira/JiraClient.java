@@ -221,7 +221,12 @@ public class JiraClient {
                 .map(issue -> {
                     Map<String, Object> map = new java.util.HashMap<>();
                     map.put("key", issue.getKey());
-                    map.put("fields", Map.of("summary", issue.getFields().getSummary()));
+                    Map<String, Object> fieldsMap = new java.util.HashMap<>();
+                    fieldsMap.put("summary", issue.getFields().getSummary());
+                    if (issue.getFields().getIssuetype() != null) {
+                        fieldsMap.put("issuetype", Map.of("name", issue.getFields().getIssuetype().getName()));
+                    }
+                    map.put("fields", fieldsMap);
                     return map;
                 })
                 .toList();

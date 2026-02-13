@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -29,12 +30,17 @@ class StoryAutoScoreServiceTest {
     @Mock
     private StatusMappingService statusMappingService;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private StoryAutoScoreService service;
     private StatusMappingConfig testConfig;
 
     @BeforeEach
     void setUp() {
-        service = new StoryAutoScoreService(statusMappingService, issueRepository);
+        // WorkflowConfigService returns 0 by default for getStoryStatusSortOrder,
+        // so the fallback matchesStatus will be used in tests
+        service = new StoryAutoScoreService(statusMappingService, issueRepository, workflowConfigService);
         testConfig = StatusMappingConfig.defaults();
     }
 

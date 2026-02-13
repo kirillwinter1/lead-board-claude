@@ -1,6 +1,7 @@
 package com.leadboard.epic;
 
 import com.leadboard.config.RoughEstimateProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
@@ -8,22 +9,27 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Service
 public class EpicService {
 
     private final JiraIssueRepository issueRepository;
     private final RoughEstimateProperties roughEstimateProperties;
+    private final WorkflowConfigService workflowConfigService;
 
-    public EpicService(JiraIssueRepository issueRepository, RoughEstimateProperties roughEstimateProperties) {
+    public EpicService(JiraIssueRepository issueRepository,
+                       RoughEstimateProperties roughEstimateProperties,
+                       WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
         this.roughEstimateProperties = roughEstimateProperties;
+        this.workflowConfigService = workflowConfigService;
     }
 
     public RoughEstimateConfigDto getRoughEstimateConfig() {
         return new RoughEstimateConfigDto(
                 roughEstimateProperties.isEnabled(),
-                roughEstimateProperties.getAllowedEpicStatuses(),
+                List.of(), // allowed statuses now determined dynamically by WorkflowConfigService
                 roughEstimateProperties.getStepDays(),
                 roughEstimateProperties.getMinDays(),
                 roughEstimateProperties.getMaxDays()
@@ -50,10 +56,9 @@ public class EpicService {
         }
 
         // Validate status allows editing
-        if (!roughEstimateProperties.isStatusAllowed(epic.getStatus())) {
+        if (!workflowConfigService.isAllowedForRoughEstimate(epic.getStatus())) {
             throw new RoughEstimateException(
-                    "Cannot edit rough estimate for Epic in status '" + epic.getStatus() +
-                    "'. Allowed statuses: " + roughEstimateProperties.getAllowedEpicStatuses());
+                    "Cannot edit rough estimate for Epic in status '" + epic.getStatus() + "'");
         }
 
         BigDecimal days = request.days();
@@ -101,6 +106,6 @@ public class EpicService {
     }
 
     private boolean isEpic(String issueType) {
-        return "Epic".equalsIgnoreCase(issueType) || "Эпик".equalsIgnoreCase(issueType);
+        return workflowConfigService.isEpic(issueType);
     }
 }

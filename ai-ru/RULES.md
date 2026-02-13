@@ -9,6 +9,7 @@
 1. **Jira — единственный источник истины.** Lead Board НИКОГДА не модифицирует данные в Jira. Хранит локальный кэш + overlay-данные.
 2. **Backend — единственный источник расчётов.** Frontend НЕ вычисляет метрики.
 3. **Конфигурируемость.** НЕ хардкодить Jira-специфику (статусы, поля, типы задач).
+4. **Роли, типы задач, статусы — ТОЛЬКО из БД.** Вся конфигурация workflow хранится в PostgreSQL (таблицы `workflow_roles`, `issue_type_mappings`, `status_mappings`, `link_type_mappings`). Доступ через `WorkflowConfigService`. **ЗАПРЕЩЕНО** хардкодить роли (SA/DEV/QA), типы задач (Epic/Story/Sub-task), статусы или pipeline в коде. Если нужно проверить тип — использовать `workflowConfigService.isEpic()`, `isStory()`, `isSubtask()`. Если нужны роли pipeline — `getRolesInPipelineOrder()`. Если нужен маппинг статуса — `categorize(status, issueType)`.
 
 ### Оценки и time logging ТОЛЬКО в Subtask
 
@@ -38,11 +39,11 @@ progress = min(logged_hours / estimated_hours, 1.0)
 ```
 
 ### Агрегация
-- Sub-task → Story: сумма по ролям (SA/DEV/QA)
+- Sub-task → Story: сумма по ролям (динамические, из `workflow_roles`)
 - Story → Epic: агрегация по ролям
 
 ### Pipeline планирования
-Строгая последовательность: **SA → DEV → QA**
+Последовательность ролей определяется `sort_order` в таблице `workflow_roles`. Дефолт: SA → DEV → QA, но может быть любой набор ролей (UX → SA → DEV → DEVOPS → QA).
 
 ### Коэффициенты грейдов
 - Senior: 0.8 (делает быстрее)
@@ -57,9 +58,7 @@ progress = min(logged_hours / estimated_hours, 1.0)
 - Топологическая сортировка для зависимостей
 
 ### Цвета ролей
-- SA — синий (#0052cc)
-- DEV — зелёный (#36b37e)
-- QA — оранжевый (#ff991f)
+Цвета хранятся в `workflow_roles.color`. Дефолтные: SA — синий (#3b82f6), DEV — зелёный (#10b981), QA — оранжевый (#f59e0b).
 
 ---
 
@@ -114,7 +113,7 @@ progress = min(logged_hours / estimated_hours, 1.0)
 Company
 └── JiraSpace (Jira-проект)
     └── Team
-        └── TeamMember (role: SA|DEV|QA, grade: Junior|Middle|Senior, hoursPerDay)
+        └── TeamMember (roleCode: динамический из workflow_roles, grade: Junior|Middle|Senior, hoursPerDay)
 ```
 
 ### Роли RBAC (запланировано)

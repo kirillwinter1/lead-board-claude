@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -43,9 +44,11 @@ public class AutoScoreCalculator {
     private static final Logger log = LoggerFactory.getLogger(AutoScoreCalculator.class);
 
     private final JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
-    public AutoScoreCalculator(JiraIssueRepository issueRepository) {
+    public AutoScoreCalculator(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     // Веса факторов (обновлены 2026-01-26)
@@ -99,6 +102,7 @@ public class AutoScoreCalculator {
     /**
      * Статус: баллы зависят от позиции в Epic Workflow.
      * Чем дальше по workflow — тем выше приоритет (закончить начатое).
+     * Uses WorkflowConfigService for DB-driven score weights with substring fallback.
      */
     private BigDecimal calculateStatusScore(JiraIssueEntity epic) {
         String status = epic.getStatus();
@@ -106,49 +110,44 @@ public class AutoScoreCalculator {
             return BigDecimal.ZERO;
         }
 
+        // Try WorkflowConfigService first (DB-driven)
+        int weight = workflowConfigService.getStatusScoreWeight(status);
+        if (weight != 0) {
+            return BigDecimal.valueOf(weight);
+        }
+
+        // Fallback: substring matching for unmapped statuses
         String statusLower = status.toLowerCase();
 
-        // Финальные стадии — максимальный приоритет
         if (statusLower.contains("acceptance") || statusLower.contains("приёмка") || statusLower.contains("приемка")) {
             return BigDecimal.valueOf(STATUS_SCORE_ACCEPTANCE);
         }
-        if (statusLower.contains("e2e") || statusLower.contains("end-to-end") || statusLower.contains("e2e testing")) {
+        if (statusLower.contains("e2e") || statusLower.contains("end-to-end")) {
             return BigDecimal.valueOf(STATUS_SCORE_E2E_TESTING);
         }
-
-        // Активная разработка
         if (statusLower.contains("developing") || statusLower.contains("development") ||
             statusLower.contains("in progress") || statusLower.contains("в работе") ||
             statusLower.contains("в разработке")) {
             return BigDecimal.valueOf(STATUS_SCORE_DEVELOPING);
         }
-
-        // Готов к старту
         if (statusLower.contains("запланировано") || statusLower.contains("planned") ||
             statusLower.contains("ready")) {
             return BigDecimal.valueOf(STATUS_SCORE_PLANNED);
         }
-
-        // Оценивается
         if (statusLower.contains("rough estimate") || statusLower.contains("estimation") ||
             statusLower.contains("оценка") || statusLower.contains("estimate")) {
             return BigDecimal.valueOf(STATUS_SCORE_ROUGH_ESTIMATE);
         }
-
-        // Пишутся БТ
         if (statusLower.contains("requirements") || statusLower.contains("требования") ||
             statusLower.contains("analysis") || statusLower.contains("аналитика")) {
             return BigDecimal.valueOf(STATUS_SCORE_REQUIREMENTS);
         }
-
-        // Не начат
         if (statusLower.contains("новое") || statusLower.contains("new") ||
             statusLower.contains("backlog") || statusLower.contains("to do") ||
             statusLower.contains("open")) {
             return BigDecimal.valueOf(STATUS_SCORE_NEW);
         }
 
-        // Неизвестный статус — нейтральный балл
         return BigDecimal.ZERO;
     }
 

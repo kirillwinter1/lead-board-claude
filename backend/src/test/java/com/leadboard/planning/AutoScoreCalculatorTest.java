@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,12 +23,15 @@ import static org.mockito.Mockito.*;
 class AutoScoreCalculatorTest {
 
     @Mock private JiraIssueRepository issueRepository;
+    @Mock private WorkflowConfigService workflowConfigService;
 
     private AutoScoreCalculator calculator;
 
     @BeforeEach
     void setUp() {
-        calculator = new AutoScoreCalculator(issueRepository);
+        // WorkflowConfigService returns 0 by default for getStatusScoreWeight,
+        // so the fallback substring matching will be used in tests
+        calculator = new AutoScoreCalculator(issueRepository, workflowConfigService);
     }
 
     // ==================== Status Factor Tests (Updated 2026-01-26) ====================

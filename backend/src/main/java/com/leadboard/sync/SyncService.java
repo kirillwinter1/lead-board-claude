@@ -1,5 +1,7 @@
 package com.leadboard.sync;
 
+import com.leadboard.config.entity.LinkCategory;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
@@ -46,6 +48,7 @@ public class SyncService {
     private final StoryAutoScoreService storyAutoScoreService;
     private final StatusChangelogService statusChangelogService;
     private final IssueOrderService issueOrderService;
+    private final WorkflowConfigService workflowConfigService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
@@ -55,7 +58,8 @@ public class SyncService {
                        AutoScoreService autoScoreService,
                        StoryAutoScoreService storyAutoScoreService,
                        StatusChangelogService statusChangelogService,
-                       IssueOrderService issueOrderService) {
+                       IssueOrderService issueOrderService,
+                       WorkflowConfigService workflowConfigService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
@@ -65,6 +69,7 @@ public class SyncService {
         this.storyAutoScoreService = storyAutoScoreService;
         this.statusChangelogService = statusChangelogService;
         this.issueOrderService = issueOrderService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -95,7 +100,6 @@ public class SyncService {
                     state.getLastSyncIssuesCount(), "Sync already in progress");
         }
 
-        // Run sync + reconciliation asynchronously
         new Thread(() -> {
             syncProject(projectKey);
             reconcileDeletedIssues(projectKey);
@@ -134,7 +138,6 @@ public class SyncService {
             return;
         }
 
-        // Mark sync as started
         state.setSyncInProgress(true);
         state.setLastSyncStartedAt(OffsetDateTime.now());
         state.setLastError(null);
@@ -143,17 +146,13 @@ public class SyncService {
         try {
             int totalSynced = 0;
 
-            // Build JQL - incremental sync if we have a previous sync time
             String jql;
             OffsetDateTime lastSync = state.getLastSyncCompletedAt();
             if (lastSync != null) {
-                // Incremental sync: only fetch issues updated since last sync
-                // Subtract 1 minute to account for timing differences
                 String lastSyncTime = lastSync.minusMinutes(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
                 jql = String.format("project = %s AND updated >= '%s' ORDER BY updated DESC", projectKey, lastSyncTime);
                 log.info("Incremental sync for project: {} (changes since {})", projectKey, lastSyncTime);
             } else {
-                // Full sync on first run
                 jql = String.format("project = %s ORDER BY updated DESC", projectKey);
                 log.info("Full sync for project: {} (first run)", projectKey);
             }
@@ -170,18 +169,16 @@ public class SyncService {
                 }
 
                 for (JiraIssue issue : issues) {
-                    JiraIssueEntity saved = saveOrUpdateIssue(issue, projectKey);
+                    saveOrUpdateIssue(issue, projectKey);
                     totalSynced++;
                 }
 
-                // Use cursor-based pagination
                 if (response.isLast() || response.getNextPageToken() == null) {
                     break;
                 }
                 nextPageToken = response.getNextPageToken();
             }
 
-            // Mark sync as completed
             state.setSyncInProgress(false);
             state.setLastSyncCompletedAt(OffsetDateTime.now());
             state.setLastSyncIssuesCount(totalSynced);
@@ -190,8 +187,7 @@ public class SyncService {
             log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
                     lastSync != null ? "incremental" : "full");
 
-            // Normalize manual_order for ALL teams and epics (not just synced ones)
-            // This fixes gaps, zeros, and NULLs accumulated from previous syncs
+            // Normalize manual_order
             try {
                 List<Long> allTeamIds = teamRepository.findByActiveTrue().stream()
                         .map(TeamEntity::getId)
@@ -200,7 +196,6 @@ public class SyncService {
                     issueOrderService.normalizeTeamEpicOrders(teamId);
                 }
 
-                // Collect all epic keys that have children (stories/bugs)
                 Set<String> allEpicKeys = issueRepository.findByProjectKey(projectKey).stream()
                         .filter(e -> e.getParentKey() != null)
                         .map(JiraIssueEntity::getParentKey)
@@ -213,7 +208,7 @@ public class SyncService {
                 log.error("Failed to normalize manual_order after sync", e);
             }
 
-            // Recalculate AutoScore for all epics and stories after sync
+            // Recalculate AutoScore
             try {
                 int epicsUpdated = autoScoreService.recalculateAll();
                 log.info("AutoScore recalculated for {} epics after sync", epicsUpdated);
@@ -237,13 +232,10 @@ public class SyncService {
                 .orElse(null);
         JiraIssueEntity entity = existing != null ? existing : new JiraIssueEntity();
 
-        // Store previous status for changelog detection
         String previousStatus = existing != null ? existing.getStatus() : null;
 
-        // Preserve local Lead Board data that survives sync
-        BigDecimal savedRoughEstimateSaDays = entity.getRoughEstimateSaDays();
-        BigDecimal savedRoughEstimateDevDays = entity.getRoughEstimateDevDays();
-        BigDecimal savedRoughEstimateQaDays = entity.getRoughEstimateQaDays();
+        // Preserve local Lead Board data
+        Map<String, BigDecimal> savedRoughEstimates = entity.getRoughEstimates();
         OffsetDateTime savedRoughEstimateUpdatedAt = entity.getRoughEstimateUpdatedAt();
         String savedRoughEstimateUpdatedBy = entity.getRoughEstimateUpdatedBy();
         BigDecimal savedAutoScore = entity.getAutoScore();
@@ -258,6 +250,12 @@ public class SyncService {
         entity.setIssueType(jiraIssue.getFields().getIssuetype().getName());
         entity.setSubtask(jiraIssue.getFields().getIssuetype().isSubtask());
 
+        // Compute board_category and workflow_role from workflow config
+        String issueTypeName = jiraIssue.getFields().getIssuetype().getName();
+        boolean isSubtaskFlag = jiraIssue.getFields().getIssuetype().isSubtask();
+        entity.setBoardCategory(workflowConfigService.computeBoardCategory(issueTypeName, isSubtaskFlag));
+        entity.setWorkflowRole(workflowConfigService.computeWorkflowRole(issueTypeName));
+
         if (jiraIssue.getFields().getParent() != null) {
             entity.setParentKey(jiraIssue.getFields().getParent().getKey());
         } else {
@@ -271,50 +269,35 @@ public class SyncService {
             entity.setTimeSpentSeconds(timetracking.getTimeSpentSeconds());
         }
 
-        // Extract and map team field
         String teamFieldValue = extractTeamFieldValue(jiraIssue);
         entity.setTeamFieldValue(teamFieldValue);
         entity.setTeamId(findTeamIdByFieldValue(teamFieldValue));
 
-        // Extract priority
         if (jiraIssue.getFields().getPriority() != null) {
             entity.setPriority(jiraIssue.getFields().getPriority().getName());
         }
 
-        // Extract due date
         entity.setDueDate(parseLocalDate(jiraIssue.getFields().getDuedate()));
-
-        // Extract created date
         entity.setJiraCreatedAt(parseOffsetDateTime(jiraIssue.getFields().getCreated()));
 
-        // Extract assignee
         if (jiraIssue.getFields().getAssignee() != null) {
-            String accountId = jiraIssue.getFields().getAssignee().getAccountId();
-            String displayName = jiraIssue.getFields().getAssignee().getDisplayName();
-            log.info("Issue {} has assignee: {} ({})", jiraIssue.getKey(), displayName, accountId);
-            entity.setAssigneeAccountId(accountId);
-            entity.setAssigneeDisplayName(displayName);
+            entity.setAssigneeAccountId(jiraIssue.getFields().getAssignee().getAccountId());
+            entity.setAssigneeDisplayName(jiraIssue.getFields().getAssignee().getDisplayName());
         } else {
             entity.setAssigneeAccountId(null);
             entity.setAssigneeDisplayName(null);
         }
 
-        // Detect "In Progress" status to set started_at
+        // Detect "In Progress" using WorkflowConfigService
         String status = jiraIssue.getFields().getStatus().getName();
-        if (isInProgressStatus(status) && entity.getStartedAt() == null) {
-            // Only set started_at if it's not already set (first time entering In Progress)
+        if (workflowConfigService.isInProgress(status, issueTypeName) && entity.getStartedAt() == null) {
             entity.setStartedAt(OffsetDateTime.now());
-        } else if (!isInProgressStatus(status) && entity.getStartedAt() != null) {
-            // Clear started_at if status is no longer In Progress (moved back to To Do or completed)
-            // Actually, let's keep it once set to track when work originally started
-            // entity.setStartedAt(null);
         }
 
-        // Extract flagged status (Impediment)
         List<Object> flaggedList = jiraIssue.getFields().getFlagged();
         entity.setFlagged(flaggedList != null && !flaggedList.isEmpty());
 
-        // Extract issue links (blocks / is blocked by)
+        // Extract issue links using WorkflowConfigService for link categorization
         List<JiraIssue.JiraIssueLink> issueLinks = jiraIssue.getFields().getIssuelinks();
         if (issueLinks != null && !issueLinks.isEmpty()) {
             List<String> blocks = new ArrayList<>();
@@ -323,23 +306,14 @@ public class SyncService {
             for (JiraIssue.JiraIssueLink link : issueLinks) {
                 if (link.getType() == null) continue;
 
-                String linkType = link.getType().getName();
-                String outward = link.getType().getOutward();
-                String inward = link.getType().getInward();
+                String linkTypeName = link.getType().getName();
+                LinkCategory linkCategory = workflowConfigService.categorizeLinkType(linkTypeName);
 
-                // Check if this is a "Blocks" type link
-                boolean isBlocksLink = "Blocks".equalsIgnoreCase(linkType) ||
-                        (outward != null && outward.toLowerCase().contains("block")) ||
-                        (inward != null && inward.toLowerCase().contains("block"));
+                if (linkCategory != LinkCategory.BLOCKS) continue;
 
-                if (!isBlocksLink) continue;
-
-                // Outward link: this issue blocks another
                 if (link.getOutwardIssue() != null) {
                     blocks.add(link.getOutwardIssue().getKey());
                 }
-
-                // Inward link: this issue is blocked by another
                 if (link.getInwardIssue() != null) {
                     isBlockedBy.add(link.getInwardIssue().getKey());
                 }
@@ -352,28 +326,21 @@ public class SyncService {
             entity.setIsBlockedBy(null);
         }
 
-        // Restore local Lead Board fields
-        entity.setRoughEstimateSaDays(savedRoughEstimateSaDays);
-        entity.setRoughEstimateDevDays(savedRoughEstimateDevDays);
-        entity.setRoughEstimateQaDays(savedRoughEstimateQaDays);
+        // Restore local fields
+        entity.setRoughEstimates(savedRoughEstimates);
         entity.setRoughEstimateUpdatedAt(savedRoughEstimateUpdatedAt);
         entity.setRoughEstimateUpdatedBy(savedRoughEstimateUpdatedBy);
         entity.setAutoScore(savedAutoScore);
         entity.setAutoScoreCalculatedAt(savedAutoScoreCalculatedAt);
         entity.setDoneAt(savedDoneAt);
 
-        // Update done_at based on current status
         statusChangelogService.updateDoneAtIfNeeded(entity);
 
-        // Save issue first (required for changelog foreign key)
         issueRepository.save(entity);
 
-        // Assign manual_order to new issues that don't have one yet
         issueOrderService.assignOrderIfMissing(entity);
 
-        // Detect status change and record to changelog AFTER saving issue
         if (!java.util.Objects.equals(previousStatus, entity.getStatus())) {
-            // Create a temporary entity with old status for changelog detection
             JiraIssueEntity previousEntity = existing != null ? new JiraIssueEntity() : null;
             if (previousEntity != null) {
                 previousEntity.setStatus(previousStatus);
@@ -386,9 +353,7 @@ public class SyncService {
     }
 
     private LocalDate parseLocalDate(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) {
-            return null;
-        }
+        if (dateStr == null || dateStr.isEmpty()) return null;
         try {
             return LocalDate.parse(dateStr);
         } catch (DateTimeParseException e) {
@@ -398,9 +363,7 @@ public class SyncService {
     }
 
     private OffsetDateTime parseOffsetDateTime(String dateTimeStr) {
-        if (dateTimeStr == null || dateTimeStr.isEmpty()) {
-            return null;
-        }
+        if (dateTimeStr == null || dateTimeStr.isEmpty()) return null;
         try {
             return OffsetDateTime.parse(dateTimeStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         } catch (DateTimeParseException e) {
@@ -411,40 +374,26 @@ public class SyncService {
 
     private String extractTeamFieldValue(JiraIssue jiraIssue) {
         String teamFieldId = jiraProperties.getTeamFieldId();
-        if (teamFieldId == null || teamFieldId.isEmpty()) {
-            return null;
-        }
+        if (teamFieldId == null || teamFieldId.isEmpty()) return null;
 
         Object fieldValue = jiraIssue.getFields().getCustomField(teamFieldId);
-        if (fieldValue == null) {
-            return null;
-        }
+        if (fieldValue == null) return null;
 
-        // Handle different team field formats
-        // Could be a simple string, or an object with "value" or "name" property
         if (fieldValue instanceof String) {
             return (String) fieldValue;
         } else if (fieldValue instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> map = (Map<String, Object>) fieldValue;
-            // Try common Jira field patterns
-            if (map.containsKey("value")) {
-                return String.valueOf(map.get("value"));
-            } else if (map.containsKey("name")) {
-                return String.valueOf(map.get("name"));
-            } else if (map.containsKey("displayName")) {
-                return String.valueOf(map.get("displayName"));
-            }
+            if (map.containsKey("value")) return String.valueOf(map.get("value"));
+            else if (map.containsKey("name")) return String.valueOf(map.get("name"));
+            else if (map.containsKey("displayName")) return String.valueOf(map.get("displayName"));
         }
 
         return String.valueOf(fieldValue);
     }
 
     private Long findTeamIdByFieldValue(String teamFieldValue) {
-        if (teamFieldValue == null || teamFieldValue.isEmpty()) {
-            return null;
-        }
-
+        if (teamFieldValue == null || teamFieldValue.isEmpty()) return null;
         Optional<TeamEntity> team = teamRepository.findByJiraTeamValue(teamFieldValue);
         return team.map(TeamEntity::getId).orElse(null);
     }
@@ -458,25 +407,11 @@ public class SyncService {
                 });
     }
 
-    private boolean isInProgressStatus(String status) {
-        if (status == null) {
-            return false;
-        }
-        String lowerStatus = status.toLowerCase();
-        return lowerStatus.contains("in progress") ||
-               lowerStatus.contains("in dev") ||
-               lowerStatus.contains("in development") ||
-               lowerStatus.contains("in review") ||
-               lowerStatus.contains("in qa") ||
-               lowerStatus.contains("in testing");
-    }
-
     @Transactional
     public void reconcileDeletedIssues(String projectKey) {
         try {
             log.info("Starting reconciliation of deleted issues for project: {}", projectKey);
 
-            // Fetch all issue keys from Jira (lightweight, only keys)
             Set<String> jiraKeys = new HashSet<>();
             String jql = String.format("project = %s ORDER BY key ASC", projectKey);
             String nextPageToken = null;
@@ -485,24 +420,18 @@ public class SyncService {
                 JiraSearchResponse response = jiraClient.searchKeysOnly(jql, 100, nextPageToken);
                 List<JiraIssue> issues = response.getIssues();
 
-                if (issues == null || issues.isEmpty()) {
-                    break;
-                }
+                if (issues == null || issues.isEmpty()) break;
 
                 for (JiraIssue issue : issues) {
                     jiraKeys.add(issue.getKey());
                 }
 
-                if (response.isLast() || response.getNextPageToken() == null) {
-                    break;
-                }
+                if (response.isLast() || response.getNextPageToken() == null) break;
                 nextPageToken = response.getNextPageToken();
             }
 
-            // Get all keys from DB
             List<String> dbKeys = issueRepository.findAllIssueKeysByProjectKey(projectKey);
 
-            // Find orphaned keys (in DB but not in Jira)
             List<String> orphanedKeys = dbKeys.stream()
                     .filter(key -> !jiraKeys.contains(key))
                     .toList();

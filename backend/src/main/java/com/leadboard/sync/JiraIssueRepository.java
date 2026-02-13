@@ -36,7 +36,19 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     @Query("DELETE FROM JiraIssueEntity e WHERE e.issueKey IN :issueKeys")
     void deleteByIssueKeyIn(@Param("issueKeys") List<String> issueKeys);
 
-    // Методы для AutoScore
+    // ==================== Board Category based queries ====================
+
+    List<JiraIssueEntity> findByBoardCategoryAndTeamId(String boardCategory, Long teamId);
+
+    List<JiraIssueEntity> findByBoardCategoryAndTeamIdOrderByAutoScoreDesc(String boardCategory, Long teamId);
+
+    List<JiraIssueEntity> findByBoardCategoryAndTeamIdAndStatusInOrderByAutoScoreDesc(
+            String boardCategory, Long teamId, List<String> statuses);
+
+    List<JiraIssueEntity> findByBoardCategory(String boardCategory);
+
+    // ==================== Legacy type-based queries (kept for transition) ====================
+
     List<JiraIssueEntity> findByIssueType(String issueType);
 
     List<JiraIssueEntity> findByIssueTypeAndTeamId(String issueType, Long teamId);
@@ -46,15 +58,15 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     List<JiraIssueEntity> findByIssueTypeAndTeamIdAndStatusInOrderByAutoScoreDesc(
             String issueType, Long teamId, List<String> statuses);
 
-    // Методы для поддержки нескольких типов (локализация)
     List<JiraIssueEntity> findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(List<String> issueTypes, Long teamId);
 
     List<JiraIssueEntity> findByIssueTypeInAndTeamIdAndStatusInOrderByAutoScoreDesc(
             List<String> issueTypes, Long teamId, List<String> statuses);
 
-    // Методы для Forecast Accuracy
+    // ==================== Forecast Accuracy (using board_category) ====================
+
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
-           "AND e.issueType IN ('Epic', 'Эпик') " +
+           "AND e.boardCategory = 'EPIC' " +
            "AND e.doneAt IS NOT NULL " +
            "AND e.doneAt BETWEEN :from AND :to " +
            "ORDER BY e.doneAt DESC")
@@ -64,9 +76,10 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("to") OffsetDateTime to
     );
 
-    // Методы для Planning Poker - эпики в нужных статусах
+    // ==================== Planning Poker (using board_category) ====================
+
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
-           "AND e.issueType IN ('Epic', 'Эпик') " +
+           "AND e.boardCategory = 'EPIC' " +
            "AND LOWER(e.status) IN :statuses " +
            "ORDER BY e.issueKey")
     List<JiraIssueEntity> findEpicsByTeamAndStatuses(
@@ -74,16 +87,31 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("statuses") List<String> statuses
     );
 
-    // Методы для manual_order сортировки
+    // ==================== Manual order queries (using board_category) ====================
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.boardCategory = 'EPIC' " +
+           "ORDER BY e.manualOrder ASC")
+    List<JiraIssueEntity> findEpicsByTeamOrderByManualOrder(@Param("teamId") Long teamId);
+
     List<JiraIssueEntity> findByIssueTypeInAndTeamIdOrderByManualOrderAsc(List<String> issueTypes, Long teamId);
 
     List<JiraIssueEntity> findByParentKeyOrderByManualOrderAsc(String parentKey);
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
-           "AND e.issueType IN :issueTypes " +
+           "AND e.boardCategory = 'EPIC' " +
            "AND e.manualOrder > :fromOrder " +
            "ORDER BY e.manualOrder ASC")
     List<JiraIssueEntity> findEpicsWithOrderGreaterThan(
+            @Param("teamId") Long teamId,
+            @Param("fromOrder") Integer fromOrder
+    );
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.issueType IN :issueTypes " +
+           "AND e.manualOrder > :fromOrder " +
+           "ORDER BY e.manualOrder ASC")
+    List<JiraIssueEntity> findEpicsWithOrderGreaterThanByType(
             @Param("teamId") Long teamId,
             @Param("issueTypes") List<String> issueTypes,
             @Param("fromOrder") Integer fromOrder
@@ -100,8 +128,12 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     );
 
     @Query("SELECT COALESCE(MAX(e.manualOrder), 0) FROM JiraIssueEntity e " +
+           "WHERE e.teamId = :teamId AND e.boardCategory = 'EPIC'")
+    Integer findMaxEpicOrderForTeam(@Param("teamId") Long teamId);
+
+    @Query("SELECT COALESCE(MAX(e.manualOrder), 0) FROM JiraIssueEntity e " +
            "WHERE e.teamId = :teamId AND e.issueType IN :issueTypes")
-    Integer findMaxEpicOrderForTeam(
+    Integer findMaxEpicOrderForTeamByType(
             @Param("teamId") Long teamId,
             @Param("issueTypes") List<String> issueTypes
     );

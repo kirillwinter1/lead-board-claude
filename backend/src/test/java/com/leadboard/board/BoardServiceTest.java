@@ -2,11 +2,13 @@ package com.leadboard.board;
 
 import com.leadboard.config.JiraProperties;
 import com.leadboard.config.RoughEstimateProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.quality.DataQualityRule;
 import com.leadboard.quality.DataQualityService;
 import com.leadboard.quality.DataQualityViolation;
+import com.leadboard.status.StatusCategory;
 import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -28,8 +30,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,6 +58,9 @@ class BoardServiceTest {
     @Mock
     private UnifiedPlanningService unifiedPlanningService;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private BoardService boardService;
 
     @BeforeEach
@@ -68,7 +72,8 @@ class BoardServiceTest {
                 roughEstimateProperties,
                 dataQualityService,
                 statusMappingService,
-                unifiedPlanningService
+                unifiedPlanningService,
+                workflowConfigService
         );
 
         // Common setup
@@ -79,6 +84,25 @@ class BoardServiceTest {
         when(dataQualityService.checkEpic(any(), anyList(), any())).thenReturn(Collections.emptyList());
         when(dataQualityService.checkStory(any(), any(), anyList(), any())).thenReturn(Collections.emptyList());
         when(dataQualityService.checkSubtask(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+
+        // WorkflowConfigService stubs
+        when(workflowConfigService.isEpic("Эпик")).thenReturn(true);
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(workflowConfigService.isEpic("История")).thenReturn(false);
+        when(workflowConfigService.isEpic("Баг")).thenReturn(false);
+        when(workflowConfigService.isEpic("Аналитика")).thenReturn(false);
+        when(workflowConfigService.isEpic("Разработка")).thenReturn(false);
+        when(workflowConfigService.isEpic("Тестирование")).thenReturn(false);
+        when(workflowConfigService.isStory("История")).thenReturn(true);
+        when(workflowConfigService.isStory("Баг")).thenReturn(true);
+        when(workflowConfigService.isStory("Эпик")).thenReturn(false);
+        when(workflowConfigService.getSubtaskRole("Аналитика")).thenReturn("SA");
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.getSubtaskRole("Тестирование")).thenReturn("QA");
+        when(workflowConfigService.getRoleCodesInPipelineOrder()).thenReturn(List.of("SA", "DEV", "QA"));
+        when(workflowConfigService.isAllowedForRoughEstimate("Новое")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("Developing")).thenReturn(false);
+        when(workflowConfigService.isAllowedForRoughEstimate("Готово")).thenReturn(false);
     }
 
     // ==================== Basic Board Tests ====================

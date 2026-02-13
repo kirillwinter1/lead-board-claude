@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,11 +25,24 @@ class IssueOrderServiceTest {
     @Mock
     private JiraIssueRepository issueRepository;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private IssueOrderService service;
 
     @BeforeEach
     void setUp() {
-        service = new IssueOrderService(issueRepository);
+        service = new IssueOrderService(issueRepository, workflowConfigService);
+
+        // Default type categorization
+        lenient().when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        lenient().when(workflowConfigService.isEpic("Story")).thenReturn(false);
+        lenient().when(workflowConfigService.isEpic("Bug")).thenReturn(false);
+        lenient().when(workflowConfigService.isStory("Story")).thenReturn(true);
+        lenient().when(workflowConfigService.isStory("Bug")).thenReturn(true);
+        lenient().when(workflowConfigService.isStory("Epic")).thenReturn(false);
+        lenient().when(workflowConfigService.isStory("Sub-task")).thenReturn(false);
+        lenient().when(workflowConfigService.getStoryTypeNames()).thenReturn(List.of("Story", "Bug"));
     }
 
     // ==================== Epic Reorder Tests ====================
@@ -52,8 +66,8 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("EPIC-4")).thenReturn(Optional.of(epic));
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(5);
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(5);
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -87,8 +101,8 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("EPIC-2")).thenReturn(Optional.of(epic));
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(5);
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(5);
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -106,14 +120,14 @@ class IssueOrderServiceTest {
             JiraIssueEntity epic = createEpic("EPIC-3", teamId, 3);
 
             when(issueRepository.findByIssueKey("EPIC-3")).thenReturn(Optional.of(epic));
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(5);
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(5);
 
             // When
             JiraIssueEntity result = service.reorderEpic("EPIC-3", 3);
 
             // Then - no save calls for shifting, only returns the same epic
             assertEquals(3, result.getManualOrder());
-            verify(issueRepository, never()).findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), anyLong());
+            verify(issueRepository, never()).findEpicsByTeamOrderByManualOrder(anyLong());
         }
 
         @Test
@@ -129,8 +143,8 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("EPIC-3")).thenReturn(Optional.of(epic));
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(3);
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(3);
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -154,8 +168,8 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(3);
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(3);
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -204,8 +218,8 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("EPIC-NEW")).thenReturn(Optional.of(epic));
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(2);
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(2);
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -343,7 +357,7 @@ class IssueOrderServiceTest {
             Long teamId = 1L;
             JiraIssueEntity epic = createEpic("EPIC-NEW", teamId, null);
 
-            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId), anyList())).thenReturn(3);
+            when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(3);
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             service.assignOrderIfMissing(epic);
@@ -402,7 +416,7 @@ class IssueOrderServiceTest {
             JiraIssueEntity epic3 = createEpic("EPIC-3", teamId, null);
 
             // ASC with NULL LAST: 0, 2, NULL
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(List.of(epic1, epic2, epic3)));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -423,7 +437,7 @@ class IssueOrderServiceTest {
             JiraIssueEntity epic2 = createEpic("EPIC-2", teamId, 2);
             JiraIssueEntity epic3 = createEpic("EPIC-3", teamId, 3);
 
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>(List.of(epic1, epic2, epic3)));
 
             // When
@@ -440,13 +454,13 @@ class IssueOrderServiceTest {
         void normalizeTeamEpicOrders_nullTeamId_doesNothing() {
             service.normalizeTeamEpicOrders(null);
 
-            verify(issueRepository, never()).findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), any());
+            verify(issueRepository, never()).findEpicsByTeamOrderByManualOrder(any());
         }
 
         @Test
         void normalizeTeamEpicOrders_emptyList_doesNothing() {
             Long teamId = 1L;
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(anyList(), eq(teamId)))
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
                 .thenReturn(new ArrayList<>());
 
             service.normalizeTeamEpicOrders(teamId);

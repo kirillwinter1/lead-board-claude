@@ -1,7 +1,5 @@
 package com.leadboard.planning;
 
-import com.leadboard.team.Role;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -16,7 +14,7 @@ public class AssigneeSchedule {
 
     private final String accountId;
     private final String displayName;
-    private final Role role;
+    private final String roleCode; // Dynamic role code (e.g., "SA", "DEV", "QA")
     private final BigDecimal effectiveHoursPerDay;
 
     // Tracks used hours per day: date -> hours already allocated
@@ -25,10 +23,10 @@ public class AssigneeSchedule {
     // Tracks total assigned hours for utilization stats
     private BigDecimal totalAssignedHours = BigDecimal.ZERO;
 
-    public AssigneeSchedule(String accountId, String displayName, Role role, BigDecimal effectiveHoursPerDay) {
+    public AssigneeSchedule(String accountId, String displayName, String roleCode, BigDecimal effectiveHoursPerDay) {
         this.accountId = accountId;
         this.displayName = displayName;
-        this.role = role;
+        this.roleCode = roleCode;
         this.effectiveHoursPerDay = effectiveHoursPerDay;
     }
 
@@ -40,8 +38,8 @@ public class AssigneeSchedule {
         return displayName;
     }
 
-    public Role getRole() {
-        return role;
+    public String getRoleCode() {
+        return roleCode;
     }
 
     public BigDecimal getEffectiveHoursPerDay() {
@@ -192,6 +190,6 @@ public class AssigneeSchedule {
     @Override
     public String toString() {
         return String.format("AssigneeSchedule{%s (%s), %.1fh/day, assigned=%.1fh}",
-                displayName, role, effectiveHoursPerDay, totalAssignedHours);
+                displayName, roleCode, effectiveHoursPerDay, totalAssignedHours);
     }
 }

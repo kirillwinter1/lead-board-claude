@@ -1,14 +1,13 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
-import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.Grade;
-import com.leadboard.team.Role;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import com.leadboard.team.TeamService;
@@ -46,15 +45,13 @@ public class UnifiedPlanningService {
     private static final Logger log = LoggerFactory.getLogger(UnifiedPlanningService.class);
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
     private static final BigDecimal SECONDS_PER_HOUR = new BigDecimal("3600");
-    private static final List<String> EPIC_TYPES = List.of("Epic", "Эпик");
-    private static final List<String> STORY_TYPES = List.of("Story", "История", "Bug", "Баг");
-    private static final List<String> PLANNED_STATUSES = List.of("Planned", "Запланировано", "To Do", "К выполнению");
 
     private final JiraIssueRepository issueRepository;
     private final TeamService teamService;
     private final TeamMemberRepository memberRepository;
     private final WorkCalendarService calendarService;
     private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
     private final StoryDependencyService dependencyService;
 
     public UnifiedPlanningService(
@@ -63,6 +60,7 @@ public class UnifiedPlanningService {
             TeamMemberRepository memberRepository,
             WorkCalendarService calendarService,
             StatusMappingService statusMappingService,
+            WorkflowConfigService workflowConfigService,
             StoryDependencyService dependencyService
     ) {
         this.issueRepository = issueRepository;
@@ -70,6 +68,7 @@ public class UnifiedPlanningService {
         this.memberRepository = memberRepository;
         this.calendarService = calendarService;
         this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
         this.dependencyService = dependencyService;
     }
 
@@ -82,7 +81,6 @@ public class UnifiedPlanningService {
         // 1. Load configuration
         PlanningConfigDto config = teamService.getPlanningConfig(teamId);
         BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : new BigDecimal("0.2");
-        StatusMappingConfig statusMapping = config.statusMapping();
         PlanningConfigDto.GradeCoefficients gradeCoeffs = config.gradeCoefficients() != null
                 ? config.gradeCoefficients()
                 : PlanningConfigDto.GradeCoefficients.defaults();
@@ -92,12 +90,15 @@ public class UnifiedPlanningService {
         Map<String, AssigneeSchedule> assigneeSchedules = buildAssigneeSchedules(members, gradeCoeffs);
 
         // 3. Load epics sorted by AutoScore
-        List<JiraIssueEntity> epics = getEpicsSorted(teamId, statusMapping);
+        List<JiraIssueEntity> epics = getEpicsSorted(teamId);
 
         // 4. Build work calendar helper
         AssigneeSchedule.WorkCalendarHelper calendarHelper = createCalendarHelper();
 
-        // 5. Plan all stories across all epics
+        // 5. Get dynamic pipeline roles
+        List<String> pipelineRoles = workflowConfigService.getRoleCodesInPipelineOrder();
+
+        // 6. Plan all stories across all epics
         List<PlannedEpic> plannedEpics = new ArrayList<>();
         List<PlanningWarning> globalWarnings = new ArrayList<>();
         Map<String, LocalDate> storyEndDates = new HashMap<>(); // For dependency tracking
@@ -109,13 +110,13 @@ public class UnifiedPlanningService {
                     storyEndDates,
                     calendarHelper,
                     riskBuffer,
-                    statusMapping,
+                    pipelineRoles,
                     globalWarnings
             );
             plannedEpics.add(plannedEpic);
         }
 
-        // 6. Build assignee utilization map
+        // 7. Build assignee utilization map
         Map<String, AssigneeUtilization> utilization = buildUtilization(assigneeSchedules);
 
         log.info("Unified planning completed: {} epics, {} warnings",
@@ -139,46 +140,52 @@ public class UnifiedPlanningService {
             Map<String, LocalDate> storyEndDates,
             AssigneeSchedule.WorkCalendarHelper calendarHelper,
             BigDecimal riskBuffer,
-            StatusMappingConfig statusMapping,
+            List<String> pipelineRoles,
             List<PlanningWarning> globalWarnings
     ) {
         String epicKey = epic.getIssueKey();
         log.debug("Planning epic {}", epicKey);
 
         // Get stories sorted by AutoScore with dependencies
-        List<JiraIssueEntity> stories = getStoriesSorted(epicKey, statusMapping);
+        List<JiraIssueEntity> stories = getStoriesSorted(epicKey);
 
         // Check if epic has no stories but has rough estimates (planned epic)
-        if (stories.isEmpty() && isPlannedStatus(epic.getStatus()) && hasRoughEstimates(epic)) {
-            return planEpicByRoughEstimates(epic, assigneeSchedules, calendarHelper, riskBuffer);
+        if (stories.isEmpty() && workflowConfigService.isPlanningAllowed(epic.getStatus()) && hasRoughEstimates(epic)) {
+            return planEpicByRoughEstimates(epic, assigneeSchedules, calendarHelper, riskBuffer, pipelineRoles);
         }
 
         List<PlannedStory> plannedStories = new ArrayList<>();
         LocalDate epicStartDate = null;
         LocalDate epicEndDate = null;
 
-        // Aggregation accumulators
-        BigDecimal totalSaHours = BigDecimal.ZERO;
-        BigDecimal totalDevHours = BigDecimal.ZERO;
-        BigDecimal totalQaHours = BigDecimal.ZERO;
-        LocalDate saStartDate = null, saEndDate = null;
-        LocalDate devStartDate = null, devEndDate = null;
-        LocalDate qaStartDate = null, qaEndDate = null;
+        // Dynamic aggregation accumulators by role
+        Map<String, BigDecimal> totalRoleHours = new LinkedHashMap<>();
+        Map<String, LocalDate> roleStartDates = new HashMap<>();
+        Map<String, LocalDate> roleEndDates = new HashMap<>();
+        for (String role : pipelineRoles) {
+            totalRoleHours.put(role, BigDecimal.ZERO);
+        }
 
-        // Epic progress accumulators
+        // Epic progress accumulators by role
+        Map<String, Long> roleEstimate = new HashMap<>();
+        Map<String, Long> roleLogged = new HashMap<>();
+        Map<String, Boolean> roleExists = new HashMap<>();
+        Map<String, Boolean> roleDone = new HashMap<>();
+        for (String role : pipelineRoles) {
+            roleEstimate.put(role, 0L);
+            roleLogged.put(role, 0L);
+            roleExists.put(role, false);
+            roleDone.put(role, true);
+        }
+
         long epicTotalEstimate = 0;
         long epicTotalLogged = 0;
-        long saEstimate = 0, saLogged = 0;
-        long devEstimate = 0, devLogged = 0;
-        long qaEstimate = 0, qaLogged = 0;
-        boolean saExists = false, devExists = false, qaExists = false;
-        boolean saDone = true, devDone = true, qaDone = true;
         int storiesTotal = stories.size();
         int storiesActive = 0;
 
         for (JiraIssueEntity story : stories) {
             // Skip done stories
-            if (statusMappingService.isDone(story.getStatus(), statusMapping)) {
+            if (workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
                 continue;
             }
 
@@ -192,19 +199,21 @@ public class UnifiedPlanningService {
                 continue;
             }
 
-            // Extract phase hours from subtasks
-            PhaseHours phaseHours = extractPhaseHours(story, epic, statusMapping);
+            // Extract phase hours from subtasks (dynamic by role)
+            Map<String, BigDecimal> phaseHoursMap = extractPhaseHoursMap(story, epic);
 
             // Check if story has estimates
-            if (phaseHours.isEmpty()) {
+            boolean isEmpty = phaseHoursMap.values().stream()
+                    .allMatch(h -> h.compareTo(BigDecimal.ZERO) == 0);
+
+            if (isEmpty) {
                 globalWarnings.add(new PlanningWarning(
                         story.getIssueKey(),
                         WarningType.NO_ESTIMATE,
                         "Story has no subtasks with estimates"
                 ));
 
-                // Add unplanned story to list with warning
-                StoryProgressData progressData = extractProgressData(story, statusMapping);
+                StoryProgressData progressData = extractProgressData(story);
                 plannedStories.add(new PlannedStory(
                         story.getIssueKey(),
                         story.getSummary(),
@@ -226,16 +235,21 @@ public class UnifiedPlanningService {
             }
 
             // Apply risk buffer
-            phaseHours = phaseHours.applyBuffer(riskBuffer);
+            BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
+            Map<String, BigDecimal> bufferedHours = new LinkedHashMap<>();
+            for (Map.Entry<String, BigDecimal> entry : phaseHoursMap.entrySet()) {
+                bufferedHours.put(entry.getKey(),
+                        entry.getValue().multiply(multiplier).setScale(2, RoundingMode.HALF_UP));
+            }
 
-            // Plan the story
+            // Plan the story with dynamic pipeline
             PlannedStory plannedStory = planStory(
                     story,
-                    phaseHours,
+                    bufferedHours,
+                    pipelineRoles,
                     assigneeSchedules,
                     storyEndDates,
-                    calendarHelper,
-                    statusMapping
+                    calendarHelper
             );
 
             plannedStories.add(plannedStory);
@@ -257,35 +271,11 @@ public class UnifiedPlanningService {
                 }
             }
 
-            // Aggregate phase data
+            // Aggregate phase data dynamically
             PlannedPhases phases = plannedStory.phases();
-            if (phases.sa() != null) {
-                totalSaHours = totalSaHours.add(phases.sa().hours());
-                if (saStartDate == null || (phases.sa().startDate() != null && phases.sa().startDate().isBefore(saStartDate))) {
-                    saStartDate = phases.sa().startDate();
-                }
-                if (saEndDate == null || (phases.sa().endDate() != null && phases.sa().endDate().isAfter(saEndDate))) {
-                    saEndDate = phases.sa().endDate();
-                }
-            }
-            if (phases.dev() != null) {
-                totalDevHours = totalDevHours.add(phases.dev().hours());
-                if (devStartDate == null || (phases.dev().startDate() != null && phases.dev().startDate().isBefore(devStartDate))) {
-                    devStartDate = phases.dev().startDate();
-                }
-                if (devEndDate == null || (phases.dev().endDate() != null && phases.dev().endDate().isAfter(devEndDate))) {
-                    devEndDate = phases.dev().endDate();
-                }
-            }
-            if (phases.qa() != null) {
-                totalQaHours = totalQaHours.add(phases.qa().hours());
-                if (qaStartDate == null || (phases.qa().startDate() != null && phases.qa().startDate().isBefore(qaStartDate))) {
-                    qaStartDate = phases.qa().startDate();
-                }
-                if (qaEndDate == null || (phases.qa().endDate() != null && phases.qa().endDate().isAfter(qaEndDate))) {
-                    qaEndDate = phases.qa().endDate();
-                }
-            }
+            aggregatePhaseData(phases.sa(), "SA", totalRoleHours, roleStartDates, roleEndDates);
+            aggregatePhaseData(phases.dev(), "DEV", totalRoleHours, roleStartDates, roleEndDates);
+            aggregatePhaseData(phases.qa(), "QA", totalRoleHours, roleStartDates, roleEndDates);
 
             // Accumulate epic progress from story
             if (plannedStory.totalEstimateSeconds() != null) {
@@ -298,37 +288,25 @@ public class UnifiedPlanningService {
             // Accumulate role progress
             RoleProgressInfo rp = plannedStory.roleProgress();
             if (rp != null) {
-                if (rp.sa() != null) {
-                    saEstimate += rp.sa().estimateSeconds() != null ? rp.sa().estimateSeconds() : 0;
-                    saLogged += rp.sa().loggedSeconds() != null ? rp.sa().loggedSeconds() : 0;
-                    saExists = true;
-                    if (!rp.sa().completed()) saDone = false;
-                }
-                if (rp.dev() != null) {
-                    devEstimate += rp.dev().estimateSeconds() != null ? rp.dev().estimateSeconds() : 0;
-                    devLogged += rp.dev().loggedSeconds() != null ? rp.dev().loggedSeconds() : 0;
-                    devExists = true;
-                    if (!rp.dev().completed()) devDone = false;
-                }
-                if (rp.qa() != null) {
-                    qaEstimate += rp.qa().estimateSeconds() != null ? rp.qa().estimateSeconds() : 0;
-                    qaLogged += rp.qa().loggedSeconds() != null ? rp.qa().loggedSeconds() : 0;
-                    qaExists = true;
-                    if (!rp.qa().completed()) qaDone = false;
-                }
+                accumulateRoleProgress(rp.sa(), "SA", roleEstimate, roleLogged, roleExists, roleDone);
+                accumulateRoleProgress(rp.dev(), "DEV", roleEstimate, roleLogged, roleExists, roleDone);
+                accumulateRoleProgress(rp.qa(), "QA", roleEstimate, roleLogged, roleExists, roleDone);
             }
 
             // Count active story
-            if (!statusMappingService.isDone(plannedStory.status(), statusMapping)) {
+            if (!workflowConfigService.isDone(plannedStory.status(), "Story")) {
                 storiesActive++;
             }
         }
 
+        // Build aggregation (backward compat: use SA/DEV/QA keys)
         PhaseAggregation aggregation = new PhaseAggregation(
-                totalSaHours, totalDevHours, totalQaHours,
-                saStartDate, saEndDate,
-                devStartDate, devEndDate,
-                qaStartDate, qaEndDate
+                totalRoleHours.getOrDefault("SA", BigDecimal.ZERO),
+                totalRoleHours.getOrDefault("DEV", BigDecimal.ZERO),
+                totalRoleHours.getOrDefault("QA", BigDecimal.ZERO),
+                roleStartDates.get("SA"), roleEndDates.get("SA"),
+                roleStartDates.get("DEV"), roleEndDates.get("DEV"),
+                roleStartDates.get("QA"), roleEndDates.get("QA")
         );
 
         // Calculate epic progress percent
@@ -336,22 +314,16 @@ public class UnifiedPlanningService {
                 ? (int) Math.min(100, (epicTotalLogged * 100) / epicTotalEstimate)
                 : 0;
 
-        // Build role progress for epic
+        // Build role progress for epic (backward compat: SA/DEV/QA)
         RoleProgressInfo epicRoleProgress = new RoleProgressInfo(
-                saExists ? new PhaseProgressInfo(saEstimate, saLogged, saDone) : null,
-                devExists ? new PhaseProgressInfo(devEstimate, devLogged, devDone) : null,
-                qaExists ? new PhaseProgressInfo(qaEstimate, qaLogged, qaDone) : null
+                roleExists.getOrDefault("SA", false) ? new PhaseProgressInfo(roleEstimate.get("SA"), roleLogged.get("SA"), roleDone.get("SA")) : null,
+                roleExists.getOrDefault("DEV", false) ? new PhaseProgressInfo(roleEstimate.get("DEV"), roleLogged.get("DEV"), roleDone.get("DEV")) : null,
+                roleExists.getOrDefault("QA", false) ? new PhaseProgressInfo(roleEstimate.get("QA"), roleLogged.get("QA"), roleDone.get("QA")) : null
         );
 
-        // Get due date from epic entity
         LocalDate dueDate = epic.getDueDate();
 
-        // Check if this epic uses rough estimates (no stories with actual subtasks)
-        boolean isRoughEstimate = plannedStories.isEmpty() && (
-                epic.getRoughEstimateSaDays() != null ||
-                epic.getRoughEstimateDevDays() != null ||
-                epic.getRoughEstimateQaDays() != null
-        );
+        boolean isRoughEstimate = plannedStories.isEmpty() && hasRoughEstimates(epic);
 
         return new PlannedEpic(
                 epicKey,
@@ -376,16 +348,42 @@ public class UnifiedPlanningService {
         );
     }
 
+    private void aggregatePhaseData(PhaseSchedule phase, String roleCode,
+                                     Map<String, BigDecimal> totalRoleHours,
+                                     Map<String, LocalDate> roleStartDates,
+                                     Map<String, LocalDate> roleEndDates) {
+        if (phase == null) return;
+        totalRoleHours.merge(roleCode, phase.hours(), BigDecimal::add);
+        if (phase.startDate() != null) {
+            roleStartDates.merge(roleCode, phase.startDate(),
+                    (existing, newDate) -> newDate.isBefore(existing) ? newDate : existing);
+        }
+        if (phase.endDate() != null) {
+            roleEndDates.merge(roleCode, phase.endDate(),
+                    (existing, newDate) -> newDate.isAfter(existing) ? newDate : existing);
+        }
+    }
+
+    private void accumulateRoleProgress(PhaseProgressInfo info, String roleCode,
+                                         Map<String, Long> roleEstimate, Map<String, Long> roleLogged,
+                                         Map<String, Boolean> roleExists, Map<String, Boolean> roleDone) {
+        if (info == null) return;
+        roleEstimate.merge(roleCode, info.estimateSeconds() != null ? info.estimateSeconds() : 0L, Long::sum);
+        roleLogged.merge(roleCode, info.loggedSeconds() != null ? info.loggedSeconds() : 0L, Long::sum);
+        roleExists.put(roleCode, true);
+        if (!info.completed()) roleDone.put(roleCode, false);
+    }
+
     /**
-     * Plans a single story with SA → DEV → QA pipeline.
+     * Plans a single story with dynamic pipeline (roles in pipeline order).
      */
     private PlannedStory planStory(
             JiraIssueEntity story,
-            PhaseHours phaseHours,
+            Map<String, BigDecimal> phaseHoursMap,
+            List<String> pipelineRoles,
             Map<String, AssigneeSchedule> assigneeSchedules,
             Map<String, LocalDate> storyEndDates,
-            AssigneeSchedule.WorkCalendarHelper calendarHelper,
-            StatusMappingConfig statusMapping
+            AssigneeSchedule.WorkCalendarHelper calendarHelper
     ) {
         String storyKey = story.getIssueKey();
         List<PlanningWarning> warnings = new ArrayList<>();
@@ -405,79 +403,51 @@ public class UnifiedPlanningService {
             }
         }
 
-        // Plan phases sequentially: SA → DEV → QA
+        // Plan phases sequentially by pipeline order
         LocalDate currentDate = earliestStart;
+        Map<String, PhaseSchedule> roleSchedules = new LinkedHashMap<>();
 
-        // SA Phase
-        PhaseSchedule saSchedule = null;
-        if (phaseHours.sa().compareTo(BigDecimal.ZERO) > 0) {
-            saSchedule = planPhase(
-                    Role.SA,
-                    phaseHours.sa(),
-                    currentDate,
-                    assigneeSchedules,
-                    calendarHelper,
-                    warnings,
-                    storyKey
-            );
-            if (saSchedule != null && saSchedule.endDate() != null) {
-                currentDate = calendarHelper.nextWorkday(saSchedule.endDate());
+        for (String roleCode : pipelineRoles) {
+            BigDecimal hours = phaseHoursMap.getOrDefault(roleCode, BigDecimal.ZERO);
+            if (hours.compareTo(BigDecimal.ZERO) > 0) {
+                PhaseSchedule schedule = planPhase(
+                        roleCode,
+                        hours,
+                        currentDate,
+                        assigneeSchedules,
+                        calendarHelper,
+                        warnings,
+                        storyKey
+                );
+                roleSchedules.put(roleCode, schedule);
+                if (schedule != null && schedule.endDate() != null) {
+                    currentDate = calendarHelper.nextWorkday(schedule.endDate());
+                }
             }
         }
 
-        // DEV Phase (starts after SA)
-        PhaseSchedule devSchedule = null;
-        if (phaseHours.dev().compareTo(BigDecimal.ZERO) > 0) {
-            devSchedule = planPhase(
-                    Role.DEV,
-                    phaseHours.dev(),
-                    currentDate,
-                    assigneeSchedules,
-                    calendarHelper,
-                    warnings,
-                    storyKey
-            );
-            if (devSchedule != null && devSchedule.endDate() != null) {
-                currentDate = calendarHelper.nextWorkday(devSchedule.endDate());
-            }
-        }
-
-        // QA Phase (starts after DEV)
-        PhaseSchedule qaSchedule = null;
-        if (phaseHours.qa().compareTo(BigDecimal.ZERO) > 0) {
-            qaSchedule = planPhase(
-                    Role.QA,
-                    phaseHours.qa(),
-                    currentDate,
-                    assigneeSchedules,
-                    calendarHelper,
-                    warnings,
-                    storyKey
-            );
-        }
-
-        // Determine story dates
+        // Determine story dates from first and last phase
         LocalDate storyStart = null;
         LocalDate storyEnd = null;
-
-        if (saSchedule != null && saSchedule.startDate() != null) {
-            storyStart = saSchedule.startDate();
-        } else if (devSchedule != null && devSchedule.startDate() != null) {
-            storyStart = devSchedule.startDate();
-        } else if (qaSchedule != null && qaSchedule.startDate() != null) {
-            storyStart = qaSchedule.startDate();
-        }
-
-        if (qaSchedule != null && qaSchedule.endDate() != null) {
-            storyEnd = qaSchedule.endDate();
-        } else if (devSchedule != null && devSchedule.endDate() != null) {
-            storyEnd = devSchedule.endDate();
-        } else if (saSchedule != null && saSchedule.endDate() != null) {
-            storyEnd = saSchedule.endDate();
+        for (String roleCode : pipelineRoles) {
+            PhaseSchedule schedule = roleSchedules.get(roleCode);
+            if (schedule != null && schedule.startDate() != null && storyStart == null) {
+                storyStart = schedule.startDate();
+            }
+            if (schedule != null && schedule.endDate() != null) {
+                storyEnd = schedule.endDate();
+            }
         }
 
         // Get progress data from subtasks
-        StoryProgressData progressData = extractProgressData(story, statusMapping);
+        StoryProgressData progressData = extractProgressData(story);
+
+        // Build PlannedPhases (backward compat: map to sa/dev/qa)
+        PlannedPhases phases = new PlannedPhases(
+                roleSchedules.get("SA"),
+                roleSchedules.get("DEV"),
+                roleSchedules.get("QA")
+        );
 
         return new PlannedStory(
                 storyKey,
@@ -486,7 +456,7 @@ public class UnifiedPlanningService {
                 story.getStatus(),
                 storyStart,
                 storyEnd,
-                new PlannedPhases(saSchedule, devSchedule, qaSchedule),
+                phases,
                 blockedBy != null ? blockedBy : List.of(),
                 warnings,
                 story.getIssueType(),
@@ -500,10 +470,10 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Plans a single phase, finding the earliest available assignee.
+     * Plans a single phase, finding the earliest available assignee with matching role code.
      */
     private PhaseSchedule planPhase(
-            Role role,
+            String roleCode,
             BigDecimal hours,
             LocalDate startAfter,
             Map<String, AssigneeSchedule> assigneeSchedules,
@@ -516,7 +486,7 @@ public class UnifiedPlanningService {
         LocalDate bestAvailableDate = null;
 
         for (AssigneeSchedule schedule : assigneeSchedules.values()) {
-            if (schedule.getRole() != role) {
+            if (!roleCode.equals(schedule.getRoleCode())) {
                 continue;
             }
 
@@ -533,7 +503,7 @@ public class UnifiedPlanningService {
             warnings.add(new PlanningWarning(
                     storyKey,
                     WarningType.NO_CAPACITY,
-                    "No " + role + " capacity in team"
+                    "No " + roleCode + " capacity in team"
             ));
             return PhaseSchedule.noCapacity(hours);
         }
@@ -556,28 +526,24 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Extracts phase hours from story's subtasks.
+     * Extracts phase hours from story's subtasks (dynamic by role code).
      */
-    private PhaseHours extractPhaseHours(JiraIssueEntity story, JiraIssueEntity epic, StatusMappingConfig statusMapping) {
+    private Map<String, BigDecimal> extractPhaseHoursMap(JiraIssueEntity story, JiraIssueEntity epic) {
         List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
 
-        BigDecimal saHours = BigDecimal.ZERO;
-        BigDecimal devHours = BigDecimal.ZERO;
-        BigDecimal qaHours = BigDecimal.ZERO;
+        Map<String, BigDecimal> roleHours = new LinkedHashMap<>();
 
         for (JiraIssueEntity subtask : subtasks) {
             // Skip done subtasks
-            if (statusMappingService.isDone(subtask.getStatus(), statusMapping)) {
+            if (workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType())) {
                 continue;
             }
 
             // Calculate remaining hours - prefer explicit remaining estimate from Jira
             long remainingSeconds;
             if (subtask.getRemainingEstimateSeconds() != null) {
-                // Use explicit remaining estimate (user set this in Jira)
                 remainingSeconds = subtask.getRemainingEstimateSeconds();
             } else {
-                // Fallback: calculate from original estimate - spent
                 long estimateSeconds = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
                 long spentSeconds = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
                 remainingSeconds = Math.max(0, estimateSeconds - spentSeconds);
@@ -590,97 +556,86 @@ public class UnifiedPlanningService {
             BigDecimal remainingHours = new BigDecimal(remainingSeconds)
                     .divide(SECONDS_PER_HOUR, 2, RoundingMode.HALF_UP);
 
-            // Determine role by subtask type
-            String phase = statusMappingService.determinePhase(
-                    subtask.getStatus(),
-                    subtask.getIssueType(),
-                    statusMapping
-            );
-
-            switch (phase) {
-                case "SA" -> saHours = saHours.add(remainingHours);
-                case "QA" -> qaHours = qaHours.add(remainingHours);
-                default -> devHours = devHours.add(remainingHours);
-            }
+            // Determine role by subtask type (dynamic)
+            String roleCode = workflowConfigService.getSubtaskRole(subtask.getIssueType());
+            roleHours.merge(roleCode, remainingHours, BigDecimal::add);
         }
 
-        // If no subtask estimates and epic is in Planned status, use rough estimate
-        if (saHours.compareTo(BigDecimal.ZERO) == 0 &&
-                devHours.compareTo(BigDecimal.ZERO) == 0 &&
-                qaHours.compareTo(BigDecimal.ZERO) == 0) {
+        // If no subtask estimates and epic is in Planned status, use rough estimates from JSONB
+        boolean allZero = roleHours.values().stream()
+                .allMatch(h -> h.compareTo(BigDecimal.ZERO) == 0);
 
-            if (isPlannedStatus(epic.getStatus())) {
-                // Use story's rough estimate if available, otherwise skip
+        if ((roleHours.isEmpty() || allZero) && workflowConfigService.isPlanningAllowed(epic.getStatus())) {
+            Map<String, BigDecimal> roughEstimates = story.getRoughEstimates();
+            if (roughEstimates != null) {
+                for (Map.Entry<String, BigDecimal> entry : roughEstimates.entrySet()) {
+                    if (entry.getValue() != null && entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
+                        roleHours.put(entry.getKey(), entry.getValue().multiply(HOURS_PER_DAY));
+                    }
+                }
+            }
+            // Legacy fallback
+            if (roleHours.isEmpty()) {
                 if (story.getRoughEstimateSaDays() != null) {
-                    saHours = story.getRoughEstimateSaDays().multiply(HOURS_PER_DAY);
+                    roleHours.put("SA", story.getRoughEstimateSaDays().multiply(HOURS_PER_DAY));
                 }
                 if (story.getRoughEstimateDevDays() != null) {
-                    devHours = story.getRoughEstimateDevDays().multiply(HOURS_PER_DAY);
+                    roleHours.put("DEV", story.getRoughEstimateDevDays().multiply(HOURS_PER_DAY));
                 }
                 if (story.getRoughEstimateQaDays() != null) {
-                    qaHours = story.getRoughEstimateQaDays().multiply(HOURS_PER_DAY);
+                    roleHours.put("QA", story.getRoughEstimateQaDays().multiply(HOURS_PER_DAY));
                 }
             }
         }
 
-        return new PhaseHours(saHours, devHours, qaHours);
+        return roleHours;
     }
 
     /**
      * Extracts progress data from story's subtasks (for tooltip display).
      * Uses JiraIssueEntity.getEffectiveEstimateSeconds() as single source of truth.
      */
-    private StoryProgressData extractProgressData(JiraIssueEntity story, StatusMappingConfig statusMapping) {
+    private StoryProgressData extractProgressData(JiraIssueEntity story) {
         List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
 
-        long saEstimate = 0, saLogged = 0;
-        long devEstimate = 0, devLogged = 0;
-        long qaEstimate = 0, qaLogged = 0;
-        boolean saDone = true, devDone = true, qaDone = true;
-        boolean saExists = false, devExists = false, qaExists = false;
+        // Dynamic role accumulators
+        Map<String, Long> roleEstimate = new HashMap<>();
+        Map<String, Long> roleLogged = new HashMap<>();
+        Map<String, Boolean> roleExists = new HashMap<>();
+        Map<String, Boolean> roleDone = new HashMap<>();
 
         for (JiraIssueEntity subtask : subtasks) {
-            // Use effective estimate from entity (single source of truth)
             long est = subtask.getEffectiveEstimateSeconds();
-            long log = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
-            boolean isDone = statusMappingService.isDone(subtask.getStatus(), statusMapping);
+            long logged = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+            boolean isDone = workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType());
 
-            String phase = statusMappingService.determinePhase(
-                    subtask.getStatus(),
-                    subtask.getIssueType(),
-                    statusMapping
-            );
+            String roleCode = workflowConfigService.getSubtaskRole(subtask.getIssueType());
 
-            switch (phase) {
-                case "SA" -> {
-                    saEstimate += est;
-                    saLogged += log;
-                    saExists = true;
-                    if (!isDone) saDone = false;
-                }
-                case "QA" -> {
-                    qaEstimate += est;
-                    qaLogged += log;
-                    qaExists = true;
-                    if (!isDone) qaDone = false;
-                }
-                default -> {
-                    devEstimate += est;
-                    devLogged += log;
-                    devExists = true;
-                    if (!isDone) devDone = false;
-                }
+            roleEstimate.merge(roleCode, est, Long::sum);
+            roleLogged.merge(roleCode, logged, Long::sum);
+            roleExists.put(roleCode, true);
+            if (!isDone) {
+                roleDone.put(roleCode, false);
+            } else {
+                roleDone.putIfAbsent(roleCode, true);
             }
         }
 
-        long totalEstimate = saEstimate + devEstimate + qaEstimate;
-        long totalLogged = saLogged + devLogged + qaLogged;
+        long totalEstimate = roleEstimate.values().stream().mapToLong(Long::longValue).sum();
+        long totalLogged = roleLogged.values().stream().mapToLong(Long::longValue).sum();
         int progressPercent = totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0;
 
+        // Build backward-compat RoleProgressInfo (SA/DEV/QA)
         RoleProgressInfo roleProgress = new RoleProgressInfo(
-                saExists ? new PhaseProgressInfo(saEstimate, saLogged, saDone) : null,
-                devExists ? new PhaseProgressInfo(devEstimate, devLogged, devDone) : null,
-                qaExists ? new PhaseProgressInfo(qaEstimate, qaLogged, qaDone) : null
+                roleExists.getOrDefault("SA", false)
+                        ? new PhaseProgressInfo(roleEstimate.get("SA"), roleLogged.get("SA"), roleDone.getOrDefault("SA", true))
+                        : null,
+                roleExists.getOrDefault("DEV", false)
+                        ? new PhaseProgressInfo(roleEstimate.get("DEV"), roleLogged.get("DEV"), roleDone.getOrDefault("DEV", true))
+                        : null,
+                roleExists.getOrDefault("QA", false)
+                        ? new PhaseProgressInfo(roleEstimate.get("QA"), roleLogged.get("QA"), roleDone.getOrDefault("QA", true))
+                        : null
         );
 
         return new StoryProgressData(totalEstimate, totalLogged, progressPercent, roleProgress);
@@ -705,7 +660,7 @@ public class UnifiedPlanningService {
                     new AssigneeSchedule(
                             member.getJiraAccountId(),
                             member.getDisplayName(),
-                            member.getRole(),
+                            member.getRoleCode(), // Dynamic role code string
                             effectiveHours
                     )
             );
@@ -725,27 +680,25 @@ public class UnifiedPlanningService {
     /**
      * Gets epics sorted by manual_order ASC.
      */
-    private List<JiraIssueEntity> getEpicsSorted(Long teamId, StatusMappingConfig statusMapping) {
-        List<JiraIssueEntity> epics = issueRepository.findByIssueTypeInAndTeamIdOrderByManualOrderAsc(
-                EPIC_TYPES, teamId);
+    private List<JiraIssueEntity> getEpicsSorted(Long teamId) {
+        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamOrderByManualOrder(teamId);
 
         // Filter out done epics and those not allowed for planning
         return epics.stream()
-                .filter(e -> !statusMappingService.isDone(e.getStatus(), statusMapping))
-                .filter(e -> statusMappingService.isPlanningAllowed(e.getStatus(), statusMapping))
+                .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
+                .filter(e -> workflowConfigService.isPlanningAllowed(e.getStatus()))
                 .toList();
     }
 
     /**
      * Gets stories for an epic, sorted by manual_order with dependencies.
      */
-    private List<JiraIssueEntity> getStoriesSorted(String epicKey, StatusMappingConfig statusMapping) {
+    private List<JiraIssueEntity> getStoriesSorted(String epicKey) {
         List<JiraIssueEntity> children = issueRepository.findByParentKeyOrderByManualOrderAsc(epicKey);
 
-        // Filter to stories only (not subtasks)
+        // Filter to stories only (not subtasks) - uses dynamic config
         List<JiraIssueEntity> stories = children.stream()
-                .filter(c -> STORY_TYPES.stream()
-                        .anyMatch(t -> t.equalsIgnoreCase(c.getIssueType())))
+                .filter(c -> workflowConfigService.isStory(c.getIssueType()))
                 .toList();
 
         if (stories.isEmpty()) {
@@ -795,18 +748,16 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Checks if epic status is "Planned".
-     */
-    private boolean isPlannedStatus(String status) {
-        if (status == null) return false;
-        return PLANNED_STATUSES.stream()
-                .anyMatch(s -> s.equalsIgnoreCase(status));
-    }
-
-    /**
-     * Checks if epic has any rough estimates set.
+     * Checks if epic has any rough estimates set (from JSONB or legacy fields).
      */
     private boolean hasRoughEstimates(JiraIssueEntity epic) {
+        // Check JSONB rough estimates
+        Map<String, BigDecimal> estimates = epic.getRoughEstimates();
+        if (estimates != null && !estimates.isEmpty()) {
+            return estimates.values().stream()
+                    .anyMatch(v -> v != null && v.compareTo(BigDecimal.ZERO) > 0);
+        }
+        // Legacy fallback
         return (epic.getRoughEstimateSaDays() != null && epic.getRoughEstimateSaDays().compareTo(BigDecimal.ZERO) > 0) ||
                 (epic.getRoughEstimateDevDays() != null && epic.getRoughEstimateDevDays().compareTo(BigDecimal.ZERO) > 0) ||
                 (epic.getRoughEstimateQaDays() != null && epic.getRoughEstimateQaDays().compareTo(BigDecimal.ZERO) > 0);
@@ -814,88 +765,87 @@ public class UnifiedPlanningService {
 
     /**
      * Plans an epic directly by its rough estimates (when no stories exist).
+     * Uses dynamic pipeline from WorkflowConfigService.
      */
     private PlannedEpic planEpicByRoughEstimates(
             JiraIssueEntity epic,
             Map<String, AssigneeSchedule> assigneeSchedules,
             AssigneeSchedule.WorkCalendarHelper calendarHelper,
-            BigDecimal riskBuffer
+            BigDecimal riskBuffer,
+            List<String> pipelineRoles
     ) {
         String epicKey = epic.getIssueKey();
         log.info("Planning epic {} by rough estimates (no stories)", epicKey);
 
-        // Get rough estimates and convert to hours
-        BigDecimal saHours = epic.getRoughEstimateSaDays() != null
-                ? epic.getRoughEstimateSaDays().multiply(HOURS_PER_DAY)
-                : BigDecimal.ZERO;
-        BigDecimal devHours = epic.getRoughEstimateDevDays() != null
-                ? epic.getRoughEstimateDevDays().multiply(HOURS_PER_DAY)
-                : BigDecimal.ZERO;
-        BigDecimal qaHours = epic.getRoughEstimateQaDays() != null
-                ? epic.getRoughEstimateQaDays().multiply(HOURS_PER_DAY)
-                : BigDecimal.ZERO;
+        // Get rough estimates from JSONB and convert to hours
+        Map<String, BigDecimal> roleHours = new LinkedHashMap<>();
+        Map<String, BigDecimal> roughEstimates = epic.getRoughEstimates();
+        if (roughEstimates != null) {
+            for (Map.Entry<String, BigDecimal> entry : roughEstimates.entrySet()) {
+                if (entry.getValue() != null && entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
+                    roleHours.put(entry.getKey(), entry.getValue().multiply(HOURS_PER_DAY));
+                }
+            }
+        }
+        // Legacy fallback
+        if (roleHours.isEmpty()) {
+            if (epic.getRoughEstimateSaDays() != null && epic.getRoughEstimateSaDays().compareTo(BigDecimal.ZERO) > 0) {
+                roleHours.put("SA", epic.getRoughEstimateSaDays().multiply(HOURS_PER_DAY));
+            }
+            if (epic.getRoughEstimateDevDays() != null && epic.getRoughEstimateDevDays().compareTo(BigDecimal.ZERO) > 0) {
+                roleHours.put("DEV", epic.getRoughEstimateDevDays().multiply(HOURS_PER_DAY));
+            }
+            if (epic.getRoughEstimateQaDays() != null && epic.getRoughEstimateQaDays().compareTo(BigDecimal.ZERO) > 0) {
+                roleHours.put("QA", epic.getRoughEstimateQaDays().multiply(HOURS_PER_DAY));
+            }
+        }
 
         // Apply risk buffer
         BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
-        saHours = saHours.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
-        devHours = devHours.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
-        qaHours = qaHours.multiply(multiplier).setScale(2, RoundingMode.HALF_UP);
+        for (Map.Entry<String, BigDecimal> entry : roleHours.entrySet()) {
+            entry.setValue(entry.getValue().multiply(multiplier).setScale(2, RoundingMode.HALF_UP));
+        }
 
-        // Plan phases sequentially: SA → DEV → QA
+        // Plan phases sequentially by pipeline order
         LocalDate currentDate = LocalDate.now();
         List<PlanningWarning> warnings = new ArrayList<>();
+        Map<String, LocalDate> startDates = new HashMap<>();
+        Map<String, LocalDate> endDates = new HashMap<>();
 
-        LocalDate saStartDate = null, saEndDate = null;
-        LocalDate devStartDate = null, devEndDate = null;
-        LocalDate qaStartDate = null, qaEndDate = null;
-
-        // SA Phase
-        if (saHours.compareTo(BigDecimal.ZERO) > 0) {
-            PhaseSchedule saSchedule = planPhase(
-                    Role.SA, saHours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
-            );
-            if (saSchedule != null && saSchedule.startDate() != null) {
-                saStartDate = saSchedule.startDate();
-                saEndDate = saSchedule.endDate();
-                currentDate = calendarHelper.nextWorkday(saSchedule.endDate());
+        for (String roleCode : pipelineRoles) {
+            BigDecimal hours = roleHours.getOrDefault(roleCode, BigDecimal.ZERO);
+            if (hours.compareTo(BigDecimal.ZERO) > 0) {
+                PhaseSchedule schedule = planPhase(
+                        roleCode, hours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
+                );
+                if (schedule != null && schedule.startDate() != null) {
+                    startDates.put(roleCode, schedule.startDate());
+                    endDates.put(roleCode, schedule.endDate());
+                    currentDate = calendarHelper.nextWorkday(schedule.endDate());
+                }
             }
         }
 
-        // DEV Phase (starts after SA)
-        if (devHours.compareTo(BigDecimal.ZERO) > 0) {
-            PhaseSchedule devSchedule = planPhase(
-                    Role.DEV, devHours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
-            );
-            if (devSchedule != null && devSchedule.startDate() != null) {
-                devStartDate = devSchedule.startDate();
-                devEndDate = devSchedule.endDate();
-                currentDate = calendarHelper.nextWorkday(devSchedule.endDate());
+        // Determine epic dates from first/last role
+        LocalDate epicStartDate = null;
+        LocalDate epicEndDate = null;
+        for (String roleCode : pipelineRoles) {
+            if (startDates.containsKey(roleCode) && epicStartDate == null) {
+                epicStartDate = startDates.get(roleCode);
+            }
+            if (endDates.containsKey(roleCode)) {
+                epicEndDate = endDates.get(roleCode);
             }
         }
 
-        // QA Phase (starts after DEV)
-        if (qaHours.compareTo(BigDecimal.ZERO) > 0) {
-            PhaseSchedule qaSchedule = planPhase(
-                    Role.QA, qaHours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
-            );
-            if (qaSchedule != null && qaSchedule.startDate() != null) {
-                qaStartDate = qaSchedule.startDate();
-                qaEndDate = qaSchedule.endDate();
-            }
-        }
-
-        // Determine epic dates
-        LocalDate epicStartDate = saStartDate != null ? saStartDate :
-                devStartDate != null ? devStartDate : qaStartDate;
-        LocalDate epicEndDate = qaEndDate != null ? qaEndDate :
-                devEndDate != null ? devEndDate : saEndDate;
-
-        // Build phase aggregation
+        // Build phase aggregation (backward compat: SA/DEV/QA)
         PhaseAggregation aggregation = new PhaseAggregation(
-                saHours, devHours, qaHours,
-                saStartDate, saEndDate,
-                devStartDate, devEndDate,
-                qaStartDate, qaEndDate
+                roleHours.getOrDefault("SA", BigDecimal.ZERO),
+                roleHours.getOrDefault("DEV", BigDecimal.ZERO),
+                roleHours.getOrDefault("QA", BigDecimal.ZERO),
+                startDates.get("SA"), endDates.get("SA"),
+                startDates.get("DEV"), endDates.get("DEV"),
+                startDates.get("QA"), endDates.get("QA")
         );
 
         return new PlannedEpic(
@@ -908,13 +858,13 @@ public class UnifiedPlanningService {
                 aggregation,
                 epic.getStatus(),
                 epic.getDueDate(),
-                0L,  // totalEstimateSeconds - no actual work logged
-                0L,  // totalLoggedSeconds
-                0,   // progressPercent
+                0L,
+                0L,
+                0,
                 RoleProgressInfo.empty(),
-                0,   // storiesTotal
-                0,   // storiesActive
-                true, // isRoughEstimate
+                0,
+                0,
+                true,
                 epic.getRoughEstimateSaDays(),
                 epic.getRoughEstimateDevDays(),
                 epic.getRoughEstimateQaDays()
@@ -932,7 +882,7 @@ public class UnifiedPlanningService {
 
             result.put(entry.getKey(), new AssigneeUtilization(
                     schedule.getDisplayName(),
-                    schedule.getRole().name(),
+                    schedule.getRoleCode(),
                     schedule.getTotalAssignedHours(),
                     schedule.getEffectiveHoursPerDay(),
                     schedule.getDailyLoad()
@@ -940,26 +890,6 @@ public class UnifiedPlanningService {
         }
 
         return result;
-    }
-
-    /**
-     * Phase hours container.
-     */
-    private record PhaseHours(BigDecimal sa, BigDecimal dev, BigDecimal qa) {
-        boolean isEmpty() {
-            return sa.compareTo(BigDecimal.ZERO) == 0 &&
-                    dev.compareTo(BigDecimal.ZERO) == 0 &&
-                    qa.compareTo(BigDecimal.ZERO) == 0;
-        }
-
-        PhaseHours applyBuffer(BigDecimal buffer) {
-            BigDecimal multiplier = BigDecimal.ONE.add(buffer);
-            return new PhaseHours(
-                    sa.multiply(multiplier).setScale(2, RoundingMode.HALF_UP),
-                    dev.multiply(multiplier).setScale(2, RoundingMode.HALF_UP),
-                    qa.multiply(multiplier).setScale(2, RoundingMode.HALF_UP)
-            );
-        }
     }
 
     /**

@@ -106,6 +106,7 @@ public abstract class IntegrationTestBase {
         epic.setTeamId(teamId);
         epic.setProjectKey("TEST");
         epic.setSubtask(false);
+        epic.setBoardCategory("EPIC");
         return issueRepository.save(epic);
     }
 
@@ -126,6 +127,7 @@ public abstract class IntegrationTestBase {
         story.setTeamId(teamId);
         story.setProjectKey("TEST");
         story.setSubtask(false);
+        story.setBoardCategory("STORY");
         return issueRepository.save(story);
     }
 
@@ -142,6 +144,7 @@ public abstract class IntegrationTestBase {
         subtask.setTeamId(teamId);
         subtask.setProjectKey("TEST");
         subtask.setSubtask(true);
+        subtask.setBoardCategory("SUBTASK");
         subtask.setOriginalEstimateSeconds(estimateSeconds);
         subtask.setTimeSpentSeconds(loggedSeconds);
         return issueRepository.save(subtask);
