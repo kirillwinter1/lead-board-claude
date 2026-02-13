@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import axios from 'axios'
 import './SettingsPage.css'
 
@@ -125,6 +126,16 @@ export function SettingsPage() {
         {users.length === 0 && (
           <div className="no-users">No users found</div>
         )}
+      </section>
+
+      <section className="settings-section">
+        <h2 className="settings-section-title">Workflow Configuration</h2>
+        <p className="settings-section-description">
+          Configure issue types, statuses, roles and link type mappings.
+        </p>
+        <Link to="/board/workflow" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
+          Open Workflow Configuration
+        </Link>
       </section>
 
       <section className="settings-section">

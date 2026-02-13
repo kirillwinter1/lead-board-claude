@@ -1,21 +1,24 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest, PlanningConfig } from '../api/teams'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { Modal } from '../components/Modal'
 import './TeamsPage.css'
 
-const ROLES = ['SA', 'DEV', 'QA'] as const
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
 
 const DEFAULT_PLANNING_CONFIG: PlanningConfig = {
   gradeCoefficients: { senior: 0.8, middle: 1.0, junior: 1.5 },
   riskBuffer: 0.2,
-  wipLimits: { team: 6, sa: 2, dev: 3, qa: 2 },
-  storyDuration: { sa: 2, dev: 2, qa: 2 }
+  wipLimits: { team: 6, roleLimits: { SA: 2, DEV: 3, QA: 2 } },
+  storyDuration: { roleDurations: { SA: 2, DEV: 2, QA: 2 } }
 }
 
 export function TeamMembersPage() {
   const { teamId } = useParams<{ teamId: string }>()
+  const { getRoleCodes, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
+  const roles = getRoleCodes()
+
   const [team, setTeam] = useState<Team | null>(null)
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,7 +28,7 @@ export function TeamMembersPage() {
   const [formData, setFormData] = useState<CreateTeamMemberRequest>({
     jiraAccountId: '',
     displayName: '',
-    role: 'DEV',
+    role: roles[0] || 'DEV',
     grade: 'MIDDLE',
     hoursPerDay: 6.0,
   })
@@ -66,7 +69,7 @@ export function TeamMembersPage() {
     setFormData({
       jiraAccountId: '',
       displayName: '',
-      role: 'DEV',
+      role: roles[0] || 'DEV',
       grade: 'MIDDLE',
       hoursPerDay: 6.0,
     })
@@ -123,12 +126,16 @@ export function TeamMembersPage() {
       })
   }
 
-  const getRoleBadgeClass = (role: string) => {
-    switch (role) {
-      case 'SA': return 'role-badge sa'
-      case 'DEV': return 'role-badge dev'
-      case 'QA': return 'role-badge qa'
-      default: return 'role-badge'
+  const getRoleBadgeStyle = (role: string): React.CSSProperties => {
+    const color = getRoleColor(role)
+    return {
+      backgroundColor: color + '20',
+      color: color,
+      padding: '2px 8px',
+      borderRadius: '4px',
+      fontSize: '12px',
+      fontWeight: 600,
+      display: 'inline-block',
     }
   }
 
@@ -162,34 +169,49 @@ export function TeamMembersPage() {
     }))
   }
 
-  const updateWipLimit = (key: 'team' | 'sa' | 'dev' | 'qa', value: number) => {
+  const updateTeamWipLimit = (value: number) => {
     setPlanningConfig(prev => ({
       ...prev,
-      wipLimits: { ...prev.wipLimits, [key]: value }
+      wipLimits: { ...prev.wipLimits, team: value }
     }))
   }
 
-  const updateStoryDuration = (role: 'sa' | 'dev' | 'qa', value: number) => {
+  const updateRoleWipLimit = (role: string, value: number) => {
     setPlanningConfig(prev => ({
       ...prev,
-      storyDuration: { ...(prev.storyDuration || { sa: 2, dev: 2, qa: 2 }), [role]: value }
+      wipLimits: {
+        ...prev.wipLimits,
+        roleLimits: { ...(prev.wipLimits.roleLimits || {}), [role]: value }
+      }
+    }))
+  }
+
+  const updateStoryDuration = (role: string, value: number) => {
+    setPlanningConfig(prev => ({
+      ...prev,
+      storyDuration: {
+        roleDurations: { ...(prev.storyDuration?.roleDurations || {}), [role]: value }
+      }
     }))
   }
 
   // Calculate recommended WIP limits based on team composition
   const recommendedWip = useMemo(() => {
-    const saCount = members.filter(m => m.role === 'SA').length
-    const devCount = members.filter(m => m.role === 'DEV').length
-    const qaCount = members.filter(m => m.role === 'QA').length
     const totalCount = members.length
+    const roleRecommendations: Record<string, number> = {}
+
+    // Build role counts dynamically
+    const roleCodes = roles.length > 0 ? roles : Object.keys(planningConfig.wipLimits.roleLimits || {})
+    for (const role of roleCodes) {
+      const count = members.filter(m => m.role === role).length
+      roleRecommendations[role] = Math.ceil(count * 1.5)
+    }
 
     return {
-      team: Math.ceil(totalCount / 3), // 1 epic per 3 people (SA+DEV+QA)
-      sa: Math.ceil(saCount * 1.5),    // 1.5 epics per SA
-      dev: Math.ceil(devCount * 1.5),  // 1.5 epics per DEV
-      qa: Math.ceil(qaCount * 1.5),    // 1.5 epics per QA
+      team: Math.ceil(totalCount / Math.max(roleCodes.length, 1)),
+      roles: roleRecommendations,
     }
-  }, [members])
+  }, [members, roles, planningConfig.wipLimits.roleLimits])
 
   // Get WIP status color: green if <= recommended, yellow if <= 150%, red if > 150%
   const getWipStatus = (value: number, recommended: number): 'good' | 'warning' | 'danger' => {
@@ -198,6 +220,26 @@ export function TeamMembersPage() {
     if (value <= recommended * 1.5) return 'warning'
     return 'danger'
   }
+
+  // Get the role limits to display - merge config with known roles
+  const roleWipEntries = useMemo(() => {
+    const roleLimits = planningConfig.wipLimits.roleLimits || {}
+    const allRoles = new Set([...roles, ...Object.keys(roleLimits)])
+    return Array.from(allRoles).map(role => ({
+      role,
+      limit: roleLimits[role] ?? 2,
+    }))
+  }, [roles, planningConfig.wipLimits.roleLimits])
+
+  // Get the story duration entries to display
+  const storyDurationEntries = useMemo(() => {
+    const roleDurations = planningConfig.storyDuration?.roleDurations || {}
+    const allRoles = new Set([...roles, ...Object.keys(roleDurations)])
+    return Array.from(allRoles).map(role => ({
+      role,
+      duration: roleDurations[role] ?? 2,
+    }))
+  }, [roles, planningConfig.storyDuration?.roleDurations])
 
   if (loading) {
     return <main className="main-content"><div className="loading">Loading...</div></main>
@@ -251,7 +293,9 @@ export function TeamMembersPage() {
                   </td>
                   <td className="cell-account-id">{member.jiraAccountId}</td>
                   <td>
-                    <span className={getRoleBadgeClass(member.role)}>{member.role}</span>
+                    <span style={getRoleBadgeStyle(member.role)}>
+                      {getRoleDisplayName(member.role)}
+                    </span>
                   </td>
                   <td>
                     <span className={getGradeBadgeClass(member.grade)}>{member.grade}</span>
@@ -363,45 +407,25 @@ export function TeamMembersPage() {
             <div className="config-group">
               <div className="config-title-row">
                 <h4>Длительность стори по ролям</h4>
-                <span className="config-info" title="Среднее время работы над одной сторёй для каждой роли. Используется для расчёта параллельной работы: DEV начинает после завершения первой стори SA, QA — после первой стори DEV.">?</span>
+                <span className="config-info" title="Среднее время работы над одной сторёй для каждой роли. Используется для расчёта параллельной работы: следующая роль начинает после завершения первой стори предыдущей.">?</span>
               </div>
               <p className="config-hint">
                 Влияет на перекрытие фаз в timeline. Меньше значение — больше параллелизм.
               </p>
               <div className="config-row">
-                <div className="config-field">
-                  <label>SA (дней)</label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    max="10"
-                    step="0.5"
-                    value={planningConfig.storyDuration?.sa ?? 2}
-                    onChange={e => updateStoryDuration('sa', parseFloat(e.target.value) || 2)}
-                  />
-                </div>
-                <div className="config-field">
-                  <label>DEV (дней)</label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    max="10"
-                    step="0.5"
-                    value={planningConfig.storyDuration?.dev ?? 2}
-                    onChange={e => updateStoryDuration('dev', parseFloat(e.target.value) || 2)}
-                  />
-                </div>
-                <div className="config-field">
-                  <label>QA (дней)</label>
-                  <input
-                    type="number"
-                    min="0.5"
-                    max="10"
-                    step="0.5"
-                    value={planningConfig.storyDuration?.qa ?? 2}
-                    onChange={e => updateStoryDuration('qa', parseFloat(e.target.value) || 2)}
-                  />
-                </div>
+                {storyDurationEntries.map(({ role, duration }) => (
+                  <div className="config-field" key={role}>
+                    <label>{getRoleDisplayName(role)} (дней)</label>
+                    <input
+                      type="number"
+                      min="0.5"
+                      max="10"
+                      step="0.5"
+                      value={duration}
+                      onChange={e => updateStoryDuration(role, parseFloat(e.target.value) || 2)}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -411,10 +435,10 @@ export function TeamMembersPage() {
                 <span className="config-info" title="Рекомендуемые ограничения количества эпиков в работе. НЕ влияют на автопланирование — используются только для визуализации и метрик.">?</span>
               </div>
               <p className="config-hint wip-notice">
-                ⚠️ Эти значения НЕ ограничивают планирование. Алгоритм планирует все эпики на основе реальной capacity команды.
+                Эти значения НЕ ограничивают планирование. Алгоритм планирует все эпики на основе реальной capacity команды.
               </p>
               <p className="config-hint">
-                Рекомендация: команда = участники ÷ 3, на роль = участников × 1.5
+                Рекомендация: команда = участники / кол-во ролей, на роль = участников x 1.5
               </p>
               <div className="config-row wip-row">
                 <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.team, recommendedWip.team)}`}>
@@ -425,54 +449,35 @@ export function TeamMembersPage() {
                     max="20"
                     step="1"
                     value={planningConfig.wipLimits.team}
-                    onChange={e => updateWipLimit('team', parseInt(e.target.value) || 1)}
+                    onChange={e => updateTeamWipLimit(parseInt(e.target.value) || 1)}
                   />
                   <span className="wip-recommendation">
                     рек. {recommendedWip.team || 1}
                   </span>
                 </div>
-                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.sa, recommendedWip.sa)}`}>
-                  <label>SA ({members.filter(m => m.role === 'SA').length})</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={planningConfig.wipLimits.sa}
-                    onChange={e => updateWipLimit('sa', parseInt(e.target.value) || 1)}
-                  />
-                  <span className="wip-recommendation">
-                    рек. {recommendedWip.sa || 1}
-                  </span>
-                </div>
-                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.dev, recommendedWip.dev)}`}>
-                  <label>DEV ({members.filter(m => m.role === 'DEV').length})</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={planningConfig.wipLimits.dev}
-                    onChange={e => updateWipLimit('dev', parseInt(e.target.value) || 1)}
-                  />
-                  <span className="wip-recommendation">
-                    рек. {recommendedWip.dev || 1}
-                  </span>
-                </div>
-                <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.qa, recommendedWip.qa)}`}>
-                  <label>QA ({members.filter(m => m.role === 'QA').length})</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    step="1"
-                    value={planningConfig.wipLimits.qa}
-                    onChange={e => updateWipLimit('qa', parseInt(e.target.value) || 1)}
-                  />
-                  <span className="wip-recommendation">
-                    рек. {recommendedWip.qa || 1}
-                  </span>
-                </div>
+                {roleWipEntries.map(({ role, limit }) => {
+                  const roleCount = members.filter(m => m.role === role).length
+                  const recommended = recommendedWip.roles[role] || 0
+                  return (
+                    <div
+                      key={role}
+                      className={`config-field wip-field ${getWipStatus(limit, recommended)}`}
+                    >
+                      <label>{getRoleDisplayName(role)} ({roleCount})</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        step="1"
+                        value={limit}
+                        onChange={e => updateRoleWipLimit(role, parseInt(e.target.value) || 1)}
+                      />
+                      <span className="wip-recommendation">
+                        рек. {recommended || 1}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
               <div className="wip-legend">
                 <span className="wip-legend-item good">● Оптимально</span>
@@ -530,10 +535,10 @@ export function TeamMembersPage() {
               <select
                 id="role"
                 value={formData.role}
-                onChange={e => setFormData({ ...formData, role: e.target.value as typeof ROLES[number] })}
+                onChange={e => setFormData({ ...formData, role: e.target.value })}
               >
-                {ROLES.map(role => (
-                  <option key={role} value={role}>{role}</option>
+                {(roles.length > 0 ? roles : ['SA', 'DEV', 'QA']).map(role => (
+                  <option key={role} value={role}>{getRoleDisplayName(role)}</option>
                 ))}
               </select>
             </div>

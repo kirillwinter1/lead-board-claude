@@ -141,7 +141,7 @@ public class StoryForecastService {
                     new AssigneeScheduleInner(
                             member.getJiraAccountId(),
                             member.getDisplayName(),
-                            member.getRoleCode(),
+                            member.getRole(),
                             effectiveHoursPerDay,
                             today // Start from today
                     )
@@ -296,10 +296,9 @@ public class StoryForecastService {
 
     /**
      * Determine required role based on story estimate distribution.
-     * Uses dynamic roughEstimates Map with fallback to legacy fields.
+     * Uses dynamic roughEstimates Map from JSONB field.
      */
     private String determineRequiredRole(JiraIssueEntity story) {
-        // Try dynamic rough estimates first
         Map<String, BigDecimal> roughEstimates = story.getRoughEstimates();
         if (roughEstimates != null && !roughEstimates.isEmpty()) {
             String maxRole = null;
@@ -318,19 +317,8 @@ public class StoryForecastService {
             }
         }
 
-        // Fallback to legacy fields
-        BigDecimal saDays = story.getRoughEstimateSaDays() != null ? story.getRoughEstimateSaDays() : BigDecimal.ZERO;
-        BigDecimal devDays = story.getRoughEstimateDevDays() != null ? story.getRoughEstimateDevDays() : BigDecimal.ZERO;
-        BigDecimal qaDays = story.getRoughEstimateQaDays() != null ? story.getRoughEstimateQaDays() : BigDecimal.ZERO;
-
-        // Return role with highest estimate
-        if (saDays.compareTo(devDays) >= 0 && saDays.compareTo(qaDays) >= 0) {
-            return "SA";
-        } else if (qaDays.compareTo(devDays) >= 0) {
-            return "QA";
-        } else {
-            return "DEV";
-        }
+        // Default to the configured default role if no estimates found
+        return workflowConfigService.getDefaultRoleCode();
     }
 
     /**

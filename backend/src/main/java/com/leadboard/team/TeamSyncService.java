@@ -189,7 +189,7 @@ public class TeamSyncService {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setTeam(team);
         member.setJiraAccountId(accountId);
-        member.setRole(Role.DEV); // Default role
+        member.setRole("DEV"); // Default role
         member.setGrade(Grade.MIDDLE); // Default grade
         member.setHoursPerDay(new BigDecimal("6.0")); // Default hours
         member.setActive(true);

@@ -71,12 +71,10 @@ public class SimulationPlanner {
 
         for (PlannedEpic epic : plan.epics()) {
             for (PlannedStory story : epic.stories()) {
-                PlannedPhases phases = story.phases();
-
-                // Process each phase
-                processPhase(phases.sa(), "SA", story, today, memberMap, actions);
-                processPhase(phases.dev(), "DEV", story, today, memberMap, actions);
-                processPhase(phases.qa(), "QA", story, today, memberMap, actions);
+                // Process each phase dynamically
+                for (Map.Entry<String, PhaseSchedule> entry : story.phases().entrySet()) {
+                    processPhase(entry.getValue(), entry.getKey(), story, today, memberMap, actions);
+                }
             }
 
             // Check for epic auto-transitions
@@ -267,7 +265,9 @@ public class SimulationPlanner {
             PlannedEpic epic,
             List<SimulationAction> actions
     ) {
-        if (workflowConfigService.isDone(epic.status(), "Epic")) {
+        String epicTypeName = workflowConfigService.getEpicTypeNames().stream()
+                .findFirst().orElse("Epic");
+        if (workflowConfigService.isDone(epic.status(), epicTypeName)) {
             return;
         }
 
@@ -291,7 +291,7 @@ public class SimulationPlanner {
         if (allStoriesDone) {
             actions.add(SimulationAction.transition(
                     epic.epicKey(),
-                    "Epic",
+                    epicTypeName,
                     null,
                     epic.status(),
                     "Done",

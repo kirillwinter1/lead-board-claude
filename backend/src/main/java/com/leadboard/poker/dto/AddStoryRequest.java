@@ -1,11 +1,12 @@
 package com.leadboard.poker.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+
+import java.util.List;
 
 public record AddStoryRequest(
     @NotBlank String title,
-    boolean needsSa,
-    boolean needsDev,
-    boolean needsQa,
+    @NotEmpty List<String> needsRoles,
     String existingStoryKey // if linking to existing Jira story
 ) {}

@@ -18,12 +18,8 @@ export interface EpicStory {
   storyKey: string
   summary: string
   status: string
-  hasSaSubtask: boolean
-  hasDevSubtask: boolean
-  hasQaSubtask: boolean
-  saEstimate: number | null
-  devEstimate: number | null
-  qaEstimate: number | null
+  subtaskRoles: string[]
+  roleEstimates: Record<string, number | null>
 }
 
 export async function getEpicStories(epicKey: string): Promise<EpicStory[]> {
@@ -51,13 +47,9 @@ export interface PokerStory {
   id: number
   storyKey: string | null
   title: string
-  needsSa: boolean
-  needsDev: boolean
-  needsQa: boolean
+  needsRoles: string[]
   status: 'PENDING' | 'VOTING' | 'REVEALED' | 'COMPLETED'
-  finalSaHours: number | null
-  finalDevHours: number | null
-  finalQaHours: number | null
+  finalEstimates: Record<string, number | null>
   orderIndex: number
   votes: PokerVote[]
 }
@@ -66,7 +58,7 @@ export interface PokerVote {
   id: number
   voterAccountId: string
   voterDisplayName: string | null
-  voterRole: 'SA' | 'DEV' | 'QA'
+  voterRole: string
   voteHours: number | null
   hasVoted: boolean
   votedAt: string | null
@@ -75,7 +67,7 @@ export interface PokerVote {
 export interface ParticipantInfo {
   accountId: string
   displayName: string
-  role: 'SA' | 'DEV' | 'QA'
+  role: string
   isFacilitator: boolean
   isOnline: boolean
 }
@@ -118,9 +110,7 @@ export async function getSessionsByTeam(teamId: number): Promise<PokerSession[]>
 
 export interface AddStoryRequest {
   title: string
-  needsSa: boolean
-  needsDev: boolean
-  needsQa: boolean
+  needsRoles: string[]
   existingStoryKey?: string
 }
 

@@ -104,18 +104,11 @@ public class RoleLoadService {
         }
         log.info("Role load calculated for team {}: {}", teamId, utilizationLog);
 
-        // Populate backward-compatible RoleLoadResponse with fixed sa/dev/qa fields
-        RoleLoadInfo saInfo = roleInfoMap.getOrDefault("SA", RoleLoadInfo.empty());
-        RoleLoadInfo devInfo = roleInfoMap.getOrDefault("DEV", RoleLoadInfo.empty());
-        RoleLoadInfo qaInfo = roleInfoMap.getOrDefault("QA", RoleLoadInfo.empty());
-
         return new RoleLoadResponse(
                 teamId,
                 today,
                 DEFAULT_PERIOD_DAYS,
-                saInfo,
-                devInfo,
-                qaInfo,
+                roleInfoMap,
                 alerts
         );
     }
@@ -125,7 +118,7 @@ public class RoleLoadService {
      */
     private RoleCapacity calculateRoleCapacity(List<TeamMemberEntity> members, String roleCode, int workdays) {
         List<TeamMemberEntity> roleMembers = members.stream()
-                .filter(m -> m.getRoleCode().equals(roleCode))
+                .filter(m -> m.getRole().equals(roleCode))
                 .toList();
 
         BigDecimal totalHoursPerDay = BigDecimal.ZERO;
@@ -140,33 +133,22 @@ public class RoleLoadService {
 
     /**
      * Рассчитывает назначенные часы по ролям из unified planning.
-     * Maps the fixed PlannedPhases fields (sa/dev/qa) to role codes for backward compatibility.
      */
     private Map<String, BigDecimal> calculateAssignedHours(UnifiedPlanningResult planning, LocalDate periodStart, LocalDate periodEnd) {
         Map<String, BigDecimal> assignedHours = new LinkedHashMap<>();
 
         for (PlannedEpic epic : planning.epics()) {
             for (PlannedStory story : epic.stories()) {
-                // Map fixed phase accessors to role codes for backward compatibility
-                // PlannedPhases has sa(), dev(), qa() fields
-                addPhaseHours(assignedHours, "SA", story.phases().sa(), periodStart, periodEnd);
-                addPhaseHours(assignedHours, "DEV", story.phases().dev(), periodStart, periodEnd);
-                addPhaseHours(assignedHours, "QA", story.phases().qa(), periodStart, periodEnd);
+                for (Map.Entry<String, PhaseSchedule> entry : story.phases().entrySet()) {
+                    if (entry.getValue() != null) {
+                        BigDecimal hours = calculateHoursInPeriod(entry.getValue(), periodStart, periodEnd);
+                        assignedHours.merge(entry.getKey(), hours, BigDecimal::add);
+                    }
+                }
             }
         }
 
         return assignedHours;
-    }
-
-    /**
-     * Adds phase hours for a role code to the assigned hours map.
-     */
-    private void addPhaseHours(Map<String, BigDecimal> assignedHours, String roleCode,
-                               PhaseSchedule phase, LocalDate periodStart, LocalDate periodEnd) {
-        if (phase != null) {
-            BigDecimal hours = calculateHoursInPeriod(phase, periodStart, periodEnd);
-            assignedHours.merge(roleCode, hours, BigDecimal::add);
-        }
     }
 
     /**

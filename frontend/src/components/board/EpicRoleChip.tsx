@@ -2,12 +2,22 @@ import { useState, useRef } from 'react'
 import { formatCompact } from './helpers'
 import type { EpicRoleChipProps } from './types'
 
-export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpdate }: EpicRoleChipProps) {
+// Generate a lighter shade for borders/backgrounds from the role color
+function lightenColor(hex: string, factor: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const lr = Math.round(r + (255 - r) * factor)
+  const lg = Math.round(g + (255 - g) * factor)
+  const lb = Math.round(b + (255 - b) * factor)
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
+}
+
+export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpdate, roleColor }: EpicRoleChipProps) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState<string>('')
   const [saving, setSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const roleClass = label.toLowerCase()
 
   const roughEstimate = metrics.roughEstimateDays
   const hasRoughEstimate = roughEstimate !== null && roughEstimate > 0
@@ -17,6 +27,9 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
   const estimateDays = metrics.estimateSeconds / 3600 / 8
   const loggedDays = metrics.loggedSeconds / 3600 / 8
   const remainingDays = Math.max(0, estimateDays - loggedDays)
+
+  const borderColor = lightenColor(roleColor, 0.6)
+  const fillColor = lightenColor(roleColor, 0.3)
 
   const handleClick = () => {
     if (!epicInTodo || !config?.enabled) return
@@ -60,7 +73,7 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
   if (epicInTodo) {
     if (editing) {
       return (
-        <div className={`epic-role-chip ${roleClass} todo editing`}>
+        <div className="epic-role-chip todo editing" style={{ color: roleColor, borderColor }}>
           <span className="epic-role-label">{label}</span>
           <input
             ref={inputRef}
@@ -81,12 +94,13 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
 
     return (
       <div
-        className={`epic-role-chip ${roleClass} todo ${hasRoughEstimate ? '' : 'needs-estimate'}`}
+        className={`epic-role-chip todo ${hasRoughEstimate ? '' : 'needs-estimate'}`}
+        style={{ color: roleColor, borderColor }}
         onClick={handleClick}
         title="Click to set estimate"
       >
         <span className="epic-role-label">{label}</span>
-        <span className="epic-role-value">{hasRoughEstimate ? `${roughEstimate}d` : '✎'}</span>
+        <span className="epic-role-value">{hasRoughEstimate ? `${roughEstimate}d` : '\u270E'}</span>
       </div>
     )
   }
@@ -100,8 +114,9 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
   if (!hasEstimate && hasRoughEstimate) {
     return (
       <div
-        className={`epic-role-chip ${roleClass} rough-only`}
-        title={`Грязная оценка: ${roughEstimate}d`}
+        className="epic-role-chip rough-only"
+        style={{ color: roleColor, borderColor }}
+        title={`\u0413\u0440\u044F\u0437\u043D\u0430\u044F \u043E\u0446\u0435\u043D\u043A\u0430: ${roughEstimate}d`}
       >
         <span className="epic-role-label">{label}</span>
         <span className="epic-role-value rough">{roughEstimate}d</span>
@@ -111,7 +126,8 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
 
   return (
     <div
-      className={`epic-role-chip ${roleClass} in-progress ${!hasEstimate ? 'no-estimate' : ''}`}
+      className={`epic-role-chip in-progress ${!hasEstimate ? 'no-estimate' : ''}`}
+      style={{ color: roleColor }}
       title={hasEstimate ? remainingText : undefined}
     >
       <div className="epic-role-header">
@@ -123,12 +139,12 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
           <div className="epic-role-progress-bar">
             <div
               className={`epic-role-progress-fill ${progress >= 100 ? 'overburn' : ''}`}
-              style={{ width: `${Math.min(progress, 100)}%` }}
+              style={{ width: `${Math.min(progress, 100)}%`, background: fillColor }}
             />
           </div>
           <div className="epic-role-times">
             <span className="time-logged">{formatCompact(loggedDays)}</span>
-            <span className="arrow">→</span>
+            <span className="arrow">{'\u2192'}</span>
             <span className="time-estimate">{formatCompact(estimateDays)}</span>
           </div>
         </>

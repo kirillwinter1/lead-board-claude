@@ -18,7 +18,7 @@ public record VoteResponse(
                 entity.getId(),
                 entity.getVoterAccountId(),
                 entity.getVoterDisplayName(),
-                entity.getVoterRole().name(),
+                entity.getVoterRole(),
                 entity.getVoteHours(),
                 entity.hasVoted(),
                 entity.getVotedAt()
@@ -31,7 +31,7 @@ public record VoteResponse(
                 entity.getId(),
                 entity.getVoterAccountId(),
                 entity.getVoterDisplayName(),
-                entity.getVoterRole().name(),
+                entity.getVoterRole(),
                 null, // hide the actual value
                 entity.hasVoted(),
                 entity.getVotedAt()

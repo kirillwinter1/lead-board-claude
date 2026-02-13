@@ -21,13 +21,9 @@ CREATE TABLE poker_stories (
     session_id BIGINT NOT NULL REFERENCES poker_sessions(id) ON DELETE CASCADE,
     story_key VARCHAR(50),
     title VARCHAR(500) NOT NULL,
-    needs_sa BOOLEAN NOT NULL DEFAULT false,
-    needs_dev BOOLEAN NOT NULL DEFAULT false,
-    needs_qa BOOLEAN NOT NULL DEFAULT false,
+    needs_roles JSONB DEFAULT '[]',
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    final_sa_hours INTEGER,
-    final_dev_hours INTEGER,
-    final_qa_hours INTEGER,
+    final_estimates JSONB DEFAULT '{}',
     order_index INTEGER NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -44,7 +40,6 @@ CREATE TABLE poker_votes (
     vote_hours INTEGER,
     voted_at TIMESTAMPTZ,
 
-    CONSTRAINT chk_voter_role CHECK (voter_role IN ('SA', 'DEV', 'QA')),
     CONSTRAINT uq_vote_per_role UNIQUE(story_id, voter_account_id, voter_role)
 );
 

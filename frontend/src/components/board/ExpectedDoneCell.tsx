@@ -1,7 +1,9 @@
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { ExpectedDoneCellProps } from './types'
 
 export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const { ref, showTooltip, tooltipPos, handleMouseEnter, handleMouseLeave } = useTooltipPosition<HTMLDivElement>({
     tooltipWidth: 280,
     minSpaceNeeded: 200,
@@ -83,21 +85,16 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
 
           <div className="forecast-tooltip-section">
             <div className="forecast-tooltip-title">Расписание фаз</div>
-            <div className="forecast-phase">
-              <span className="phase-label sa">SA</span>
-              <span className="phase-dates">{formatDateRange(phaseSchedule?.sa?.startDate, phaseSchedule?.sa?.endDate)}</span>
-              <span className="phase-remaining">({remainingByRole?.sa?.days?.toFixed(1) || 0}d)</span>
-            </div>
-            <div className="forecast-phase">
-              <span className="phase-label dev">DEV</span>
-              <span className="phase-dates">{formatDateRange(phaseSchedule?.dev?.startDate, phaseSchedule?.dev?.endDate)}</span>
-              <span className="phase-remaining">({remainingByRole?.dev?.days?.toFixed(1) || 0}d)</span>
-            </div>
-            <div className="forecast-phase">
-              <span className="phase-label qa">QA</span>
-              <span className="phase-dates">{formatDateRange(phaseSchedule?.qa?.startDate, phaseSchedule?.qa?.endDate)}</span>
-              <span className="phase-remaining">({remainingByRole?.qa?.days?.toFixed(1) || 0}d)</span>
-            </div>
+            {Object.entries(phaseSchedule || {}).map(([role, schedule]) => schedule && (
+              <div key={role} className="forecast-phase">
+                <span className="phase-label" style={{ color: getRoleColor(role) }}>{role}</span>
+                <span className="phase-dates">{formatDateRange(schedule.startDate, schedule.endDate)}</span>
+                <span className="phase-remaining">({remainingByRole?.[role]?.days?.toFixed(1) || 0}d)</span>
+              </div>
+            ))}
+            {Object.keys(phaseSchedule || {}).length === 0 && (
+              <div className="forecast-phase" style={{ color: '#666' }}>Нет данных о фазах</div>
+            )}
           </div>
 
           {dueDate && (

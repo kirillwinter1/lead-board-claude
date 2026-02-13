@@ -1,18 +1,12 @@
 package com.leadboard.poker.dto;
 
+import java.util.List;
+import java.util.Map;
+
 public record EpicStoryResponse(
     String storyKey,
     String summary,
     String status,
-    boolean hasSaSubtask,
-    boolean hasDevSubtask,
-    boolean hasQaSubtask,
-    Integer saEstimate,
-    Integer devEstimate,
-    Integer qaEstimate
-) {
-    // Constructor for backward compatibility
-    public EpicStoryResponse(String storyKey, String summary, String status) {
-        this(storyKey, summary, status, true, true, true, null, null, null);
-    }
-}
+    List<String> subtaskRoles,
+    Map<String, Integer> roleEstimates
+) {}

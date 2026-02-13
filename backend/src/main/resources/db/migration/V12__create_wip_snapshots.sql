@@ -9,13 +9,8 @@ CREATE TABLE wip_snapshots (
     team_wip_limit INTEGER NOT NULL,
     team_wip_current INTEGER NOT NULL,
 
-    -- Role-level WIP
-    sa_wip_limit INTEGER,
-    sa_wip_current INTEGER,
-    dev_wip_limit INTEGER,
-    dev_wip_current INTEGER,
-    qa_wip_limit INTEGER,
-    qa_wip_current INTEGER,
+    -- Dynamic role-level WIP (e.g. {"SA": {"limit": 3, "current": 2}, "DEV": {"limit": 5, "current": 4}})
+    role_wip_data JSONB,
 
     -- Queue info
     epics_in_queue INTEGER,

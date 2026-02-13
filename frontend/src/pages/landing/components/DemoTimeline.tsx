@@ -3,16 +3,16 @@ import { mockTimelineData, TimelineStory } from '../mockData'
 import epicIcon from '../../../icons/epic.png'
 import storyIcon from '../../../icons/story.png'
 
-const PHASE_COLORS = {
-  sa: '#85B8FF',
-  dev: '#D6A0FB',
-  qa: '#8BDBE5'
+const PHASE_COLORS: Record<string, string> = {
+  SA: '#85B8FF',
+  DEV: '#D6A0FB',
+  QA: '#8BDBE5'
 }
 
-const PHASE_LABELS = {
-  sa: 'Анализ',
-  dev: 'Разработка',
-  qa: 'Тестирование',
+const PHASE_LABELS: Record<string, string> = {
+  SA: 'Анализ',
+  DEV: 'Разработка',
+  QA: 'Тестирование',
   buffer: 'Буфер'
 }
 
@@ -121,15 +121,11 @@ export function DemoTimeline({ onHighlight }: DemoTimelineProps) {
     // Calculate buffer gaps between phases
     const phases: { type: string; start: number; duration: number; color: string }[] = []
 
-    if (story.phases.sa) {
-      phases.push({ type: 'sa', start: story.phases.sa.start, duration: story.phases.sa.duration, color: PHASE_COLORS.sa })
-    }
-    if (story.phases.dev) {
-      phases.push({ type: 'dev', start: story.phases.dev.start, duration: story.phases.dev.duration, color: PHASE_COLORS.dev })
-    }
-    if (story.phases.qa) {
-      phases.push({ type: 'qa', start: story.phases.qa.start, duration: story.phases.qa.duration, color: PHASE_COLORS.qa })
-    }
+    Object.entries(story.phases).forEach(([type, phase]) => {
+      if (phase) {
+        phases.push({ type, start: phase.start, duration: phase.duration, color: PHASE_COLORS[type] || '#999' })
+      }
+    })
 
     // Sort phases by start time
     phases.sort((a, b) => a.start - b.start)
@@ -280,7 +276,7 @@ export function DemoTimeline({ onHighlight }: DemoTimelineProps) {
           }}
         >
           <div className="demo-timeline-tooltip-title">
-            {PHASE_LABELS[tooltip.phase as keyof typeof PHASE_LABELS]}
+            {PHASE_LABELS[tooltip.phase] || tooltip.phase}
           </div>
           <div className="demo-timeline-tooltip-detail">
             {tooltip.duration} дней
@@ -290,18 +286,12 @@ export function DemoTimeline({ onHighlight }: DemoTimelineProps) {
 
       {/* Legend */}
       <div className="demo-gantt-legend">
-        <div className="demo-gantt-legend-item">
-          <div className="demo-gantt-legend-color" style={{ background: PHASE_COLORS.sa }} />
-          <span>SA</span>
-        </div>
-        <div className="demo-gantt-legend-item">
-          <div className="demo-gantt-legend-color" style={{ background: PHASE_COLORS.dev }} />
-          <span>DEV</span>
-        </div>
-        <div className="demo-gantt-legend-item">
-          <div className="demo-gantt-legend-color" style={{ background: PHASE_COLORS.qa }} />
-          <span>QA</span>
-        </div>
+        {Object.entries(PHASE_COLORS).map(([role, color]) => (
+          <div key={role} className="demo-gantt-legend-item">
+            <div className="demo-gantt-legend-color" style={{ background: color }} />
+            <span>{role}</span>
+          </div>
+        ))}
         <div className="demo-gantt-legend-item">
           <div className="demo-gantt-legend-color" style={{ background: '#DFE1E6' }} />
           <span>Буфер</span>

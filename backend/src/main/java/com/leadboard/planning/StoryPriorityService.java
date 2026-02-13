@@ -1,10 +1,9 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.RecalculateResponse;
 import com.leadboard.planning.dto.StoriesResponse;
 import com.leadboard.planning.dto.StoryWithScore;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -28,16 +27,16 @@ public class StoryPriorityService {
     private final JiraIssueRepository issueRepository;
     private final StoryAutoScoreService autoScoreService;
     private final StoryDependencyService dependencyService;
-    private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
 
     public StoryPriorityService(JiraIssueRepository issueRepository,
                                 StoryAutoScoreService autoScoreService,
                                 StoryDependencyService dependencyService,
-                                StatusMappingService statusMappingService) {
+                                WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
         this.autoScoreService = autoScoreService;
         this.dependencyService = dependencyService;
-        this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -53,16 +52,13 @@ public class StoryPriorityService {
             return new StoriesResponse(List.of(), new StoryDependencyService.DependencyGraph(List.of(), List.of()));
         }
 
-        // Get team config (for now, use default - TODO: get from epic's team)
-        StatusMappingConfig teamConfig = statusMappingService.getDefaultConfig();
-
         // Calculate AutoScore for each story
         Map<String, Double> storyScores = new HashMap<>();
         Map<String, Map<String, BigDecimal>> breakdowns = new HashMap<>();
 
         for (JiraIssueEntity story : stories) {
-            BigDecimal score = autoScoreService.calculateAutoScore(story, teamConfig);
-            Map<String, BigDecimal> breakdown = autoScoreService.calculateScoreBreakdown(story, teamConfig);
+            BigDecimal score = autoScoreService.calculateAutoScore(story);
+            Map<String, BigDecimal> breakdown = autoScoreService.calculateScoreBreakdown(story);
 
             storyScores.put(story.getIssueKey(), score.doubleValue());
             breakdowns.put(story.getIssueKey(), breakdown);
@@ -76,13 +72,13 @@ public class StoryPriorityService {
 
         // Get completed stories (for canStart check)
         Set<String> completedStories = stories.stream()
-                .filter(s -> statusMappingService.isDone(s.getStatus(), teamConfig))
+                .filter(s -> workflowConfigService.isDone(s.getStatus(), s.getIssueType()))
                 .map(JiraIssueEntity::getIssueKey)
                 .collect(Collectors.toSet());
 
         // Convert to DTOs
         List<StoryWithScore> storyDtos = sorted.stream()
-                .map(story -> toStoryWithScore(story, storyScores, breakdowns, completedStories, teamConfig))
+                .map(story -> toStoryWithScore(story, storyScores, breakdowns, completedStories))
                 .toList();
 
         return new StoriesResponse(storyDtos, graph);
@@ -107,11 +103,10 @@ public class StoryPriorityService {
                     .toList();
         }
 
-        StatusMappingConfig teamConfig = statusMappingService.getDefaultConfig();
         int count = 0;
 
         for (JiraIssueEntity story : stories) {
-            BigDecimal score = autoScoreService.calculateAutoScore(story, teamConfig);
+            BigDecimal score = autoScoreService.calculateAutoScore(story);
             story.setAutoScore(score);
             story.setAutoScoreCalculatedAt(OffsetDateTime.now());
             issueRepository.save(story);
@@ -127,8 +122,7 @@ public class StoryPriorityService {
             JiraIssueEntity story,
             Map<String, Double> storyScores,
             Map<String, Map<String, BigDecimal>> breakdowns,
-            Set<String> completedStories,
-            StatusMappingConfig teamConfig
+            Set<String> completedStories
     ) {
         // Get subtasks
         List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());

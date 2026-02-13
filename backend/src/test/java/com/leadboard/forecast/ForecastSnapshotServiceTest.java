@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -70,8 +71,8 @@ class ForecastSnapshotServiceTest {
         ForecastResponse mockForecast = new ForecastResponse(
                 OffsetDateTime.now(),
                 teamId,
-                new ForecastResponse.TeamCapacity(new BigDecimal("8.0"), new BigDecimal("8.0"), new BigDecimal("4.0")),
-                new ForecastResponse.WipStatus(5, 3, false, null, null, null),
+                Map.of("SA", new BigDecimal("8.0"), "DEV", new BigDecimal("8.0"), "QA", new BigDecimal("4.0")),
+                ForecastResponse.WipStatus.of(5, 3, Map.of()),
                 Collections.emptyList()
         );
         when(forecastService.calculateForecast(teamId)).thenReturn(mockForecast);
@@ -194,8 +195,8 @@ class ForecastSnapshotServiceTest {
         ForecastResponse mockForecast = new ForecastResponse(
                 OffsetDateTime.now(),
                 1L,
-                new ForecastResponse.TeamCapacity(new BigDecimal("8.0"), new BigDecimal("8.0"), new BigDecimal("4.0")),
-                new ForecastResponse.WipStatus(5, 3, false, null, null, null),
+                Map.of("SA", new BigDecimal("8.0"), "DEV", new BigDecimal("8.0"), "QA", new BigDecimal("4.0")),
+                ForecastResponse.WipStatus.of(5, 3, Map.of()),
                 Collections.emptyList()
         );
         when(forecastService.calculateForecast(any())).thenReturn(mockForecast);

@@ -1,6 +1,8 @@
 package com.leadboard.config.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -14,6 +16,7 @@ public class TrackerMetadataCacheEntity {
     @Column(name = "cache_key", nullable = false, unique = true, length = 200)
     private String cacheKey;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data", nullable = false, columnDefinition = "jsonb")
     private String data;
 

@@ -31,9 +31,9 @@ class FullSyncE2ETest extends IntegrationTestBase {
 
         // Create epic with rough estimates
         var epic = createEpic("E2E-EPIC-1", "Payment Integration", "В работе", team.getId());
-        epic.setRoughEstimateSaDays(new BigDecimal("2.0"));
-        epic.setRoughEstimateDevDays(new BigDecimal("5.0"));
-        epic.setRoughEstimateQaDays(new BigDecimal("2.0"));
+        epic.setRoughEstimate("SA", new BigDecimal("2.0"));
+        epic.setRoughEstimate("DEV", new BigDecimal("5.0"));
+        epic.setRoughEstimate("QA", new BigDecimal("2.0"));
         epic.setAutoScore(new BigDecimal("75.0"));
         issueRepository.save(epic);
 

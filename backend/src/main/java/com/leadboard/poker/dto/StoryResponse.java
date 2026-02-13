@@ -3,18 +3,15 @@ package com.leadboard.poker.dto;
 import com.leadboard.poker.entity.PokerStoryEntity;
 
 import java.util.List;
+import java.util.Map;
 
 public record StoryResponse(
     Long id,
     String storyKey,
     String title,
-    boolean needsSa,
-    boolean needsDev,
-    boolean needsQa,
+    List<String> needsRoles,
     String status,
-    Integer finalSaHours,
-    Integer finalDevHours,
-    Integer finalQaHours,
+    Map<String, Integer> finalEstimates,
     Integer orderIndex,
     List<VoteResponse> votes
 ) {
@@ -23,13 +20,9 @@ public record StoryResponse(
                 entity.getId(),
                 entity.getStoryKey(),
                 entity.getTitle(),
-                entity.isNeedsSa(),
-                entity.isNeedsDev(),
-                entity.isNeedsQa(),
+                entity.getNeedsRoles(),
                 entity.getStatus().name(),
-                entity.getFinalSaHours(),
-                entity.getFinalDevHours(),
-                entity.getFinalQaHours(),
+                entity.getFinalEstimates(),
                 entity.getOrderIndex(),
                 entity.getVotes() != null
                         ? entity.getVotes().stream().map(VoteResponse::from).toList()
@@ -43,13 +36,9 @@ public record StoryResponse(
                 entity.getId(),
                 entity.getStoryKey(),
                 entity.getTitle(),
-                entity.isNeedsSa(),
-                entity.isNeedsDev(),
-                entity.isNeedsQa(),
+                entity.getNeedsRoles(),
                 entity.getStatus().name(),
-                entity.getFinalSaHours(),
-                entity.getFinalDevHours(),
-                entity.getFinalQaHours(),
+                entity.getFinalEstimates(),
                 entity.getOrderIndex(),
                 entity.getVotes() != null
                         ? entity.getVotes().stream().map(VoteResponse::fromWithoutValue).toList()

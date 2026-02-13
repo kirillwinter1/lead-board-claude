@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { getConfig } from '../api/config'
 import { teamsApi, TeamMember } from '../api/teams'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -38,6 +39,7 @@ interface AuthStatus {
 export function PokerRoomPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
   const navigate = useNavigate()
+  const { getRoleCodes, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
 
   const [session, setSession] = useState<PokerSession | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,7 +49,7 @@ export function PokerRoomPage() {
   // Auth state
   const [authUser, setAuthUser] = useState<AuthUser | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
-  const [userRole, setUserRole] = useState<'SA' | 'DEV' | 'QA' | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [isFacilitator, setIsFacilitator] = useState(false)
 
@@ -63,9 +65,7 @@ export function PokerRoomPage() {
   // Add story modal
   const [showAddStory, setShowAddStory] = useState(false)
   const [newStoryTitle, setNewStoryTitle] = useState('')
-  const [newStoryNeedsSa, setNewStoryNeedsSa] = useState(true)
-  const [newStoryNeedsDev, setNewStoryNeedsDev] = useState(true)
-  const [newStoryNeedsQa, setNewStoryNeedsQa] = useState(true)
+  const [newStoryNeedsRoles, setNewStoryNeedsRoles] = useState<Set<string>>(new Set(getRoleCodes()))
 
   // Import existing stories modal
   const [showImportStories, setShowImportStories] = useState(false)
@@ -73,10 +73,8 @@ export function PokerRoomPage() {
   const [loadingExisting, setLoadingExisting] = useState(false)
   const [selectedImportKeys, setSelectedImportKeys] = useState<Set<string>>(new Set())
 
-  // Final estimate inputs
-  const [finalSa, setFinalSa] = useState<string>('')
-  const [finalDev, setFinalDev] = useState<string>('')
-  const [finalQa, setFinalQa] = useState<string>('')
+  // Final estimate inputs - dynamic map
+  const [finalEstimateInputs, setFinalEstimateInputs] = useState<Record<string, string>>({})
 
   // Fetch auth status
   useEffect(() => {
@@ -95,6 +93,14 @@ export function PokerRoomPage() {
       })
   }, [])
 
+  // Initialize newStoryNeedsRoles when roles load
+  useEffect(() => {
+    const codes = getRoleCodes()
+    if (codes.length > 0) {
+      setNewStoryNeedsRoles(new Set(codes))
+    }
+  }, [getRoleCodes])
+
   // Load session + determine role once auth is ready
   useEffect(() => {
     if (!roomCode || !authUser) return
@@ -109,7 +115,7 @@ export function PokerRoomPage() {
         setCurrentStoryId(sessionData.currentStoryId)
         setJiraBaseUrl(config.jiraBaseUrl)
 
-        // Determine facilitator (fallback: "system" means legacy session — treat creator as facilitator)
+        // Determine facilitator (fallback: "system" means legacy session -- treat creator as facilitator)
         const isFac = sessionData.facilitatorAccountId === authUser.accountId
           || sessionData.facilitatorAccountId === 'system'
         setIsFacilitator(isFac)
@@ -178,7 +184,7 @@ export function PokerRoomPage() {
           id: 0,
           voterAccountId,
           voterDisplayName: null,
-          voterRole: role as 'SA' | 'DEV' | 'QA',
+          voterRole: role,
           voteHours: null,
           hasVoted: true,
           votedAt: new Date().toISOString()
@@ -195,22 +201,18 @@ export function PokerRoomPage() {
     ))
   }, [])
 
-  const handleStoryCompleted = useCallback((storyId: number, saHours: number, devHours: number, qaHours: number) => {
+  const handleStoryCompleted = useCallback((storyId: number, finalEstimates: Record<string, number>) => {
     setStories(prev => prev.map(story =>
       story.id === storyId
         ? {
             ...story,
             status: 'COMPLETED' as const,
-            finalSaHours: saHours,
-            finalDevHours: devHours,
-            finalQaHours: qaHours
+            finalEstimates
           }
         : story
     ))
     setMyVote(null)
-    setFinalSa('')
-    setFinalDev('')
-    setFinalQa('')
+    setFinalEstimateInputs({})
   }, [])
 
   const handleCurrentStoryChanged = useCallback((storyId: number) => {
@@ -231,7 +233,7 @@ export function PokerRoomPage() {
     setError(message)
   }, [])
 
-  // WebSocket connection — only connect when we have auth + role
+  // WebSocket connection -- only connect when we have auth + role
   const wsReady = !!authUser && !!userRole
   const {
     connected,
@@ -271,12 +273,11 @@ export function PokerRoomPage() {
 
   const handleSetFinal = () => {
     if (!currentStoryId) return
-    sendSetFinal(
-      currentStoryId,
-      finalSa ? parseInt(finalSa) : null,
-      finalDev ? parseInt(finalDev) : null,
-      finalQa ? parseInt(finalQa) : null
-    )
+    const estimates: Record<string, number | null> = {}
+    for (const [role, value] of Object.entries(finalEstimateInputs)) {
+      estimates[role] = value ? parseInt(value) : null
+    }
+    sendSetFinal(currentStoryId, estimates)
   }
 
   const handleNextStory = () => {
@@ -295,9 +296,21 @@ export function PokerRoomPage() {
     })
   }
 
-  const handleSelectRole = (role: 'SA' | 'DEV' | 'QA') => {
+  const handleSelectRole = (role: string) => {
     setUserRole(role)
     setShowRoleSelector(false)
+  }
+
+  const handleToggleNewStoryRole = (roleCode: string) => {
+    setNewStoryNeedsRoles(prev => {
+      const next = new Set(prev)
+      if (next.has(roleCode)) {
+        next.delete(roleCode)
+      } else {
+        next.add(roleCode)
+      }
+      return next
+    })
   }
 
   const handleAddStory = async () => {
@@ -305,9 +318,7 @@ export function PokerRoomPage() {
 
     const request: AddStoryRequest = {
       title: newStoryTitle.trim(),
-      needsSa: newStoryNeedsSa,
-      needsDev: newStoryNeedsDev,
-      needsQa: newStoryNeedsQa,
+      needsRoles: Array.from(newStoryNeedsRoles),
     }
 
     try {
@@ -363,9 +374,7 @@ export function PokerRoomPage() {
         if (epicStory) {
           const request: AddStoryRequest = {
             title: epicStory.summary,
-            needsSa: epicStory.hasSaSubtask,
-            needsDev: epicStory.hasDevSubtask,
-            needsQa: epicStory.hasQaSubtask,
+            needsRoles: epicStory.subtaskRoles,
             existingStoryKey: epicStory.storyKey,
           }
           const story = await addStory(session.id, request, false)
@@ -380,6 +389,20 @@ export function PokerRoomPage() {
     }
   }
 
+  // Helpers
+  const roleBadgeStyle = (roleCode: string) => ({
+    background: getRoleColor(roleCode),
+    color: '#fff',
+  })
+
+  const roleLightStyle = (roleCode: string) => {
+    const color = getRoleColor(roleCode)
+    return {
+      background: color + '18',
+      color: color,
+    }
+  }
+
   // Current story
   const currentStory = stories.find(s => s.id === currentStoryId)
 
@@ -390,28 +413,11 @@ export function PokerRoomPage() {
   const canVote = currentStory &&
     currentStory.status === 'VOTING' &&
     userRole &&
-    ((userRole === 'SA' && currentStory.needsSa) ||
-     (userRole === 'DEV' && currentStory.needsDev) ||
-     (userRole === 'QA' && currentStory.needsQa))
+    currentStory.needsRoles.includes(userRole)
 
-  // Get votes for display
-  const getVotesDisplay = (story: PokerStory) => {
-    if (story.status === 'VOTING') {
-      const saVoted = story.votes.filter(v => v.voterRole === 'SA' && v.hasVoted).length
-      const devVoted = story.votes.filter(v => v.voterRole === 'DEV' && v.hasVoted).length
-      const qaVoted = story.votes.filter(v => v.voterRole === 'QA' && v.hasVoted).length
-      return { saVoted, devVoted, qaVoted, revealed: false }
-    }
-    if (story.status === 'REVEALED' || story.status === 'COMPLETED') {
-      return {
-        saVotes: story.votes.filter(v => v.voterRole === 'SA'),
-        devVotes: story.votes.filter(v => v.voterRole === 'DEV'),
-        qaVotes: story.votes.filter(v => v.voterRole === 'QA'),
-        revealed: true
-      }
-    }
-    return null
-  }
+  // Get vote counts per role (for voting status display)
+  const getVoteCountByRole = (story: PokerStory, role: string) =>
+    story.votes.filter(v => v.voterRole === role && v.hasVoted).length
 
   // Loading states
   if (authLoading || loading) {
@@ -435,6 +441,7 @@ export function PokerRoomPage() {
 
   // Role selector modal
   if (showRoleSelector && !userRole) {
+    const roleCodes = getRoleCodes()
     return (
       <main className="main-content">
         <div className="modal-overlay" style={{ position: 'relative', background: 'transparent' }}>
@@ -443,16 +450,17 @@ export function PokerRoomPage() {
             <p style={{ color: '#6b778c', marginBottom: 16 }}>
               Вы не привязаны к команде. Выберите роль для голосования:
             </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <button className="btn btn-primary poker-role-select-btn sa" onClick={() => handleSelectRole('SA')}>
-                SA
-              </button>
-              <button className="btn btn-primary poker-role-select-btn dev" onClick={() => handleSelectRole('DEV')}>
-                DEV
-              </button>
-              <button className="btn btn-primary poker-role-select-btn qa" onClick={() => handleSelectRole('QA')}>
-                QA
-              </button>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              {roleCodes.map(code => (
+                <button
+                  key={code}
+                  className="btn btn-primary poker-role-select-btn"
+                  style={{ background: getRoleColor(code), borderColor: getRoleColor(code) }}
+                  onClick={() => handleSelectRole(code)}
+                >
+                  {getRoleDisplayName(code)}
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -466,7 +474,7 @@ export function PokerRoomPage() {
       <div className="poker-header">
         <div className="poker-header-left">
           <button className="btn btn-secondary" onClick={() => navigate('/board/poker')}>
-            ← Назад
+            &#8592; Назад
           </button>
           <h2>
             <a
@@ -488,14 +496,14 @@ export function PokerRoomPage() {
             title="Скопировать код комнаты"
           >
             <code>{session.roomCode}</code>
-            <span className="copy-icon">{copied ? '✓' : '⎘'}</span>
+            <span className="copy-icon">{copied ? '\u2713' : '\u2398'}</span>
           </button>
           <div className={`poker-connection-dot ${connected ? 'connected' : 'disconnected'}`} title={connected ? 'Подключено' : 'Отключено'} />
           {authUser && (
             <div className="poker-user-badge">
               <span className="poker-user-name">{authUser.displayName}</span>
               {userRole && (
-                <span className={`participant-role role-${userRole.toLowerCase()}`}>{userRole}</span>
+                <span className="participant-role" style={roleLightStyle(userRole)}>{userRole}</span>
               )}
             </div>
           )}
@@ -521,7 +529,7 @@ export function PokerRoomPage() {
                   onClick={handleOpenImportStories}
                   title="Импорт из Jira"
                 >
-                  ↓ Импорт
+                  &#8595; Импорт
                 </button>
                 <button className="btn btn-primary btn-small" onClick={() => setShowAddStory(true)} title="Создать новую">
                   + Новая
@@ -533,7 +541,7 @@ export function PokerRoomPage() {
           <div className="poker-stories-list">
             {stories.length === 0 ? (
               <div className="poker-stories-empty">
-                <div className="poker-stories-empty-icon">📋</div>
+                <div className="poker-stories-empty-icon">&#x1F4CB;</div>
                 <p>Пока нет сторей</p>
                 {isFacilitator && session.status === 'PREPARING' && (
                   <small>Импортируйте из Jira или создайте вручную</small>
@@ -557,18 +565,20 @@ export function PokerRoomPage() {
                       </a>
                     )}
                     <span className={`story-status story-status-${story.status.toLowerCase()}`}>
-                      {story.status === 'PENDING' && '○'}
-                      {story.status === 'VOTING' && '●'}
-                      {story.status === 'REVEALED' && '◐'}
-                      {story.status === 'COMPLETED' && '✓'}
+                      {story.status === 'PENDING' && '\u25CB'}
+                      {story.status === 'VOTING' && '\u25CF'}
+                      {story.status === 'REVEALED' && '\u25D0'}
+                      {story.status === 'COMPLETED' && '\u2713'}
                     </span>
                   </div>
                   <div className="poker-story-title">{story.title}</div>
                   {story.status === 'COMPLETED' && (
                     <div className="poker-story-estimates">
-                      {story.needsSa && <span className="estimate-badge sa">SA: {story.finalSaHours}ч</span>}
-                      {story.needsDev && <span className="estimate-badge dev">DEV: {story.finalDevHours}ч</span>}
-                      {story.needsQa && <span className="estimate-badge qa">QA: {story.finalQaHours}ч</span>}
+                      {story.needsRoles.map(role => (
+                        <span key={role} className="estimate-badge" style={roleLightStyle(role)}>
+                          {role}: {story.finalEstimates[role] ?? 0}\u0447
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -590,7 +600,7 @@ export function PokerRoomPage() {
         <div className="poker-main">
           {session.status === 'PREPARING' ? (
             <div className="poker-preparing">
-              <div className="poker-preparing-icon">🃏</div>
+              <div className="poker-preparing-icon">&#x1F0CF;</div>
               <h3>Подготовка сессии</h3>
               {isFacilitator ? (
                 <div className="poker-preparing-steps">
@@ -604,12 +614,12 @@ export function PokerRoomPage() {
                   </div>
                   <div className="poker-step">
                     <span className="poker-step-num">3</span>
-                    <span>Нажмите «Начать сессию»</span>
+                    <span>Нажмите "Начать сессию"</span>
                   </div>
                   {stories.length === 0 && (
                     <div className="poker-preparing-actions">
                       <button className="btn btn-secondary" onClick={handleOpenImportStories}>
-                        ↓ Импорт из Jira
+                        &#8595; Импорт из Jira
                       </button>
                       <button className="btn btn-primary" onClick={() => setShowAddStory(true)}>
                         + Новая стори
@@ -623,7 +633,7 @@ export function PokerRoomPage() {
             </div>
           ) : session.status === 'COMPLETED' ? (
             <div className="poker-completed">
-              <div className="poker-completed-icon">✅</div>
+              <div className="poker-completed-icon">&#x2705;</div>
               <h3>Сессия завершена</h3>
               <p>Все стори оценены ({completedCount} из {stories.length})</p>
             </div>
@@ -647,9 +657,9 @@ export function PokerRoomPage() {
                 </div>
 
                 <div className="needed-roles">
-                  {currentStory.needsSa && <span className="role-badge sa">SA</span>}
-                  {currentStory.needsDev && <span className="role-badge dev">DEV</span>}
-                  {currentStory.needsQa && <span className="role-badge qa">QA</span>}
+                  {currentStory.needsRoles.map(role => (
+                    <span key={role} className="role-badge" style={roleBadgeStyle(role)}>{role}</span>
+                  ))}
                 </div>
               </div>
 
@@ -658,30 +668,20 @@ export function PokerRoomPage() {
                 <>
                   {/* Show who has voted */}
                   <div className="votes-status">
-                    {(() => {
-                      const display = getVotesDisplay(currentStory)
-                      if (!display || display.revealed) return null
-                      const { saVoted, devVoted, qaVoted } = display as { saVoted: number; devVoted: number; qaVoted: number; revealed: boolean }
-                      return (
-                        <div className="votes-pending">
-                          {currentStory.needsSa && (
-                            <span className={`vote-indicator sa ${saVoted > 0 ? 'voted' : ''}`}>
-                              SA {saVoted > 0 ? '✓' : '...'}
-                            </span>
-                          )}
-                          {currentStory.needsDev && (
-                            <span className={`vote-indicator dev ${devVoted > 0 ? 'voted' : ''}`}>
-                              DEV {devVoted > 0 ? '✓' : '...'}
-                            </span>
-                          )}
-                          {currentStory.needsQa && (
-                            <span className={`vote-indicator qa ${qaVoted > 0 ? 'voted' : ''}`}>
-                              QA {qaVoted > 0 ? '✓' : '...'}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })()}
+                    <div className="votes-pending">
+                      {currentStory.needsRoles.map(role => {
+                        const voted = getVoteCountByRole(currentStory, role)
+                        return (
+                          <span
+                            key={role}
+                            className={`vote-indicator ${voted > 0 ? 'voted' : ''}`}
+                            style={voted > 0 ? roleLightStyle(role) : undefined}
+                          >
+                            {role} {voted > 0 ? '\u2713' : '...'}
+                          </span>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   {/* Voting cards */}
@@ -718,39 +718,17 @@ export function PokerRoomPage() {
                 <div className="votes-revealed">
                   <h4>Результаты голосования:</h4>
                   <div className="votes-grid">
-                    {currentStory.needsSa && (
-                      <div className="vote-column">
-                        <h5>SA</h5>
-                        {currentStory.votes.filter(v => v.voterRole === 'SA').map(vote => (
+                    {currentStory.needsRoles.map(role => (
+                      <div key={role} className="vote-column">
+                        <h5>{role}</h5>
+                        {currentStory.votes.filter(v => v.voterRole === role).map(vote => (
                           <div key={vote.id} className="vote-result">
                             <span>{vote.voterDisplayName || vote.voterAccountId}</span>
                             <span className="vote-value">{vote.voteHours === -1 ? '?' : vote.voteHours}</span>
                           </div>
                         ))}
                       </div>
-                    )}
-                    {currentStory.needsDev && (
-                      <div className="vote-column">
-                        <h5>DEV</h5>
-                        {currentStory.votes.filter(v => v.voterRole === 'DEV').map(vote => (
-                          <div key={vote.id} className="vote-result">
-                            <span>{vote.voterDisplayName || vote.voterAccountId}</span>
-                            <span className="vote-value">{vote.voteHours === -1 ? '?' : vote.voteHours}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {currentStory.needsQa && (
-                      <div className="vote-column">
-                        <h5>QA</h5>
-                        {currentStory.votes.filter(v => v.voterRole === 'QA').map(vote => (
-                          <div key={vote.id} className="vote-result">
-                            <span>{vote.voterDisplayName || vote.voterAccountId}</span>
-                            <span className="vote-value">{vote.voteHours === -1 ? '?' : vote.voteHours}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    ))}
                   </div>
 
                   {/* Facilitator: Set final estimate */}
@@ -758,42 +736,18 @@ export function PokerRoomPage() {
                     <div className="final-estimate-form">
                       <h4>Финальная оценка:</h4>
                       <div className="final-inputs">
-                        {currentStory.needsSa && (
-                          <div className="final-input-group">
-                            <label>SA (часы)</label>
+                        {currentStory.needsRoles.map(role => (
+                          <div key={role} className="final-input-group">
+                            <label>{role} (часы)</label>
                             <input
                               type="number"
-                              value={finalSa}
-                              onChange={e => setFinalSa(e.target.value)}
+                              value={finalEstimateInputs[role] || ''}
+                              onChange={e => setFinalEstimateInputs(prev => ({ ...prev, [role]: e.target.value }))}
                               min="0"
                               max="100"
                             />
                           </div>
-                        )}
-                        {currentStory.needsDev && (
-                          <div className="final-input-group">
-                            <label>DEV (часы)</label>
-                            <input
-                              type="number"
-                              value={finalDev}
-                              onChange={e => setFinalDev(e.target.value)}
-                              min="0"
-                              max="100"
-                            />
-                          </div>
-                        )}
-                        {currentStory.needsQa && (
-                          <div className="final-input-group">
-                            <label>QA (часы)</label>
-                            <input
-                              type="number"
-                              value={finalQa}
-                              onChange={e => setFinalQa(e.target.value)}
-                              min="0"
-                              max="100"
-                            />
-                          </div>
-                        )}
+                        ))}
                       </div>
                       <div className="final-actions">
                         <button className="btn btn-primary" onClick={handleSetFinal}>
@@ -809,7 +763,7 @@ export function PokerRoomPage() {
               {currentStory.status === 'COMPLETED' && isFacilitator && (
                 <div className="facilitator-controls">
                   <button className="btn btn-primary" onClick={handleNextStory}>
-                    Следующая стори →
+                    Следующая стори &#8594;
                   </button>
                 </div>
               )}
@@ -832,7 +786,7 @@ export function PokerRoomPage() {
                   <small>Поделитесь кодом комнаты:</small>
                   <button className="poker-share-code-btn" onClick={handleCopyRoomCode}>
                     <code>{session.roomCode}</code>
-                    <span>{copied ? '✓' : '⎘'}</span>
+                    <span>{copied ? '\u2713' : '\u2398'}</span>
                   </button>
                 </div>
               </div>
@@ -841,9 +795,9 @@ export function PokerRoomPage() {
                 <div key={p.accountId} className={`participant-item ${p.isOnline ? 'online' : 'offline'}`}>
                   <span className="participant-name">
                     {p.displayName}
-                    {p.isFacilitator && ' 👑'}
+                    {p.isFacilitator && ' \uD83D\uDC51'}
                   </span>
-                  <span className={`participant-role role-${p.role.toLowerCase()}`}>
+                  <span className="participant-role" style={roleLightStyle(p.role)}>
                     {p.role}
                   </span>
                 </div>
@@ -872,30 +826,16 @@ export function PokerRoomPage() {
             <div className="form-group">
               <label className="filter-label">Роли</label>
               <div className="checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={newStoryNeedsSa}
-                    onChange={e => setNewStoryNeedsSa(e.target.checked)}
-                  />
-                  Аналитика (SA)
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={newStoryNeedsDev}
-                    onChange={e => setNewStoryNeedsDev(e.target.checked)}
-                  />
-                  Разработка (DEV)
-                </label>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={newStoryNeedsQa}
-                    onChange={e => setNewStoryNeedsQa(e.target.checked)}
-                  />
-                  Тестирование (QA)
-                </label>
+                {getRoleCodes().map(code => (
+                  <label key={code}>
+                    <input
+                      type="checkbox"
+                      checked={newStoryNeedsRoles.has(code)}
+                      onChange={() => handleToggleNewStoryRole(code)}
+                    />
+                    {getRoleDisplayName(code)} ({code})
+                  </label>
+                ))}
               </div>
             </div>
             <div className="modal-actions">
@@ -905,7 +845,7 @@ export function PokerRoomPage() {
               <button
                 className="btn btn-primary"
                 onClick={handleAddStory}
-                disabled={!newStoryTitle.trim() || (!newStoryNeedsSa && !newStoryNeedsDev && !newStoryNeedsQa)}
+                disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0}
               >
                 Добавить
               </button>
@@ -947,21 +887,11 @@ export function PokerRoomPage() {
                       </div>
                       <span className="import-story-summary">{story.summary}</span>
                       <div className="import-story-subtasks">
-                        {story.hasSaSubtask && (
-                          <span className="subtask-badge sa">
-                            SA {story.saEstimate ? `${story.saEstimate}ч` : '—'}
+                        {story.subtaskRoles.map(role => (
+                          <span key={role} className="subtask-badge" style={roleLightStyle(role)}>
+                            {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}\u0447` : '\u2014'}
                           </span>
-                        )}
-                        {story.hasDevSubtask && (
-                          <span className="subtask-badge dev">
-                            DEV {story.devEstimate ? `${story.devEstimate}ч` : '—'}
-                          </span>
-                        )}
-                        {story.hasQaSubtask && (
-                          <span className="subtask-badge qa">
-                            QA {story.qaEstimate ? `${story.qaEstimate}ч` : '—'}
-                          </span>
-                        )}
+                        ))}
                       </div>
                     </div>
                   </label>

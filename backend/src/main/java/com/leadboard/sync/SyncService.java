@@ -1,6 +1,7 @@
 package com.leadboard.sync;
 
 import com.leadboard.config.entity.LinkCategory;
+import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.JiraClient;
@@ -49,6 +50,7 @@ public class SyncService {
     private final StatusChangelogService statusChangelogService;
     private final IssueOrderService issueOrderService;
     private final WorkflowConfigService workflowConfigService;
+    private final MappingAutoDetectService autoDetectService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
@@ -59,7 +61,8 @@ public class SyncService {
                        StoryAutoScoreService storyAutoScoreService,
                        StatusChangelogService statusChangelogService,
                        IssueOrderService issueOrderService,
-                       WorkflowConfigService workflowConfigService) {
+                       WorkflowConfigService workflowConfigService,
+                       MappingAutoDetectService autoDetectService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
@@ -70,6 +73,7 @@ public class SyncService {
         this.statusChangelogService = statusChangelogService;
         this.issueOrderService = issueOrderService;
         this.workflowConfigService = workflowConfigService;
+        this.autoDetectService = autoDetectService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -78,6 +82,7 @@ public class SyncService {
         if (projectKey == null || projectKey.isEmpty()) {
             return;
         }
+        autoDetectIfNeeded(projectKey);
         log.info("Starting scheduled sync for project: {}", projectKey);
         syncProject(projectKey);
 
@@ -101,6 +106,7 @@ public class SyncService {
         }
 
         new Thread(() -> {
+            autoDetectIfNeeded(projectKey);
             syncProject(projectKey);
             reconcileDeletedIssues(projectKey);
         }).start();
@@ -146,8 +152,8 @@ public class SyncService {
         try {
             int totalSynced = 0;
 
-            String jql;
             OffsetDateTime lastSync = state.getLastSyncCompletedAt();
+            String jql;
             if (lastSync != null) {
                 String lastSyncTime = lastSync.minusMinutes(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
                 jql = String.format("project = %s AND updated >= '%s' ORDER BY updated DESC", projectKey, lastSyncTime);
@@ -224,6 +230,29 @@ public class SyncService {
             state.setSyncInProgress(false);
             state.setLastError(e.getMessage());
             syncStateRepository.save(state);
+        }
+    }
+
+    /**
+     * Runs auto-detect OUTSIDE the sync transaction to avoid Hibernate session corruption.
+     * Each call to autoDetectService.autoDetect() runs in its own REQUIRES_NEW transaction.
+     */
+    private void autoDetectIfNeeded(String projectKey) {
+        try {
+            JiraSyncStateEntity state = syncStateRepository.findByProjectKey(projectKey).orElse(null);
+            boolean isFirstSync = (state == null || state.getLastSyncCompletedAt() == null);
+            if (isFirstSync && autoDetectService.isConfigEmpty()) {
+                log.info("First sync: auto-detecting workflow configuration from Jira...");
+                var result = autoDetectService.autoDetect();
+                log.info("Auto-detected: {} types, {} roles, {} statuses, {} links",
+                        result.issueTypeCount(), result.roleCount(),
+                        result.statusMappingCount(), result.linkTypeCount());
+                if (!result.warnings().isEmpty()) {
+                    result.warnings().forEach(w -> log.warn("Auto-detect warning: {}", w));
+                }
+            }
+        } catch (Exception e) {
+            log.error("Auto-detection failed, fallback substring matching will be used", e);
         }
     }
 

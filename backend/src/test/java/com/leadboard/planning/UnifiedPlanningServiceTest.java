@@ -4,7 +4,6 @@ import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -39,8 +38,6 @@ class UnifiedPlanningServiceTest {
     @Mock
     private WorkCalendarService calendarService;
     @Mock
-    private StatusMappingService statusMappingService;
-    @Mock
     private WorkflowConfigService workflowConfigService;
     @Mock
     private StoryDependencyService dependencyService;
@@ -56,7 +53,6 @@ class UnifiedPlanningServiceTest {
                 teamService,
                 memberRepository,
                 calendarService,
-                statusMappingService,
                 workflowConfigService,
                 dependencyService
         );
@@ -66,8 +62,7 @@ class UnifiedPlanningServiceTest {
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 PlanningConfigDto.WipLimits.defaults(),
-                PlanningConfigDto.StoryDuration.defaults(),
-                null
+                PlanningConfigDto.StoryDuration.defaults()
         ));
 
         // Calendar always returns workdays
@@ -103,9 +98,9 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask, devSubtask, qaSubtask));
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("sa-1", "Anna SA", Role.SA, Grade.MIDDLE, new BigDecimal("8")),
-                createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8")),
-                createMember("qa-1", "Carol QA", Role.QA, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8")),
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8")),
+                createMember("qa-1", "Carol QA", "QA", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
@@ -124,15 +119,15 @@ class UnifiedPlanningServiceTest {
 
         PlannedStory plannedStory = plannedEpic.stories().get(0);
         assertEquals("STORY-1", plannedStory.storyKey());
-        assertNotNull(plannedStory.phases().sa());
-        assertNotNull(plannedStory.phases().dev());
-        assertNotNull(plannedStory.phases().qa());
+        assertNotNull(plannedStory.phases().get("SA"));
+        assertNotNull(plannedStory.phases().get("DEV"));
+        assertNotNull(plannedStory.phases().get("QA"));
 
         // Verify pipeline: SA -> DEV -> QA
-        assertTrue(plannedStory.phases().sa().endDate()
-                .isBefore(plannedStory.phases().dev().startDate()) ||
-                plannedStory.phases().sa().endDate()
-                        .isEqual(plannedStory.phases().dev().startDate().minusDays(1)));
+        assertTrue(plannedStory.phases().get("SA").endDate()
+                .isBefore(plannedStory.phases().get("DEV").startDate()) ||
+                plannedStory.phases().get("SA").endDate()
+                        .isEqual(plannedStory.phases().get("DEV").startDate().minusDays(1)));
     }
 
     @Test
@@ -152,8 +147,8 @@ class UnifiedPlanningServiceTest {
 
         // 2 SAs available
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("sa-1", "Anna SA", Role.SA, Grade.MIDDLE, new BigDecimal("8")),
-                createMember("sa-2", "Dan SA", Role.SA, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8")),
+                createMember("sa-2", "Dan SA", "SA", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
@@ -170,12 +165,12 @@ class UnifiedPlanningServiceTest {
         PlannedStory planned2 = plannedEpic.stories().get(1);
 
         // Both stories should start on the same day (parallel SAs)
-        assertEquals(planned1.phases().sa().startDate(), planned2.phases().sa().startDate());
+        assertEquals(planned1.phases().get("SA").startDate(), planned2.phases().get("SA").startDate());
 
         // Different assignees
         assertNotEquals(
-                planned1.phases().sa().assigneeAccountId(),
-                planned2.phases().sa().assigneeAccountId()
+                planned1.phases().get("SA").assigneeAccountId(),
+                planned2.phases().get("SA").assigneeAccountId()
         );
     }
 
@@ -197,7 +192,7 @@ class UnifiedPlanningServiceTest {
 
         // Only 1 SA
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("sa-1", "Anna SA", Role.SA, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
@@ -215,11 +210,11 @@ class UnifiedPlanningServiceTest {
         // Story 2: starts same day but may end next day due to remaining 1.6h
 
         // Same assignee for both
-        assertEquals("sa-1", planned1.phases().sa().assigneeAccountId());
-        assertEquals("sa-1", planned2.phases().sa().assigneeAccountId());
+        assertEquals("sa-1", planned1.phases().get("SA").assigneeAccountId());
+        assertEquals("sa-1", planned2.phases().get("SA").assigneeAccountId());
 
         // First story starts today
-        assertNotNull(planned1.phases().sa().startDate());
+        assertNotNull(planned1.phases().get("SA").startDate());
     }
 
     @Test
@@ -234,7 +229,7 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of()); // No subtasks
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
@@ -271,7 +266,7 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(dev2));
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         // Topological sort: story1 before story2
@@ -313,7 +308,7 @@ class UnifiedPlanningServiceTest {
 
         // Only 1 SA
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("sa-1", "Anna SA", Role.SA, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
@@ -331,12 +326,12 @@ class UnifiedPlanningServiceTest {
         assertEquals("EPIC-2", planned2.epicKey());
 
         // Same SA works on both
-        assertEquals("sa-1", planned1.stories().get(0).phases().sa().assigneeAccountId());
-        assertEquals("sa-1", planned2.stories().get(0).phases().sa().assigneeAccountId());
+        assertEquals("sa-1", planned1.stories().get(0).phases().get("SA").assigneeAccountId());
+        assertEquals("sa-1", planned2.stories().get(0).phases().get("SA").assigneeAccountId());
 
         // Epic 2 starts after Epic 1's SA phase ends (or same day if day split)
-        LocalDate epic1SaEnd = planned1.stories().get(0).phases().sa().endDate();
-        LocalDate epic2SaStart = planned2.stories().get(0).phases().sa().startDate();
+        LocalDate epic1SaEnd = planned1.stories().get(0).phases().get("SA").endDate();
+        LocalDate epic2SaStart = planned2.stories().get(0).phases().get("SA").startDate();
         // With risk buffer, work might spill to next day, so epic2 starts after or on the end day
         assertTrue(epic2SaStart.isAfter(epic1SaEnd) ||
                 epic2SaStart.isEqual(epic1SaEnd) ||
@@ -358,7 +353,7 @@ class UnifiedPlanningServiceTest {
 
         // Only DEV, no SA
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                createMember("dev-1", "Bob DEV", Role.DEV, Grade.MIDDLE, new BigDecimal("8"))
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
         ));
 
         when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
@@ -368,8 +363,8 @@ class UnifiedPlanningServiceTest {
 
         // Then
         PlannedStory plannedStory = result.epics().get(0).stories().get(0);
-        assertTrue(plannedStory.phases().sa().noCapacity());
-        assertNull(plannedStory.phases().sa().assigneeAccountId());
+        assertTrue(plannedStory.phases().get("SA").noCapacity());
+        assertNull(plannedStory.phases().get("SA").assigneeAccountId());
     }
 
     // Helper methods
@@ -410,7 +405,7 @@ class UnifiedPlanningServiceTest {
         return subtask;
     }
 
-    private TeamMemberEntity createMember(String accountId, String displayName, Role role,
+    private TeamMemberEntity createMember(String accountId, String displayName, String role,
                                            Grade grade, BigDecimal hoursPerDay) {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setJiraAccountId(accountId);

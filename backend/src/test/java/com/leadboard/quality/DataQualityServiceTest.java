@@ -2,8 +2,6 @@ package com.leadboard.quality;
 
 import com.leadboard.config.repository.*;
 import com.leadboard.config.service.WorkflowConfigService;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
@@ -48,9 +46,7 @@ class DataQualityServiceTest {
     private LinkTypeMappingRepository linkTypeRepo;
 
     private WorkflowConfigService workflowConfigService;
-    private StatusMappingService statusMappingService;
     private DataQualityService dataQualityService;
-    private StatusMappingConfig statusMapping;
 
     @BeforeEach
     void setUp() {
@@ -58,9 +54,7 @@ class DataQualityServiceTest {
         workflowConfigService = new WorkflowConfigService(
                 configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper()
         );
-        statusMappingService = new StatusMappingService(workflowConfigService);
-        statusMapping = statusMappingService.getDefaultConfig();
-        dataQualityService = new DataQualityService(issueRepository, memberRepository, statusMappingService);
+        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService);
     }
 
     // ==================== Helper Methods ====================
@@ -108,7 +102,7 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
             epic.setTeamId(null);
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_TEAM));
             assertTrue(violations.stream()
@@ -123,7 +117,7 @@ class DataQualityServiceTest {
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_TEAM));
         }
@@ -135,7 +129,7 @@ class DataQualityServiceTest {
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of());
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_TEAM_NO_MEMBERS));
             assertTrue(violations.stream()
@@ -151,7 +145,7 @@ class DataQualityServiceTest {
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_DUE_DATE));
             assertTrue(violations.stream()
@@ -167,7 +161,7 @@ class DataQualityServiceTest {
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_OVERDUE));
         }
@@ -180,7 +174,7 @@ class DataQualityServiceTest {
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_OVERDUE));
         }
@@ -193,7 +187,7 @@ class DataQualityServiceTest {
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_ESTIMATE));
         }
@@ -203,11 +197,11 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().plusDays(30));
-            epic.setRoughEstimateDevDays(new java.math.BigDecimal("5.0"));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_ESTIMATE));
         }
@@ -217,13 +211,13 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Done");
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().plusDays(30));
-            epic.setRoughEstimateDevDays(new java.math.BigDecimal("5.0"));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
 
             JiraIssueEntity openStory = createStory("TEST-2", "In Progress", "TEST-1");
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(openStory), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(openStory));
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_DONE_OPEN_CHILDREN));
         }
@@ -233,11 +227,11 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Developing");
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().plusDays(30));
-            epic.setRoughEstimateDevDays(new java.math.BigDecimal("5.0"));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_IN_PROGRESS_NO_STORIES));
         }
@@ -247,12 +241,12 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Developing");
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().plusDays(30));
-            epic.setRoughEstimateDevDays(new java.math.BigDecimal("5.0"));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
             epic.setTimeSpentSeconds(3600L);
 
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TIME_LOGGED_NOT_IN_SUBTASK));
         }
@@ -262,7 +256,7 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().plusDays(30));
-            epic.setRoughEstimateDevDays(new java.math.BigDecimal("5.0"));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
 
             JiraIssueEntity story = createStory("TEST-2", "In Progress", "TEST-1");
 
@@ -273,7 +267,7 @@ class DataQualityServiceTest {
             when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
             when(issueRepository.findByParentKeyIn(List.of("TEST-2"))).thenReturn(List.of(subtask));
 
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(story), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(story));
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TIME_LOGGED_WRONG_EPIC_STATUS));
         }
@@ -290,7 +284,7 @@ class DataQualityServiceTest {
             JiraIssueEntity story = createStory("TEST-2", "Done", "TEST-1");
             JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
 
-            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask));
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_DONE_OPEN_CHILDREN));
         }
@@ -300,7 +294,7 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Developing");
             JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
 
-            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_IN_PROGRESS_NO_SUBTASKS));
         }
@@ -310,7 +304,7 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
             JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
 
-            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.CHILD_IN_PROGRESS_EPIC_NOT));
         }
@@ -321,7 +315,7 @@ class DataQualityServiceTest {
             JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
             story.setTimeSpentSeconds(3600L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(), statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TIME_LOGGED_NOT_IN_SUBTASK));
         }
@@ -339,7 +333,7 @@ class DataQualityServiceTest {
             JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
             subtask.setOriginalEstimateSeconds(0L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_NO_ESTIMATE));
         }
@@ -351,7 +345,7 @@ class DataQualityServiceTest {
             JiraIssueEntity subtask = createSubtask("TEST-3", "Done", "TEST-2");
             subtask.setOriginalEstimateSeconds(0L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_NO_ESTIMATE));
         }
@@ -364,7 +358,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(0L);
             subtask.setTimeSpentSeconds(3600L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_WORK_NO_ESTIMATE));
         }
@@ -377,7 +371,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(3600L); // 1 hour
             subtask.setTimeSpentSeconds(6000L); // More than 1.5x (5400 seconds)
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_OVERRUN));
         }
@@ -390,7 +384,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(3600L); // 1 hour
             subtask.setTimeSpentSeconds(4000L); // Less than 1.5x (5400 seconds)
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_OVERRUN));
         }
@@ -402,7 +396,7 @@ class DataQualityServiceTest {
             JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
             subtask.setOriginalEstimateSeconds(3600L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_IN_PROGRESS_STORY_NOT));
         }
@@ -414,7 +408,7 @@ class DataQualityServiceTest {
             JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
             subtask.setOriginalEstimateSeconds(3600L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.CHILD_IN_PROGRESS_EPIC_NOT));
         }
@@ -427,7 +421,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(28800L); // 8 hours
             subtask.setTimeSpentSeconds(null);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_DONE_NO_TIME_LOGGED));
         }
@@ -440,7 +434,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(28800L); // 8 hours
             subtask.setTimeSpentSeconds(25200L); // 7 hours
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_DONE_NO_TIME_LOGGED));
         }
@@ -453,7 +447,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(14400L); // 4 hours
             subtask.setTimeSpentSeconds(14000L); // ~3.9 hours
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_TIME_LOGGED_BUT_TODO));
         }
@@ -466,7 +460,7 @@ class DataQualityServiceTest {
             subtask.setOriginalEstimateSeconds(14400L);
             subtask.setTimeSpentSeconds(14000L);
 
-            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_TIME_LOGGED_BUT_TODO));
         }
@@ -482,7 +476,7 @@ class DataQualityServiceTest {
             JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
             epic.setTeamId(null);
 
-            assertTrue(dataQualityService.hasBlockingErrors(epic, statusMapping));
+            assertTrue(dataQualityService.hasBlockingErrors(epic));
         }
 
         @Test
@@ -491,7 +485,7 @@ class DataQualityServiceTest {
             epic.setTeamId(1L);
             epic.setDueDate(LocalDate.now().minusDays(1));
 
-            assertTrue(dataQualityService.hasBlockingErrors(epic, statusMapping));
+            assertTrue(dataQualityService.hasBlockingErrors(epic));
         }
 
         @Test
@@ -501,7 +495,7 @@ class DataQualityServiceTest {
             epic.setDueDate(LocalDate.now().plusDays(30));
             epic.setTimeSpentSeconds(3600L);
 
-            assertTrue(dataQualityService.hasBlockingErrors(epic, statusMapping));
+            assertTrue(dataQualityService.hasBlockingErrors(epic));
         }
 
         @Test
@@ -514,7 +508,7 @@ class DataQualityServiceTest {
 
             when(issueRepository.findByParentKey("TEST-1")).thenReturn(List.of(openStory));
 
-            assertTrue(dataQualityService.hasBlockingErrors(epic, statusMapping));
+            assertTrue(dataQualityService.hasBlockingErrors(epic));
         }
 
         @Test
@@ -527,7 +521,7 @@ class DataQualityServiceTest {
 
             when(issueRepository.findByParentKey("TEST-1")).thenReturn(List.of(story));
 
-            assertFalse(dataQualityService.hasBlockingErrors(epic, statusMapping));
+            assertFalse(dataQualityService.hasBlockingErrors(epic));
         }
     }
 

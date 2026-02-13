@@ -87,9 +87,11 @@ public class JiraIssueEntity {
     private Boolean flagged = false;
 
     @Column(name = "blocks", columnDefinition = "TEXT[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
     private List<String> blocks;
 
     @Column(name = "is_blocked_by", columnDefinition = "TEXT[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
     private List<String> isBlockedBy;
 
     @Column(name = "assignee_account_id", length = 255)
@@ -149,60 +151,6 @@ public class JiraIssueEntity {
         } else {
             roughEstimates.put(roleCode, days);
         }
-    }
-
-    /**
-     * Legacy getter for backward compatibility.
-     * @deprecated Use getRoughEstimate("SA") instead.
-     */
-    @Deprecated
-    public BigDecimal getRoughEstimateSaDays() {
-        return getRoughEstimate("SA");
-    }
-
-    /**
-     * Legacy setter for backward compatibility.
-     * @deprecated Use setRoughEstimate("SA", value) instead.
-     */
-    @Deprecated
-    public void setRoughEstimateSaDays(BigDecimal value) {
-        setRoughEstimate("SA", value);
-    }
-
-    /**
-     * Legacy getter for backward compatibility.
-     * @deprecated Use getRoughEstimate("DEV") instead.
-     */
-    @Deprecated
-    public BigDecimal getRoughEstimateDevDays() {
-        return getRoughEstimate("DEV");
-    }
-
-    /**
-     * Legacy setter for backward compatibility.
-     * @deprecated Use setRoughEstimate("DEV", value) instead.
-     */
-    @Deprecated
-    public void setRoughEstimateDevDays(BigDecimal value) {
-        setRoughEstimate("DEV", value);
-    }
-
-    /**
-     * Legacy getter for backward compatibility.
-     * @deprecated Use getRoughEstimate("QA") instead.
-     */
-    @Deprecated
-    public BigDecimal getRoughEstimateQaDays() {
-        return getRoughEstimate("QA");
-    }
-
-    /**
-     * Legacy setter for backward compatibility.
-     * @deprecated Use setRoughEstimate("QA", value) instead.
-     */
-    @Deprecated
-    public void setRoughEstimateQaDays(BigDecimal value) {
-        setRoughEstimate("QA", value);
     }
 
     // ==================== Getters and Setters ====================

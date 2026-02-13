@@ -11,7 +11,7 @@ public record CreateTeamMemberRequest(
     @Size(max = 255, message = "Display name must not exceed 255 characters")
     String displayName,
 
-    Role role,
+    String role,
 
     Grade grade,
 

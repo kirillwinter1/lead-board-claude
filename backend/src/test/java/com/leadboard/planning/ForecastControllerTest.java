@@ -4,6 +4,7 @@ import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.config.service.WorkflowConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -54,6 +55,9 @@ class ForecastControllerTest {
 
     @MockBean
     private JiraIssueRepository issueRepository;
+
+    @MockBean
+    private WorkflowConfigService workflowConfigService;
 
     // ==================== Story Forecast Tests ====================
 

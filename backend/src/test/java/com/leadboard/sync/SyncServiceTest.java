@@ -1,6 +1,7 @@
 package com.leadboard.sync;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
@@ -68,6 +69,9 @@ class SyncServiceTest {
     @Mock
     private WorkflowConfigService workflowConfigService;
 
+    @Mock
+    private MappingAutoDetectService autoDetectService;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -82,7 +86,8 @@ class SyncServiceTest {
                 storyAutoScoreService,
                 statusChangelogService,
                 issueOrderService,
-                workflowConfigService
+                workflowConfigService,
+                autoDetectService
         );
 
         // Common setup
@@ -226,9 +231,9 @@ class SyncServiceTest {
             JiraSearchResponse response = createSearchResponse(List.of(jiraIssue), true);
 
             JiraIssueEntity existingEntity = createExistingEntity("LB-50", "Новое");
-            existingEntity.setRoughEstimateSaDays(BigDecimal.valueOf(5));
-            existingEntity.setRoughEstimateDevDays(BigDecimal.valueOf(10));
-            existingEntity.setRoughEstimateQaDays(BigDecimal.valueOf(3));
+            existingEntity.setRoughEstimate("SA", BigDecimal.valueOf(5));
+            existingEntity.setRoughEstimate("DEV", BigDecimal.valueOf(10));
+            existingEntity.setRoughEstimate("QA", BigDecimal.valueOf(3));
 
             when(jiraProperties.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
@@ -244,9 +249,9 @@ class SyncServiceTest {
             verify(issueRepository).save(captor.capture());
 
             JiraIssueEntity saved = captor.getValue();
-            assertEquals(BigDecimal.valueOf(5), saved.getRoughEstimateSaDays());
-            assertEquals(BigDecimal.valueOf(10), saved.getRoughEstimateDevDays());
-            assertEquals(BigDecimal.valueOf(3), saved.getRoughEstimateQaDays());
+            assertEquals(BigDecimal.valueOf(5), saved.getRoughEstimate("SA"));
+            assertEquals(BigDecimal.valueOf(10), saved.getRoughEstimate("DEV"));
+            assertEquals(BigDecimal.valueOf(3), saved.getRoughEstimate("QA"));
         }
 
         @Test

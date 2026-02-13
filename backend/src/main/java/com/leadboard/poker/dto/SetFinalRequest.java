@@ -1,8 +1,8 @@
 package com.leadboard.poker.dto;
 
+import java.util.Map;
+
 public record SetFinalRequest(
     Long storyId,
-    Integer saHours,
-    Integer devHours,
-    Integer qaHours
+    Map<String, Integer> finalEstimates
 ) {}

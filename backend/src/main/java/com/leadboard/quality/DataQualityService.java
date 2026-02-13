@@ -1,8 +1,7 @@
 package com.leadboard.quality;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusCategory;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
@@ -27,16 +26,16 @@ public class DataQualityService {
 
     private final JiraIssueRepository issueRepository;
     private final TeamMemberRepository memberRepository;
-    private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
 
     public DataQualityService(
             JiraIssueRepository issueRepository,
             TeamMemberRepository memberRepository,
-            StatusMappingService statusMappingService
+            WorkflowConfigService workflowConfigService
     ) {
         this.issueRepository = issueRepository;
         this.memberRepository = memberRepository;
-        this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -44,13 +43,11 @@ public class DataQualityService {
      *
      * @param epic The epic to check
      * @param children All direct children (Stories/Bugs) of the epic
-     * @param statusMapping The status mapping configuration
      * @return List of violations found
      */
     public List<DataQualityViolation> checkEpic(
             JiraIssueEntity epic,
-            List<JiraIssueEntity> children,
-            StatusMappingConfig statusMapping
+            List<JiraIssueEntity> children
     ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
@@ -68,15 +65,17 @@ public class DataQualityService {
         }
 
         // EPIC_NO_DUE_DATE - Epic without due date (only for epics in Planned or later)
-        StatusCategory epicCategory = statusMappingService.categorizeEpic(epic.getStatus(), statusMapping);
-        boolean epicPastTodo = epicCategory == StatusCategory.IN_PROGRESS || epicCategory == StatusCategory.DONE;
+        StatusCategory epicCategory = workflowConfigService.categorizeEpic(epic.getStatus());
+        boolean epicPastTodo = epicCategory == StatusCategory.PLANNED
+                || epicCategory == StatusCategory.IN_PROGRESS
+                || epicCategory == StatusCategory.DONE;
         if (epicPastTodo && epic.getDueDate() == null) {
             violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_DUE_DATE));
         }
 
         // EPIC_OVERDUE - Epic with due date in the past and not Done
         if (epic.getDueDate() != null && epic.getDueDate().isBefore(LocalDate.now())) {
-            if (!statusMappingService.isDone(epic.getStatus(), statusMapping)) {
+            if (!workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
                 violations.add(DataQualityViolation.of(
                         DataQualityRule.EPIC_OVERDUE,
                         epic.getDueDate().toString()
@@ -86,9 +85,9 @@ public class DataQualityService {
 
         // EPIC_NO_ESTIMATE - Epic without rough estimate and without detailed subtasks (only for epics in Planned or later)
         if (epicPastTodo) {
-            boolean hasRoughEstimate = epic.getRoughEstimateSaDays() != null
-                    || epic.getRoughEstimateDevDays() != null
-                    || epic.getRoughEstimateQaDays() != null;
+            boolean hasRoughEstimate = epic.getRoughEstimates() != null
+                    && epic.getRoughEstimates().values().stream()
+                            .anyMatch(v -> v != null && v.compareTo(java.math.BigDecimal.ZERO) > 0);
 
             if (!hasRoughEstimate) {
                 // Check if children have estimates
@@ -100,7 +99,7 @@ public class DataQualityService {
         }
 
         // TIME_LOGGED_WRONG_EPIC_STATUS - Time logged on subtasks when epic not in Developing/E2E Testing
-        if (!statusMappingService.isTimeLoggingAllowed(epic.getStatus(), statusMapping)) {
+        if (!workflowConfigService.isTimeLoggingAllowed(epic.getStatus())) {
             List<String> childKeys = children.stream().map(JiraIssueEntity::getIssueKey).toList();
             List<JiraIssueEntity> subtasks = childKeys.isEmpty() ? List.of() : issueRepository.findByParentKeyIn(childKeys);
             boolean hasLoggedTime = subtasks.stream()
@@ -114,14 +113,14 @@ public class DataQualityService {
         if (epic.getTimeSpentSeconds() != null && epic.getTimeSpentSeconds() > 0) {
             violations.add(DataQualityViolation.of(
                     DataQualityRule.TIME_LOGGED_NOT_IN_SUBTASK,
-                    "Epic"
+                    epic.getIssueType()
             ));
         }
 
         // EPIC_DONE_OPEN_CHILDREN - Epic is Done but has open children
-        if (statusMappingService.isDone(epic.getStatus(), statusMapping)) {
+        if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
             long openChildren = children.stream()
-                    .filter(c -> !statusMappingService.isDone(c.getStatus(), statusMapping))
+                    .filter(c -> !workflowConfigService.isDone(c.getStatus(), c.getIssueType()))
                     .count();
             if (openChildren > 0) {
                 violations.add(DataQualityViolation.of(
@@ -132,7 +131,7 @@ public class DataQualityService {
         }
 
         // EPIC_IN_PROGRESS_NO_STORIES - Epic in progress without stories
-        if (statusMappingService.isEpicInProgress(epic.getStatus(), statusMapping)) {
+        if (workflowConfigService.isEpicInProgress(epic.getStatus())) {
             if (children.isEmpty()) {
                 violations.add(DataQualityViolation.of(DataQualityRule.EPIC_IN_PROGRESS_NO_STORIES));
             }
@@ -147,14 +146,12 @@ public class DataQualityService {
      * @param story The story or bug to check
      * @param epic The parent epic (may be null)
      * @param subtasks All subtasks of this story
-     * @param statusMapping The status mapping configuration
      * @return List of violations found
      */
     public List<DataQualityViolation> checkStory(
             JiraIssueEntity story,
             JiraIssueEntity epic,
-            List<JiraIssueEntity> subtasks,
-            StatusMappingConfig statusMapping
+            List<JiraIssueEntity> subtasks
     ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
@@ -168,8 +165,8 @@ public class DataQualityService {
         }
 
         // CHILD_IN_PROGRESS_EPIC_NOT - Story in progress but Epic not in Developing/E2E Testing
-        if (statusMappingService.isInProgress(story.getStatus(), statusMapping)) {
-            if (epic != null && !statusMappingService.isEpicInProgress(epic.getStatus(), statusMapping)) {
+        if (workflowConfigService.isInProgress(story.getStatus(), story.getIssueType())) {
+            if (epic != null && !workflowConfigService.isEpicInProgress(epic.getStatus())) {
                 violations.add(DataQualityViolation.of(
                         DataQualityRule.CHILD_IN_PROGRESS_EPIC_NOT,
                         Map.of("childKey", story.getIssueKey(), "epicKey", epic.getIssueKey()),
@@ -179,9 +176,9 @@ public class DataQualityService {
         }
 
         // STORY_DONE_OPEN_CHILDREN - Story is Done but has open subtasks
-        if (statusMappingService.isDone(story.getStatus(), statusMapping)) {
+        if (workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
             long openSubtasks = subtasks.stream()
-                    .filter(s -> !statusMappingService.isDone(s.getStatus(), statusMapping))
+                    .filter(s -> !workflowConfigService.isDone(s.getStatus(), s.getIssueType()))
                     .count();
             if (openSubtasks > 0) {
                 violations.add(DataQualityViolation.of(
@@ -192,14 +189,14 @@ public class DataQualityService {
         }
 
         // STORY_IN_PROGRESS_NO_SUBTASKS - Story in progress without subtasks
-        if (statusMappingService.isInProgress(story.getStatus(), statusMapping)) {
+        if (workflowConfigService.isInProgress(story.getStatus(), story.getIssueType())) {
             if (subtasks.isEmpty()) {
                 violations.add(DataQualityViolation.of(DataQualityRule.STORY_IN_PROGRESS_NO_SUBTASKS));
             }
         }
 
         // STORY_NO_SUBTASK_ESTIMATES - Story has no subtasks with estimates (not Done stories only)
-        if (!statusMappingService.isDone(story.getStatus(), statusMapping)) {
+        if (!workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
             boolean hasSubtaskEstimates = subtasks.stream()
                     .anyMatch(s -> s.getOriginalEstimateSeconds() != null && s.getOriginalEstimateSeconds() > 0);
             if (!hasSubtaskEstimates) {
@@ -242,7 +239,7 @@ public class DataQualityService {
                         if (blocker.isPresent()) {
                             JiraIssueEntity blockerIssue = blocker.get();
                             // If blocker is not done and has no time logged in subtasks, no progress
-                            if (!statusMappingService.isDone(blockerIssue.getStatus(), statusMapping)) {
+                            if (!workflowConfigService.isDone(blockerIssue.getStatus(), blockerIssue.getIssueType())) {
                                 List<JiraIssueEntity> blockerSubtasks = issueRepository.findByParentKey(blockerKey);
                                 long blockerTimeSpent = blockerSubtasks.stream()
                                         .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
@@ -269,21 +266,19 @@ public class DataQualityService {
      * @param subtask The subtask to check
      * @param story The parent story (may be null)
      * @param epic The grandparent epic (may be null)
-     * @param statusMapping The status mapping configuration
      * @return List of violations found
      */
     public List<DataQualityViolation> checkSubtask(
             JiraIssueEntity subtask,
             JiraIssueEntity story,
-            JiraIssueEntity epic,
-            StatusMappingConfig statusMapping
+            JiraIssueEntity epic
     ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
         // SUBTASK_NO_ESTIMATE - Subtask without original estimate
         if (subtask.getOriginalEstimateSeconds() == null || subtask.getOriginalEstimateSeconds() == 0) {
             // Only warn if subtask is not done
-            if (!statusMappingService.isDone(subtask.getStatus(), statusMapping)) {
+            if (!workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType())) {
                 violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_NO_ESTIMATE));
             }
         }
@@ -312,17 +307,17 @@ public class DataQualityService {
         }
 
         // SUBTASK_IN_PROGRESS_STORY_NOT - Subtask in progress but Story not in progress
-        if (statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
-            if (story != null && !statusMappingService.isInProgress(story.getStatus(), statusMapping)) {
+        if (workflowConfigService.isInProgress(subtask.getStatus(), subtask.getIssueType())) {
+            if (story != null && !workflowConfigService.isInProgress(story.getStatus(), story.getIssueType())) {
                 violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_IN_PROGRESS_STORY_NOT));
             }
         }
 
         // SUBTASK_ACTIVE_STORY_NOT_INPROGRESS - Subtask in active status but Story in TODO
-        if (statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
+        if (workflowConfigService.isInProgress(subtask.getStatus(), subtask.getIssueType())) {
             if (story != null) {
-                boolean storyIsTodo = !statusMappingService.isInProgress(story.getStatus(), statusMapping)
-                        && !statusMappingService.isDone(story.getStatus(), statusMapping);
+                boolean storyIsTodo = !workflowConfigService.isInProgress(story.getStatus(), story.getIssueType())
+                        && !workflowConfigService.isDone(story.getStatus(), story.getIssueType());
                 if (storyIsTodo) {
                     violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_ACTIVE_STORY_NOT_INPROGRESS));
                 }
@@ -330,7 +325,7 @@ public class DataQualityService {
         }
 
         // SUBTASK_DONE_NO_TIME_LOGGED - Subtask is Done but has no time logged
-        if (statusMappingService.isDone(subtask.getStatus(), statusMapping)) {
+        if (workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType())) {
             boolean noTimeLogged = subtask.getTimeSpentSeconds() == null || subtask.getTimeSpentSeconds() == 0;
             if (noTimeLogged) {
                 double estimateHours = subtask.getOriginalEstimateSeconds() != null
@@ -344,8 +339,8 @@ public class DataQualityService {
 
         // SUBTASK_TIME_LOGGED_BUT_TODO - Subtask has time logged but still in TODO status
         if (subtask.getTimeSpentSeconds() != null && subtask.getTimeSpentSeconds() > 0) {
-            boolean isTodo = !statusMappingService.isInProgress(subtask.getStatus(), statusMapping)
-                    && !statusMappingService.isDone(subtask.getStatus(), statusMapping);
+            boolean isTodo = !workflowConfigService.isInProgress(subtask.getStatus(), subtask.getIssueType())
+                    && !workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType());
             if (isTodo) {
                 double loggedHours = subtask.getTimeSpentSeconds() / 3600.0;
                 violations.add(DataQualityViolation.of(
@@ -356,8 +351,8 @@ public class DataQualityService {
         }
 
         // CHILD_IN_PROGRESS_EPIC_NOT - Subtask in progress but Epic not in Developing/E2E Testing
-        if (statusMappingService.isInProgress(subtask.getStatus(), statusMapping)) {
-            if (epic != null && !statusMappingService.isEpicInProgress(epic.getStatus(), statusMapping)) {
+        if (workflowConfigService.isInProgress(subtask.getStatus(), subtask.getIssueType())) {
+            if (epic != null && !workflowConfigService.isEpicInProgress(epic.getStatus())) {
                 violations.add(DataQualityViolation.of(
                         DataQualityRule.CHILD_IN_PROGRESS_EPIC_NOT,
                         Map.of("childKey", subtask.getIssueKey(), "epicKey", epic.getIssueKey()),
@@ -373,7 +368,7 @@ public class DataQualityService {
      * Checks if an epic has any blocking errors (severity = ERROR).
      * Epics with blocking errors should be excluded from planning.
      */
-    public boolean hasBlockingErrors(JiraIssueEntity epic, StatusMappingConfig statusMapping) {
+    public boolean hasBlockingErrors(JiraIssueEntity epic) {
         // Quick checks for blocking errors without loading children
 
         // EPIC_NO_TEAM is blocking
@@ -383,7 +378,7 @@ public class DataQualityService {
 
         // EPIC_OVERDUE is blocking
         if (epic.getDueDate() != null && epic.getDueDate().isBefore(LocalDate.now())) {
-            if (!statusMappingService.isDone(epic.getStatus(), statusMapping)) {
+            if (!workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
                 return true;
             }
         }
@@ -392,9 +387,9 @@ public class DataQualityService {
         List<JiraIssueEntity> children = issueRepository.findByParentKey(epic.getIssueKey());
 
         // EPIC_DONE_OPEN_CHILDREN is blocking
-        if (statusMappingService.isDone(epic.getStatus(), statusMapping)) {
+        if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
             boolean hasOpenChildren = children.stream()
-                    .anyMatch(c -> !statusMappingService.isDone(c.getStatus(), statusMapping));
+                    .anyMatch(c -> !workflowConfigService.isDone(c.getStatus(), c.getIssueType()));
             if (hasOpenChildren) {
                 return true;
             }

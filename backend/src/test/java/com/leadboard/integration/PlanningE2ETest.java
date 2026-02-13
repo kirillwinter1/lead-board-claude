@@ -47,8 +47,7 @@ class PlanningE2ETest extends IntegrationTestBase {
                 config.gradeCoefficients(),
                 new BigDecimal("0.25"), // 25% risk buffer
                 config.wipLimits(),
-                config.storyDuration(),
-                config.statusMapping());
+                config.storyDuration());
 
         var updateResponse = restTemplate.exchange(
                 "/api/teams/" + team.getId() + "/planning-config",
@@ -61,7 +60,7 @@ class PlanningE2ETest extends IntegrationTestBase {
         // ===== Step 3: Add team members =====
         // Add SA (Senior)
         var saRequest = new CreateTeamMemberRequest(
-                "sa-account-1", "Alex Analyst", Role.SA, Grade.SENIOR, new BigDecimal("7.0"));
+                "sa-account-1", "Alex Analyst", "SA", Grade.SENIOR, new BigDecimal("7.0"));
         var saResponse = restTemplate.postForEntity(
                 "/api/teams/" + team.getId() + "/members",
                 saRequest,
@@ -70,7 +69,7 @@ class PlanningE2ETest extends IntegrationTestBase {
 
         // Add DEV (Middle)
         var devRequest = new CreateTeamMemberRequest(
-                "dev-account-1", "Dana Developer", Role.DEV, Grade.MIDDLE, new BigDecimal("8.0"));
+                "dev-account-1", "Dana Developer", "DEV", Grade.MIDDLE, new BigDecimal("8.0"));
         restTemplate.postForEntity(
                 "/api/teams/" + team.getId() + "/members",
                 devRequest,
@@ -78,7 +77,7 @@ class PlanningE2ETest extends IntegrationTestBase {
 
         // Add DEV (Junior)
         var dev2Request = new CreateTeamMemberRequest(
-                "dev-account-2", "Junior Dev", Role.DEV, Grade.JUNIOR, new BigDecimal("6.0"));
+                "dev-account-2", "Junior Dev", "DEV", Grade.JUNIOR, new BigDecimal("6.0"));
         restTemplate.postForEntity(
                 "/api/teams/" + team.getId() + "/members",
                 dev2Request,
@@ -86,7 +85,7 @@ class PlanningE2ETest extends IntegrationTestBase {
 
         // Add QA (Middle)
         var qaRequest = new CreateTeamMemberRequest(
-                "qa-account-1", "Quinn QA", Role.QA, Grade.MIDDLE, new BigDecimal("7.0"));
+                "qa-account-1", "Quinn QA", "QA", Grade.MIDDLE, new BigDecimal("7.0"));
         restTemplate.postForEntity(
                 "/api/teams/" + team.getId() + "/members",
                 qaRequest,
@@ -94,9 +93,9 @@ class PlanningE2ETest extends IntegrationTestBase {
 
         // ===== Step 4: Create work items =====
         var epic = createEpic("E2E-PLAN-1", "Feature X", "В работе", team.getId());
-        epic.setRoughEstimateSaDays(new BigDecimal("3.0"));
-        epic.setRoughEstimateDevDays(new BigDecimal("10.0"));
-        epic.setRoughEstimateQaDays(new BigDecimal("4.0"));
+        epic.setRoughEstimate("SA", new BigDecimal("3.0"));
+        epic.setRoughEstimate("DEV", new BigDecimal("10.0"));
+        epic.setRoughEstimate("QA", new BigDecimal("4.0"));
         issueRepository.save(epic);
 
         var story = createStory("E2E-PLAN-STORY-1", "Implement Feature X", "В работе", "E2E-PLAN-1", team.getId());
@@ -141,20 +140,20 @@ class PlanningE2ETest extends IntegrationTestBase {
         var largeTeam = createTeam("Large Team");
 
         // Small team: 1 dev
-        addTeamMember(smallTeam.getId(), "small-dev-1", "Solo Dev", Role.DEV, Grade.MIDDLE, new BigDecimal("8.0"));
+        addTeamMember(smallTeam.getId(), "small-dev-1", "Solo Dev", "DEV", Grade.MIDDLE, new BigDecimal("8.0"));
 
         // Large team: 3 devs
-        addTeamMember(largeTeam.getId(), "large-dev-1", "Dev 1", Role.DEV, Grade.SENIOR, new BigDecimal("8.0"));
-        addTeamMember(largeTeam.getId(), "large-dev-2", "Dev 2", Role.DEV, Grade.MIDDLE, new BigDecimal("8.0"));
-        addTeamMember(largeTeam.getId(), "large-dev-3", "Dev 3", Role.DEV, Grade.MIDDLE, new BigDecimal("8.0"));
+        addTeamMember(largeTeam.getId(), "large-dev-1", "Dev 1", "DEV", Grade.SENIOR, new BigDecimal("8.0"));
+        addTeamMember(largeTeam.getId(), "large-dev-2", "Dev 2", "DEV", Grade.MIDDLE, new BigDecimal("8.0"));
+        addTeamMember(largeTeam.getId(), "large-dev-3", "Dev 3", "DEV", Grade.MIDDLE, new BigDecimal("8.0"));
 
         // Create same epic for both teams
         var smallEpic = createEpic("SMALL-1", "Feature", "В работе", smallTeam.getId());
-        smallEpic.setRoughEstimateDevDays(new BigDecimal("20.0"));
+        smallEpic.setRoughEstimate("DEV", new BigDecimal("20.0"));
         issueRepository.save(smallEpic);
 
         var largeEpic = createEpic("LARGE-1", "Feature", "В работе", largeTeam.getId());
-        largeEpic.setRoughEstimateDevDays(new BigDecimal("20.0"));
+        largeEpic.setRoughEstimate("DEV", new BigDecimal("20.0"));
         issueRepository.save(largeEpic);
 
         // ===== Get forecasts for both teams =====
@@ -177,7 +176,7 @@ class PlanningE2ETest extends IntegrationTestBase {
 
     // Helper method
     private TeamMemberEntity addTeamMember(Long teamId, String accountId, String name,
-                                            Role role, Grade grade, BigDecimal hoursPerDay) {
+                                            String role, Grade grade, BigDecimal hoursPerDay) {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setTeam(teamRepository.findById(teamId).orElseThrow());
         member.setJiraAccountId(accountId);

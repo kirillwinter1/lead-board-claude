@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Сервис для управления снапшотами WIP.
@@ -65,17 +67,12 @@ public class WipSnapshotService {
         snapshot.setTeamWipLimit(wipStatus.limit());
         snapshot.setTeamWipCurrent(wipStatus.current());
 
-        if (wipStatus.sa() != null) {
-            snapshot.setSaWipLimit(wipStatus.sa().limit());
-            snapshot.setSaWipCurrent(wipStatus.sa().current());
-        }
-        if (wipStatus.dev() != null) {
-            snapshot.setDevWipLimit(wipStatus.dev().limit());
-            snapshot.setDevWipCurrent(wipStatus.dev().current());
-        }
-        if (wipStatus.qa() != null) {
-            snapshot.setQaWipLimit(wipStatus.qa().limit());
-            snapshot.setQaWipCurrent(wipStatus.qa().current());
+        if (wipStatus.roleWip() != null) {
+            Map<String, WipSnapshotEntity.RoleWipEntry> roleData = new LinkedHashMap<>();
+            wipStatus.roleWip().forEach((role, wip) ->
+                roleData.put(role, new WipSnapshotEntity.RoleWipEntry(wip.limit(), wip.current()))
+            );
+            snapshot.setRoleWipData(roleData);
         }
 
         // Считаем эпики в очереди

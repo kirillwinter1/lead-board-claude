@@ -39,10 +39,10 @@
   color: #de350b;
 }
 
-/* Role Cards Grid */
+/* Role Cards Grid — auto-fit adapts to any number of roles */
 .role-load-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
 }
 
@@ -64,33 +64,9 @@
   gap: 8px;
 }
 
-.role-card-sa {
-  border-left: 4px solid #669DF1;
-}
-
-.role-card-dev {
-  border-left: 4px solid #B55FEB;
-}
-
-.role-card-qa {
-  border-left: 4px solid #6CC3E0;
-}
-
 .role-card-title {
   font-size: 18px;
   font-weight: 700;
-}
-
-.role-card-sa .role-card-title {
-  color: #1558BC;
-}
-
-.role-card-dev .role-card-title {
-  color: #803FA5;
-}
-
-.role-card-qa .role-card-title {
-  color: #206A83;
 }
 
 .role-card-members {
@@ -113,19 +89,6 @@
   height: 100%;
   border-radius: 6px;
   transition: width 0.3s ease;
-}
-
-/* Progress bar uses role color */
-.role-card-sa .role-card-bar {
-  background: #669DF1;
-}
-
-.role-card-dev .role-card-bar {
-  background: #B55FEB;
-}
-
-.role-card-qa .role-card-bar {
-  background: #6CC3E0;
 }
 
 /* Override for overload status - show red */

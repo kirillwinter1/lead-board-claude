@@ -250,7 +250,7 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("STORY-4")).thenReturn(Optional.of(story));
-            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey), anyList())).thenReturn(4);
+            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(4);
             when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
                 .thenReturn(new ArrayList<>(allStories));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -275,7 +275,7 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("STORY-1")).thenReturn(Optional.of(story));
-            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey), anyList())).thenReturn(3);
+            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(3);
             when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
                 .thenReturn(new ArrayList<>(allStories));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -334,7 +334,7 @@ class IssueOrderServiceTest {
             );
 
             when(issueRepository.findByIssueKey("BUG-1")).thenReturn(Optional.of(bug));
-            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey), anyList())).thenReturn(3);
+            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(3);
             when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
                 .thenReturn(new ArrayList<>(allStories));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -382,7 +382,7 @@ class IssueOrderServiceTest {
             String parentKey = "EPIC-1";
             JiraIssueEntity story = createStory("STORY-NEW", parentKey, null);
 
-            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey), anyList())).thenReturn(2);
+            when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(2);
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             service.assignOrderIfMissing(story);

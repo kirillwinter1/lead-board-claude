@@ -138,8 +138,13 @@ public class WorkflowConfigService {
                 linkTypeLookup.put(lm.getJiraLinkTypeName().toLowerCase(), lm.getLinkCategory());
             }
 
-            log.info("Workflow configuration loaded: {} roles, {} type mappings, {} status mappings, {} link mappings",
-                    cachedRoles.size(), typeMappings.size(), statusMappings.size(), linkMappings.size());
+            if (cachedRoles.isEmpty() && typeMappings.isEmpty()) {
+                log.warn("Workflow configuration is EMPTY — no roles or type mappings found. " +
+                        "Auto-detect will populate config on first Jira sync, or configure manually via Settings > Workflow.");
+            } else {
+                log.info("Workflow configuration loaded: {} roles, {} type mappings, {} status mappings, {} link mappings",
+                        cachedRoles.size(), typeMappings.size(), statusMappings.size(), linkMappings.size());
+            }
         } catch (Exception e) {
             log.error("Failed to load workflow configuration from DB", e);
         }

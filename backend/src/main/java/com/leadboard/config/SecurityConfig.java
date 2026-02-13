@@ -44,8 +44,9 @@ public class SecurityConfig {
                 // Health check
                 .requestMatchers("/api/health").permitAll()
 
-                // Config endpoint
+                // Config endpoints
                 .requestMatchers("/api/config").permitAll()
+                .requestMatchers("/api/config/workflow/**").permitAll()
 
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()

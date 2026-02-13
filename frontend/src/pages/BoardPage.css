@@ -335,32 +335,6 @@
   font-size: 10px;
 }
 
-.role-chip.sa {
-  background: #E9F2FE;
-  color: #1558BC;
-}
-
-.role-chip.sa .role-chip-fill {
-  background: #669DF1;
-}
-
-.role-chip.dev {
-  background: #F8EEFE;
-  color: #803FA5;
-}
-
-.role-chip.dev .role-chip-fill {
-  background: #B55FEB;
-}
-
-.role-chip.qa {
-  background: #E7F9FF;
-  color: #206A83;
-}
-
-.role-chip.qa .role-chip-fill {
-  background: #6CC3E0;
-}
 
 .role-chip.disabled {
   background: #f4f5f7;
@@ -515,30 +489,6 @@
   outline: none;
 }
 
-/* Epic role chip colors - Atlassian Design System */
-.epic-role-chip.sa {
-  color: #1558BC;
-}
-
-.epic-role-chip.sa.todo {
-  border-color: #CFE1FD;
-}
-
-.epic-role-chip.dev {
-  color: #803FA5;
-}
-
-.epic-role-chip.dev.todo {
-  border-color: #EED7FC;
-}
-
-.epic-role-chip.qa {
-  color: #206A83;
-}
-
-.epic-role-chip.qa.todo {
-  border-color: #C6EDFB;
-}
 
 /* Epic in progress - with progress bar */
 .epic-role-chip.in-progress {
@@ -580,17 +530,6 @@
   transition: width 0.3s ease;
 }
 
-.epic-role-chip.sa .epic-role-progress-fill {
-  background: #669DF1;
-}
-
-.epic-role-chip.dev .epic-role-progress-fill {
-  background: #B55FEB;
-}
-
-.epic-role-chip.qa .epic-role-progress-fill {
-  background: #6CC3E0;
-}
 
 .epic-role-progress-fill.overburn {
   background: #de350b;
@@ -650,17 +589,6 @@
   opacity: 0.8;
 }
 
-.epic-role-chip.sa.rough-only {
-  border-color: #a5c8ff;
-}
-
-.epic-role-chip.dev.rough-only {
-  border-color: #d4a5f7;
-}
-
-.epic-role-chip.qa.rough-only {
-  border-color: #a5e0ed;
-}
 
 .epic-role-times.warning {
   justify-content: center;
@@ -819,20 +747,6 @@
   font-size: 10px;
 }
 
-.phase-label.sa {
-  background: #e3f2fd;
-  color: #0d47a1;
-}
-
-.phase-label.dev {
-  background: #e8f5e9;
-  color: #1b5e20;
-}
-
-.phase-label.qa {
-  background: #fff3e0;
-  color: #e65100;
-}
 
 .phase-dates {
   flex: 1;

@@ -61,12 +61,10 @@ public record PokerMessage(
         ));
     }
 
-    public static PokerMessage storyCompleted(Long storyId, Integer saHours, Integer devHours, Integer qaHours) {
+    public static PokerMessage storyCompleted(Long storyId, Map<String, Integer> finalEstimates) {
         return new PokerMessage(TYPE_STORY_COMPLETED, Map.of(
                 "storyId", storyId,
-                "finalSaHours", saHours != null ? saHours : 0,
-                "finalDevHours", devHours != null ? devHours : 0,
-                "finalQaHours", qaHours != null ? qaHours : 0
+                "finalEstimates", finalEstimates != null ? finalEstimates : Map.of()
         ));
     }
 

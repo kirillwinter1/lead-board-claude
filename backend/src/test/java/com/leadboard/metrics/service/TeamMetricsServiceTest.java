@@ -48,9 +48,9 @@ class TeamMetricsServiceTest {
 
         Timestamp periodStart = Timestamp.valueOf("2024-01-01 00:00:00");
         List<Object[]> mockData = Arrays.asList(
-                new Object[]{periodStart, "Story", 5L},
-                new Object[]{periodStart, "Epic", 2L},
-                new Object[]{Timestamp.valueOf("2024-01-08 00:00:00"), "Story", 3L}
+                new Object[]{periodStart, "STORY", 5L},
+                new Object[]{periodStart, "EPIC", 2L},
+                new Object[]{Timestamp.valueOf("2024-01-08 00:00:00"), "STORY", 3L}
         );
 
         when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))

@@ -1,6 +1,6 @@
 # F29: Workflow Configuration
 
-## Статус: ✅ Реализовано (2026-02-13)
+## Статус: ✅ Done (2026-02-13)
 
 ## Описание
 
@@ -88,6 +88,24 @@ GET    /api/admin/jira-metadata/link-types     — связи из Jira
 - `quality/DataQualityService.java` — WorkflowConfigService
 - `planning/AutoScoreCalculator.java` — score weights из конфигурации
 - `status/StatusMappingService.java` — фасад к WorkflowConfigService
+
+### Фаза 5: Frontend UI
+- **WorkflowConfigPage** (`/board/workflow`) — страница с 4 табами:
+  - **Roles** — код, название, цвет (color picker), порядок, default
+  - **Issue Types** — Jira тип → BoardCategory, роль (для SUBTASK)
+  - **Statuses** — Jira статус → StatusCategory, фильтр по issueCategory, scoreWeight
+  - **Link Types** — Jira link type → LinkCategory
+- Inline-редактирование в таблицах, Add/Delete строк, Save по табу
+- Кнопка Validate — показывает ошибки и предупреждения
+- Ссылка из Settings page
+- Доступно только для ADMIN
+
+### Frontend файлы
+- `frontend/src/api/workflowConfig.ts` — API клиент с TypeScript интерфейсами
+- `frontend/src/pages/WorkflowConfigPage.tsx` — страница конфигурации
+- `frontend/src/pages/WorkflowConfigPage.css` — стили
+- `frontend/src/App.tsx` — роут `/board/workflow`
+- `frontend/src/pages/SettingsPage.tsx` — ссылка на Workflow Configuration
 
 ## Тесты
 

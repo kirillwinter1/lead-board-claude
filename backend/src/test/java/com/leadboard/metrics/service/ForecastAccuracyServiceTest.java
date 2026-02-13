@@ -1,14 +1,12 @@
 package com.leadboard.metrics.service;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.forecast.entity.ForecastSnapshotEntity;
 import com.leadboard.forecast.repository.ForecastSnapshotRepository;
 import com.leadboard.metrics.dto.ForecastAccuracyResponse;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
-import com.leadboard.status.WorkflowConfig;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,7 +48,7 @@ class ForecastAccuracyServiceTest {
     private StatusChangelogRepository statusChangelogRepository;
 
     @Mock
-    private StatusMappingService statusMappingService;
+    private WorkflowConfigService workflowConfigService;
 
     private ForecastAccuracyService forecastAccuracyService;
 
@@ -61,12 +59,8 @@ class ForecastAccuracyServiceTest {
                 issueRepository,
                 workCalendarService,
                 statusChangelogRepository,
-                statusMappingService
+                workflowConfigService
         );
-
-        // Setup default status mapping config
-        StatusMappingConfig config = StatusMappingConfig.defaults();
-        when(statusMappingService.getDefaultConfig()).thenReturn(config);
     }
 
     // ==================== calculateAccuracy() Tests ====================

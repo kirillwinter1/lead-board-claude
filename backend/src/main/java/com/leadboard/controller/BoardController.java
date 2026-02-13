@@ -5,8 +5,6 @@ import com.leadboard.board.BoardService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.AutoScoreService;
 import com.leadboard.planning.StoryAutoScoreService;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.http.ResponseEntity;
@@ -29,20 +27,17 @@ public class BoardController {
     private final BoardService boardService;
     private final AutoScoreService autoScoreService;
     private final StoryAutoScoreService storyAutoScoreService;
-    private final StatusMappingService statusMappingService;
     private final WorkflowConfigService workflowConfigService;
     private final JiraIssueRepository issueRepository;
 
     public BoardController(BoardService boardService,
                           AutoScoreService autoScoreService,
                           StoryAutoScoreService storyAutoScoreService,
-                          StatusMappingService statusMappingService,
                           WorkflowConfigService workflowConfigService,
                           JiraIssueRepository issueRepository) {
         this.boardService = boardService;
         this.autoScoreService = autoScoreService;
         this.storyAutoScoreService = storyAutoScoreService;
-        this.statusMappingService = statusMappingService;
         this.workflowConfigService = workflowConfigService;
         this.issueRepository = issueRepository;
     }
@@ -88,8 +83,7 @@ public class BoardController {
             }
         } else {
             // Story or Bug - use StoryAutoScoreService
-            StatusMappingConfig teamConfig = statusMappingService.getDefaultConfig();
-            Map<String, BigDecimal> breakdown = storyAutoScoreService.calculateScoreBreakdown(issue, teamConfig);
+            Map<String, BigDecimal> breakdown = storyAutoScoreService.calculateScoreBreakdown(issue);
             response.put("breakdown", breakdown);
         }
 

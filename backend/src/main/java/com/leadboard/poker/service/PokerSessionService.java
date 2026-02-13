@@ -1,16 +1,15 @@
 package com.leadboard.poker.service;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
 import com.leadboard.poker.entity.PokerSessionEntity.SessionStatus;
 import com.leadboard.poker.entity.PokerStoryEntity;
 import com.leadboard.poker.entity.PokerStoryEntity.StoryStatus;
 import com.leadboard.poker.entity.PokerVoteEntity;
-import com.leadboard.poker.entity.PokerVoteEntity.VoterRole;
 import com.leadboard.poker.repository.PokerSessionRepository;
 import com.leadboard.poker.repository.PokerStoryRepository;
 import com.leadboard.poker.repository.PokerVoteRepository;
-import com.leadboard.team.Role;
 import com.leadboard.team.TeamMemberRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +32,7 @@ public class PokerSessionService {
     private final PokerStoryRepository storyRepository;
     private final PokerVoteRepository voteRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final WorkflowConfigService workflowConfigService;
 
     // In-memory tracking of online participants per room
     private final Map<String, Map<String, ParticipantInfo>> roomParticipants = new ConcurrentHashMap<>();
@@ -41,11 +41,13 @@ public class PokerSessionService {
             PokerSessionRepository sessionRepository,
             PokerStoryRepository storyRepository,
             PokerVoteRepository voteRepository,
-            TeamMemberRepository teamMemberRepository) {
+            TeamMemberRepository teamMemberRepository,
+            WorkflowConfigService workflowConfigService) {
         this.sessionRepository = sessionRepository;
         this.storyRepository = storyRepository;
         this.voteRepository = voteRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     // ===== Session Management =====
@@ -127,9 +129,7 @@ public class PokerSessionService {
         story.setSession(session);
         story.setTitle(request.title());
         story.setStoryKey(request.existingStoryKey());
-        story.setNeedsSa(request.needsSa());
-        story.setNeedsDev(request.needsDev());
-        story.setNeedsQa(request.needsQa());
+        story.setNeedsRoles(request.needsRoles());
         story.setOrderIndex(maxOrder + 1);
         story.setStatus(StoryStatus.PENDING);
 
@@ -157,7 +157,7 @@ public class PokerSessionService {
     // ===== Voting =====
 
     @Transactional
-    public PokerVoteEntity castVote(Long storyId, String voterAccountId, String voterDisplayName, VoterRole role, Integer hours) {
+    public PokerVoteEntity castVote(Long storyId, String voterAccountId, String voterDisplayName, String role, Integer hours) {
         PokerStoryEntity story = storyRepository.findById(storyId)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
 
@@ -166,12 +166,7 @@ public class PokerSessionService {
         }
 
         // Check if role is needed for this story
-        boolean roleNeeded = switch (role) {
-            case SA -> story.isNeedsSa();
-            case DEV -> story.isNeedsDev();
-            case QA -> story.isNeedsQa();
-        };
-        if (!roleNeeded) {
+        if (!story.needsRole(role)) {
             throw new IllegalArgumentException("This role is not needed for this story");
         }
 
@@ -206,13 +201,11 @@ public class PokerSessionService {
     }
 
     @Transactional
-    public PokerStoryEntity setFinalEstimate(Long storyId, Integer saHours, Integer devHours, Integer qaHours) {
+    public PokerStoryEntity setFinalEstimate(Long storyId, Map<String, Integer> finalEstimates) {
         PokerStoryEntity story = storyRepository.findById(storyId)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
 
-        story.setFinalSaHours(saHours);
-        story.setFinalDevHours(devHours);
-        story.setFinalQaHours(qaHours);
+        story.setFinalEstimates(finalEstimates);
         story.setStatus(StoryStatus.COMPLETED);
 
         return storyRepository.save(story);
@@ -257,17 +250,9 @@ public class PokerSessionService {
         return participants != null ? List.copyOf(participants.values()) : List.of();
     }
 
-    public Optional<VoterRole> getParticipantRole(Long teamId, String accountId) {
+    public Optional<String> getParticipantRole(Long teamId, String accountId) {
         return teamMemberRepository.findByTeamIdAndJiraAccountId(teamId, accountId)
-                .map(member -> mapRoleToVoterRole(member.getRole()));
-    }
-
-    private VoterRole mapRoleToVoterRole(Role role) {
-        return switch (role) {
-            case SA -> VoterRole.SA;
-            case DEV -> VoterRole.DEV;
-            case QA -> VoterRole.QA;
-        };
+                .map(member -> member.getRole());
     }
 
     // ===== Session State =====

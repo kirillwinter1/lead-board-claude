@@ -28,7 +28,7 @@
 | F24 | Team Metrics v2 (5 визуализаций) | 2026-02-04 | [features/F24](features/F24_TEAM_METRICS_V2.md) |
 | F27 | RBAC | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
 | F28 | AI Simulation | 2026-02-08 | [features/F28](features/F28_SIMULATION.md) |
-| F29 | Workflow Configuration | 2026-02-13 | [features/F29](features/F29_WORKFLOW_CONFIGURATION.md) |
+| F29 | Workflow Configuration | 🚧 В работе | [features/F29](features/F29_WORKFLOW_CONFIGURATION.md) |
 
 ## Бэклог (BF)
 
@@ -42,7 +42,7 @@
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |
-| BF9 | Universal Workflow Configuration | ✅ Done → [F29](features/F29_WORKFLOW_CONFIGURATION.md) | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
+| BF9 | Universal Workflow Configuration | 🚧 В работе → [F29](features/F29_WORKFLOW_CONFIGURATION.md) | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
 | BF11 | Competency Matrix | 📋 Planned | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
 | BF12 | Sprint Integration | 📋 Planned | [backlog/BF12](backlog/BF12_SPRINT_INTEGRATION.md) |

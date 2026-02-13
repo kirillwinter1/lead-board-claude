@@ -9,8 +9,6 @@ import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedEpic;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedStory;
 import com.leadboard.quality.DataQualityService;
 import com.leadboard.quality.DataQualityViolation;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamRepository;
@@ -34,13 +32,12 @@ public class BoardService {
     private final TeamRepository teamRepository;
     private final RoughEstimateProperties roughEstimateProperties;
     private final DataQualityService dataQualityService;
-    private final StatusMappingService statusMappingService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final WorkflowConfigService workflowConfigService;
 
     public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties,
                         TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
-                        DataQualityService dataQualityService, StatusMappingService statusMappingService,
+                        DataQualityService dataQualityService,
                         UnifiedPlanningService unifiedPlanningService,
                         WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
@@ -48,7 +45,6 @@ public class BoardService {
         this.teamRepository = teamRepository;
         this.roughEstimateProperties = roughEstimateProperties;
         this.dataQualityService = dataQualityService;
-        this.statusMappingService = statusMappingService;
         this.unifiedPlanningService = unifiedPlanningService;
         this.workflowConfigService = workflowConfigService;
     }
@@ -155,8 +151,7 @@ public class BoardService {
                 aggregateProgress(epic);
             }
 
-            StatusMappingConfig statusMapping = statusMappingService.getDefaultConfig();
-            addDataQualityAlerts(filteredEpics, stories, subtasks, issueMap, epicMap, storyMap, statusMapping);
+            addDataQualityAlerts(filteredEpics, stories, subtasks, issueMap, epicMap, storyMap);
 
             // Sort children within each epic by manualOrder
             for (BoardNode epic : epicMap.values()) {
@@ -235,20 +230,12 @@ public class BoardService {
             boolean epicInTodo = workflowConfigService.isAllowedForRoughEstimate(entity.getStatus());
             node.setEpicInTodo(epicInTodo);
 
-            // Legacy fields (for frontend backward compat)
-            node.setRoughEstimateSaDays(entity.getRoughEstimateSaDays());
-            node.setRoughEstimateDevDays(entity.getRoughEstimateDevDays());
-            node.setRoughEstimateQaDays(entity.getRoughEstimateQaDays());
-
-            // New dynamic rough estimates
+            // Dynamic rough estimates
             node.setRoughEstimates(entity.getRoughEstimates());
 
             if (epicInTodo) {
-                BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
-                roleProgress.setAnalytics(new BoardNode.RoleMetrics(0, 0, entity.getRoughEstimateSaDays()));
-                roleProgress.setDevelopment(new BoardNode.RoleMetrics(0, 0, entity.getRoughEstimateDevDays()));
-                roleProgress.setTesting(new BoardNode.RoleMetrics(0, 0, entity.getRoughEstimateQaDays()));
-                node.setRoleProgress(roleProgress);
+                Map<String, BoardNode.RoleMetrics> roleProgressMap = buildRoleProgressFromRoughEstimates(entity);
+                node.setRoleProgress(roleProgressMap);
 
                 long roughEstimateSeconds = 0;
                 if (entity.getRoughEstimates() != null) {
@@ -316,8 +303,7 @@ public class BoardService {
             return;
         }
 
-        // Aggregate from children by role
-        // Use dynamic role codes from WorkflowConfigService
+        // Aggregate from children by role using dynamic role codes
         List<String> roleCodes = workflowConfigService.getRoleCodesInPipelineOrder();
         Map<String, long[]> roleMetrics = new LinkedHashMap<>(); // roleCode -> [estimate, logged]
         for (String code : roleCodes) {
@@ -329,22 +315,20 @@ public class BoardService {
         for (BoardNode child : node.getChildren()) {
             aggregateProgress(child);
 
-            if (child.getRoleProgress() != null && !workflowConfigService.isEpic(child.getIssueType())) {
-                // Legacy aggregation from RoleProgress
-                BoardNode.RoleProgress rp = child.getRoleProgress();
-                addToRoleMetrics(roleMetrics, "SA", rp.getAnalytics());
-                addToRoleMetrics(roleMetrics, "DEV", rp.getDevelopment());
-                addToRoleMetrics(roleMetrics, "QA", rp.getTesting());
+            if (child.getRoleProgress() != null && !child.getRoleProgress().isEmpty()
+                    && !workflowConfigService.isEpic(child.getIssueType())) {
+                // Aggregate from child's dynamic roleProgressMap
+                for (Map.Entry<String, BoardNode.RoleMetrics> entry : child.getRoleProgress().entrySet()) {
+                    addToRoleMetrics(roleMetrics, entry.getKey(), entry.getValue());
+                }
             } else if (child.getRole() != null) {
-                // Map subtask role to our role codes
-                String roleCode = mapSubtaskRoleToCode(child.getRole());
+                // Direct subtask: role is already a code from workflowConfigService.getSubtaskRole()
+                String roleCode = child.getRole();
                 long est = child.getEstimateSeconds() != null ? child.getEstimateSeconds() : 0;
                 long lg = child.getLoggedSeconds() != null ? child.getLoggedSeconds() : 0;
-                long[] metrics = roleMetrics.get(roleCode);
-                if (metrics != null) {
-                    metrics[0] += est;
-                    metrics[1] += lg;
-                }
+                long[] metrics = roleMetrics.computeIfAbsent(roleCode, k -> new long[]{0, 0});
+                metrics[0] += est;
+                metrics[1] += lg;
             }
 
             if (child.getLoggedSeconds() != null) {
@@ -358,17 +342,12 @@ public class BoardService {
             if (totalEstimate > 0) {
                 node.setEstimateSeconds(totalEstimate);
                 node.setLoggedSeconds(totalLogged);
-                node.setProgress(totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0);
+                node.setProgress((int) Math.min(100, (totalLogged * 100) / totalEstimate));
 
-                BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
-                long[] sa = roleMetrics.getOrDefault("SA", new long[]{0, 0});
-                long[] dev = roleMetrics.getOrDefault("DEV", new long[]{0, 0});
-                long[] qa = roleMetrics.getOrDefault("QA", new long[]{0, 0});
-                roleProgress.setAnalytics(new BoardNode.RoleMetrics(sa[0], sa[1], null));
-                roleProgress.setDevelopment(new BoardNode.RoleMetrics(dev[0], dev[1], null));
-                roleProgress.setTesting(new BoardNode.RoleMetrics(qa[0], qa[1], null));
-                node.setRoleProgress(roleProgress);
-            } else if (node.getRoleProgress() != null) {
+                Map<String, BoardNode.RoleMetrics> roleProgressMap = buildDynamicRoleProgressMap(roleMetrics, null);
+                node.setRoleProgress(roleProgressMap);
+            } else if (node.getRoleProgress() != null && !node.getRoleProgress().isEmpty()) {
+                // Rough estimates already set on the node, just update logged
                 node.setLoggedSeconds(totalLogged);
                 Long estimate = node.getEstimateSeconds();
                 if (estimate != null && estimate > 0) {
@@ -382,41 +361,44 @@ public class BoardService {
             node.setLoggedSeconds(totalLogged);
             node.setProgress(totalEstimate > 0 ? (int) Math.min(100, (totalLogged * 100) / totalEstimate) : 0);
 
-            BoardNode.RoleProgress roleProgress = new BoardNode.RoleProgress();
-            long[] sa = roleMetrics.getOrDefault("SA", new long[]{0, 0});
-            long[] dev = roleMetrics.getOrDefault("DEV", new long[]{0, 0});
-            long[] qa = roleMetrics.getOrDefault("QA", new long[]{0, 0});
-
-            if (isEpic) {
-                roleProgress.setAnalytics(new BoardNode.RoleMetrics(sa[0], sa[1], node.getRoughEstimateSaDays()));
-                roleProgress.setDevelopment(new BoardNode.RoleMetrics(dev[0], dev[1], node.getRoughEstimateDevDays()));
-                roleProgress.setTesting(new BoardNode.RoleMetrics(qa[0], qa[1], node.getRoughEstimateQaDays()));
-            } else {
-                roleProgress.setAnalytics(new BoardNode.RoleMetrics(sa[0], sa[1]));
-                roleProgress.setDevelopment(new BoardNode.RoleMetrics(dev[0], dev[1]));
-                roleProgress.setTesting(new BoardNode.RoleMetrics(qa[0], qa[1]));
-            }
-            node.setRoleProgress(roleProgress);
+            Map<String, BigDecimal> roughEstimates = isEpic ? node.getRoughEstimates() : null;
+            Map<String, BoardNode.RoleMetrics> roleProgressMap = buildDynamicRoleProgressMap(roleMetrics, roughEstimates);
+            node.setRoleProgress(roleProgressMap);
         }
+    }
+
+    private Map<String, BoardNode.RoleMetrics> buildRoleProgressFromRoughEstimates(JiraIssueEntity entity) {
+        Map<String, BigDecimal> roughEst = entity.getRoughEstimates();
+        Map<String, BoardNode.RoleMetrics> roleProgressMap = new LinkedHashMap<>();
+        for (var role : workflowConfigService.getRolesInPipelineOrder()) {
+            BigDecimal days = roughEst != null ? roughEst.get(role.getCode()) : null;
+            roleProgressMap.put(role.getCode(),
+                    new BoardNode.RoleMetrics(0, 0, days, role.getDisplayName(), role.getColor()));
+        }
+        return roleProgressMap;
+    }
+
+    private Map<String, BoardNode.RoleMetrics> buildDynamicRoleProgressMap(
+            Map<String, long[]> roleMetrics, Map<String, BigDecimal> roughEstimates) {
+        Map<String, BoardNode.RoleMetrics> result = new LinkedHashMap<>();
+        for (Map.Entry<String, long[]> entry : roleMetrics.entrySet()) {
+            String code = entry.getKey();
+            long[] m = entry.getValue();
+            BigDecimal roughDays = roughEstimates != null ? roughEstimates.get(code) : null;
+            if (roughDays != null) {
+                result.put(code, new BoardNode.RoleMetrics(m[0], m[1], roughDays));
+            } else {
+                result.put(code, new BoardNode.RoleMetrics(m[0], m[1]));
+            }
+        }
+        return result;
     }
 
     private void addToRoleMetrics(Map<String, long[]> roleMetrics, String roleCode, BoardNode.RoleMetrics rm) {
         if (rm == null) return;
-        long[] metrics = roleMetrics.get(roleCode);
-        if (metrics != null) {
-            metrics[0] += rm.getEstimateSeconds();
-            metrics[1] += rm.getLoggedSeconds();
-        }
-    }
-
-    private String mapSubtaskRoleToCode(String subtaskRole) {
-        if (subtaskRole == null) return "DEV";
-        // Map legacy role names to codes
-        return switch (subtaskRole.toUpperCase()) {
-            case "ANALYTICS", "SA" -> "SA";
-            case "TESTING", "QA" -> "QA";
-            default -> "DEV";
-        };
+        long[] metrics = roleMetrics.computeIfAbsent(roleCode, k -> new long[]{0, 0});
+        metrics[0] += rm.getEstimateSeconds();
+        metrics[1] += rm.getLoggedSeconds();
     }
 
     private void enrichStoriesWithForecast(Map<String, BoardNode> epicMap) {
@@ -451,16 +433,12 @@ public class BoardService {
                     child.setExpectedDone(planned.endDate());
 
                     if (child.getAssigneeDisplayName() == null && planned.phases() != null) {
-                        var phases = planned.phases();
-                        if (phases.sa() != null && phases.sa().assigneeDisplayName() != null) {
-                            child.setAssigneeAccountId(phases.sa().assigneeAccountId());
-                            child.setAssigneeDisplayName(phases.sa().assigneeDisplayName());
-                        } else if (phases.dev() != null && phases.dev().assigneeDisplayName() != null) {
-                            child.setAssigneeAccountId(phases.dev().assigneeAccountId());
-                            child.setAssigneeDisplayName(phases.dev().assigneeDisplayName());
-                        } else if (phases.qa() != null && phases.qa().assigneeDisplayName() != null) {
-                            child.setAssigneeAccountId(phases.qa().assigneeAccountId());
-                            child.setAssigneeDisplayName(phases.qa().assigneeDisplayName());
+                        for (var phase : planned.phases().values()) {
+                            if (phase != null && phase.assigneeDisplayName() != null) {
+                                child.setAssigneeAccountId(phase.assigneeAccountId());
+                                child.setAssigneeDisplayName(phase.assigneeDisplayName());
+                                break;
+                            }
                         }
                     }
                 }
@@ -474,8 +452,7 @@ public class BoardService {
             List<JiraIssueEntity> subtasks,
             Map<String, JiraIssueEntity> issueMap,
             Map<String, BoardNode> epicMap,
-            Map<String, BoardNode> storyMap,
-            StatusMappingConfig statusMapping
+            Map<String, BoardNode> storyMap
     ) {
         Map<String, List<JiraIssueEntity>> childrenByParent = new HashMap<>();
         Map<String, List<JiraIssueEntity>> subtasksByParent = new HashMap<>();
@@ -496,7 +473,7 @@ public class BoardService {
             if (epicNode == null) continue;
 
             List<JiraIssueEntity> children = childrenByParent.getOrDefault(epic.getIssueKey(), List.of());
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, children, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, children);
             epicNode.addAlerts(violations);
         }
 
@@ -506,12 +483,12 @@ public class BoardService {
 
             JiraIssueEntity epic = story.getParentKey() != null ? issueMap.get(story.getParentKey()) : null;
             List<JiraIssueEntity> storySubtasks = subtasksByParent.getOrDefault(story.getIssueKey(), List.of());
-            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, storySubtasks, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, storySubtasks);
             storyNode.addAlerts(violations);
 
             for (JiraIssueEntity subtask : storySubtasks) {
                 List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(
-                        subtask, story, epic, statusMapping);
+                        subtask, story, epic);
                 for (BoardNode child : storyNode.getChildren()) {
                     if (child.getIssueKey().equals(subtask.getIssueKey())) {
                         child.addAlerts(subtaskViolations);

@@ -133,7 +133,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
         var memberRequest = new CreateTeamMemberRequest(
                 "jira-account-123",
                 "John Developer",
-                Role.DEV,
+                "DEV",
                 Grade.SENIOR,
                 new BigDecimal("7.0"));
 
@@ -145,7 +145,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
         // Then
         assertEquals(HttpStatus.CREATED, addResponse.getStatusCode());
         assertEquals("John Developer", addResponse.getBody().displayName());
-        assertEquals(Role.DEV, addResponse.getBody().role());
+        assertEquals("DEV", addResponse.getBody().role());
         assertEquals(Grade.SENIOR, addResponse.getBody().grade());
 
         // When - list members
@@ -163,12 +163,12 @@ class TeamIntegrationTest extends IntegrationTestBase {
     void shouldUpdateTeamMember() {
         // Given
         var team = createTeam("QA Team");
-        var member = createTeamMember(team.getId(), "account-456", "Jane Tester", Role.QA, Grade.MIDDLE);
+        var member = createTeamMember(team.getId(), "account-456", "Jane Tester", "QA", Grade.MIDDLE);
 
         // When
         var updateRequest = new UpdateTeamMemberRequest(
                 "Jane Senior Tester",
-                Role.QA,
+                "QA",
                 Grade.SENIOR,
                 new BigDecimal("8.0"));
 
@@ -189,7 +189,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
     void shouldDeactivateTeamMember() {
         // Given
         var team = createTeam("Analytics Team");
-        var member = createTeamMember(team.getId(), "account-789", "Alex Analyst", Role.SA, Grade.MIDDLE);
+        var member = createTeamMember(team.getId(), "account-789", "Alex Analyst", "SA", Grade.MIDDLE);
 
         // When
         var response = restTemplate.postForEntity(
@@ -230,8 +230,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
                 config.gradeCoefficients(),
                 new BigDecimal("0.3"), // increased risk buffer
                 config.wipLimits(),
-                config.storyDuration(),
-                config.statusMapping());
+                config.storyDuration());
 
         var updateResponse = restTemplate.exchange(
                 "/api/teams/" + team.getId() + "/planning-config",
@@ -246,7 +245,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
 
     // ========== Helper Methods ==========
 
-    private TeamMemberEntity createTeamMember(Long teamId, String accountId, String name, Role role, Grade grade) {
+    private TeamMemberEntity createTeamMember(Long teamId, String accountId, String name, String role, Grade grade) {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setTeam(teamRepository.findById(teamId).orElseThrow());
         member.setJiraAccountId(accountId);

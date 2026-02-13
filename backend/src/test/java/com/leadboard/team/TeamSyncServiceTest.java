@@ -258,7 +258,7 @@ class TeamSyncServiceTest {
 
             assertEquals("John Doe", captor.getValue().getDisplayName());
             assertEquals("account-123", captor.getValue().getJiraAccountId());
-            assertEquals(Role.DEV, captor.getValue().getRole()); // Default
+            assertEquals("DEV", captor.getValue().getRole()); // Default
             assertEquals(Grade.MIDDLE, captor.getValue().getGrade()); // Default
         }
 

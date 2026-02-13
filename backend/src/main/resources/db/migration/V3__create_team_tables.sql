@@ -21,7 +21,6 @@ CREATE TABLE team_members (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_hours_per_day CHECK (hours_per_day > 0 AND hours_per_day <= 12),
-    CONSTRAINT chk_role CHECK (role IN ('SA', 'DEV', 'QA')),
     CONSTRAINT chk_grade CHECK (grade IN ('JUNIOR', 'MIDDLE', 'SENIOR'))
 );
 

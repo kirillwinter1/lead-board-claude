@@ -15,7 +15,7 @@ export interface TeamMember {
   teamId: number
   jiraAccountId: string
   displayName: string | null
-  role: 'SA' | 'DEV' | 'QA'
+  role: string
   grade: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
   hoursPerDay: number
   active: boolean
@@ -36,14 +36,14 @@ export interface UpdateTeamRequest {
 export interface CreateTeamMemberRequest {
   jiraAccountId: string
   displayName?: string
-  role?: 'SA' | 'DEV' | 'QA'
+  role?: string
   grade?: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
   hoursPerDay?: number
 }
 
 export interface UpdateTeamMemberRequest {
   displayName?: string
-  role?: 'SA' | 'DEV' | 'QA'
+  role?: string
   grade?: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
   hoursPerDay?: number
 }
@@ -67,15 +67,11 @@ export interface GradeCoefficients {
 
 export interface WipLimits {
   team: number
-  sa: number
-  dev: number
-  qa: number
+  roleLimits: Record<string, number>
 }
 
 export interface StoryDuration {
-  sa: number
-  dev: number
-  qa: number
+  roleDurations: Record<string, number>
 }
 
 export interface PlanningConfig {

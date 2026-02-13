@@ -61,9 +61,9 @@ public class TeamMetricsService {
         List<PeriodThroughput> byPeriod = periodMap.entrySet().stream()
                 .map(e -> {
                     Map<String, Integer> counts = e.getValue();
-                    int epics = counts.getOrDefault("Epic", 0);
-                    int stories = counts.getOrDefault("Story", 0);
-                    int subtasks = counts.getOrDefault("Sub-task", 0);
+                    int epics = counts.getOrDefault("EPIC", 0);
+                    int stories = counts.getOrDefault("STORY", 0);
+                    int subtasks = counts.getOrDefault("SUBTASK", 0);
                     return new PeriodThroughput(
                             e.getKey(),
                             e.getKey().plusDays(6),

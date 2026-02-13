@@ -18,37 +18,39 @@ interface Alert {
   message: string
 }
 
-const mockData = {
-  periodDays: 30,
-  sa: {
+const mockRoles: Record<string, RoleInfo> = {
+  SA: {
     memberCount: 2,
     utilizationPercent: 64,
     status: 'NORMAL' as UtilizationStatus,
     assignedHours: 238,
     capacityHours: 372
   },
-  dev: {
+  DEV: {
     memberCount: 1,
     utilizationPercent: 100,
     status: 'OVERLOAD' as UtilizationStatus,
     assignedHours: 187,
     capacityHours: 186
   },
-  qa: {
+  QA: {
     memberCount: 3,
     utilizationPercent: 34,
     status: 'IDLE' as UtilizationStatus,
     assignedHours: 192,
     capacityHours: 567
-  },
-  alerts: [
-    { type: 'ROLE_OVERLOAD' as const, message: 'DEV перегружены: 100.4%' },
-    { type: 'ROLE_IDLE' as const, message: 'QA недозагружены: 33.6%' },
-    { type: 'IMBALANCE' as const, message: 'Дисбаланс нагрузки: DEV (100%) vs QA (34%)' }
-  ]
+  }
 }
 
-function RoleCard({ role, info }: { role: 'SA' | 'DEV' | 'QA'; info: RoleInfo }) {
+const mockAlerts: Alert[] = [
+  { type: 'ROLE_OVERLOAD' as const, message: 'DEV перегружены: 100.4%' },
+  { type: 'ROLE_IDLE' as const, message: 'QA недозагружены: 33.6%' },
+  { type: 'IMBALANCE' as const, message: 'Дисбаланс нагрузки: DEV (100%) vs QA (34%)' }
+]
+
+const mockPeriodDays = 30
+
+function RoleCard({ role, info }: { role: string; info: RoleInfo }) {
   const statusLabel = {
     NORMAL: 'Норма',
     OVERLOAD: 'Перегрузка',
@@ -105,17 +107,17 @@ export function DemoRoleLoad() {
     <div className="demo-role-load-block">
       <div className="demo-role-load-header">
         <h3>Загрузка по ролям</h3>
-        <span className="demo-role-load-period">{mockData.periodDays} рабочих дней</span>
+        <span className="demo-role-load-period">{mockPeriodDays} рабочих дней</span>
       </div>
 
       <div className="demo-role-load-cards">
-        <RoleCard role="SA" info={mockData.sa} />
-        <RoleCard role="DEV" info={mockData.dev} />
-        <RoleCard role="QA" info={mockData.qa} />
+        {Object.entries(mockRoles).map(([role, info]) => (
+          <RoleCard key={role} role={role} info={info} />
+        ))}
       </div>
 
       <div className="demo-role-load-alerts">
-        {mockData.alerts.map((alert, index) => (
+        {mockAlerts.map((alert, index) => (
           <AlertBadge key={index} alert={alert} />
         ))}
       </div>

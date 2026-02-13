@@ -108,7 +108,7 @@ public class TeamService {
         member.setTeam(team);
         member.setJiraAccountId(request.jiraAccountId());
         member.setDisplayName(request.displayName());
-        member.setRole(request.role() != null ? request.role() : Role.DEV);
+        member.setRole(request.role() != null ? request.role() : "DEV");
         member.setGrade(request.grade() != null ? request.grade() : Grade.MIDDLE);
         if (request.hoursPerDay() != null) {
             member.setHoursPerDay(request.hoursPerDay());
@@ -217,14 +217,13 @@ public class TeamService {
             if (wip.team() != null && wip.team() < 1) {
                 throw new InvalidPlanningConfigException("Team WIP limit must be at least 1");
             }
-            if (wip.sa() != null && wip.sa() < 1) {
-                throw new InvalidPlanningConfigException("SA WIP limit must be at least 1");
-            }
-            if (wip.dev() != null && wip.dev() < 1) {
-                throw new InvalidPlanningConfigException("DEV WIP limit must be at least 1");
-            }
-            if (wip.qa() != null && wip.qa() < 1) {
-                throw new InvalidPlanningConfigException("QA WIP limit must be at least 1");
+            if (wip.roleLimits() != null) {
+                for (var entry : wip.roleLimits().entrySet()) {
+                    if (entry.getValue() != null && entry.getValue() < 1) {
+                        throw new InvalidPlanningConfigException(
+                                entry.getKey() + " WIP limit must be at least 1");
+                    }
+                }
             }
         }
     }

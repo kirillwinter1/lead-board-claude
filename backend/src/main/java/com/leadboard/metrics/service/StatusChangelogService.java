@@ -1,8 +1,8 @@
 package com.leadboard.metrics.service;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,12 +19,12 @@ public class StatusChangelogService {
     private static final Logger log = LoggerFactory.getLogger(StatusChangelogService.class);
 
     private final StatusChangelogRepository repository;
-    private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
 
     public StatusChangelogService(StatusChangelogRepository repository,
-                                  StatusMappingService statusMappingService) {
+                                  WorkflowConfigService workflowConfigService) {
         this.repository = repository;
-        this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -77,7 +77,7 @@ public class StatusChangelogService {
      * @param entity the issue entity to update
      */
     public void updateDoneAtIfNeeded(JiraIssueEntity entity) {
-        boolean isDone = statusMappingService.isDone(entity.getStatus(), null);
+        boolean isDone = workflowConfigService.isDone(entity.getStatus(), entity.getIssueType());
 
         if (isDone && entity.getDoneAt() == null) {
             entity.setDoneAt(OffsetDateTime.now());

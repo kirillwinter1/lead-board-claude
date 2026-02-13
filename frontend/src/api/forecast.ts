@@ -5,37 +5,19 @@ export interface RoleRemaining {
   days: number
 }
 
-export interface RemainingByRole {
-  sa: RoleRemaining
-  dev: RoleRemaining
-  qa: RoleRemaining
-}
-
 export interface PhaseInfo {
   startDate: string | null
   endDate: string | null
   workDays: number
-  noCapacity?: boolean  // true если нет ресурсов для этой роли
-}
-
-export interface PhaseSchedule {
-  sa: PhaseInfo
-  dev: PhaseInfo
-  qa: PhaseInfo
+  noCapacity?: boolean
 }
 
 export type Confidence = 'HIGH' | 'MEDIUM' | 'LOW'
 
 export interface RoleWaitInfo {
-  waiting: boolean              // Ожидает ли вход в фазу
-  waitingUntil: string | null   // До какой даты ждёт
-  queuePosition: number | null  // Позиция в очереди на эту фазу
-}
-
-export interface PhaseWaitInfo {
-  sa: RoleWaitInfo
-  dev: RoleWaitInfo
-  qa: RoleWaitInfo
+  waiting: boolean
+  waitingUntil: string | null
+  queuePosition: number | null
 }
 
 export interface EpicForecast {
@@ -46,41 +28,31 @@ export interface EpicForecast {
   confidence: Confidence
   dueDateDeltaDays: number | null
   dueDate: string | null
-  remainingByRole: RemainingByRole
-  phaseSchedule: PhaseSchedule
-  // WIP fields (team-level)
-  queuePosition: number | null     // Позиция в очереди (null если в WIP)
-  queuedUntil: string | null       // До какой даты в очереди
-  isWithinWip: boolean             // Входит ли в активный WIP
-  // WIP fields (role-level)
-  phaseWaitInfo: PhaseWaitInfo | null  // Информация об ожидании по фазам
-}
-
-export interface TeamCapacity {
-  saHoursPerDay: number
-  devHoursPerDay: number
-  qaHoursPerDay: number
+  remainingByRole: Record<string, RoleRemaining>
+  phaseSchedule: Record<string, PhaseInfo>
+  queuePosition: number | null
+  queuedUntil: string | null
+  isWithinWip: boolean
+  phaseWaitInfo: Record<string, RoleWaitInfo> | null
 }
 
 export interface RoleWipStatus {
-  limit: number      // Лимит для роли
-  current: number    // Текущее количество эпиков на этой фазе
-  exceeded: boolean  // Превышен ли лимит
+  limit: number
+  current: number
+  exceeded: boolean
 }
 
 export interface WipStatus {
-  limit: number      // WIP лимит команды
-  current: number    // Текущее количество активных эпиков
-  exceeded: boolean  // Превышен ли лимит
-  sa: RoleWipStatus | null   // WIP статус для SA
-  dev: RoleWipStatus | null  // WIP статус для DEV
-  qa: RoleWipStatus | null   // WIP статус для QA
+  limit: number
+  current: number
+  exceeded: boolean
+  roleWip: Record<string, RoleWipStatus>
 }
 
 export interface ForecastResponse {
   calculatedAt: string
   teamId: number
-  teamCapacity: TeamCapacity
+  roleCapacity: Record<string, number>
   wipStatus: WipStatus
   epics: EpicForecast[]
 }
@@ -98,16 +70,16 @@ export async function getForecast(teamId: number, statuses?: string[]): Promise<
 }
 
 // WIP History types
+export interface WipRoleData {
+  limit: number | null
+  current: number | null
+}
+
 export interface WipDataPoint {
   date: string
   teamLimit: number
   teamCurrent: number
-  saLimit: number | null
-  saCurrent: number | null
-  devLimit: number | null
-  devCurrent: number | null
-  qaLimit: number | null
-  qaCurrent: number | null
+  roleData: Record<string, WipRoleData>
   inQueue: number | null
   totalEpics: number | null
 }
@@ -140,8 +112,6 @@ export async function createWipSnapshot(teamId: number): Promise<{ status: strin
 }
 
 // Story types
-export type StoryPhase = 'SA' | 'DEV' | 'QA'
-
 export interface RoleBreakdown {
   estimateSeconds: number | null
   loggedSeconds: number | null
@@ -157,10 +127,8 @@ export interface StoryInfo {
   endDate: string | null
   estimateSeconds: number | null
   timeSpentSeconds: number | null
-  phase: StoryPhase
-  saBreakdown: RoleBreakdown | null
-  devBreakdown: RoleBreakdown | null
-  qaBreakdown: RoleBreakdown | null
+  phase: string
+  roleBreakdowns: Record<string, RoleBreakdown>
   autoScore: number | null
 }
 
@@ -187,15 +155,6 @@ export interface UnifiedPhaseSchedule {
 }
 
 /**
- * Phase schedules for a story (SA -> DEV -> QA pipeline).
- */
-export interface PlannedPhases {
-  sa: UnifiedPhaseSchedule | null
-  dev: UnifiedPhaseSchedule | null
-  qa: UnifiedPhaseSchedule | null
-}
-
-/**
  * Warning types for planning issues.
  */
 export type WarningType = 'NO_ESTIMATE' | 'NO_CAPACITY' | 'CIRCULAR_DEPENDENCY' | 'FLAGGED'
@@ -210,21 +169,12 @@ export interface PlanningWarning {
 }
 
 /**
- * Progress info for a single phase (SA/DEV/QA).
+ * Progress info for a single phase.
  */
 export interface PhaseProgressInfo {
   estimateSeconds: number
   loggedSeconds: number
   completed: boolean
-}
-
-/**
- * Role progress info for a story.
- */
-export interface RoleProgressInfo {
-  sa: PhaseProgressInfo | null
-  dev: PhaseProgressInfo | null
-  qa: PhaseProgressInfo | null
 }
 
 /**
@@ -237,33 +187,25 @@ export interface PlannedStory {
   status: string
   startDate: string | null
   endDate: string | null
-  phases: PlannedPhases
+  phases: Record<string, UnifiedPhaseSchedule>
   blockedBy: string[]
   warnings: PlanningWarning[]
-  // Additional fields for tooltip
   issueType: string | null
   priority: string | null
   flagged: boolean | null
-  // Aggregated progress from subtasks
   totalEstimateSeconds: number | null
   totalLoggedSeconds: number | null
   progressPercent: number | null
-  roleProgress: RoleProgressInfo | null
+  roleProgress: Record<string, PhaseProgressInfo> | null
 }
 
 /**
- * Aggregated phase data for epic.
+ * Aggregated phase data entry for a role.
  */
-export interface PhaseAggregation {
-  saHours: number
-  devHours: number
-  qaHours: number
-  saStartDate: string | null
-  saEndDate: string | null
-  devStartDate: string | null
-  devEndDate: string | null
-  qaStartDate: string | null
-  qaEndDate: string | null
+export interface PhaseAggregationEntry {
+  hours: number
+  startDate: string | null
+  endDate: string | null
 }
 
 /**
@@ -276,21 +218,17 @@ export interface PlannedEpic {
   startDate: string | null
   endDate: string | null
   stories: PlannedStory[]
-  phaseAggregation: PhaseAggregation
-  // Additional fields for epic card/tooltip
+  phaseAggregation: Record<string, PhaseAggregationEntry>
   status: string | null
   dueDate: string | null
   totalEstimateSeconds: number | null
   totalLoggedSeconds: number | null
   progressPercent: number | null
-  roleProgress: RoleProgressInfo | null
+  roleProgress: Record<string, PhaseProgressInfo> | null
   storiesTotal: number
   storiesActive: number
-  // Rough estimate fields (for epics without stories)
   isRoughEstimate: boolean
-  roughEstimateSaDays: number | null
-  roughEstimateDevDays: number | null
-  roughEstimateQaDays: number | null
+  roughEstimates: Record<string, number> | null
 }
 
 /**
@@ -327,9 +265,6 @@ export async function getUnifiedPlanning(teamId: number): Promise<UnifiedPlannin
 
 // ==================== Forecast Snapshots API ====================
 
-/**
- * Получает доступные даты снэпшотов для команды.
- */
 export async function getAvailableSnapshotDates(teamId: number): Promise<string[]> {
   const response = await axios.get<string[]>(
     `/api/forecast-snapshots/dates?teamId=${teamId}`
@@ -337,9 +272,6 @@ export async function getAvailableSnapshotDates(teamId: number): Promise<string[
   return response.data
 }
 
-/**
- * Получает unified planning из исторического снэпшота.
- */
 export async function getUnifiedPlanningSnapshot(teamId: number, date: string): Promise<UnifiedPlanningResult> {
   const response = await axios.get<UnifiedPlanningResult>(
     `/api/forecast-snapshots/unified?teamId=${teamId}&date=${date}`
@@ -347,9 +279,6 @@ export async function getUnifiedPlanningSnapshot(teamId: number, date: string): 
   return response.data
 }
 
-/**
- * Получает forecast из исторического снэпшота.
- */
 export async function getForecastSnapshot(teamId: number, date: string): Promise<ForecastResponse> {
   const response = await axios.get<ForecastResponse>(
     `/api/forecast-snapshots/forecast?teamId=${teamId}&date=${date}`
@@ -359,14 +288,8 @@ export async function getForecastSnapshot(teamId: number, date: string): Promise
 
 // ==================== Role Load API ====================
 
-/**
- * Статус утилизации роли.
- */
 export type UtilizationStatus = 'OVERLOAD' | 'NORMAL' | 'IDLE' | 'NO_CAPACITY'
 
-/**
- * Информация о загрузке для одной роли.
- */
 export interface RoleLoadInfo {
   memberCount: number
   totalCapacityHours: number
@@ -375,40 +298,25 @@ export interface RoleLoadInfo {
   status: UtilizationStatus
 }
 
-/**
- * Типы алертов загрузки.
- */
 export type RoleLoadAlertType = 'ROLE_OVERLOAD' | 'ROLE_IDLE' | 'IMBALANCE' | 'NO_CAPACITY'
 
-/**
- * Алерт о проблеме с загрузкой.
- */
 export interface RoleLoadAlert {
   type: RoleLoadAlertType
   role: string | null
   message: string
 }
 
-/**
- * Ответ API с информацией о загрузке команды по ролям.
- */
 export interface RoleLoadResponse {
   teamId: number
   planningDate: string
   periodDays: number
-  sa: RoleLoadInfo
-  dev: RoleLoadInfo
-  qa: RoleLoadInfo
+  roles: Record<string, RoleLoadInfo>
   alerts: RoleLoadAlert[]
 }
 
-/**
- * Получает загрузку команды по ролям.
- */
 export async function getRoleLoad(teamId: number): Promise<RoleLoadResponse> {
   const response = await axios.get<RoleLoadResponse>(
     `/api/planning/role-load?teamId=${teamId}`
   )
   return response.data
 }
-

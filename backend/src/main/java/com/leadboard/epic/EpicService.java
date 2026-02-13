@@ -42,9 +42,14 @@ public class EpicService {
             throw new RoughEstimateException("Rough estimate feature is disabled");
         }
 
-        // Validate role
-        if (role == null || (!role.equalsIgnoreCase("sa") && !role.equalsIgnoreCase("dev") && !role.equalsIgnoreCase("qa"))) {
-            throw new RoughEstimateException("Invalid role: " + role + ". Must be one of: sa, dev, qa");
+        // Validate role against configured workflow roles
+        if (role == null) {
+            throw new RoughEstimateException("Role is required");
+        }
+        List<String> validRoleCodes = workflowConfigService.getRoleCodesInPipelineOrder();
+        if (validRoleCodes.stream().noneMatch(code -> code.equalsIgnoreCase(role))) {
+            throw new RoughEstimateException("Invalid role: " + role + ". Must be one of: " +
+                    String.join(", ", validRoleCodes));
         }
 
         JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
@@ -75,18 +80,8 @@ public class EpicService {
             }
         }
 
-        // Update the specific role's rough estimate
-        switch (role.toLowerCase()) {
-            case "sa":
-                epic.setRoughEstimateSaDays(days);
-                break;
-            case "dev":
-                epic.setRoughEstimateDevDays(days);
-                break;
-            case "qa":
-                epic.setRoughEstimateQaDays(days);
-                break;
-        }
+        // Update the specific role's rough estimate using dynamic method
+        epic.setRoughEstimate(role.toUpperCase(), days);
 
         epic.setRoughEstimateUpdatedAt(OffsetDateTime.now());
         epic.setRoughEstimateUpdatedBy(request.updatedBy() != null ? request.updatedBy() : "anonymous");
@@ -97,9 +92,7 @@ public class EpicService {
                 epic.getIssueKey(),
                 role.toLowerCase(),
                 days,
-                epic.getRoughEstimateSaDays(),
-                epic.getRoughEstimateDevDays(),
-                epic.getRoughEstimateQaDays(),
+                epic.getRoughEstimates(),
                 epic.getRoughEstimateUpdatedAt(),
                 epic.getRoughEstimateUpdatedBy()
         );

@@ -17,9 +17,7 @@ export interface RoughEstimateResponse {
   epicKey: string
   role: string
   updatedDays: number | null
-  saDays: number | null
-  devDays: number | null
-  qaDays: number | null
+  roughEstimates: Record<string, number | null>
   roughEstimateUpdatedAt: string | null
   roughEstimateUpdatedBy: string | null
 }
@@ -31,7 +29,7 @@ export async function getRoughEstimateConfig(): Promise<RoughEstimateConfig> {
 
 export async function updateRoughEstimate(
   epicKey: string,
-  role: 'sa' | 'dev' | 'qa',
+  role: string,
   request: RoughEstimateRequest
 ): Promise<RoughEstimateResponse> {
   const response = await axios.patch<RoughEstimateResponse>(

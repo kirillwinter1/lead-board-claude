@@ -3,6 +3,7 @@ package com.leadboard.config.controller;
 import com.leadboard.config.dto.*;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
+import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.MappingValidationService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,6 +33,7 @@ public class WorkflowConfigController {
     private final LinkTypeMappingRepository linkTypeRepo;
     private final WorkflowConfigService workflowConfigService;
     private final MappingValidationService validationService;
+    private final MappingAutoDetectService autoDetectService;
     private final ObjectMapper objectMapper;
 
     public WorkflowConfigController(
@@ -42,6 +44,7 @@ public class WorkflowConfigController {
             LinkTypeMappingRepository linkTypeRepo,
             WorkflowConfigService workflowConfigService,
             MappingValidationService validationService,
+            MappingAutoDetectService autoDetectService,
             ObjectMapper objectMapper
     ) {
         this.configRepo = configRepo;
@@ -51,6 +54,7 @@ public class WorkflowConfigController {
         this.linkTypeRepo = linkTypeRepo;
         this.workflowConfigService = workflowConfigService;
         this.validationService = validationService;
+        this.autoDetectService = autoDetectService;
         this.objectMapper = objectMapper;
     }
 
@@ -263,6 +267,21 @@ public class WorkflowConfigController {
         );
 
         return ResponseEntity.ok(result);
+    }
+
+    // ==================== Auto-detect ====================
+
+    @PostMapping("/auto-detect")
+    public ResponseEntity<MappingAutoDetectService.AutoDetectResult> autoDetect() {
+        log.info("Manual auto-detect triggered via API");
+        var result = autoDetectService.autoDetect();
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<Map<String, Object>> getConfigStatus() {
+        boolean configured = !autoDetectService.isConfigEmpty();
+        return ResponseEntity.ok(Map.of("configured", configured));
     }
 
     // ==================== Helpers ====================

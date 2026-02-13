@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot } from '../api/forecast'
 import { getConfig } from '../api/config'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './TimelinePage.css'
 
 // Issue type icons
@@ -284,18 +285,15 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6
 }
 
-// Phase colors - Atlassian Design System (300 level)
-const PHASE_COLORS = {
-  sa: '#85B8FF',   // Blue 300 — светло-синий
-  dev: '#D6A0FB',  // Purple 300 — светло-фиолетовый
-  qa: '#8BDBE5'    // Teal 300 — светло-бирюзовый
-}
-
-// Dimmed phase colors for rough estimates (50% opacity effect)
-const PHASE_COLORS_DIMMED = {
-  sa: '#c2dbff',   // Lighter blue
-  dev: '#e8cffc',  // Lighter purple
-  qa: '#c5edf2'    // Lighter teal
+// Helper to lighten a hex color by a factor (0=original, 1=white)
+function lightenColor(hex: string, factor: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const lr = Math.round(r + (255 - r) * factor)
+  const lg = Math.round(g + (255 - g) * factor)
+  const lb = Math.round(b + (255 - b) * factor)
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
 }
 
 // Get issue type icon
@@ -350,7 +348,7 @@ function calculateRowHeight(epic: PlannedEpic): number {
 
   const activeStories = epic.stories.filter(s => {
     const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
-    const hasPhases = s.phases?.sa || s.phases?.dev || s.phases?.qa
+    const hasPhases = s.phases && Object.keys(s.phases).length > 0
     return !isDone && hasPhases && s.startDate && s.endDate
   })
 
@@ -393,6 +391,7 @@ interface EpicLabelProps {
 }
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -581,54 +580,22 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
             <div style={{ borderTop: '1px solid #42526e', paddingTop: 10, marginBottom: 10 }}>
               <table style={{ width: '100%', fontSize: 12 }}>
                 <tbody>
-                  {epic.roleProgress.sa && (
-                    <tr>
+                  {Object.entries(epic.roleProgress).map(([role, progress]) => progress && (
+                    <tr key={role}>
                       <td style={{ padding: '3px 0', width: 50 }}>
-                        <span style={{ color: PHASE_COLORS.sa }}>●</span> SA
-                        {epic.roleProgress.sa.completed && <span style={{ marginLeft: 4 }}>✓</span>}
+                        <span style={{ color: getRoleColor(role) }}>●</span> {role}
+                        {progress.completed && <span style={{ marginLeft: 4 }}>✓</span>}
                       </td>
                       <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
-                        {formatHours(epic.roleProgress.sa.loggedSeconds)} / {formatHours(epic.roleProgress.sa.estimateSeconds)}
+                        {formatHours(progress.loggedSeconds)} / {formatHours(progress.estimateSeconds)}
                       </td>
                       <td style={{ color: '#8993A4', textAlign: 'right', width: 45 }}>
-                        {epic.roleProgress.sa.estimateSeconds
-                          ? Math.min(100, Math.round((epic.roleProgress.sa.loggedSeconds || 0) * 100 / epic.roleProgress.sa.estimateSeconds))
+                        {progress.estimateSeconds
+                          ? Math.min(100, Math.round((progress.loggedSeconds || 0) * 100 / progress.estimateSeconds))
                           : 0}%
                       </td>
                     </tr>
-                  )}
-                  {epic.roleProgress.dev && (
-                    <tr>
-                      <td style={{ padding: '3px 0' }}>
-                        <span style={{ color: PHASE_COLORS.dev }}>●</span> DEV
-                        {epic.roleProgress.dev.completed && <span style={{ marginLeft: 4 }}>✓</span>}
-                      </td>
-                      <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
-                        {formatHours(epic.roleProgress.dev.loggedSeconds)} / {formatHours(epic.roleProgress.dev.estimateSeconds)}
-                      </td>
-                      <td style={{ color: '#8993A4', textAlign: 'right' }}>
-                        {epic.roleProgress.dev.estimateSeconds
-                          ? Math.min(100, Math.round((epic.roleProgress.dev.loggedSeconds || 0) * 100 / epic.roleProgress.dev.estimateSeconds))
-                          : 0}%
-                      </td>
-                    </tr>
-                  )}
-                  {epic.roleProgress.qa && (
-                    <tr>
-                      <td style={{ padding: '3px 0' }}>
-                        <span style={{ color: PHASE_COLORS.qa }}>●</span> QA
-                        {epic.roleProgress.qa.completed && <span style={{ marginLeft: 4 }}>✓</span>}
-                      </td>
-                      <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
-                        {formatHours(epic.roleProgress.qa.loggedSeconds)} / {formatHours(epic.roleProgress.qa.estimateSeconds)}
-                      </td>
-                      <td style={{ color: '#8993A4', textAlign: 'right' }}>
-                        {epic.roleProgress.qa.estimateSeconds
-                          ? Math.min(100, Math.round((epic.roleProgress.qa.loggedSeconds || 0) * 100 / epic.roleProgress.qa.estimateSeconds))
-                          : 0}%
-                      </td>
-                    </tr>
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -657,6 +624,7 @@ interface StoryBarProps {
 }
 
 function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover }: StoryBarProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const totalDays = daysBetween(dateRange.start, dateRange.end)
   const startDate = new Date(story.startDate!)
   const endDate = new Date(story.endDate!)
@@ -670,9 +638,11 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const isBlocked = story.blockedBy && story.blockedBy.length > 0
   const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
 
+  const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.5)
+
   const renderPhaseSegment = (
     phase: UnifiedPhaseSchedule | null,
-    phaseType: 'sa' | 'dev' | 'qa'
+    phaseType: string
   ) => {
     if (!phase || !phase.startDate || !phase.endDate || phase.hours <= 0) return null
 
@@ -691,7 +661,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
           left: `${phaseLeftPercent}%`,
           width: `${phaseWidthPercent}%`,
           height: '100%',
-          backgroundColor: PHASE_COLORS[phaseType],
+          backgroundColor: getPhaseColor(phaseType),
           opacity: phase.noCapacity ? 0.4 : 1
         }}
       />
@@ -721,9 +691,9 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => onHover(null)}
     >
-      {renderPhaseSegment(story.phases?.sa ?? null, 'sa')}
-      {renderPhaseSegment(story.phases?.dev ?? null, 'dev')}
-      {renderPhaseSegment(story.phases?.qa ?? null, 'qa')}
+      {story.phases && Object.entries(story.phases).map(([role, phase]) =>
+        renderPhaseSegment(phase, role)
+      )}
 
       <span
         style={{
@@ -759,13 +729,14 @@ interface StoryBarsProps {
 }
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
   // Filter active stories with phases
   const activeStories = stories.filter(s => {
     const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
-    const hasPhases = s.phases?.sa || s.phases?.dev || s.phases?.qa
+    const hasPhases = s.phases && Object.keys(s.phases).length > 0
     return !isDone && hasPhases && s.startDate && s.endDate
   })
 
@@ -896,66 +867,37 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           {/* Phase breakdown with progress */}
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <tbody>
-              {(phaseHasHours(hoveredStory.phases?.sa) || hoveredStory.roleProgress?.sa) && (
-                <tr>
-                  <td style={{ padding: '3px 4px' }}>
-                    <span style={{ color: PHASE_COLORS.sa }}>●</span> SA
-                    {hoveredStory.roleProgress?.sa?.completed && (
-                      <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{hoveredStory.phases?.sa?.assigneeDisplayName || '-'}</td>
-                  <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                    {hoveredStory.roleProgress?.sa ? (
-                      <span>
-                        {formatHours(hoveredStory.roleProgress.sa.loggedSeconds)}/{formatHours(hoveredStory.roleProgress.sa.estimateSeconds)}
-                      </span>
-                    ) : (
-                      <span>{hoveredStory.phases?.sa?.hours.toFixed(0)}ч</span>
-                    )}
-                  </td>
-                </tr>
-              )}
-              {(phaseHasHours(hoveredStory.phases?.dev) || hoveredStory.roleProgress?.dev) && (
-                <tr>
-                  <td style={{ padding: '3px 4px' }}>
-                    <span style={{ color: PHASE_COLORS.dev }}>●</span> DEV
-                    {hoveredStory.roleProgress?.dev?.completed && (
-                      <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{hoveredStory.phases?.dev?.assigneeDisplayName || '-'}</td>
-                  <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                    {hoveredStory.roleProgress?.dev ? (
-                      <span>
-                        {formatHours(hoveredStory.roleProgress.dev.loggedSeconds)}/{formatHours(hoveredStory.roleProgress.dev.estimateSeconds)}
-                      </span>
-                    ) : (
-                      <span>{hoveredStory.phases?.dev?.hours.toFixed(0)}ч</span>
-                    )}
-                  </td>
-                </tr>
-              )}
-              {(phaseHasHours(hoveredStory.phases?.qa) || hoveredStory.roleProgress?.qa) && (
-                <tr>
-                  <td style={{ padding: '3px 4px' }}>
-                    <span style={{ color: PHASE_COLORS.qa }}>●</span> QA
-                    {hoveredStory.roleProgress?.qa?.completed && (
-                      <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
-                    )}
-                  </td>
-                  <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{hoveredStory.phases?.qa?.assigneeDisplayName || '-'}</td>
-                  <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                    {hoveredStory.roleProgress?.qa ? (
-                      <span>
-                        {formatHours(hoveredStory.roleProgress.qa.loggedSeconds)}/{formatHours(hoveredStory.roleProgress.qa.estimateSeconds)}
-                      </span>
-                    ) : (
-                      <span>{hoveredStory.phases?.qa?.hours.toFixed(0)}ч</span>
-                    )}
-                  </td>
-                </tr>
-              )}
+              {(() => {
+                // Collect all roles from phases and roleProgress
+                const roles = new Set<string>()
+                if (hoveredStory.phases) Object.keys(hoveredStory.phases).forEach(r => roles.add(r))
+                if (hoveredStory.roleProgress) Object.keys(hoveredStory.roleProgress).forEach(r => roles.add(r))
+                return Array.from(roles).map(role => {
+                  const phase = hoveredStory.phases?.[role]
+                  const progress = hoveredStory.roleProgress?.[role]
+                  if (!phaseHasHours(phase) && !progress) return null
+                  return (
+                    <tr key={role}>
+                      <td style={{ padding: '3px 4px' }}>
+                        <span style={{ color: getRoleColor(role) }}>●</span> {role}
+                        {progress?.completed && (
+                          <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
+                        )}
+                      </td>
+                      <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{phase?.assigneeDisplayName || '-'}</td>
+                      <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                        {progress ? (
+                          <span>
+                            {formatHours(progress.loggedSeconds)}/{formatHours(progress.estimateSeconds)}
+                          </span>
+                        ) : (
+                          <span>{phase?.hours.toFixed(0)}ч</span>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
+              })()}
             </tbody>
           </table>
 
@@ -981,6 +923,7 @@ interface RoughEstimateBarProps {
 }
 
 function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstimateBarProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const totalDays = daysBetween(dateRange.start, dateRange.end)
   const agg = epic.phaseAggregation
 
@@ -994,11 +937,13 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
   const leftPercent = (daysFromStart / totalDays) * 100
   const widthPercent = (duration / totalDays) * 100
 
+  const getPhaseColorDimmed = (role: string) => lightenColor(getRoleColor(role), 0.7)
+
   // Calculate phase segments within the bar
   const renderPhaseSegment = (
     phaseStartDate: string | null,
     phaseEndDate: string | null,
-    phaseType: 'sa' | 'dev' | 'qa'
+    phaseType: string
   ) => {
     if (!phaseStartDate || !phaseEndDate) return null
 
@@ -1017,7 +962,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
           left: `${phaseLeftPercent}%`,
           width: `${phaseWidthPercent}%`,
           height: '100%',
-          backgroundColor: PHASE_COLORS_DIMMED[phaseType],
+          backgroundColor: getPhaseColorDimmed(phaseType),
           backgroundImage: `repeating-linear-gradient(
             135deg,
             transparent,
@@ -1055,9 +1000,9 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
       onMouseLeave={() => onHover(null)}
       onClick={() => window.open(`${jiraBaseUrl}${epic.epicKey}`, '_blank')}
     >
-      {renderPhaseSegment(agg.saStartDate, agg.saEndDate, 'sa')}
-      {renderPhaseSegment(agg.devStartDate, agg.devEndDate, 'dev')}
-      {renderPhaseSegment(agg.qaStartDate, agg.qaEndDate, 'qa')}
+      {agg && Object.entries(agg).map(([role, entry]) =>
+        renderPhaseSegment(entry.startDate, entry.endDate, role)
+      )}
 
       <span
         style={{
@@ -1073,7 +1018,9 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
           whiteSpace: 'nowrap',
         }}
       >
-        ~{epic.roughEstimateSaDays ?? 0}/{epic.roughEstimateDevDays ?? 0}/{epic.roughEstimateQaDays ?? 0}д
+        ~{epic.roughEstimates
+          ? Object.entries(epic.roughEstimates).map(([role, days]) => `${role}:${days}`).join('/')
+          : '0'}д
       </span>
     </div>
   )
@@ -1087,6 +1034,7 @@ interface RoughEstimateBarsProps {
 }
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1154,45 +1102,27 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
           </div>
 
           {/* Rough estimates breakdown */}
-          <div style={{ marginBottom: '10px', borderTop: '1px solid #374151', paddingTop: '10px' }}>
-            <div style={{ color: '#9ca3af', fontSize: '11px', marginBottom: '6px' }}>
-              Оценки (дней):
+          {hoveredEpic.roughEstimates && Object.keys(hoveredEpic.roughEstimates).length > 0 && (
+            <div style={{ marginBottom: '10px', borderTop: '1px solid #374151', paddingTop: '10px' }}>
+              <div style={{ color: '#9ca3af', fontSize: '11px', marginBottom: '6px' }}>
+                Оценки (дней):
+              </div>
+              <table style={{ width: '100%', fontSize: '12px' }}>
+                <tbody>
+                  {Object.entries(hoveredEpic.roughEstimates).map(([role, days]) => days > 0 && (
+                    <tr key={role}>
+                      <td style={{ padding: '2px 4px' }}>
+                        <span style={{ color: getRoleColor(role) }}>●</span> {role}
+                      </td>
+                      <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                        {days} дней
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <table style={{ width: '100%', fontSize: '12px' }}>
-              <tbody>
-                {hoveredEpic.roughEstimateSaDays != null && hoveredEpic.roughEstimateSaDays > 0 && (
-                  <tr>
-                    <td style={{ padding: '2px 4px' }}>
-                      <span style={{ color: PHASE_COLORS.sa }}>●</span> SA
-                    </td>
-                    <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                      {hoveredEpic.roughEstimateSaDays} дней
-                    </td>
-                  </tr>
-                )}
-                {hoveredEpic.roughEstimateDevDays != null && hoveredEpic.roughEstimateDevDays > 0 && (
-                  <tr>
-                    <td style={{ padding: '2px 4px' }}>
-                      <span style={{ color: PHASE_COLORS.dev }}>●</span> DEV
-                    </td>
-                    <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                      {hoveredEpic.roughEstimateDevDays} дней
-                    </td>
-                  </tr>
-                )}
-                {hoveredEpic.roughEstimateQaDays != null && hoveredEpic.roughEstimateQaDays > 0 && (
-                  <tr>
-                    <td style={{ padding: '2px 4px' }}>
-                      <span style={{ color: PHASE_COLORS.qa }}>●</span> QA
-                    </td>
-                    <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                      {hoveredEpic.roughEstimateQaDays} дней
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          )}
 
           {/* Dates */}
           {hoveredEpic.startDate && hoveredEpic.endDate && (
@@ -1274,6 +1204,7 @@ function GanttRow({ plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl
 // --- Main component ---
 
 export function TimelinePage() {
+  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [searchParams, setSearchParams] = useSearchParams()
   const [teams, setTeams] = useState<Team[]>([])
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
@@ -1537,9 +1468,18 @@ export function TimelinePage() {
         </div>
 
         <div className="timeline-legend">
-          <span className="legend-item legend-phase-sa">SA</span>
-          <span className="legend-item legend-phase-dev">DEV</span>
-          <span className="legend-item legend-phase-qa">QA</span>
+          {getRoleCodes().map(code => (
+            <span
+              key={code}
+              className="legend-item"
+              style={{
+                borderLeft: `3px solid ${lightenColor(getRoleColor(code), 0.5)}`,
+                paddingLeft: 6,
+              }}
+            >
+              {code}
+            </span>
+          ))}
           <span className="legend-item legend-today">Сегодня</span>
           <span className="legend-item legend-due">Due Date</span>
         </div>

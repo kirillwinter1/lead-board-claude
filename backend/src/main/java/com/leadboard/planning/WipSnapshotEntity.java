@@ -3,6 +3,7 @@ package com.leadboard.planning;
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.Map;
 
 /**
  * Снапшот WIP статуса команды на определённую дату.
@@ -34,24 +35,11 @@ public class WipSnapshotEntity {
     @Column(name = "team_wip_current", nullable = false)
     private Integer teamWipCurrent;
 
-    // Role-level WIP
-    @Column(name = "sa_wip_limit")
-    private Integer saWipLimit;
-
-    @Column(name = "sa_wip_current")
-    private Integer saWipCurrent;
-
-    @Column(name = "dev_wip_limit")
-    private Integer devWipLimit;
-
-    @Column(name = "dev_wip_current")
-    private Integer devWipCurrent;
-
-    @Column(name = "qa_wip_limit")
-    private Integer qaWipLimit;
-
-    @Column(name = "qa_wip_current")
-    private Integer qaWipCurrent;
+    // Dynamic role-level WIP stored as JSONB
+    // Format: {"SA": {"limit": 3, "current": 2}, "DEV": {"limit": 4, "current": 3}, ...}
+    @Column(name = "role_wip_data", columnDefinition = "jsonb")
+    @Convert(converter = RoleWipDataConverter.class)
+    private Map<String, RoleWipEntry> roleWipData;
 
     // Queue info
     @Column(name = "epics_in_queue")
@@ -68,6 +56,11 @@ public class WipSnapshotEntity {
         this.snapshotDate = snapshotDate;
         this.createdAt = OffsetDateTime.now();
     }
+
+    /**
+     * WIP data for a single role (limit and current count).
+     */
+    public record RoleWipEntry(Integer limit, Integer current) {}
 
     // Getters and Setters
 
@@ -119,52 +112,12 @@ public class WipSnapshotEntity {
         this.teamWipCurrent = teamWipCurrent;
     }
 
-    public Integer getSaWipLimit() {
-        return saWipLimit;
+    public Map<String, RoleWipEntry> getRoleWipData() {
+        return roleWipData;
     }
 
-    public void setSaWipLimit(Integer saWipLimit) {
-        this.saWipLimit = saWipLimit;
-    }
-
-    public Integer getSaWipCurrent() {
-        return saWipCurrent;
-    }
-
-    public void setSaWipCurrent(Integer saWipCurrent) {
-        this.saWipCurrent = saWipCurrent;
-    }
-
-    public Integer getDevWipLimit() {
-        return devWipLimit;
-    }
-
-    public void setDevWipLimit(Integer devWipLimit) {
-        this.devWipLimit = devWipLimit;
-    }
-
-    public Integer getDevWipCurrent() {
-        return devWipCurrent;
-    }
-
-    public void setDevWipCurrent(Integer devWipCurrent) {
-        this.devWipCurrent = devWipCurrent;
-    }
-
-    public Integer getQaWipLimit() {
-        return qaWipLimit;
-    }
-
-    public void setQaWipLimit(Integer qaWipLimit) {
-        this.qaWipLimit = qaWipLimit;
-    }
-
-    public Integer getQaWipCurrent() {
-        return qaWipCurrent;
-    }
-
-    public void setQaWipCurrent(Integer qaWipCurrent) {
-        this.qaWipCurrent = qaWipCurrent;
+    public void setRoleWipData(Map<String, RoleWipEntry> roleWipData) {
+        this.roleWipData = roleWipData;
     }
 
     public Integer getEpicsInQueue() {

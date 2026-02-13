@@ -246,14 +246,18 @@ public class JiraMetadataService {
     }
 
     private void cacheValue(String key, String value) {
-        TrackerMetadataCacheEntity entity = cacheRepo.findByCacheKey(key)
-                .orElseGet(() -> {
-                    TrackerMetadataCacheEntity e = new TrackerMetadataCacheEntity();
-                    e.setCacheKey(key);
-                    return e;
-                });
-        entity.setData(value);
-        entity.setFetchedAt(OffsetDateTime.now());
-        cacheRepo.save(entity);
+        try {
+            TrackerMetadataCacheEntity entity = cacheRepo.findByCacheKey(key)
+                    .orElseGet(() -> {
+                        TrackerMetadataCacheEntity e = new TrackerMetadataCacheEntity();
+                        e.setCacheKey(key);
+                        return e;
+                    });
+            entity.setData(value);
+            entity.setFetchedAt(OffsetDateTime.now());
+            cacheRepo.saveAndFlush(entity);
+        } catch (Exception e) {
+            log.warn("Failed to cache metadata for key '{}': {}", key, e.getMessage());
+        }
     }
 }

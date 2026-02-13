@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getRoleLoad, RoleLoadResponse, RoleLoadInfo, UtilizationStatus, RoleLoadAlert } from '../../api/forecast'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import './RoleLoadBlock.css'
 
 interface RoleLoadBlockProps {
@@ -63,9 +64,9 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
       </div>
 
       <div className="role-load-cards">
-        <RoleCard role="SA" info={data.sa} />
-        <RoleCard role="DEV" info={data.dev} />
-        <RoleCard role="QA" info={data.qa} />
+        {data.roles && Object.entries(data.roles).map(([role, info]) => (
+          <RoleCard key={role} role={role} info={info} />
+        ))}
       </div>
 
       {data.alerts.length > 0 && (
@@ -80,24 +81,33 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
 }
 
 interface RoleCardProps {
-  role: 'SA' | 'DEV' | 'QA'
+  role: string
   info: RoleLoadInfo
 }
 
 function RoleCard({ role, info }: RoleCardProps) {
+  const { getRoleColor, getRoleDisplayName } = useWorkflowConfig()
   const statusLabel = getStatusLabel(info.status)
   const statusClass = getStatusClass(info.status)
   const barWidth = Math.min(info.utilizationPercent, 150) // Cap at 150% for display
+  const roleColor = getRoleColor(role)
+
+  // Determine bar background: override for overload/no_capacity, otherwise use role color
+  const isOverrideStatus = info.status === 'OVERLOAD' || info.status === 'NO_CAPACITY'
+  const barStyle: React.CSSProperties = {
+    width: `${(barWidth / 150) * 100}%`,
+    ...(!isOverrideStatus ? { background: roleColor } : {}),
+  }
 
   return (
-    <div className={`role-card role-card-${role.toLowerCase()}`}>
-      <div className="role-card-title">{role}</div>
+    <div className="role-card" style={{ borderLeft: `4px solid ${roleColor}` }}>
+      <div className="role-card-title" style={{ color: roleColor }}>{getRoleDisplayName(role)}</div>
       <div className="role-card-members">{info.memberCount} чел.</div>
 
       <div className="role-card-bar-container">
         <div
-          className={`role-card-bar ${info.status === 'OVERLOAD' || info.status === 'NO_CAPACITY' ? statusClass : ''}`}
-          style={{ width: `${(barWidth / 150) * 100}%` }}
+          className={`role-card-bar ${isOverrideStatus ? statusClass : ''}`}
+          style={barStyle}
         />
         <div className="role-card-bar-markers">
           <div className="role-card-bar-marker" style={{ left: '33.33%' }} title="50%" />

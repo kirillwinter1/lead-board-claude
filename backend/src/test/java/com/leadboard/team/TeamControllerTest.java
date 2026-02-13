@@ -175,7 +175,7 @@ class TeamControllerTest {
     @Test
     void getTeamMembersReturnsList() throws Exception {
         TeamMemberDto member = new TeamMemberDto(1L, 1L, "acc-123", "John Doe",
-                Role.DEV, Grade.SENIOR, new BigDecimal("8.0"), true,
+                "DEV", Grade.SENIOR, new BigDecimal("8.0"), true,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.getTeamMembers(1L)).thenReturn(List.of(member));
 
@@ -190,9 +190,9 @@ class TeamControllerTest {
     @Test
     void addTeamMemberReturns201() throws Exception {
         CreateTeamMemberRequest request = new CreateTeamMemberRequest(
-                "acc-456", "Jane Smith", Role.QA, Grade.MIDDLE, new BigDecimal("6.0"));
+                "acc-456", "Jane Smith", "QA", Grade.MIDDLE, new BigDecimal("6.0"));
         TeamMemberDto member = new TeamMemberDto(2L, 1L, "acc-456", "Jane Smith",
-                Role.QA, Grade.MIDDLE, new BigDecimal("6.0"), true,
+                "QA", Grade.MIDDLE, new BigDecimal("6.0"), true,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.addTeamMember(eq(1L), any())).thenReturn(member);
 
@@ -207,7 +207,7 @@ class TeamControllerTest {
     @Test
     void addTeamMemberReturns409WhenDuplicate() throws Exception {
         CreateTeamMemberRequest request = new CreateTeamMemberRequest(
-                "acc-123", "Duplicate", Role.DEV, Grade.JUNIOR, null);
+                "acc-123", "Duplicate", "DEV", Grade.JUNIOR, null);
         when(teamService.addTeamMember(eq(1L), any()))
                 .thenThrow(new TeamService.TeamMemberAlreadyExistsException(
                         "Member with Jira account ID already exists in team: acc-123"));
@@ -221,9 +221,9 @@ class TeamControllerTest {
     @Test
     void updateTeamMemberReturnsUpdatedMember() throws Exception {
         UpdateTeamMemberRequest request = new UpdateTeamMemberRequest(
-                "Updated Name", Role.SA, Grade.SENIOR, new BigDecimal("7.5"));
+                "Updated Name", "SA", Grade.SENIOR, new BigDecimal("7.5"));
         TeamMemberDto member = new TeamMemberDto(1L, 1L, "acc-123", "Updated Name",
-                Role.SA, Grade.SENIOR, new BigDecimal("7.5"), true,
+                "SA", Grade.SENIOR, new BigDecimal("7.5"), true,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.updateTeamMember(eq(1L), eq(1L), any())).thenReturn(member);
 
@@ -248,7 +248,7 @@ class TeamControllerTest {
     @Test
     void addTeamMemberReturns400WhenHoursExceed12() throws Exception {
         CreateTeamMemberRequest request = new CreateTeamMemberRequest(
-                "acc-789", "Overworker", Role.DEV, Grade.MIDDLE, new BigDecimal("15.0"));
+                "acc-789", "Overworker", "DEV", Grade.MIDDLE, new BigDecimal("15.0"));
 
         mockMvc.perform(post("/api/teams/1/members")
                         .contentType(MediaType.APPLICATION_JSON)

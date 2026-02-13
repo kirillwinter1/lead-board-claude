@@ -52,6 +52,7 @@ class EpicServiceTest {
         when(workflowConfigService.isEpic("Epic")).thenReturn(true);
         when(workflowConfigService.isEpic("Эпик")).thenReturn(true);
         when(workflowConfigService.isEpic("Story")).thenReturn(false);
+        when(workflowConfigService.getRoleCodesInPipelineOrder()).thenReturn(List.of("SA", "DEV", "QA"));
     }
 
     // ==================== getRoughEstimateConfig() Tests ====================
@@ -94,7 +95,8 @@ class EpicServiceTest {
             assertEquals("LB-1", response.epicKey());
             assertEquals("sa", response.role());
             assertEquals(BigDecimal.valueOf(5), response.updatedDays());
-            assertEquals(BigDecimal.valueOf(5), response.saDays());
+            assertNotNull(response.roughEstimates());
+            assertEquals(BigDecimal.valueOf(5), response.roughEstimates().get("SA"));
         }
 
         @Test
@@ -110,7 +112,8 @@ class EpicServiceTest {
             RoughEstimateResponseDto response = epicService.updateRoughEstimate("LB-1", "dev", request);
 
             assertEquals("dev", response.role());
-            assertEquals(BigDecimal.valueOf(10), response.devDays());
+            assertNotNull(response.roughEstimates());
+            assertEquals(BigDecimal.valueOf(10), response.roughEstimates().get("DEV"));
         }
 
         @Test
@@ -126,7 +129,8 @@ class EpicServiceTest {
             RoughEstimateResponseDto response = epicService.updateRoughEstimate("LB-1", "qa", request);
 
             assertEquals("qa", response.role());
-            assertEquals(BigDecimal.valueOf(3), response.qaDays());
+            assertNotNull(response.roughEstimates());
+            assertEquals(BigDecimal.valueOf(3), response.roughEstimates().get("QA"));
         }
 
         @Test
@@ -245,7 +249,8 @@ class EpicServiceTest {
 
             RoughEstimateResponseDto response = epicService.updateRoughEstimate("LB-1", "sa", request);
 
-            assertEquals(BigDecimal.valueOf(5), response.saDays());
+            assertNotNull(response.roughEstimates());
+            assertEquals(BigDecimal.valueOf(5), response.roughEstimates().get("SA"));
         }
 
         @Test

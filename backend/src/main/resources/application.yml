@@ -21,7 +21,7 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     show-sql: false
     properties:
       hibernate:
@@ -39,7 +39,6 @@ jira:
   team-field-id: ${JIRA_TEAM_FIELD_ID:}
   organization-id: ${JIRA_ORGANIZATION_ID:}
   manual-team-management: ${JIRA_MANUAL_TEAM_MANAGEMENT:false}
-  # subtask-roles moved to DB (workflow_configuration tables)
 
 telegram:
   bot-token: ${TELEGRAM_BOT_TOKEN:}
@@ -70,10 +69,6 @@ planning:
     cache-ttl: ${PLANNING_CALENDAR_CACHE_TTL:86400}
     # Путь к файлу с праздниками (для source=file)
     file-path: ${PLANNING_CALENDAR_FILE_PATH:}
-
-# Status mapping configuration moved to DB (workflow_configuration tables in V26)
-# StatusMappingProperties kept as empty for backward compatibility
-status-mapping: {}
 
 # AI Simulation
 simulation:

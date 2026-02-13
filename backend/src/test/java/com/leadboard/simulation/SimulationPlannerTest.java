@@ -9,7 +9,6 @@ import com.leadboard.simulation.dto.SimulationAction;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
-import com.leadboard.team.Role;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -84,7 +83,7 @@ class SimulationPlannerTest {
     @Test
     void planDay_subtaskInTodo_generatesTransition() {
         // Setup team member
-        TeamMemberEntity member = createMember("acc-1", "Dev One", Role.DEV);
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
 
         // Setup plan with active DEV phase today
@@ -114,7 +113,7 @@ class SimulationPlannerTest {
 
     @Test
     void planDay_subtaskInProgress_generatesWorklog() {
-        TeamMemberEntity member = createMember("acc-1", "Dev One", Role.DEV);
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
 
         PhaseSchedule devPhase = new PhaseSchedule(
@@ -143,7 +142,7 @@ class SimulationPlannerTest {
 
     @Test
     void planDay_subtaskWorkComplete_generatesTransitionToDone() {
-        TeamMemberEntity member = createMember("acc-1", "Dev One", Role.DEV);
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
 
         PhaseSchedule devPhase = new PhaseSchedule(
@@ -172,7 +171,7 @@ class SimulationPlannerTest {
 
     @Test
     void planDay_phaseNotActiveToday_noActions() {
-        TeamMemberEntity member = createMember("acc-1", "Dev One", Role.DEV);
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
 
         // Phase starts tomorrow
@@ -192,7 +191,7 @@ class SimulationPlannerTest {
 
     @Test
     void planDay_allSubtasksDone_generatesStoryTransition() {
-        TeamMemberEntity member = createMember("acc-1", "Dev One", Role.DEV);
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
 
         PhaseSchedule devPhase = new PhaseSchedule(
@@ -223,7 +222,7 @@ class SimulationPlannerTest {
 
     // Helper methods
 
-    private TeamMemberEntity createMember(String accountId, String name, Role role) {
+    private TeamMemberEntity createMember(String accountId, String name, String role) {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setJiraAccountId(accountId);
         member.setDisplayName(name);
@@ -245,24 +244,25 @@ class SimulationPlannerTest {
     }
 
     private PlannedStory createStory(String key, String status, PhaseSchedule devPhase) {
+        Map<String, PhaseSchedule> phases = devPhase != null ? Map.of("DEV", devPhase) : Map.of();
         return new PlannedStory(
                 key, "Test Story", null, status,
                 devPhase != null ? devPhase.startDate() : null,
                 devPhase != null ? devPhase.endDate() : null,
-                new PlannedPhases(null, devPhase, null),
+                phases,
                 List.of(), List.of(),
                 "Story", "Medium", false,
-                null, null, null, RoleProgressInfo.empty()
+                null, null, null, Map.of()
         );
     }
 
     private PlannedEpic createEpic(String key, List<PlannedStory> stories) {
         return new PlannedEpic(
                 key, "Test Epic", null, TODAY, TODAY.plusDays(30),
-                stories, PhaseAggregation.empty(),
+                stories, Map.of(),
                 "Developing", null, 0L, 0L, 0,
-                RoleProgressInfo.empty(), stories.size(), stories.size(),
-                false, null, null, null
+                Map.of(), stories.size(), stories.size(),
+                false, null
         );
     }
 }

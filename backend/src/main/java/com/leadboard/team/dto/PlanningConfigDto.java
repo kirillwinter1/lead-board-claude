@@ -1,8 +1,8 @@
 package com.leadboard.team.dto;
 
-import com.leadboard.status.StatusMappingConfig;
-
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Конфигурация автопланирования для команды.
@@ -11,8 +11,7 @@ public record PlanningConfigDto(
         GradeCoefficients gradeCoefficients,
         BigDecimal riskBuffer,
         WipLimits wipLimits,
-        StoryDuration storyDuration,
-        StatusMappingConfig statusMapping
+        StoryDuration storyDuration
 ) {
     /**
      * Коэффициенты производительности по грейдам.
@@ -51,12 +50,14 @@ public record PlanningConfigDto(
      */
     public record WipLimits(
             Integer team,  // Рекомендуемый общий лимит на команду
-            Integer sa,    // Рекомендуемый лимит для SA
-            Integer dev,   // Рекомендуемый лимит для DEV
-            Integer qa     // Рекомендуемый лимит для QA
+            Map<String, Integer> roleLimits  // Рекомендуемые лимиты по ролям (ключ = код роли)
     ) {
         public static WipLimits defaults() {
-            return new WipLimits(6, 2, 3, 2);
+            Map<String, Integer> roles = new LinkedHashMap<>();
+            roles.put("SA", 2);
+            roles.put("DEV", 3);
+            roles.put("QA", 2);
+            return new WipLimits(6, roles);
         }
     }
 
@@ -66,16 +67,14 @@ public record PlanningConfigDto(
      * Например, если SA тратит 2 дня на сторю, то DEV может начать через 2 дня после начала SA.
      */
     public record StoryDuration(
-            BigDecimal sa,   // Дней на сторю для SA
-            BigDecimal dev,  // Дней на сторю для DEV
-            BigDecimal qa    // Дней на сторю для QA
+            Map<String, BigDecimal> roleDurations  // Длительность по ролям (ключ = код роли)
     ) {
         public static StoryDuration defaults() {
-            return new StoryDuration(
-                    new BigDecimal("2"),
-                    new BigDecimal("2"),
-                    new BigDecimal("2")
-            );
+            Map<String, BigDecimal> roles = new LinkedHashMap<>();
+            roles.put("SA", new BigDecimal("2"));
+            roles.put("DEV", new BigDecimal("2"));
+            roles.put("QA", new BigDecimal("2"));
+            return new StoryDuration(roles);
         }
     }
 
@@ -87,8 +86,7 @@ public record PlanningConfigDto(
                 GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 WipLimits.defaults(),
-                StoryDuration.defaults(),
-                null  // statusMapping берётся из StatusMappingService
+                StoryDuration.defaults()
         );
     }
 }

@@ -1,7 +1,9 @@
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { StoryExpectedDoneCellProps } from './types'
 
 export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: StoryExpectedDoneCellProps) {
+  const { getRoleColor } = useWorkflowConfig()
   const { ref, showTooltip, tooltipPos, handleMouseEnter, handleMouseLeave } = useTooltipPosition<HTMLDivElement>({
     tooltipWidth: 280,
     minSpaceNeeded: 180,
@@ -17,10 +19,10 @@ export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: Stor
   }
 
   const formatDateRange = (start: string | null | undefined, end: string | null | undefined): string => {
-    if (!start && !end) return '—'
-    if (!start) return `→ ${formatDate(end!)}`
-    if (!end) return `${formatDate(start)} →`
-    return `${formatDate(start)} → ${formatDate(end)}`
+    if (!start && !end) return '\u2014'
+    if (!start) return `\u2192 ${formatDate(end!)}`
+    if (!end) return `${formatDate(start)} \u2192`
+    return `${formatDate(start)} \u2192 ${formatDate(end)}`
   }
 
   return (
@@ -53,34 +55,16 @@ export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: Stor
 
           <div className="forecast-tooltip-section">
             <div className="forecast-tooltip-title">Расписание фаз</div>
-            {storyPlanning.phases.sa && (
-              <div className="forecast-phase">
-                <span className="phase-label sa">SA</span>
-                <span className="phase-dates">{formatDateRange(storyPlanning.phases.sa.startDate, storyPlanning.phases.sa.endDate)}</span>
-                {storyPlanning.phases.sa.assigneeDisplayName && (
-                  <span className="phase-assignee">{storyPlanning.phases.sa.assigneeDisplayName}</span>
+            {Object.entries(storyPlanning.phases).map(([role, phase]) => phase && (
+              <div key={role} className="forecast-phase">
+                <span className="phase-label" style={{ color: getRoleColor(role) }}>{role}</span>
+                <span className="phase-dates">{formatDateRange(phase.startDate, phase.endDate)}</span>
+                {phase.assigneeDisplayName && (
+                  <span className="phase-assignee">{phase.assigneeDisplayName}</span>
                 )}
               </div>
-            )}
-            {storyPlanning.phases.dev && (
-              <div className="forecast-phase">
-                <span className="phase-label dev">DEV</span>
-                <span className="phase-dates">{formatDateRange(storyPlanning.phases.dev.startDate, storyPlanning.phases.dev.endDate)}</span>
-                {storyPlanning.phases.dev.assigneeDisplayName && (
-                  <span className="phase-assignee">{storyPlanning.phases.dev.assigneeDisplayName}</span>
-                )}
-              </div>
-            )}
-            {storyPlanning.phases.qa && (
-              <div className="forecast-phase">
-                <span className="phase-label qa">QA</span>
-                <span className="phase-dates">{formatDateRange(storyPlanning.phases.qa.startDate, storyPlanning.phases.qa.endDate)}</span>
-                {storyPlanning.phases.qa.assigneeDisplayName && (
-                  <span className="phase-assignee">{storyPlanning.phases.qa.assigneeDisplayName}</span>
-                )}
-              </div>
-            )}
-            {!storyPlanning.phases.sa && !storyPlanning.phases.dev && !storyPlanning.phases.qa && (
+            ))}
+            {Object.keys(storyPlanning.phases).length === 0 && (
               <div className="forecast-phase" style={{ color: '#666' }}>Нет данных о фазах</div>
             )}
           </div>

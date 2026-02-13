@@ -13,7 +13,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
     @Query(value = """
         SELECT
             DATE_TRUNC('week', done_at) as period_start,
-            issue_type,
+            COALESCE(board_category, 'STORY') as category,
             COUNT(*) as count
         FROM jira_issues
         WHERE team_id = :teamId
@@ -21,7 +21,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
           AND (:issueType IS NULL OR issue_type = :issueType)
           AND (:epicKey IS NULL OR parent_key = :epicKey OR issue_key = :epicKey)
           AND (:assigneeAccountId IS NULL OR assignee_account_id = :assigneeAccountId)
-        GROUP BY DATE_TRUNC('week', done_at), issue_type
+        GROUP BY DATE_TRUNC('week', done_at), COALESCE(board_category, 'STORY')
         ORDER BY period_start
         """, nativeQuery = true)
     List<Object[]> getThroughputByWeek(
@@ -97,14 +97,14 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
 
     @Query(value = """
         SELECT
-            issue_type,
+            COALESCE(board_category, 'STORY') as category,
             COUNT(*) as count
         FROM jira_issues
         WHERE team_id = :teamId
           AND done_at BETWEEN :from AND :to
           AND (:issueType IS NULL OR issue_type = :issueType)
           AND (:epicKey IS NULL OR parent_key = :epicKey OR issue_key = :epicKey)
-        GROUP BY issue_type
+        GROUP BY COALESCE(board_category, 'STORY')
         """, nativeQuery = true)
     List<Object[]> getThroughputByType(
             @Param("teamId") Long teamId,

@@ -8,7 +8,7 @@ public record TeamMemberDto(
     Long teamId,
     String jiraAccountId,
     String displayName,
-    Role role,
+    String role,
     Grade grade,
     BigDecimal hoursPerDay,
     Boolean active,

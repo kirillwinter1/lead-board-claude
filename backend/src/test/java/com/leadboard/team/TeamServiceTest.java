@@ -9,7 +9,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -149,11 +151,11 @@ class TeamServiceTest {
         });
 
         CreateTeamMemberRequest request = new CreateTeamMemberRequest(
-                "acc-456", "Jane Smith", Role.QA, Grade.SENIOR, new BigDecimal("7.0"));
+                "acc-456", "Jane Smith", "QA", Grade.SENIOR, new BigDecimal("7.0"));
         TeamMemberDto result = teamService.addTeamMember(1L, request);
 
         assertEquals("Jane Smith", result.displayName());
-        assertEquals(Role.QA, result.role());
+        assertEquals("QA", result.role());
         assertEquals(Grade.SENIOR, result.grade());
         assertEquals(new BigDecimal("7.0"), result.hoursPerDay());
     }
@@ -173,7 +175,7 @@ class TeamServiceTest {
                 "acc-789", "Default Member", null, null, null);
         TeamMemberDto result = teamService.addTeamMember(1L, request);
 
-        assertEquals(Role.DEV, result.role());
+        assertEquals("DEV", result.role());
         assertEquals(Grade.MIDDLE, result.grade());
         assertEquals(new BigDecimal("6.0"), result.hoursPerDay());
     }
@@ -185,7 +187,7 @@ class TeamServiceTest {
         when(memberRepository.existsByTeamIdAndJiraAccountIdAndActiveTrue(1L, "acc-123")).thenReturn(true);
 
         CreateTeamMemberRequest request = new CreateTeamMemberRequest(
-                "acc-123", "Duplicate", Role.DEV, Grade.JUNIOR, null);
+                "acc-123", "Duplicate", "DEV", Grade.JUNIOR, null);
 
         assertThrows(TeamService.TeamMemberAlreadyExistsException.class,
                 () -> teamService.addTeamMember(1L, request));
@@ -200,11 +202,11 @@ class TeamServiceTest {
         when(memberRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateTeamMemberRequest request = new UpdateTeamMemberRequest(
-                "New Name", Role.SA, Grade.SENIOR, new BigDecimal("8.0"));
+                "New Name", "SA", Grade.SENIOR, new BigDecimal("8.0"));
         TeamMemberDto result = teamService.updateTeamMember(1L, 1L, request);
 
         assertEquals("New Name", result.displayName());
-        assertEquals(Role.SA, result.role());
+        assertEquals("SA", result.role());
         assertEquals(Grade.SENIOR, result.grade());
         assertEquals(new BigDecimal("8.0"), result.hoursPerDay());
     }
@@ -250,9 +252,8 @@ class TeamServiceTest {
                         new BigDecimal("1.8")
                 ),
                 new BigDecimal("0.3"),
-                new PlanningConfigDto.WipLimits(8, 3, 4, 3),
-                PlanningConfigDto.StoryDuration.defaults(),
-                null  // statusMapping
+                new PlanningConfigDto.WipLimits(8, Map.of("SA", 3, "DEV", 4, "QA", 3)),
+                PlanningConfigDto.StoryDuration.defaults()
         );
         team.setPlanningConfig(objectMapper.writeValueAsString(config));
         when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
@@ -277,9 +278,8 @@ class TeamServiceTest {
                         new BigDecimal("1.3")
                 ),
                 new BigDecimal("0.15"),
-                new PlanningConfigDto.WipLimits(5, 2, 3, 2),
-                PlanningConfigDto.StoryDuration.defaults(),
-                null  // statusMapping
+                new PlanningConfigDto.WipLimits(5, Map.of("SA", 2, "DEV", 3, "QA", 2)),
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         PlanningConfigDto result = teamService.updatePlanningConfig(1L, config);
@@ -299,8 +299,7 @@ class TeamServiceTest {
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("-0.1"),
                 PlanningConfigDto.WipLimits.defaults(),
-                PlanningConfigDto.StoryDuration.defaults(),
-                null  // statusMapping
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         assertThrows(TeamService.InvalidPlanningConfigException.class,
@@ -320,8 +319,7 @@ class TeamServiceTest {
                 ),
                 new BigDecimal("0.2"),
                 PlanningConfigDto.WipLimits.defaults(),
-                PlanningConfigDto.StoryDuration.defaults(),
-                null  // statusMapping
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         assertThrows(TeamService.InvalidPlanningConfigException.class,
@@ -336,9 +334,8 @@ class TeamServiceTest {
         PlanningConfigDto config = new PlanningConfigDto(
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
-                new PlanningConfigDto.WipLimits(0, 2, 3, 2),
-                PlanningConfigDto.StoryDuration.defaults(),
-                null  // statusMapping
+                new PlanningConfigDto.WipLimits(0, Map.of("SA", 2, "DEV", 3, "QA", 2)),
+                PlanningConfigDto.StoryDuration.defaults()
         );
 
         assertThrows(TeamService.InvalidPlanningConfigException.class,
@@ -361,7 +358,7 @@ class TeamServiceTest {
         member.setTeam(team);
         member.setJiraAccountId(accountId);
         member.setDisplayName(displayName);
-        member.setRole(Role.DEV);
+        member.setRole("DEV");
         member.setGrade(Grade.MIDDLE);
         member.setHoursPerDay(new BigDecimal("6.0"));
         member.setActive(true);

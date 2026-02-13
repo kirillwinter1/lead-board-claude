@@ -8,10 +8,10 @@ import com.leadboard.forecast.entity.ForecastSnapshotEntity;
 import com.leadboard.forecast.repository.ForecastSnapshotRepository;
 import com.leadboard.metrics.dto.ForecastAccuracyResponse;
 import com.leadboard.metrics.dto.ForecastAccuracyResponse.EpicAccuracy;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Service for calculating forecast accuracy metrics.
@@ -38,7 +37,7 @@ public class ForecastAccuracyService {
     private final JiraIssueRepository issueRepository;
     private final WorkCalendarService workCalendarService;
     private final StatusChangelogRepository statusChangelogRepository;
-    private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
     private final ObjectMapper objectMapper;
 
     public ForecastAccuracyService(
@@ -46,13 +45,13 @@ public class ForecastAccuracyService {
             JiraIssueRepository issueRepository,
             WorkCalendarService workCalendarService,
             StatusChangelogRepository statusChangelogRepository,
-            StatusMappingService statusMappingService
+            WorkflowConfigService workflowConfigService
     ) {
         this.snapshotRepository = snapshotRepository;
         this.issueRepository = issueRepository;
         this.workCalendarService = workCalendarService;
         this.statusChangelogRepository = statusChangelogRepository;
-        this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -98,21 +97,6 @@ public class ForecastAccuracyService {
             }
         }
 
-        // Build time-logging-allowed and done status sets
-        var config = statusMappingService.getDefaultConfig();
-        Set<String> developingStatuses = new HashSet<>();
-        if (config.timeLoggingAllowedStatuses() != null) {
-            for (String s : config.timeLoggingAllowedStatuses()) {
-                developingStatuses.add(s.toLowerCase());
-            }
-        }
-        Set<String> doneStatuses = new HashSet<>();
-        if (config.epicWorkflow() != null && config.epicWorkflow().doneStatuses() != null) {
-            for (String s : config.epicWorkflow().doneStatuses()) {
-                doneStatuses.add(s.toLowerCase());
-            }
-        }
-
         // Calculate accuracy for each epic
         List<EpicAccuracy> epicAccuracies = new ArrayList<>();
         int onTimeCount = 0;
@@ -122,7 +106,7 @@ public class ForecastAccuracyService {
         int totalScheduleVariance = 0;
 
         for (JiraIssueEntity epic : completedEpics) {
-            EpicAccuracy accuracy = calculateEpicAccuracy(epic, snapshotEntries, developingStatuses, doneStatuses);
+            EpicAccuracy accuracy = calculateEpicAccuracy(epic, snapshotEntries);
             if (accuracy != null) {
                 epicAccuracies.add(accuracy);
                 totalAccuracyRatio = totalAccuracyRatio.add(accuracy.accuracyRatio());
@@ -170,16 +154,14 @@ public class ForecastAccuracyService {
      */
     private EpicAccuracy calculateEpicAccuracy(
             JiraIssueEntity epic,
-            List<SnapshotEntry> snapshotEntries,
-            Set<String> developingStatuses,
-            Set<String> doneStatuses
+            List<SnapshotEntry> snapshotEntries
     ) {
         // Determine actual start/end from status changelog
         List<StatusChangelogEntity> changelog = statusChangelogRepository
                 .findByIssueKeyOrderByTransitionedAtAsc(epic.getIssueKey());
 
-        LocalDate actualStart = findActualStart(changelog, developingStatuses);
-        LocalDate actualEnd = findActualEnd(changelog, doneStatuses);
+        LocalDate actualStart = findActualStart(changelog, epic.getIssueType());
+        LocalDate actualEnd = findActualEnd(changelog, epic.getIssueType());
 
         // Fallback to entity dates
         if (actualEnd == null) {
@@ -302,11 +284,11 @@ public class ForecastAccuracyService {
     }
 
     /**
-     * Find actual start date: first transition to a developing/time-logging-allowed status.
+     * Find actual start date: first transition to an in-progress status.
      */
-    private LocalDate findActualStart(List<StatusChangelogEntity> changelog, Set<String> developingStatuses) {
+    private LocalDate findActualStart(List<StatusChangelogEntity> changelog, String issueType) {
         for (StatusChangelogEntity entry : changelog) {
-            if (developingStatuses.contains(entry.getToStatus().toLowerCase())) {
+            if (workflowConfigService.isInProgress(entry.getToStatus(), issueType)) {
                 return entry.getTransitionedAt().toLocalDate();
             }
         }
@@ -316,10 +298,10 @@ public class ForecastAccuracyService {
     /**
      * Find actual end date: last transition to a done status.
      */
-    private LocalDate findActualEnd(List<StatusChangelogEntity> changelog, Set<String> doneStatuses) {
+    private LocalDate findActualEnd(List<StatusChangelogEntity> changelog, String issueType) {
         LocalDate lastDone = null;
         for (StatusChangelogEntity entry : changelog) {
-            if (doneStatuses.contains(entry.getToStatus().toLowerCase())) {
+            if (workflowConfigService.isDone(entry.getToStatus(), issueType)) {
                 lastDone = entry.getTransitionedAt().toLocalDate();
             }
         }

@@ -1,9 +1,14 @@
 package com.leadboard.poker.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Entity
 @Table(name = "poker_stories")
@@ -23,27 +28,17 @@ public class PokerStoryEntity {
     @Column(nullable = false)
     private String title;
 
-    @Column(name = "needs_sa", nullable = false)
-    private boolean needsSa = false;
-
-    @Column(name = "needs_dev", nullable = false)
-    private boolean needsDev = false;
-
-    @Column(name = "needs_qa", nullable = false)
-    private boolean needsQa = false;
+    @Column(name = "needs_roles", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<String> needsRoles = new ArrayList<>();
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private StoryStatus status = StoryStatus.PENDING;
 
-    @Column(name = "final_sa_hours")
-    private Integer finalSaHours;
-
-    @Column(name = "final_dev_hours")
-    private Integer finalDevHours;
-
-    @Column(name = "final_qa_hours")
-    private Integer finalQaHours;
+    @Column(name = "final_estimates", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Integer> finalEstimates = new HashMap<>();
 
     @Column(name = "order_index", nullable = false)
     private Integer orderIndex;
@@ -98,28 +93,16 @@ public class PokerStoryEntity {
         this.title = title;
     }
 
-    public boolean isNeedsSa() {
-        return needsSa;
+    public List<String> getNeedsRoles() {
+        return needsRoles;
     }
 
-    public void setNeedsSa(boolean needsSa) {
-        this.needsSa = needsSa;
+    public void setNeedsRoles(List<String> needsRoles) {
+        this.needsRoles = needsRoles != null ? needsRoles : new ArrayList<>();
     }
 
-    public boolean isNeedsDev() {
-        return needsDev;
-    }
-
-    public void setNeedsDev(boolean needsDev) {
-        this.needsDev = needsDev;
-    }
-
-    public boolean isNeedsQa() {
-        return needsQa;
-    }
-
-    public void setNeedsQa(boolean needsQa) {
-        this.needsQa = needsQa;
+    public boolean needsRole(String roleCode) {
+        return needsRoles != null && needsRoles.contains(roleCode);
     }
 
     public StoryStatus getStatus() {
@@ -130,28 +113,25 @@ public class PokerStoryEntity {
         this.status = status;
     }
 
-    public Integer getFinalSaHours() {
-        return finalSaHours;
+    public Map<String, Integer> getFinalEstimates() {
+        return finalEstimates;
     }
 
-    public void setFinalSaHours(Integer finalSaHours) {
-        this.finalSaHours = finalSaHours;
+    public void setFinalEstimates(Map<String, Integer> finalEstimates) {
+        this.finalEstimates = finalEstimates != null ? finalEstimates : new HashMap<>();
     }
 
-    public Integer getFinalDevHours() {
-        return finalDevHours;
+    public Integer getFinalEstimate(String roleCode) {
+        return finalEstimates != null ? finalEstimates.get(roleCode) : null;
     }
 
-    public void setFinalDevHours(Integer finalDevHours) {
-        this.finalDevHours = finalDevHours;
-    }
-
-    public Integer getFinalQaHours() {
-        return finalQaHours;
-    }
-
-    public void setFinalQaHours(Integer finalQaHours) {
-        this.finalQaHours = finalQaHours;
+    public void setFinalEstimate(String roleCode, Integer hours) {
+        if (finalEstimates == null) {
+            finalEstimates = new HashMap<>();
+        }
+        if (hours != null) {
+            finalEstimates.put(roleCode, hours);
+        }
     }
 
     public Integer getOrderIndex() {

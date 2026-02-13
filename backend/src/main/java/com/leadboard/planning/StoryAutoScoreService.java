@@ -1,8 +1,6 @@
 package com.leadboard.planning;
 
 import com.leadboard.config.service.WorkflowConfigService;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -37,14 +35,11 @@ public class StoryAutoScoreService {
 
     private static final Logger log = LoggerFactory.getLogger(StoryAutoScoreService.class);
 
-    private final StatusMappingService statusMappingService;
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
 
-    public StoryAutoScoreService(StatusMappingService statusMappingService,
-                                  JiraIssueRepository issueRepository,
+    public StoryAutoScoreService(JiraIssueRepository issueRepository,
                                   WorkflowConfigService workflowConfigService) {
-        this.statusMappingService = statusMappingService;
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
     }
@@ -52,8 +47,8 @@ public class StoryAutoScoreService {
     /**
      * Calculate AutoScore for a story.
      */
-    public BigDecimal calculateAutoScore(JiraIssueEntity story, StatusMappingConfig teamConfig) {
-        Map<String, BigDecimal> breakdown = calculateScoreBreakdown(story, teamConfig);
+    public BigDecimal calculateAutoScore(JiraIssueEntity story) {
+        Map<String, BigDecimal> breakdown = calculateScoreBreakdown(story);
 
         // Sum all components
         BigDecimal total = BigDecimal.ZERO;
@@ -67,14 +62,14 @@ public class StoryAutoScoreService {
     /**
      * Calculate AutoScore breakdown for UI tooltip.
      */
-    public Map<String, BigDecimal> calculateScoreBreakdown(JiraIssueEntity story, StatusMappingConfig teamConfig) {
+    public Map<String, BigDecimal> calculateScoreBreakdown(JiraIssueEntity story) {
         Map<String, BigDecimal> breakdown = new HashMap<>();
 
         // 1. Issue Type Weight (Bug=100, Story=0)
         breakdown.put("issueType", calculateIssueTypeWeight(story));
 
         // 2. Status Weight (by workflow, step 10)
-        breakdown.put("status", calculateStatusWeight(story, teamConfig));
+        breakdown.put("status", calculateStatusWeight(story));
 
         // 3. Progress Weight (timeSpent/estimate * 30)
         breakdown.put("progress", calculateProgressWeight(story));
@@ -113,7 +108,7 @@ public class StoryAutoScoreService {
         return BigDecimal.ZERO;
     }
 
-    private BigDecimal calculateStatusWeight(JiraIssueEntity story, StatusMappingConfig teamConfig) {
+    private BigDecimal calculateStatusWeight(JiraIssueEntity story) {
         if (story.getStatus() == null) {
             return BigDecimal.ZERO;
         }
@@ -141,10 +136,10 @@ public class StoryAutoScoreService {
         if (matchesStatus(status, "Ready to Release", "Готов к релизу")) return BigDecimal.valueOf(100);
         if (matchesStatus(status, "Done", "Готово")) return BigDecimal.ZERO;
 
-        // Fallback: check using StatusMappingService
-        if (statusMappingService.isDone(status, teamConfig)) {
+        // Fallback: check using WorkflowConfigService
+        if (workflowConfigService.isDone(status, story.getIssueType())) {
             return BigDecimal.ZERO;
-        } else if (statusMappingService.isInProgress(status, teamConfig)) {
+        } else if (workflowConfigService.isInProgress(status, story.getIssueType())) {
             return BigDecimal.valueOf(50);
         }
 
@@ -284,11 +279,10 @@ public class StoryAutoScoreService {
      */
     public int recalculateAll() {
         int count = 0;
-        StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
 
         List<JiraIssueEntity> stories = issueRepository.findByBoardCategory("STORY");
         for (JiraIssueEntity story : stories) {
-            BigDecimal score = calculateAutoScore(story, defaultConfig);
+            BigDecimal score = calculateAutoScore(story);
             story.setAutoScore(score);
             story.setAutoScoreCalculatedAt(OffsetDateTime.now());
             issueRepository.save(story);
@@ -312,14 +306,13 @@ public class StoryAutoScoreService {
         }
 
         int count = 0;
-        StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
 
         for (String parentKey : parentKeys) {
             List<JiraIssueEntity> stories = issueRepository.findByParentKey(parentKey);
             for (JiraIssueEntity story : stories) {
                 // Only recalculate for story types, not subtasks
                 if (isStoryType(story.getIssueType())) {
-                    BigDecimal score = calculateAutoScore(story, defaultConfig);
+                    BigDecimal score = calculateAutoScore(story);
                     story.setAutoScore(score);
                     story.setAutoScoreCalculatedAt(OffsetDateTime.now());
                     issueRepository.save(story);
@@ -357,12 +350,11 @@ public class StoryAutoScoreService {
         }
 
         int count = 0;
-        StatusMappingConfig defaultConfig = StatusMappingConfig.defaults();
 
         for (String storyKey : storyKeys) {
             issueRepository.findByIssueKey(storyKey).ifPresent(story -> {
                 if (isStoryType(story.getIssueType())) {
-                    BigDecimal score = calculateAutoScore(story, defaultConfig);
+                    BigDecimal score = calculateAutoScore(story);
                     story.setAutoScore(score);
                     story.setAutoScoreCalculatedAt(OffsetDateTime.now());
                     issueRepository.save(story);

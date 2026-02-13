@@ -29,9 +29,6 @@ public class AutoScoreService {
         this.issueRepository = issueRepository;
     }
 
-    // Поддержка локализованных типов
-    private static final List<String> EPIC_TYPES = List.of("Epic", "Эпик");
-
     /**
      * Пересчитывает AutoScore для всех эпиков.
      *
@@ -39,17 +36,15 @@ public class AutoScoreService {
      */
     @Transactional
     public int recalculateAll() {
+        List<JiraIssueEntity> epics = issueRepository.findByBoardCategory("EPIC");
         int count = 0;
 
-        for (String epicType : EPIC_TYPES) {
-            List<JiraIssueEntity> epics = issueRepository.findByIssueType(epicType);
-            for (JiraIssueEntity epic : epics) {
-                BigDecimal score = calculator.calculate(epic);
-                epic.setAutoScore(score);
-                epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
-                issueRepository.save(epic);
-                count++;
-            }
+        for (JiraIssueEntity epic : epics) {
+            BigDecimal score = calculator.calculate(epic);
+            epic.setAutoScore(score);
+            epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
+            issueRepository.save(epic);
+            count++;
         }
 
         log.info("Recalculated AutoScore for {} epics", count);
@@ -64,17 +59,15 @@ public class AutoScoreService {
      */
     @Transactional
     public int recalculateForTeam(Long teamId) {
+        List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
         int count = 0;
 
-        for (String epicType : EPIC_TYPES) {
-            List<JiraIssueEntity> epics = issueRepository.findByIssueTypeAndTeamId(epicType, teamId);
-            for (JiraIssueEntity epic : epics) {
-                BigDecimal score = calculator.calculate(epic);
-                epic.setAutoScore(score);
-                epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
-                issueRepository.save(epic);
-                count++;
-            }
+        for (JiraIssueEntity epic : epics) {
+            BigDecimal score = calculator.calculate(epic);
+            epic.setAutoScore(score);
+            epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
+            issueRepository.save(epic);
+            count++;
         }
 
         log.info("Recalculated AutoScore for {} epics of team {}", count, teamId);
@@ -137,7 +130,7 @@ public class AutoScoreService {
      * @return список эпиков
      */
     public List<JiraIssueEntity> getEpicsByPriority(Long teamId) {
-        return issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(EPIC_TYPES, teamId);
+        return issueRepository.findByBoardCategoryAndTeamIdOrderByAutoScoreDesc("EPIC", teamId);
     }
 
     /**
@@ -148,7 +141,7 @@ public class AutoScoreService {
      * @return список эпиков
      */
     public List<JiraIssueEntity> getEpicsByPriorityAndStatus(Long teamId, List<String> statuses) {
-        return issueRepository.findByIssueTypeInAndTeamIdAndStatusInOrderByAutoScoreDesc(EPIC_TYPES, teamId, statuses);
+        return issueRepository.findByBoardCategoryAndTeamIdAndStatusInOrderByAutoScoreDesc("EPIC", teamId, statuses);
     }
 
     /**

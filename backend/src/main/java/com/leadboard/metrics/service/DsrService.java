@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.entity.WorkflowRoleEntity;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.forecast.entity.ForecastSnapshotEntity;
 import com.leadboard.forecast.repository.ForecastSnapshotRepository;
 import com.leadboard.metrics.dto.EpicDsr;
@@ -40,16 +42,19 @@ public class DsrService {
     private final JiraIssueRepository issueRepository;
     private final WorkCalendarService workCalendarService;
     private final ForecastSnapshotRepository snapshotRepository;
+    private final WorkflowConfigService workflowConfigService;
     private final ObjectMapper objectMapper;
 
     public DsrService(
             JiraIssueRepository issueRepository,
             WorkCalendarService workCalendarService,
-            ForecastSnapshotRepository snapshotRepository
+            ForecastSnapshotRepository snapshotRepository,
+            WorkflowConfigService workflowConfigService
     ) {
         this.issueRepository = issueRepository;
         this.workCalendarService = workCalendarService;
         this.snapshotRepository = snapshotRepository;
+        this.workflowConfigService = workflowConfigService;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -166,17 +171,17 @@ public class DsrService {
             }
         }
 
-        // 2. Fallback to rough estimates on epic
-        BigDecimal sa = epic.getRoughEstimateSaDays();
-        BigDecimal dev = epic.getRoughEstimateDevDays();
-        BigDecimal qa = epic.getRoughEstimateQaDays();
-        if (sa != null || dev != null || qa != null) {
-            BigDecimal total = BigDecimal.ZERO;
-            if (sa != null) total = total.add(sa);
-            if (dev != null) total = total.add(dev);
-            if (qa != null) total = total.add(qa);
-            if (total.compareTo(BigDecimal.ZERO) > 0) return total;
+        // 2. Fallback to rough estimates on epic (dynamic roles from workflow config)
+        BigDecimal total = BigDecimal.ZERO;
+        boolean hasAny = false;
+        for (WorkflowRoleEntity role : workflowConfigService.getRolesInPipelineOrder()) {
+            BigDecimal estimate = epic.getRoughEstimate(role.getCode());
+            if (estimate != null) {
+                total = total.add(estimate);
+                hasAny = true;
+            }
         }
+        if (hasAny && total.compareTo(BigDecimal.ZERO) > 0) return total;
 
         return null;
     }

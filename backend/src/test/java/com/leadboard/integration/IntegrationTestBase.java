@@ -1,10 +1,14 @@
 package com.leadboard.integration;
 
+import com.leadboard.config.entity.*;
+import com.leadboard.config.repository.*;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.poker.repository.PokerSessionRepository;
 import com.leadboard.poker.repository.PokerStoryRepository;
 import com.leadboard.poker.repository.PokerVoteRepository;
+import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
@@ -74,6 +78,24 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected PokerSessionRepository pokerSessionRepository;
 
+    @Autowired
+    protected ProjectConfigurationRepository projectConfigRepo;
+
+    @Autowired
+    protected WorkflowRoleRepository workflowRoleRepo;
+
+    @Autowired
+    protected IssueTypeMappingRepository issueTypeMappingRepo;
+
+    @Autowired
+    protected StatusMappingRepository statusMappingRepo;
+
+    @Autowired
+    protected LinkTypeMappingRepository linkTypeMappingRepo;
+
+    @Autowired
+    protected WorkflowConfigService workflowConfigService;
+
     @BeforeEach
     void cleanUp() {
         // Delete in correct order to respect FK constraints
@@ -84,6 +106,103 @@ public abstract class IntegrationTestBase {
         issueRepository.deleteAll();
         teamMemberRepository.deleteAll();
         teamRepository.deleteAll();
+
+        // Seed workflow config (V26 no longer has seed data)
+        seedWorkflowConfig();
+    }
+
+    /**
+     * Seeds minimal workflow configuration for integration tests.
+     * Replaces the seed data that was previously in V26.
+     */
+    protected void seedWorkflowConfig() {
+        // Check if already seeded (Flyway creates the singleton row)
+        var existingConfig = projectConfigRepo.findByIsDefaultTrue();
+        if (existingConfig.isEmpty()) return;
+
+        Long configId = existingConfig.get().getId();
+
+        // Only seed if empty (avoid duplicates across tests)
+        if (!workflowRoleRepo.findByConfigIdOrderBySortOrderAsc(configId).isEmpty()) return;
+
+        // Roles
+        saveRole(configId, "SA", "System Analyst", "#3b82f6", 1, false);
+        saveRole(configId, "DEV", "Developer", "#10b981", 2, true);
+        saveRole(configId, "QA", "QA Engineer", "#f59e0b", 3, false);
+
+        // Issue type mappings
+        saveIssueType(configId, "Эпик", BoardCategory.EPIC, null);
+        saveIssueType(configId, "Epic", BoardCategory.EPIC, null);
+        saveIssueType(configId, "История", BoardCategory.STORY, null);
+        saveIssueType(configId, "Story", BoardCategory.STORY, null);
+        saveIssueType(configId, "Bug", BoardCategory.STORY, null);
+        saveIssueType(configId, "Аналитика", BoardCategory.SUBTASK, "SA");
+        saveIssueType(configId, "Разработка", BoardCategory.SUBTASK, "DEV");
+        saveIssueType(configId, "Тестирование", BoardCategory.SUBTASK, "QA");
+        saveIssueType(configId, "Sub-task", BoardCategory.SUBTASK, "DEV");
+
+        // Status mappings — EPIC
+        saveStatus(configId, "Новое", BoardCategory.EPIC, StatusCategory.NEW, null, 0, -5);
+        saveStatus(configId, "В работе", BoardCategory.EPIC, StatusCategory.IN_PROGRESS, null, 30, 25);
+        saveStatus(configId, "Done", BoardCategory.EPIC, StatusCategory.DONE, null, 50, 0);
+        saveStatus(configId, "Готово", BoardCategory.EPIC, StatusCategory.DONE, null, 50, 0);
+
+        // Status mappings — STORY
+        saveStatus(configId, "Новое", BoardCategory.STORY, StatusCategory.NEW, null, 0, 0);
+        saveStatus(configId, "В работе", BoardCategory.STORY, StatusCategory.IN_PROGRESS, null, 20, 0);
+        saveStatus(configId, "Done", BoardCategory.STORY, StatusCategory.DONE, null, 50, 0);
+
+        // Status mappings — SUBTASK
+        saveStatus(configId, "Новое", BoardCategory.SUBTASK, StatusCategory.NEW, null, 0, 0);
+        saveStatus(configId, "В работе", BoardCategory.SUBTASK, StatusCategory.IN_PROGRESS, null, 10, 0);
+        saveStatus(configId, "Done", BoardCategory.SUBTASK, StatusCategory.DONE, null, 50, 0);
+
+        // Link types
+        saveLinkType(configId, "Blocks", LinkCategory.BLOCKS);
+
+        // Refresh caches
+        workflowConfigService.clearCache();
+    }
+
+    private void saveRole(Long configId, String code, String displayName, String color, int order, boolean isDefault) {
+        WorkflowRoleEntity role = new WorkflowRoleEntity();
+        role.setConfigId(configId);
+        role.setCode(code);
+        role.setDisplayName(displayName);
+        role.setColor(color);
+        role.setSortOrder(order);
+        role.setDefault(isDefault);
+        workflowRoleRepo.save(role);
+    }
+
+    private void saveIssueType(Long configId, String name, BoardCategory cat, String roleCode) {
+        IssueTypeMappingEntity e = new IssueTypeMappingEntity();
+        e.setConfigId(configId);
+        e.setJiraTypeName(name);
+        e.setBoardCategory(cat);
+        e.setWorkflowRoleCode(roleCode);
+        issueTypeMappingRepo.save(e);
+    }
+
+    private void saveStatus(Long configId, String statusName, BoardCategory issueCat, StatusCategory statusCat,
+                             String roleCode, int sortOrder, int scoreWeight) {
+        StatusMappingEntity e = new StatusMappingEntity();
+        e.setConfigId(configId);
+        e.setJiraStatusName(statusName);
+        e.setIssueCategory(issueCat);
+        e.setStatusCategory(statusCat);
+        e.setWorkflowRoleCode(roleCode);
+        e.setSortOrder(sortOrder);
+        e.setScoreWeight(scoreWeight);
+        statusMappingRepo.save(e);
+    }
+
+    private void saveLinkType(Long configId, String name, LinkCategory cat) {
+        LinkTypeMappingEntity e = new LinkTypeMappingEntity();
+        e.setConfigId(configId);
+        e.setJiraLinkTypeName(name);
+        e.setLinkCategory(cat);
+        linkTypeMappingRepo.save(e);
     }
 
     // Helper methods

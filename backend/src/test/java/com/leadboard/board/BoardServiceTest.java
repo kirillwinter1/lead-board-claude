@@ -9,8 +9,6 @@ import com.leadboard.quality.DataQualityRule;
 import com.leadboard.quality.DataQualityService;
 import com.leadboard.quality.DataQualityViolation;
 import com.leadboard.status.StatusCategory;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
@@ -52,8 +50,6 @@ class BoardServiceTest {
     @Mock
     private DataQualityService dataQualityService;
 
-    @Mock
-    private StatusMappingService statusMappingService;
 
     @Mock
     private UnifiedPlanningService unifiedPlanningService;
@@ -71,7 +67,6 @@ class BoardServiceTest {
                 teamRepository,
                 roughEstimateProperties,
                 dataQualityService,
-                statusMappingService,
                 unifiedPlanningService,
                 workflowConfigService
         );
@@ -80,10 +75,9 @@ class BoardServiceTest {
         when(jiraProperties.getProjectKey()).thenReturn("LB");
         when(jiraProperties.getBaseUrl()).thenReturn("https://jira.example.com");
         when(teamRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
-        when(statusMappingService.getDefaultConfig()).thenReturn(StatusMappingConfig.defaults());
-        when(dataQualityService.checkEpic(any(), anyList(), any())).thenReturn(Collections.emptyList());
-        when(dataQualityService.checkStory(any(), any(), anyList(), any())).thenReturn(Collections.emptyList());
-        when(dataQualityService.checkSubtask(any(), any(), any(), any())).thenReturn(Collections.emptyList());
+        when(dataQualityService.checkEpic(any(), anyList())).thenReturn(Collections.emptyList());
+        when(dataQualityService.checkStory(any(), any(), anyList())).thenReturn(Collections.emptyList());
+        when(dataQualityService.checkSubtask(any(), any(), any())).thenReturn(Collections.emptyList());
 
         // WorkflowConfigService stubs
         when(workflowConfigService.isEpic("Эпик")).thenReturn(true);
@@ -189,7 +183,6 @@ class BoardServiceTest {
             JiraIssueEntity subtask = createSubtask("LB-3", "Subtask", "В работе", "LB-2", "Разработка");
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, subtask));
-            when(jiraProperties.getRoleForSubtaskType("Разработка")).thenReturn("DEVELOPMENT");
 
             BoardResponse response = boardService.getBoard();
 
@@ -231,7 +224,6 @@ class BoardServiceTest {
                     3600L * 8, 3600L * 4); // 8h estimate, 4h logged = 50%
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, subtask));
-            when(jiraProperties.getRoleForSubtaskType("Разработка")).thenReturn("DEVELOPMENT");
 
             BoardResponse response = boardService.getBoard();
 
@@ -250,9 +242,6 @@ class BoardServiceTest {
             JiraIssueEntity qaTask = createSubtaskWithTime("LB-5", "QA", "LB-2", "Тестирование", 3600L * 8, 0L);
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, saTask, devTask, qaTask));
-            when(jiraProperties.getRoleForSubtaskType("Аналитика")).thenReturn("ANALYTICS");
-            when(jiraProperties.getRoleForSubtaskType("Разработка")).thenReturn("DEVELOPMENT");
-            when(jiraProperties.getRoleForSubtaskType("Тестирование")).thenReturn("TESTING");
 
             BoardResponse response = boardService.getBoard();
 
@@ -260,16 +249,16 @@ class BoardServiceTest {
             assertNotNull(epicNode.getRoleProgress());
 
             // SA: 8h/8h = 100%
-            assertEquals(3600L * 8, epicNode.getRoleProgress().getAnalytics().getEstimateSeconds());
-            assertEquals(3600L * 8, epicNode.getRoleProgress().getAnalytics().getLoggedSeconds());
+            assertEquals(3600L * 8, epicNode.getRoleProgress().get("SA").getEstimateSeconds());
+            assertEquals(3600L * 8, epicNode.getRoleProgress().get("SA").getLoggedSeconds());
 
             // DEV: 8h/16h = 50%
-            assertEquals(3600L * 16, epicNode.getRoleProgress().getDevelopment().getEstimateSeconds());
-            assertEquals(3600L * 8, epicNode.getRoleProgress().getDevelopment().getLoggedSeconds());
+            assertEquals(3600L * 16, epicNode.getRoleProgress().get("DEV").getEstimateSeconds());
+            assertEquals(3600L * 8, epicNode.getRoleProgress().get("DEV").getLoggedSeconds());
 
             // QA: 0h/8h = 0%
-            assertEquals(3600L * 8, epicNode.getRoleProgress().getTesting().getEstimateSeconds());
-            assertEquals(0L, epicNode.getRoleProgress().getTesting().getLoggedSeconds());
+            assertEquals(3600L * 8, epicNode.getRoleProgress().get("QA").getEstimateSeconds());
+            assertEquals(0L, epicNode.getRoleProgress().get("QA").getLoggedSeconds());
         }
 
         @Test
@@ -280,7 +269,6 @@ class BoardServiceTest {
             JiraIssueEntity subtask = createSubtaskWithTime("LB-3", "Dev", "LB-2", "Разработка", 0L, 0L);
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, subtask));
-            when(jiraProperties.getRoleForSubtaskType("Разработка")).thenReturn("DEVELOPMENT");
 
             BoardResponse response = boardService.getBoard();
 
@@ -479,7 +467,7 @@ class BoardServiceTest {
             DataQualityViolation violation = DataQualityViolation.of(DataQualityRule.EPIC_NO_DUE_DATE);
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic));
-            when(dataQualityService.checkEpic(any(), anyList(), any())).thenReturn(List.of(violation));
+            when(dataQualityService.checkEpic(any(), anyList())).thenReturn(List.of(violation));
 
             BoardResponse response = boardService.getBoard();
 

@@ -5,14 +5,14 @@ interface UsePokerWebSocketOptions {
   roomCode: string
   accountId: string
   displayName: string
-  role: 'SA' | 'DEV' | 'QA'
+  role: string
   isFacilitator: boolean
   onStateUpdate?: (state: SessionState) => void
   onParticipantJoined?: (participant: ParticipantInfo) => void
   onParticipantLeft?: (accountId: string) => void
   onVoteCast?: (storyId: number, voterAccountId: string, role: string) => void
   onVotesRevealed?: (storyId: number, votes: PokerVote[]) => void
-  onStoryCompleted?: (storyId: number, saHours: number, devHours: number, qaHours: number) => void
+  onStoryCompleted?: (storyId: number, finalEstimates: Record<string, number>) => void
   onCurrentStoryChanged?: (storyId: number) => void
   onSessionCompleted?: () => void
   onError?: (message: string) => void
@@ -114,9 +114,7 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
       case 'STORY_COMPLETED':
         onStoryCompleted?.(
           message.payload.storyId as number,
-          message.payload.finalSaHours as number,
-          message.payload.finalDevHours as number,
-          message.payload.finalQaHours as number
+          message.payload.finalEstimates as Record<string, number>
         )
         break
       case 'CURRENT_STORY_CHANGED':
@@ -163,14 +161,12 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
     }
   }, [])
 
-  const sendSetFinal = useCallback((storyId: number, saHours: number | null, devHours: number | null, qaHours: number | null) => {
+  const sendSetFinal = useCallback((storyId: number, finalEstimates: Record<string, number | null>) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'SET_FINAL',
         storyId,
-        saHours,
-        devHours,
-        qaHours,
+        finalEstimates,
       }))
     }
   }, [])

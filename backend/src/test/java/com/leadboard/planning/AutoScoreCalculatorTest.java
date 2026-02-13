@@ -361,9 +361,9 @@ class AutoScoreCalculatorTest {
     @Test
     void sizeSmallEpicGivesHighScore() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setRoughEstimateSaDays(new BigDecimal("1"));
-        epic.setRoughEstimateDevDays(new BigDecimal("2"));
-        epic.setRoughEstimateQaDays(new BigDecimal("1"));
+        epic.setRoughEstimate("SA", new BigDecimal("1"));
+        epic.setRoughEstimate("DEV", new BigDecimal("2"));
+        epic.setRoughEstimate("QA", new BigDecimal("1"));
         // Total 4 days - small epic
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
@@ -375,9 +375,9 @@ class AutoScoreCalculatorTest {
     @Test
     void sizeLargeEpicGivesLowScore() {
         JiraIssueEntity epic = createBasicEpic();
-        epic.setRoughEstimateSaDays(new BigDecimal("10"));
-        epic.setRoughEstimateDevDays(new BigDecimal("40"));
-        epic.setRoughEstimateQaDays(new BigDecimal("10"));
+        epic.setRoughEstimate("SA", new BigDecimal("10"));
+        epic.setRoughEstimate("DEV", new BigDecimal("40"));
+        epic.setRoughEstimate("QA", new BigDecimal("10"));
         // Total 60 days - large epic
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
@@ -548,9 +548,9 @@ class AutoScoreCalculatorTest {
     @Test
     void epicWithEstimateScoresHigherThanWithout() {
         JiraIssueEntity withEstimate = createBasicEpic();
-        withEstimate.setRoughEstimateSaDays(new BigDecimal("2"));
-        withEstimate.setRoughEstimateDevDays(new BigDecimal("5"));
-        withEstimate.setRoughEstimateQaDays(new BigDecimal("2"));
+        withEstimate.setRoughEstimate("SA", new BigDecimal("2"));
+        withEstimate.setRoughEstimate("DEV", new BigDecimal("5"));
+        withEstimate.setRoughEstimate("QA", new BigDecimal("2"));
 
         JiraIssueEntity withoutEstimate = createBasicEpic();
         // No estimates

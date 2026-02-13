@@ -22,9 +22,8 @@ public class TeamMemberEntity {
     @Column(name = "display_name", length = 255)
     private String displayName;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false, length = 50)
-    private Role role = Role.DEV;
+    private String role = "DEV";
 
     @Enumerated(EnumType.STRING)
     @Column(name = "grade", nullable = false, length = 50)
@@ -86,20 +85,12 @@ public class TeamMemberEntity {
         this.displayName = displayName;
     }
 
-    public Role getRole() {
+    public String getRole() {
         return role;
     }
 
-    public void setRole(Role role) {
+    public void setRole(String role) {
         this.role = role;
-    }
-
-    /**
-     * Returns role as a String code (e.g., "SA", "DEV", "QA").
-     * Used by dynamic workflow configuration.
-     */
-    public String getRoleCode() {
-        return role != null ? role.name() : "DEV";
     }
 
     public Grade getGrade() {

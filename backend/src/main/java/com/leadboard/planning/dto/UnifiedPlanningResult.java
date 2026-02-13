@@ -28,21 +28,19 @@ public record UnifiedPlanningResult(
             LocalDate startDate,
             LocalDate endDate,
             List<PlannedStory> stories,
-            PhaseAggregation phaseAggregation,
+            Map<String, PhaseAggregationEntry> phaseAggregation,
             // Additional fields for epic card/tooltip
             String status,
             LocalDate dueDate,
             Long totalEstimateSeconds,
             Long totalLoggedSeconds,
             Integer progressPercent,
-            RoleProgressInfo roleProgress,
+            Map<String, PhaseProgressInfo> roleProgress,
             int storiesTotal,
             int storiesActive,
             // Rough estimate fields (for epics without stories)
             boolean isRoughEstimate,
-            BigDecimal roughEstimateSaDays,
-            BigDecimal roughEstimateDevDays,
-            BigDecimal roughEstimateQaDays
+            Map<String, BigDecimal> roughEstimates
     ) {}
 
     /**
@@ -55,7 +53,7 @@ public record UnifiedPlanningResult(
             String status,
             LocalDate startDate,
             LocalDate endDate,
-            PlannedPhases phases,
+            Map<String, PhaseSchedule> phases,
             List<String> blockedBy,
             List<PlanningWarning> warnings,
             // Additional fields for tooltip
@@ -67,21 +65,8 @@ public record UnifiedPlanningResult(
             Long totalLoggedSeconds,
             Integer progressPercent,
             // Phase completion status
-            RoleProgressInfo roleProgress
+            Map<String, PhaseProgressInfo> roleProgress
     ) {}
-
-    /**
-     * Progress info per role (SA/DEV/QA).
-     */
-    public record RoleProgressInfo(
-            PhaseProgressInfo sa,
-            PhaseProgressInfo dev,
-            PhaseProgressInfo qa
-    ) {
-        public static RoleProgressInfo empty() {
-            return new RoleProgressInfo(null, null, null);
-        }
-    }
 
     /**
      * Progress info for a single phase.
@@ -91,19 +76,6 @@ public record UnifiedPlanningResult(
             Long loggedSeconds,
             boolean completed
     ) {}
-
-    /**
-     * Phase schedules for a story (SA -> DEV -> QA pipeline).
-     */
-    public record PlannedPhases(
-            PhaseSchedule sa,
-            PhaseSchedule dev,
-            PhaseSchedule qa
-    ) {
-        public static PlannedPhases empty() {
-            return new PlannedPhases(null, null, null);
-        }
-    }
 
     /**
      * Schedule for a single phase.
@@ -122,32 +94,13 @@ public record UnifiedPlanningResult(
     }
 
     /**
-     * Aggregated phase data for epic.
+     * Aggregated phase data entry for a single role.
      */
-    public record PhaseAggregation(
-            BigDecimal saHours,
-            BigDecimal devHours,
-            BigDecimal qaHours,
-            LocalDate saStartDate,
-            LocalDate saEndDate,
-            LocalDate devStartDate,
-            LocalDate devEndDate,
-            LocalDate qaStartDate,
-            LocalDate qaEndDate
-    ) {
-        public static PhaseAggregation empty() {
-            return new PhaseAggregation(
-                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                    null, null, null, null, null, null
-            );
-        }
-
-        public boolean hasData() {
-            return (saHours != null && saHours.compareTo(BigDecimal.ZERO) > 0) ||
-                    (devHours != null && devHours.compareTo(BigDecimal.ZERO) > 0) ||
-                    (qaHours != null && qaHours.compareTo(BigDecimal.ZERO) > 0);
-        }
-    }
+    public record PhaseAggregationEntry(
+            BigDecimal hours,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {}
 
     /**
      * Planning warning.

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
 import com.leadboard.poker.entity.PokerStoryEntity;
-import com.leadboard.poker.entity.PokerVoteEntity.VoterRole;
 import com.leadboard.poker.service.PokerJiraService;
 import com.leadboard.poker.service.PokerSessionService;
 import org.slf4j.Logger;
@@ -18,6 +17,7 @@ import org.springframework.web.util.UriTemplate;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -134,8 +134,7 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        VoterRole voterRole = VoterRole.valueOf(participant.role());
-        sessionService.castVote(storyId, participant.accountId(), participant.displayName(), voterRole, hours);
+        sessionService.castVote(storyId, participant.accountId(), participant.displayName(), participant.role(), hours);
 
         // Broadcast that a vote was cast (without revealing the value)
         broadcastToRoom(roomCode, PokerMessage.voteCast(storyId, participant.accountId(), participant.role()));
@@ -157,11 +156,9 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
         broadcastToRoom(roomCode, PokerMessage.votesRevealed(storyId, votes));
     }
 
+    @SuppressWarnings("unchecked")
     private void handleSetFinal(WebSocketSession session, String roomCode, Map<String, Object> payload) throws IOException {
         Long storyId = ((Number) payload.get("storyId")).longValue();
-        Integer saHours = payload.get("saHours") != null ? ((Number) payload.get("saHours")).intValue() : null;
-        Integer devHours = payload.get("devHours") != null ? ((Number) payload.get("devHours")).intValue() : null;
-        Integer qaHours = payload.get("qaHours") != null ? ((Number) payload.get("qaHours")).intValue() : null;
 
         // Check if facilitator
         ParticipantInfo participant = sessionParticipants.get(session.getId());
@@ -170,18 +167,30 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        PokerStoryEntity story = sessionService.setFinalEstimate(storyId, saHours, devHours, qaHours);
+        // Parse finalEstimates from payload
+        Map<String, Integer> finalEstimates = new HashMap<>();
+        Object estimatesObj = payload.get("finalEstimates");
+        if (estimatesObj instanceof Map) {
+            Map<String, Object> rawEstimates = (Map<String, Object>) estimatesObj;
+            for (Map.Entry<String, Object> entry : rawEstimates.entrySet()) {
+                if (entry.getValue() instanceof Number) {
+                    finalEstimates.put(entry.getKey(), ((Number) entry.getValue()).intValue());
+                }
+            }
+        }
+
+        PokerStoryEntity story = sessionService.setFinalEstimate(storyId, finalEstimates);
 
         // Update Jira if story has a key
         if (story.getStoryKey() != null) {
             try {
-                jiraService.updateSubtaskEstimates(story.getStoryKey(), saHours, devHours, qaHours);
+                jiraService.updateSubtaskEstimates(story.getStoryKey(), finalEstimates);
             } catch (Exception e) {
                 log.error("Failed to update Jira estimates: {}", e.getMessage());
             }
         }
 
-        broadcastToRoom(roomCode, PokerMessage.storyCompleted(storyId, saHours, devHours, qaHours));
+        broadcastToRoom(roomCode, PokerMessage.storyCompleted(storyId, finalEstimates));
     }
 
     private void handleNextStory(WebSocketSession session, String roomCode, Map<String, Object> payload) throws IOException {

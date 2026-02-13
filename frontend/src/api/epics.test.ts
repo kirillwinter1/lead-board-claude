@@ -108,9 +108,9 @@ describe('Epics API', () => {
           epicKey: 'EPIC-1',
           role: 'sa',
           updatedDays: 10,
-          saDays: 10,
-          devDays: null,
-          qaDays: null
+          roughEstimates: { SA: 10, DEV: null, QA: null },
+          roughEstimateUpdatedAt: null,
+          roughEstimateUpdatedBy: null
         }
       }
       mockedAxios.patch.mockResolvedValueOnce(mockResponse)
@@ -121,7 +121,7 @@ describe('Epics API', () => {
         '/api/epics/EPIC-1/rough-estimate/sa',
         { days: 10 }
       )
-      expect(result.saDays).toBe(10)
+      expect(result.roughEstimates['SA']).toBe(10)
     })
 
     it('should clear rough estimate when days is null', async () => {
@@ -130,9 +130,9 @@ describe('Epics API', () => {
           epicKey: 'EPIC-1',
           role: 'dev',
           updatedDays: null,
-          saDays: 10,
-          devDays: null,
-          qaDays: 5
+          roughEstimates: { SA: 10, DEV: null, QA: 5 },
+          roughEstimateUpdatedAt: null,
+          roughEstimateUpdatedBy: null
         }
       }
       mockedAxios.patch.mockResolvedValueOnce(mockResponse)
@@ -143,7 +143,7 @@ describe('Epics API', () => {
         '/api/epics/EPIC-1/rough-estimate/dev',
         { days: null }
       )
-      expect(result.devDays).toBeNull()
+      expect(result.roughEstimates['DEV']).toBeNull()
     })
   })
 })

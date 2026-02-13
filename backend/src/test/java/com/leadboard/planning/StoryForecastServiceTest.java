@@ -2,7 +2,6 @@ package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.config.service.WorkflowConfigService;
-import com.leadboard.status.StatusMappingConfig;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
@@ -77,7 +76,7 @@ class StoryForecastServiceTest {
         story.setAssigneeAccountId("user-123");
         story.setAssigneeDisplayName("John Doe");
 
-        TeamMemberEntity member = createMember("user-123", "John Doe", Role.DEV, Grade.MIDDLE, "6.0");
+        TeamMemberEntity member = createMember("user-123", "John Doe", "DEV", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story));
@@ -117,9 +116,9 @@ class StoryForecastServiceTest {
 
         JiraIssueEntity epic = createEpic(epicKey, "Epic 1");
         JiraIssueEntity story = createStory("STORY-1", 28800L, 0L);
-        story.setRoughEstimateDevDays(BigDecimal.ONE); // Indicates DEV role
+        story.setRoughEstimate("DEV", BigDecimal.ONE); // Indicates DEV role
 
-        TeamMemberEntity member = createMember("user-123", "John Doe", Role.DEV, Grade.MIDDLE, "6.0");
+        TeamMemberEntity member = createMember("user-123", "John Doe", "DEV", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story));
@@ -159,7 +158,7 @@ class StoryForecastServiceTest {
         story2.setAssigneeAccountId("user-123");
         story2.setIsBlockedBy(List.of("STORY-1"));
 
-        TeamMemberEntity member = createMember("user-123", "John Doe", Role.DEV, Grade.MIDDLE, "6.0");
+        TeamMemberEntity member = createMember("user-123", "John Doe", "DEV", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story1, story2));
@@ -203,13 +202,13 @@ class StoryForecastServiceTest {
         JiraIssueEntity epic = createEpic(epicKey, "Epic 1");
 
         JiraIssueEntity story1 = createStory("STORY-1", 28800L, 0L);
-        story1.setRoughEstimateDevDays(BigDecimal.ONE); // DEV role
+        story1.setRoughEstimate("DEV", BigDecimal.ONE); // DEV role
 
         JiraIssueEntity story2 = createStory("STORY-2", 28800L, 0L);
-        story2.setRoughEstimateQaDays(BigDecimal.ONE); // QA role
+        story2.setRoughEstimate("QA", BigDecimal.ONE); // QA role
 
-        TeamMemberEntity devMember = createMember("dev-123", "Dev User", Role.DEV, Grade.MIDDLE, "6.0");
-        TeamMemberEntity qaMember = createMember("qa-456", "QA User", Role.QA, Grade.MIDDLE, "6.0");
+        TeamMemberEntity devMember = createMember("dev-123", "Dev User", "DEV", Grade.MIDDLE, "6.0");
+        TeamMemberEntity qaMember = createMember("qa-456", "QA User", "QA", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story1, story2));
@@ -259,7 +258,7 @@ class StoryForecastServiceTest {
         JiraIssueEntity story3 = createStory("STORY-3", 28800L, 0L);
         story3.setAssigneeAccountId("user-123");
 
-        TeamMemberEntity member = createMember("user-123", "John Doe", Role.DEV, Grade.MIDDLE, "6.0");
+        TeamMemberEntity member = createMember("user-123", "John Doe", "DEV", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story1, story2, story3));
@@ -301,7 +300,7 @@ class StoryForecastServiceTest {
         JiraIssueEntity story = createStory("STORY-1", 28800L, 0L); // 8 hours
         story.setAssigneeAccountId("senior-123");
 
-        TeamMemberEntity seniorMember = createMember("senior-123", "Senior Dev", Role.DEV, Grade.SENIOR, "6.0");
+        TeamMemberEntity seniorMember = createMember("senior-123", "Senior Dev", "DEV", Grade.SENIOR, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story));
@@ -337,7 +336,7 @@ class StoryForecastServiceTest {
         JiraIssueEntity epic = createEpic(epicKey, "Epic 1");
         JiraIssueEntity story = createStory("STORY-1", null, 0L); // No estimate
 
-        TeamMemberEntity member = createMember("user-123", "John Doe", Role.DEV, Grade.MIDDLE, "6.0");
+        TeamMemberEntity member = createMember("user-123", "John Doe", "DEV", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story));
@@ -364,7 +363,7 @@ class StoryForecastServiceTest {
         JiraIssueEntity story = createStory("STORY-1", 28800L, 14400L); // 8 hours, 4 spent
         story.setAssigneeAccountId("user-123");
 
-        TeamMemberEntity member = createMember("user-123", "John Doe", Role.DEV, Grade.MIDDLE, "6.0");
+        TeamMemberEntity member = createMember("user-123", "John Doe", "DEV", Grade.MIDDLE, "6.0");
 
         when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
         when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story));
@@ -412,7 +411,7 @@ class StoryForecastServiceTest {
         return story;
     }
 
-    private TeamMemberEntity createMember(String accountId, String name, Role role, Grade grade, String hoursPerDay) {
+    private TeamMemberEntity createMember(String accountId, String name, String role, Grade grade, String hoursPerDay) {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setJiraAccountId(accountId);
         member.setDisplayName(name);
@@ -428,8 +427,7 @@ class StoryForecastServiceTest {
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 PlanningConfigDto.WipLimits.defaults(),
-                PlanningConfigDto.StoryDuration.defaults(),
-                StatusMappingConfig.defaults()
+                PlanningConfigDto.StoryDuration.defaults()
         );
     }
 }

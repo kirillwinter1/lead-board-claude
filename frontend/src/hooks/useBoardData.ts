@@ -67,7 +67,7 @@ export function useBoardData() {
     fetchRoughEstimateConfig()
   }, [fetchBoard, fetchSyncStatus, fetchRoughEstimateConfig])
 
-  const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => {
+  const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: string, days: number | null) => {
     await updateRoughEstimate(epicKey, role, { days })
     await fetchBoard()
   }, [fetchBoard])

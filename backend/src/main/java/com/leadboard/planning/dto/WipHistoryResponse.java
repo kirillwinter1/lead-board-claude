@@ -2,6 +2,7 @@ package com.leadboard.planning.dto;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Ответ с историей WIP для построения графика.
@@ -19,12 +20,7 @@ public record WipHistoryResponse(
             LocalDate date,
             Integer teamLimit,
             Integer teamCurrent,
-            Integer saLimit,
-            Integer saCurrent,
-            Integer devLimit,
-            Integer devCurrent,
-            Integer qaLimit,
-            Integer qaCurrent,
+            Map<String, WipRoleData> roleData,
             Integer inQueue,
             Integer totalEpics
     ) {
@@ -36,4 +32,12 @@ public record WipHistoryResponse(
             return Math.round((float) teamCurrent / teamLimit * 100);
         }
     }
+
+    /**
+     * WIP data for a single role.
+     */
+    public record WipRoleData(
+            Integer limit,
+            Integer current
+    ) {}
 }

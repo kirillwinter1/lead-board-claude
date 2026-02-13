@@ -43,9 +43,9 @@ class SyncIntegrationTest extends IntegrationTestBase {
         var epic = createEpic("EPIC-1", "Original Summary", "Новое", team.getId());
 
         // Set local fields (rough estimates)
-        epic.setRoughEstimateSaDays(new BigDecimal("5.0"));
-        epic.setRoughEstimateDevDays(new BigDecimal("10.0"));
-        epic.setRoughEstimateQaDays(new BigDecimal("3.0"));
+        epic.setRoughEstimate("SA", new BigDecimal("5.0"));
+        epic.setRoughEstimate("DEV", new BigDecimal("10.0"));
+        epic.setRoughEstimate("QA", new BigDecimal("3.0"));
         epic.setAutoScore(new BigDecimal("85.5"));
         issueRepository.save(epic);
 
@@ -59,9 +59,9 @@ class SyncIntegrationTest extends IntegrationTestBase {
         assertEquals("Updated Summary", updated.getSummary());
         assertEquals("В работе", updated.getStatus());
         // Compare BigDecimal by value, not scale
-        assertEquals(0, new BigDecimal("5.0").compareTo(updated.getRoughEstimateSaDays()));
-        assertEquals(0, new BigDecimal("10.0").compareTo(updated.getRoughEstimateDevDays()));
-        assertEquals(0, new BigDecimal("3.0").compareTo(updated.getRoughEstimateQaDays()));
+        assertEquals(0, new BigDecimal("5.0").compareTo(updated.getRoughEstimate("SA")));
+        assertEquals(0, new BigDecimal("10.0").compareTo(updated.getRoughEstimate("DEV")));
+        assertEquals(0, new BigDecimal("3.0").compareTo(updated.getRoughEstimate("QA")));
         assertEquals(0, new BigDecimal("85.5").compareTo(updated.getAutoScore()));
     }
 
@@ -119,11 +119,11 @@ class SyncIntegrationTest extends IntegrationTestBase {
         var epic2 = createEpic("EPIC-2", "Backend Epic", "Новое", team2.getId());
 
         // Then
-        var frontendEpics = issueRepository.findByIssueTypeAndTeamId("Эпик", team1.getId());
+        var frontendEpics = issueRepository.findByBoardCategoryAndTeamId("EPIC", team1.getId());
         assertEquals(1, frontendEpics.size());
         assertEquals("EPIC-1", frontendEpics.get(0).getIssueKey());
 
-        var backendEpics = issueRepository.findByIssueTypeAndTeamId("Эпик", team2.getId());
+        var backendEpics = issueRepository.findByBoardCategoryAndTeamId("EPIC", team2.getId());
         assertEquals(1, backendEpics.size());
         assertEquals("EPIC-2", backendEpics.get(0).getIssueKey());
     }

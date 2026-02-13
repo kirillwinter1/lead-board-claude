@@ -1,5 +1,9 @@
 package com.leadboard.component;
 
+import com.leadboard.config.entity.*;
+import com.leadboard.config.repository.*;
+import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
@@ -54,10 +58,92 @@ public abstract class ComponentTestBase {
     @Autowired
     protected TeamRepository teamRepository;
 
+    @Autowired
+    protected ProjectConfigurationRepository projectConfigRepo;
+
+    @Autowired
+    protected WorkflowRoleRepository workflowRoleRepo;
+
+    @Autowired
+    protected IssueTypeMappingRepository issueTypeMappingRepo;
+
+    @Autowired
+    protected StatusMappingRepository statusMappingRepo;
+
+    @Autowired
+    protected LinkTypeMappingRepository linkTypeMappingRepo;
+
+    @Autowired
+    protected WorkflowConfigService workflowConfigService;
+
     @BeforeEach
     void cleanUp() {
         issueRepository.deleteAll();
         teamRepository.deleteAll();
+        seedWorkflowConfig();
+    }
+
+    protected void seedWorkflowConfig() {
+        var existingConfig = projectConfigRepo.findByIsDefaultTrue();
+        if (existingConfig.isEmpty()) return;
+        Long configId = existingConfig.get().getId();
+        if (!workflowRoleRepo.findByConfigIdOrderBySortOrderAsc(configId).isEmpty()) return;
+
+        // Roles
+        saveRole(configId, "SA", "System Analyst", "#3b82f6", 1, false);
+        saveRole(configId, "DEV", "Developer", "#10b981", 2, true);
+        saveRole(configId, "QA", "QA Engineer", "#f59e0b", 3, false);
+
+        // Issue types
+        saveIssueType(configId, "Эпик", BoardCategory.EPIC, null);
+        saveIssueType(configId, "История", BoardCategory.STORY, null);
+        saveIssueType(configId, "Bug", BoardCategory.STORY, null);
+        saveIssueType(configId, "Аналитика", BoardCategory.SUBTASK, "SA");
+        saveIssueType(configId, "Разработка", BoardCategory.SUBTASK, "DEV");
+        saveIssueType(configId, "Тестирование", BoardCategory.SUBTASK, "QA");
+
+        // Statuses
+        saveStatus(configId, "Новое", BoardCategory.EPIC, StatusCategory.NEW, null, 0, -5);
+        saveStatus(configId, "В работе", BoardCategory.EPIC, StatusCategory.IN_PROGRESS, null, 30, 25);
+        saveStatus(configId, "Done", BoardCategory.EPIC, StatusCategory.DONE, null, 50, 0);
+        saveStatus(configId, "Новое", BoardCategory.STORY, StatusCategory.NEW, null, 0, 0);
+        saveStatus(configId, "В работе", BoardCategory.STORY, StatusCategory.IN_PROGRESS, null, 20, 0);
+        saveStatus(configId, "Done", BoardCategory.STORY, StatusCategory.DONE, null, 50, 0);
+        saveStatus(configId, "Новое", BoardCategory.SUBTASK, StatusCategory.NEW, null, 0, 0);
+        saveStatus(configId, "В работе", BoardCategory.SUBTASK, StatusCategory.IN_PROGRESS, null, 10, 0);
+        saveStatus(configId, "Done", BoardCategory.SUBTASK, StatusCategory.DONE, null, 50, 0);
+
+        saveLinkType(configId, "Blocks", LinkCategory.BLOCKS);
+
+        workflowConfigService.clearCache();
+    }
+
+    private void saveRole(Long configId, String code, String displayName, String color, int order, boolean isDefault) {
+        WorkflowRoleEntity e = new WorkflowRoleEntity();
+        e.setConfigId(configId); e.setCode(code); e.setDisplayName(displayName);
+        e.setColor(color); e.setSortOrder(order); e.setDefault(isDefault);
+        workflowRoleRepo.save(e);
+    }
+
+    private void saveIssueType(Long configId, String name, BoardCategory cat, String roleCode) {
+        IssueTypeMappingEntity e = new IssueTypeMappingEntity();
+        e.setConfigId(configId); e.setJiraTypeName(name); e.setBoardCategory(cat); e.setWorkflowRoleCode(roleCode);
+        issueTypeMappingRepo.save(e);
+    }
+
+    private void saveStatus(Long configId, String statusName, BoardCategory issueCat, StatusCategory statusCat,
+                             String roleCode, int sortOrder, int scoreWeight) {
+        StatusMappingEntity e = new StatusMappingEntity();
+        e.setConfigId(configId); e.setJiraStatusName(statusName); e.setIssueCategory(issueCat);
+        e.setStatusCategory(statusCat); e.setWorkflowRoleCode(roleCode);
+        e.setSortOrder(sortOrder); e.setScoreWeight(scoreWeight);
+        statusMappingRepo.save(e);
+    }
+
+    private void saveLinkType(Long configId, String name, LinkCategory cat) {
+        LinkTypeMappingEntity e = new LinkTypeMappingEntity();
+        e.setConfigId(configId); e.setJiraLinkTypeName(name); e.setLinkCategory(cat);
+        linkTypeMappingRepo.save(e);
     }
 
     protected TeamEntity createTeam(String name) {
@@ -74,6 +160,7 @@ public abstract class ComponentTestBase {
         epic.setIssueId("id-" + key);
         epic.setSummary(summary);
         epic.setIssueType("Эпик");
+        epic.setBoardCategory("EPIC");
         epic.setStatus("Новое");
         epic.setTeamId(teamId);
         epic.setProjectKey("TEST");
@@ -87,6 +174,7 @@ public abstract class ComponentTestBase {
         epic.setIssueId("id-" + key);
         epic.setSummary(summary);
         epic.setIssueType("Эпик");
+        epic.setBoardCategory("EPIC");
         epic.setStatus(status);
         epic.setTeamId(teamId);
         epic.setProjectKey("TEST");
@@ -100,6 +188,7 @@ public abstract class ComponentTestBase {
         story.setIssueId("id-" + key);
         story.setSummary(summary);
         story.setIssueType("История");
+        story.setBoardCategory("STORY");
         story.setStatus("Новое");
         story.setParentKey(parentKey);
         story.setTeamId(teamId);
@@ -114,6 +203,7 @@ public abstract class ComponentTestBase {
         subtask.setIssueId("id-" + key);
         subtask.setSummary(summary);
         subtask.setIssueType(subtaskType);
+        subtask.setBoardCategory("SUBTASK");
         subtask.setStatus("Новое");
         subtask.setParentKey(parentKey);
         subtask.setTeamId(teamId);

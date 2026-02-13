@@ -3,18 +3,16 @@ package com.leadboard.planning.dto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Ответ API с информацией о загрузке команды по ролям.
- * Показывает capacity, assigned hours и utilization для каждой роли (SA/DEV/QA).
  */
 public record RoleLoadResponse(
         Long teamId,
         LocalDate planningDate,
         int periodDays,
-        RoleLoadInfo sa,
-        RoleLoadInfo dev,
-        RoleLoadInfo qa,
+        Map<String, RoleLoadInfo> roles,
         List<RoleLoadAlert> alerts
 ) {
 
@@ -43,10 +41,10 @@ public record RoleLoadResponse(
      * Статус утилизации роли.
      */
     public enum UtilizationStatus {
-        OVERLOAD,    // >100%
-        NORMAL,      // 50-100%
-        IDLE,        // <50%
-        NO_CAPACITY  // нет людей в роли
+        OVERLOAD,
+        NORMAL,
+        IDLE,
+        NO_CAPACITY
     }
 
     /**
@@ -62,9 +60,9 @@ public record RoleLoadResponse(
      * Типы алертов.
      */
     public enum AlertType {
-        ROLE_OVERLOAD,  // Роль перегружена (>100%)
-        ROLE_IDLE,      // Роль простаивает (<50%)
-        IMBALANCE,      // Дисбаланс между ролями (>40% разница)
-        NO_CAPACITY     // Нет людей в роли
+        ROLE_OVERLOAD,
+        ROLE_IDLE,
+        IMBALANCE,
+        NO_CAPACITY
     }
 }

@@ -8,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.http.HttpStatus;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -127,8 +129,8 @@ class PokerIntegrationTest extends IntegrationTestBase {
                 SessionResponse.class).getBody();
 
         // When - add stories
-        var story1 = new AddStoryRequest("User login feature", true, true, true, null);
-        var story2 = new AddStoryRequest("Dashboard widget", false, true, true, null);
+        var story1 = new AddStoryRequest("User login feature", List.of("SA", "DEV", "QA"), null);
+        var story2 = new AddStoryRequest("Dashboard widget", List.of("DEV", "QA"), null);
 
         var addResponse1 = restTemplate.postForEntity(
                 "/api/poker/sessions/" + session.id() + "/stories",
@@ -143,10 +145,10 @@ class PokerIntegrationTest extends IntegrationTestBase {
         // Then
         assertEquals(HttpStatus.OK, addResponse1.getStatusCode());
         assertEquals("User login feature", addResponse1.getBody().title());
-        assertTrue(addResponse1.getBody().needsSa());
+        assertTrue(addResponse1.getBody().needsRoles().contains("SA"));
 
         assertEquals(HttpStatus.OK, addResponse2.getStatusCode());
-        assertFalse(addResponse2.getBody().needsSa());
+        assertFalse(addResponse2.getBody().needsRoles().contains("SA"));
 
         // When - list stories
         var listResponse = restTemplate.getForEntity(

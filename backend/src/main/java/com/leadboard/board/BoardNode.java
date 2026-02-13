@@ -16,17 +16,14 @@ public class BoardNode {
     private String status;
     private String issueType;
     private String jiraUrl;
-    private String role; // ANALYTICS, DEVELOPMENT, TESTING (for sub-tasks)
+    private String role; // workflow role code (for sub-tasks)
     private Long teamId;
     private String teamName;
     private Long estimateSeconds;
     private Long loggedSeconds;
     private Integer progress; // 0-100
-    private RoleProgress roleProgress; // aggregated progress by role
+    private Map<String, RoleMetrics> roleProgress; // dynamic role progress by role code
     private boolean epicInTodo; // true if Epic is in Backlog/To Do status (for UI styling)
-    private BigDecimal roughEstimateSaDays; // rough estimate for SA (Epic only, for editing)
-    private BigDecimal roughEstimateDevDays; // rough estimate for DEV (Epic only, for editing)
-    private BigDecimal roughEstimateQaDays; // rough estimate for QA (Epic only, for editing)
     private Map<String, BigDecimal> roughEstimates; // dynamic rough estimates by role code
     private BigDecimal autoScore; // AutoScore for prioritization (Epic and Story)
     private Integer manualOrder; // Manual order position (1 = first)
@@ -36,7 +33,6 @@ public class BoardNode {
     private LocalDate expectedDone; // Expected completion date (Story only, calculated)
     private String assigneeAccountId; // Assignee Jira account ID (Story only)
     private String assigneeDisplayName; // Assignee display name (Story only)
-    private Map<String, RoleMetrics> roleProgressMap; // dynamic role progress by role code
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
@@ -139,11 +135,11 @@ public class BoardNode {
         this.progress = progress;
     }
 
-    public RoleProgress getRoleProgress() {
+    public Map<String, RoleMetrics> getRoleProgress() {
         return roleProgress;
     }
 
-    public void setRoleProgress(RoleProgress roleProgress) {
+    public void setRoleProgress(Map<String, RoleMetrics> roleProgress) {
         this.roleProgress = roleProgress;
     }
 
@@ -153,30 +149,6 @@ public class BoardNode {
 
     public void setEpicInTodo(boolean epicInTodo) {
         this.epicInTodo = epicInTodo;
-    }
-
-    public BigDecimal getRoughEstimateSaDays() {
-        return roughEstimateSaDays;
-    }
-
-    public void setRoughEstimateSaDays(BigDecimal roughEstimateSaDays) {
-        this.roughEstimateSaDays = roughEstimateSaDays;
-    }
-
-    public BigDecimal getRoughEstimateDevDays() {
-        return roughEstimateDevDays;
-    }
-
-    public void setRoughEstimateDevDays(BigDecimal roughEstimateDevDays) {
-        this.roughEstimateDevDays = roughEstimateDevDays;
-    }
-
-    public BigDecimal getRoughEstimateQaDays() {
-        return roughEstimateQaDays;
-    }
-
-    public void setRoughEstimateQaDays(BigDecimal roughEstimateQaDays) {
-        this.roughEstimateQaDays = roughEstimateQaDays;
     }
 
     public Map<String, BigDecimal> getRoughEstimates() {
@@ -251,14 +223,6 @@ public class BoardNode {
         this.assigneeDisplayName = assigneeDisplayName;
     }
 
-    public Map<String, RoleMetrics> getRoleProgressMap() {
-        return roleProgressMap;
-    }
-
-    public void setRoleProgressMap(Map<String, RoleMetrics> roleProgressMap) {
-        this.roleProgressMap = roleProgressMap;
-    }
-
     public List<DataQualityViolation> getAlerts() {
         return alerts;
     }
@@ -287,47 +251,13 @@ public class BoardNode {
         this.children.add(child);
     }
 
-    public static class RoleProgress {
-        private RoleMetrics analytics;
-        private RoleMetrics development;
-        private RoleMetrics testing;
-
-        public RoleProgress() {
-            this.analytics = new RoleMetrics();
-            this.development = new RoleMetrics();
-            this.testing = new RoleMetrics();
-        }
-
-        public RoleMetrics getAnalytics() {
-            return analytics;
-        }
-
-        public void setAnalytics(RoleMetrics analytics) {
-            this.analytics = analytics;
-        }
-
-        public RoleMetrics getDevelopment() {
-            return development;
-        }
-
-        public void setDevelopment(RoleMetrics development) {
-            this.development = development;
-        }
-
-        public RoleMetrics getTesting() {
-            return testing;
-        }
-
-        public void setTesting(RoleMetrics testing) {
-            this.testing = testing;
-        }
-    }
-
     public static class RoleMetrics {
         private long estimateSeconds;
         private long loggedSeconds;
         private int progress;
         private BigDecimal roughEstimateDays; // rough estimate for this role (Epic only)
+        private String displayName; // human-readable role name
+        private String color; // color for UI rendering
 
         public RoleMetrics() {
         }
@@ -343,6 +273,13 @@ public class BoardNode {
         public RoleMetrics(long estimateSeconds, long loggedSeconds, BigDecimal roughEstimateDays) {
             this(estimateSeconds, loggedSeconds);
             this.roughEstimateDays = roughEstimateDays;
+        }
+
+        public RoleMetrics(long estimateSeconds, long loggedSeconds, BigDecimal roughEstimateDays,
+                           String displayName, String color) {
+            this(estimateSeconds, loggedSeconds, roughEstimateDays);
+            this.displayName = displayName;
+            this.color = color;
         }
 
         public long getEstimateSeconds() {
@@ -375,6 +312,22 @@ public class BoardNode {
 
         public void setRoughEstimateDays(BigDecimal roughEstimateDays) {
             this.roughEstimateDays = roughEstimateDays;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        public void setDisplayName(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getColor() {
+            return color;
+        }
+
+        public void setColor(String color) {
+            this.color = color;
         }
     }
 }

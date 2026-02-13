@@ -9,13 +9,16 @@ import { DataQualityPage } from './pages/DataQualityPage'
 import { PlanningPokerPage } from './pages/PlanningPokerPage'
 import { PokerRoomPage } from './pages/PokerRoomPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { WorkflowConfigPage } from './pages/WorkflowConfigPage'
 import { MemberProfilePage } from './pages/MemberProfilePage'
 import { LandingPage } from './pages/landing/LandingPage'
+import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
 import './App.css'
 
 function App() {
   return (
     <BrowserRouter>
+      <WorkflowConfigProvider>
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/landing" element={<LandingPage />} />
@@ -30,8 +33,10 @@ function App() {
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
           <Route path="teams/:teamId/member/:memberId" element={<MemberProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="workflow" element={<WorkflowConfigPage />} />
         </Route>
       </Routes>
+      </WorkflowConfigProvider>
     </BrowserRouter>
   )
 }

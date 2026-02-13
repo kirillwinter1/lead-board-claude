@@ -1,10 +1,9 @@
 package com.leadboard.quality;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.quality.dto.DataQualityResponse;
 import com.leadboard.quality.dto.IssueViolations;
-import com.leadboard.status.StatusMappingConfig;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.http.ResponseEntity;
@@ -24,18 +23,18 @@ public class DataQualityController {
     private final JiraIssueRepository issueRepository;
     private final JiraProperties jiraProperties;
     private final DataQualityService dataQualityService;
-    private final StatusMappingService statusMappingService;
+    private final WorkflowConfigService workflowConfigService;
 
     public DataQualityController(
             JiraIssueRepository issueRepository,
             JiraProperties jiraProperties,
             DataQualityService dataQualityService,
-            StatusMappingService statusMappingService
+            WorkflowConfigService workflowConfigService
     ) {
         this.issueRepository = issueRepository;
         this.jiraProperties = jiraProperties;
         this.dataQualityService = dataQualityService;
-        this.statusMappingService = statusMappingService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -52,8 +51,6 @@ public class DataQualityController {
             return ResponseEntity.ok(emptyResponse(teamId));
         }
 
-        StatusMappingConfig statusMapping = statusMappingService.getDefaultConfig();
-
         // Load all issues
         List<JiraIssueEntity> allIssues = issueRepository.findByProjectKey(projectKey);
 
@@ -63,12 +60,12 @@ public class DataQualityController {
 
         // Separate by type
         List<JiraIssueEntity> epics = allIssues.stream()
-                .filter(e -> isEpic(e.getIssueType()))
+                .filter(e -> workflowConfigService.isEpic(e.getIssueType()))
                 .filter(e -> teamId == null || Objects.equals(e.getTeamId(), teamId))
                 .toList();
 
         List<JiraIssueEntity> storiesAndBugs = allIssues.stream()
-                .filter(e -> isStoryOrBug(e.getIssueType()))
+                .filter(e -> workflowConfigService.isStory(e.getIssueType()))
                 .toList();
 
         List<JiraIssueEntity> subtasks = allIssues.stream()
@@ -92,7 +89,7 @@ public class DataQualityController {
         // Check epics
         for (JiraIssueEntity epic : epics) {
             List<JiraIssueEntity> children = childrenByParent.getOrDefault(epic.getIssueKey(), List.of());
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, children, statusMapping);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, children);
 
             if (!violations.isEmpty()) {
                 allViolations.add(toIssueViolations(epic, baseUrl, violations));
@@ -102,7 +99,7 @@ public class DataQualityController {
             // Check children of this epic
             for (JiraIssueEntity child : children) {
                 List<JiraIssueEntity> childSubtasks = subtasksByParent.getOrDefault(child.getIssueKey(), List.of());
-                List<DataQualityViolation> childViolations = dataQualityService.checkStory(child, epic, childSubtasks, statusMapping);
+                List<DataQualityViolation> childViolations = dataQualityService.checkStory(child, epic, childSubtasks);
 
                 if (!childViolations.isEmpty()) {
                     allViolations.add(toIssueViolations(child, baseUrl, childViolations));
@@ -111,7 +108,7 @@ public class DataQualityController {
 
                 // Check subtasks
                 for (JiraIssueEntity subtask : childSubtasks) {
-                    List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(subtask, child, epic, statusMapping);
+                    List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(subtask, child, epic);
 
                     if (!subtaskViolations.isEmpty()) {
                         allViolations.add(toIssueViolations(subtask, baseUrl, subtaskViolations));
@@ -188,13 +185,4 @@ public class DataQualityController {
         return 2;
     }
 
-    private boolean isEpic(String issueType) {
-        return "Epic".equalsIgnoreCase(issueType) || "Эпик".equalsIgnoreCase(issueType);
-    }
-
-    private boolean isStoryOrBug(String issueType) {
-        String lower = issueType.toLowerCase();
-        return lower.contains("story") || lower.contains("история")
-                || lower.contains("bug") || lower.contains("баг");
-    }
 }

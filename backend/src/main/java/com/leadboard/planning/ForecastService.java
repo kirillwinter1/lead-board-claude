@@ -1,9 +1,10 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.config.entity.WorkflowRoleEntity;
 import com.leadboard.planning.dto.EpicForecast;
 import com.leadboard.planning.dto.EpicForecast.*;
 import com.leadboard.planning.dto.ForecastResponse;
-import com.leadboard.planning.dto.ForecastResponse.TeamCapacity;
 import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.planning.dto.ForecastResponse.RoleWipStatus;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
@@ -20,9 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Сервис расчёта прогноза завершения эпиков.
@@ -40,56 +39,45 @@ public class ForecastService {
     private final TeamService teamService;
     private final TeamMemberRepository memberRepository;
     private final UnifiedPlanningService unifiedPlanningService;
+    private final WorkflowConfigService workflowConfigService;
 
     public ForecastService(
             JiraIssueRepository issueRepository,
             TeamService teamService,
             TeamMemberRepository memberRepository,
-            UnifiedPlanningService unifiedPlanningService
+            UnifiedPlanningService unifiedPlanningService,
+            WorkflowConfigService workflowConfigService
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
         this.memberRepository = memberRepository;
         this.unifiedPlanningService = unifiedPlanningService;
+        this.workflowConfigService = workflowConfigService;
     }
 
-    /**
-     * Рассчитывает прогноз для всех эпиков команды.
-     */
     public ForecastResponse calculateForecast(Long teamId) {
         return calculateForecast(teamId, null);
     }
 
-    /**
-     * Рассчитывает прогноз для эпиков команды с фильтрацией по статусам.
-     * Делегирует к UnifiedPlanningService и конвертирует результат.
-     */
     public ForecastResponse calculateForecast(Long teamId, List<String> statuses) {
         log.info("Calculating forecast for team {} with statuses {}", teamId, statuses);
 
-        // Get unified planning result
         UnifiedPlanningResult unifiedResult = unifiedPlanningService.calculatePlan(teamId);
 
-        // Calculate team capacity for response
         PlanningConfigDto config = teamService.getPlanningConfig(teamId);
-        TeamCapacity teamCapacity = calculateTeamCapacity(teamId, config);
+        Map<String, BigDecimal> roleCapacity = calculateRoleCapacity(teamId, config);
 
-        // Convert unified result to forecast response
-        return convertToForecastResponse(unifiedResult, teamCapacity, statuses);
+        return convertToForecastResponse(unifiedResult, roleCapacity, statuses);
     }
 
-    /**
-     * Converts UnifiedPlanningResult to ForecastResponse for backward compatibility.
-     */
     private ForecastResponse convertToForecastResponse(
             UnifiedPlanningResult unifiedResult,
-            TeamCapacity teamCapacity,
+            Map<String, BigDecimal> roleCapacity,
             List<String> statusFilter
     ) {
         List<EpicForecast> forecasts = new ArrayList<>();
 
         for (PlannedEpic plannedEpic : unifiedResult.epics()) {
-            // Apply status filter if provided
             if (statusFilter != null && !statusFilter.isEmpty()) {
                 Optional<JiraIssueEntity> epicEntity = issueRepository.findByIssueKey(plannedEpic.epicKey());
                 if (epicEntity.isPresent() && !statusFilter.contains(epicEntity.get().getStatus())) {
@@ -101,53 +89,50 @@ public class ForecastService {
             forecasts.add(forecast);
         }
 
-        // Create default WIP status (unified planning doesn't use WIP limits)
-        WipStatus wipStatus = WipStatus.of(
-                forecasts.size(),  // No limit, all epics are "in WIP"
-                forecasts.size(),
-                RoleWipStatus.of(forecasts.size(), forecasts.size()),
-                RoleWipStatus.of(forecasts.size(), forecasts.size()),
-                RoleWipStatus.of(forecasts.size(), forecasts.size())
-        );
+        // Build dynamic role WIP status
+        Map<String, RoleWipStatus> roleWip = new LinkedHashMap<>();
+        for (String roleCode : workflowConfigService.getRoleCodesInPipelineOrder()) {
+            roleWip.put(roleCode, RoleWipStatus.of(forecasts.size(), forecasts.size()));
+        }
+        WipStatus wipStatus = WipStatus.of(forecasts.size(), forecasts.size(), roleWip);
 
         return new ForecastResponse(
                 unifiedResult.planningDate(),
                 unifiedResult.teamId(),
-                teamCapacity,
+                roleCapacity,
                 wipStatus,
                 forecasts
         );
     }
 
-    /**
-     * Converts a PlannedEpic to EpicForecast.
-     */
     private EpicForecast convertPlannedEpicToForecast(PlannedEpic plannedEpic, List<PlanningWarning> warnings) {
-        // Get epic entity for additional data
         Optional<JiraIssueEntity> epicEntityOpt = issueRepository.findByIssueKey(plannedEpic.epicKey());
-
         LocalDate dueDate = epicEntityOpt.map(JiraIssueEntity::getDueDate).orElse(null);
 
-        // Calculate confidence from warnings
         Confidence confidence = calculateConfidence(plannedEpic, warnings);
-
-        // Calculate due date delta
         Integer dueDateDeltaDays = calculateDueDateDelta(plannedEpic.endDate(), dueDate);
 
         // Convert phase aggregation to remaining by role
-        PhaseAggregation agg = plannedEpic.phaseAggregation();
-        RemainingByRole remainingByRole = new RemainingByRole(
-                new RoleRemaining(agg.saHours(), hoursToDays(agg.saHours())),
-                new RoleRemaining(agg.devHours(), hoursToDays(agg.devHours())),
-                new RoleRemaining(agg.qaHours(), hoursToDays(agg.qaHours()))
-        );
+        Map<String, PhaseAggregationEntry> agg = plannedEpic.phaseAggregation();
+        Map<String, RoleRemaining> remainingByRole = new LinkedHashMap<>();
+        for (Map.Entry<String, PhaseAggregationEntry> entry : agg.entrySet()) {
+            BigDecimal hours = entry.getValue().hours();
+            remainingByRole.put(entry.getKey(), new RoleRemaining(hours, hoursToDays(hours)));
+        }
 
         // Convert phase aggregation to phase schedule
-        EpicForecast.PhaseSchedule phaseSchedule = new EpicForecast.PhaseSchedule(
-                new PhaseInfo(agg.saStartDate(), agg.saEndDate(), hoursToDays(agg.saHours()), false),
-                new PhaseInfo(agg.devStartDate(), agg.devEndDate(), hoursToDays(agg.devHours()), false),
-                new PhaseInfo(agg.qaStartDate(), agg.qaEndDate(), hoursToDays(agg.qaHours()), false)
-        );
+        Map<String, PhaseInfo> phaseSchedule = new LinkedHashMap<>();
+        for (Map.Entry<String, PhaseAggregationEntry> entry : agg.entrySet()) {
+            PhaseAggregationEntry e = entry.getValue();
+            phaseSchedule.put(entry.getKey(), new PhaseInfo(
+                    e.startDate(), e.endDate(), hoursToDays(e.hours()), false));
+        }
+
+        // Phase wait info (none for unified planning)
+        Map<String, EpicForecast.RoleWaitInfo> phaseWaitInfo = new LinkedHashMap<>();
+        for (String roleCode : workflowConfigService.getRoleCodesInPipelineOrder()) {
+            phaseWaitInfo.put(roleCode, EpicForecast.RoleWaitInfo.none());
+        }
 
         return new EpicForecast(
                 plannedEpic.epicKey(),
@@ -159,35 +144,28 @@ public class ForecastService {
                 dueDate,
                 remainingByRole,
                 phaseSchedule,
-                null,  // queuePosition - not used in unified planning
-                null,  // queuedUntil - not used in unified planning
-                true,  // isWithinWip - all epics are "active" in unified planning
-                EpicForecast.PhaseWaitInfo.none()  // No wait info in unified planning
+                null,
+                null,
+                true,
+                phaseWaitInfo
         );
     }
 
-    /**
-     * Calculates confidence level based on epic data and warnings.
-     */
     private Confidence calculateConfidence(PlannedEpic plannedEpic, List<PlanningWarning> warnings) {
-        PhaseAggregation agg = plannedEpic.phaseAggregation();
+        Map<String, PhaseAggregationEntry> agg = plannedEpic.phaseAggregation();
 
-        // Check if epic has any estimates
-        boolean hasEstimates = agg.saHours().compareTo(BigDecimal.ZERO) > 0
-                || agg.devHours().compareTo(BigDecimal.ZERO) > 0
-                || agg.qaHours().compareTo(BigDecimal.ZERO) > 0;
+        boolean hasEstimates = agg.values().stream()
+                .anyMatch(e -> e.hours() != null && e.hours().compareTo(BigDecimal.ZERO) > 0);
 
         if (!hasEstimates) {
             return Confidence.LOW;
         }
 
-        // Count warnings for this epic's stories
         long warningCount = warnings.stream()
                 .filter(w -> plannedEpic.stories().stream()
                         .anyMatch(s -> s.storyKey().equals(w.issueKey())))
                 .count();
 
-        // Count no-capacity warnings
         long noCapacityWarnings = warnings.stream()
                 .filter(w -> w.type() == WarningType.NO_CAPACITY)
                 .filter(w -> plannedEpic.stories().stream()
@@ -204,9 +182,6 @@ public class ForecastService {
         return Confidence.HIGH;
     }
 
-    /**
-     * Helper method to convert hours to days.
-     */
     private BigDecimal hoursToDays(BigDecimal hours) {
         if (hours == null || hours.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
@@ -215,35 +190,27 @@ public class ForecastService {
     }
 
     /**
-     * Рассчитывает capacity команды по ролям с учётом коэффициентов грейдов.
+     * Calculates capacity per role dynamically from WorkflowConfigService.
      */
-    private TeamCapacity calculateTeamCapacity(Long teamId, PlanningConfigDto config) {
+    private Map<String, BigDecimal> calculateRoleCapacity(Long teamId, PlanningConfigDto config) {
         List<TeamMemberEntity> members = memberRepository.findByTeamIdAndActiveTrue(teamId);
-
-        BigDecimal saCapacity = BigDecimal.ZERO;
-        BigDecimal devCapacity = BigDecimal.ZERO;
-        BigDecimal qaCapacity = BigDecimal.ZERO;
 
         var gradeCoefficients = config.gradeCoefficients() != null
                 ? config.gradeCoefficients()
                 : PlanningConfigDto.GradeCoefficients.defaults();
 
+        Map<String, BigDecimal> capacity = new LinkedHashMap<>();
+
         for (TeamMemberEntity member : members) {
             BigDecimal hoursPerDay = member.getHoursPerDay();
             BigDecimal gradeCoef = getGradeCoefficient(member.getGrade(), gradeCoefficients);
-
-            // Эффективные часы = часы / коэффициент грейда
-            // (Junior с коэффициентом 1.5 даёт меньше эффективных часов)
             BigDecimal effectiveHours = hoursPerDay.divide(gradeCoef, 2, RoundingMode.HALF_UP);
 
-            switch (member.getRole()) {
-                case SA -> saCapacity = saCapacity.add(effectiveHours);
-                case DEV -> devCapacity = devCapacity.add(effectiveHours);
-                case QA -> qaCapacity = qaCapacity.add(effectiveHours);
-            }
+            String roleCode = member.getRole();
+            capacity.merge(roleCode, effectiveHours, BigDecimal::add);
         }
 
-        return new TeamCapacity(saCapacity, devCapacity, qaCapacity);
+        return capacity;
     }
 
     private BigDecimal getGradeCoefficient(Grade grade, PlanningConfigDto.GradeCoefficients coefficients) {
@@ -254,10 +221,6 @@ public class ForecastService {
         };
     }
 
-    /**
-     * Рассчитывает дельту между Expected Done и Due Date.
-     * Положительное значение = опоздание, отрицательное = запас.
-     */
     private Integer calculateDueDateDelta(LocalDate expectedDone, LocalDate dueDate) {
         if (expectedDone == null || dueDate == null) {
             return null;

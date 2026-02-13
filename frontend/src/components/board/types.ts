@@ -10,11 +10,7 @@ export interface RoleMetrics {
   roughEstimateDays: number | null
 }
 
-export interface RoleProgress {
-  analytics: RoleMetrics
-  development: RoleMetrics
-  testing: RoleMetrics
-}
+export type RoleProgress = Record<string, RoleMetrics>
 
 export interface DataQualityViolation {
   rule: string
@@ -36,9 +32,7 @@ export interface BoardNode {
   progress: number | null
   roleProgress: RoleProgress | null
   epicInTodo: boolean
-  roughEstimateSaDays: number | null
-  roughEstimateDevDays: number | null
-  roughEstimateQaDays: number | null
+  roughEstimates: Record<string, number> | null
   alerts: DataQualityViolation[]
   autoScore: number | null
   manualOrder: number | null
@@ -68,7 +62,7 @@ export interface DragHandleProps {
   [key: string]: unknown
 }
 
-export type RoughEstimateUpdateFn = (epicKey: string, role: 'sa' | 'dev' | 'qa', days: number | null) => Promise<void>
+export type RoughEstimateUpdateFn = (epicKey: string, role: string, days: number | null) => Promise<void>
 
 // Component prop types
 
@@ -80,12 +74,13 @@ export interface ProgressCellProps {
 
 export interface EpicRoleChipProps {
   label: string
-  role: 'sa' | 'dev' | 'qa'
+  role: string
   metrics: RoleMetrics
   epicInTodo: boolean
   epicKey: string
   config: RoughEstimateConfig | null
   onUpdate: RoughEstimateUpdateFn
+  roleColor: string
 }
 
 export interface RoleChipsProps {

@@ -16,10 +16,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -59,13 +61,13 @@ class WipSnapshotServiceTest {
             Long teamId = 1L;
             LocalDate today = LocalDate.now();
 
-            WipStatus wipStatus = WipStatus.of(5, 3,
-                    RoleWipStatus.of(2, 1),
-                    RoleWipStatus.of(2, 1),
-                    RoleWipStatus.of(1, 1));
+            WipStatus wipStatus = WipStatus.of(5, 3, Map.of(
+                    "SA", RoleWipStatus.of(2, 1),
+                    "DEV", RoleWipStatus.of(2, 1),
+                    "QA", RoleWipStatus.of(1, 1)));
 
             ForecastResponse forecast = new ForecastResponse(
-                    OffsetDateTime.now(), teamId, null, wipStatus, List.of());
+                    OffsetDateTime.now(), teamId, Map.of(), wipStatus, List.of());
 
             when(snapshotRepository.existsByTeamIdAndSnapshotDate(teamId, today)).thenReturn(false);
             when(forecastService.calculateForecast(teamId)).thenReturn(forecast);
@@ -102,13 +104,13 @@ class WipSnapshotServiceTest {
         void shouldSaveRoleWipData() {
             Long teamId = 1L;
 
-            WipStatus wipStatus = WipStatus.of(10, 6,
-                    RoleWipStatus.of(3, 2),
-                    RoleWipStatus.of(4, 3),
-                    RoleWipStatus.of(3, 1));
+            WipStatus wipStatus = WipStatus.of(10, 6, Map.of(
+                    "SA", RoleWipStatus.of(3, 2),
+                    "DEV", RoleWipStatus.of(4, 3),
+                    "QA", RoleWipStatus.of(3, 1)));
 
             ForecastResponse forecast = new ForecastResponse(
-                    OffsetDateTime.now(), teamId, null, wipStatus, List.of());
+                    OffsetDateTime.now(), teamId, Map.of(), wipStatus, List.of());
 
             when(snapshotRepository.existsByTeamIdAndSnapshotDate(any(), any())).thenReturn(false);
             when(forecastService.calculateForecast(teamId)).thenReturn(forecast);
@@ -120,12 +122,23 @@ class WipSnapshotServiceTest {
             verify(snapshotRepository).save(captor.capture());
 
             WipSnapshotEntity saved = captor.getValue();
-            assertEquals(3, saved.getSaWipLimit());
-            assertEquals(2, saved.getSaWipCurrent());
-            assertEquals(4, saved.getDevWipLimit());
-            assertEquals(3, saved.getDevWipCurrent());
-            assertEquals(3, saved.getQaWipLimit());
-            assertEquals(1, saved.getQaWipCurrent());
+            assertNotNull(saved.getRoleWipData());
+            assertEquals(3, saved.getRoleWipData().size());
+
+            WipSnapshotEntity.RoleWipEntry saEntry = saved.getRoleWipData().get("SA");
+            assertNotNull(saEntry);
+            assertEquals(3, saEntry.limit());
+            assertEquals(2, saEntry.current());
+
+            WipSnapshotEntity.RoleWipEntry devEntry = saved.getRoleWipData().get("DEV");
+            assertNotNull(devEntry);
+            assertEquals(4, devEntry.limit());
+            assertEquals(3, devEntry.current());
+
+            WipSnapshotEntity.RoleWipEntry qaEntry = saved.getRoleWipData().get("QA");
+            assertNotNull(qaEntry);
+            assertEquals(3, qaEntry.limit());
+            assertEquals(1, qaEntry.current());
         }
     }
 
@@ -199,9 +212,9 @@ class WipSnapshotServiceTest {
             team2.setId(2L);
             team2.setActive(true);
 
-            WipStatus wipStatus = WipStatus.of(5, 3);
+            WipStatus wipStatus = WipStatus.of(5, 3, Map.of());
             ForecastResponse forecast = new ForecastResponse(
-                    OffsetDateTime.now(), 1L, null, wipStatus, List.of());
+                    OffsetDateTime.now(), 1L, Map.of(), wipStatus, List.of());
 
             when(teamRepository.findByActiveTrue()).thenReturn(List.of(team1, team2));
             when(snapshotRepository.existsByTeamIdAndSnapshotDate(any(), any())).thenReturn(false);
@@ -222,9 +235,9 @@ class WipSnapshotServiceTest {
             TeamEntity team2 = new TeamEntity();
             team2.setId(2L);
 
-            WipStatus wipStatus = WipStatus.of(5, 3);
+            WipStatus wipStatus = WipStatus.of(5, 3, Map.of());
             ForecastResponse forecast = new ForecastResponse(
-                    OffsetDateTime.now(), 2L, null, wipStatus, List.of());
+                    OffsetDateTime.now(), 2L, Map.of(), wipStatus, List.of());
 
             when(teamRepository.findByActiveTrue()).thenReturn(List.of(team1, team2));
             when(snapshotRepository.existsByTeamIdAndSnapshotDate(any(), any())).thenReturn(false);

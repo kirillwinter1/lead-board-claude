@@ -307,17 +307,18 @@ public class AutoScoreCalculator {
      * Приоритет: rough estimate → агрегация из subtasks → original estimate на эпике.
      */
     private BigDecimal getTotalEstimateDays(JiraIssueEntity epic) {
-        // 1. Rough estimate на эпике
-        BigDecimal sa = epic.getRoughEstimateSaDays();
-        BigDecimal dev = epic.getRoughEstimateDevDays();
-        BigDecimal qa = epic.getRoughEstimateQaDays();
-
-        if (sa != null || dev != null || qa != null) {
+        // 1. Rough estimate на эпике (from dynamic JSONB map)
+        Map<String, BigDecimal> roughEstimates = epic.getRoughEstimates();
+        if (roughEstimates != null && !roughEstimates.isEmpty()) {
             BigDecimal total = BigDecimal.ZERO;
-            if (sa != null) total = total.add(sa);
-            if (dev != null) total = total.add(dev);
-            if (qa != null) total = total.add(qa);
-            return total;
+            boolean hasAny = false;
+            for (BigDecimal days : roughEstimates.values()) {
+                if (days != null) {
+                    total = total.add(days);
+                    hasAny = true;
+                }
+            }
+            if (hasAny) return total;
         }
 
         // 2. Агрегация original estimate из subtasks (Epic → Story → Subtask)

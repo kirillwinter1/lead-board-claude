@@ -3,7 +3,7 @@ export interface DemoStory {
   title: string
   status: string
   statusColor: string
-  role: 'SA' | 'DEV' | 'QA'
+  role: string
   assignee: string
   progress: number
 }
@@ -13,7 +13,7 @@ export interface DemoEpic {
   title: string
   status: string
   statusColor: string
-  progress: { sa: number; dev: number; qa: number }
+  progress: Record<string, number>
   totalProgress: number // общий прогресс в %
   targetDay: number // целевая дата от бизнеса (дней от 1 февраля)
   baseExpectedDay: number // прогноз завершения при оптимальной позиции (дней от 1 февраля)
@@ -30,7 +30,7 @@ export const mockEpics: DemoEpic[] = [
     title: 'Интеграция с внешними системами',
     status: 'Тестирование',
     statusColor: '#00875a',
-    progress: { sa: 100, dev: 65, qa: 20 },
+    progress: { SA: 100, DEV: 65, QA: 20 },
     totalProgress: 70,
     targetDay: 14, // 15 февраля - бизнес хочет к этой дате
     baseExpectedDay: 10, // при оптимальной позиции завершим 11 февраля
@@ -46,7 +46,7 @@ export const mockEpics: DemoEpic[] = [
     title: 'Управление сотрудниками',
     status: 'Анализ',
     statusColor: '#6554c0',
-    progress: { sa: 40, dev: 0, qa: 0 },
+    progress: { SA: 40, DEV: 0, QA: 0 },
     totalProgress: 13,
     targetDay: 28, // 1 марта
     baseExpectedDay: 25, // при оптимальной позиции завершим 26 февраля
@@ -63,7 +63,7 @@ export const mockEpics: DemoEpic[] = [
     title: 'Автоматизация отчётности',
     status: 'Анализ',
     statusColor: '#6554c0',
-    progress: { sa: 100, dev: 0, qa: 0 },
+    progress: { SA: 100, DEV: 0, QA: 0 },
     totalProgress: 33,
     targetDay: 38, // 11 марта
     baseExpectedDay: 33, // при оптимальной позиции завершим 6 марта
@@ -79,7 +79,7 @@ export const mockEpics: DemoEpic[] = [
     title: 'Дашборды и виджеты',
     status: 'Тестирование',
     statusColor: '#00875a',
-    progress: { sa: 100, dev: 80, qa: 50 },
+    progress: { SA: 100, DEV: 80, QA: 50 },
     totalProgress: 85,
     targetDay: 7, // 8 февраля - ближайший дедлайн
     baseExpectedDay: 4, // при оптимальной позиции завершим 5 февраля
@@ -95,7 +95,7 @@ export const mockEpics: DemoEpic[] = [
     title: 'Система уведомлений',
     status: 'В работе',
     statusColor: '#0052cc',
-    progress: { sa: 100, dev: 45, qa: 0 },
+    progress: { SA: 100, DEV: 45, QA: 0 },
     totalProgress: 48,
     targetDay: 21, // 22 февраля
     baseExpectedDay: 18, // при оптимальной позиции завершим 19 февраля
@@ -112,7 +112,7 @@ export const mockEpics: DemoEpic[] = [
     title: 'Доступы и ролевая модель',
     status: 'Анализ',
     statusColor: '#6554c0',
-    progress: { sa: 60, dev: 0, qa: 0 },
+    progress: { SA: 60, DEV: 0, QA: 0 },
     totalProgress: 20,
     targetDay: 45, // 18 марта
     baseExpectedDay: 40, // при оптимальной позиции завершим 13 марта
@@ -140,11 +140,7 @@ export interface TimelineStory {
   title: string
   start: number
   duration: number
-  phases: {
-    sa?: { start: number; duration: number }
-    dev?: { start: number; duration: number }
-    qa?: { start: number; duration: number }
-  }
+  phases: Record<string, { start: number; duration: number }>
 }
 
 export interface TimelineEpic {
@@ -166,9 +162,9 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 0,
         duration: 22,
         phases: {
-          sa: { start: 0, duration: 3 },
-          dev: { start: 5, duration: 10 },
-          qa: { start: 18, duration: 4 }
+          SA: { start: 0, duration: 3 },
+          DEV: { start: 5, duration: 10 },
+          QA: { start: 18, duration: 4 }
         }
       },
       {
@@ -177,9 +173,9 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 8,
         duration: 24,
         phases: {
-          sa: { start: 0, duration: 2 },
-          dev: { start: 4, duration: 12 },
-          qa: { start: 19, duration: 5 }
+          SA: { start: 0, duration: 2 },
+          DEV: { start: 4, duration: 12 },
+          QA: { start: 19, duration: 5 }
         }
       },
       {
@@ -188,7 +184,7 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 20,
         duration: 14,
         phases: {
-          qa: { start: 4, duration: 10 }
+          QA: { start: 4, duration: 10 }
         }
       }
     ]
@@ -204,7 +200,7 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 6,
         duration: 12,
         phases: {
-          sa: { start: 0, duration: 8 }
+          SA: { start: 0, duration: 8 }
         }
       },
       {
@@ -213,9 +209,9 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 10,
         duration: 26,
         phases: {
-          sa: { start: 0, duration: 3 },
-          dev: { start: 5, duration: 12 },
-          qa: { start: 20, duration: 6 }
+          SA: { start: 0, duration: 3 },
+          DEV: { start: 5, duration: 12 },
+          QA: { start: 20, duration: 6 }
         }
       }
     ]
@@ -231,9 +227,9 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 14,
         duration: 20,
         phases: {
-          sa: { start: 0, duration: 3 },
-          dev: { start: 5, duration: 8 },
-          qa: { start: 16, duration: 4 }
+          SA: { start: 0, duration: 3 },
+          DEV: { start: 5, duration: 8 },
+          QA: { start: 16, duration: 4 }
         }
       },
       {
@@ -242,9 +238,9 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 18,
         duration: 20,
         phases: {
-          sa: { start: 0, duration: 2 },
-          dev: { start: 4, duration: 10 },
-          qa: { start: 16, duration: 4 }
+          SA: { start: 0, duration: 2 },
+          DEV: { start: 4, duration: 10 },
+          QA: { start: 16, duration: 4 }
         }
       },
       {
@@ -253,8 +249,8 @@ export const mockTimelineData: TimelineEpic[] = [
         start: 24,
         duration: 16,
         phases: {
-          dev: { start: 2, duration: 8 },
-          qa: { start: 12, duration: 4 }
+          DEV: { start: 2, duration: 8 },
+          QA: { start: 12, duration: 4 }
         }
       }
     ]

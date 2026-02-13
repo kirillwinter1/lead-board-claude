@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.EpicForecast;
 import com.leadboard.planning.dto.EpicForecast.*;
 import com.leadboard.planning.dto.ForecastResponse;
@@ -21,9 +22,7 @@ import org.mockito.quality.Strictness;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -45,6 +44,9 @@ class ForecastServiceTest {
     @Mock
     private UnifiedPlanningService unifiedPlanningService;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private ForecastService forecastService;
 
     private static final Long TEAM_ID = 1L;
@@ -55,11 +57,15 @@ class ForecastServiceTest {
                 issueRepository,
                 teamService,
                 memberRepository,
-                unifiedPlanningService
+                unifiedPlanningService,
+                workflowConfigService
         );
 
         // Default planning config
         setupDefaultPlanningConfig();
+
+        // Default workflow config — roles in pipeline order
+        when(workflowConfigService.getRoleCodesInPipelineOrder()).thenReturn(List.of("SA", "DEV", "QA"));
     }
 
     // ==================== Team Capacity Tests ====================
@@ -71,9 +77,9 @@ class ForecastServiceTest {
         void calculatesCapacityWithDefaultGradeCoefficients() {
             // Given: team with SA(6h), DEV(8h), QA(6h) all Middle grade
             when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                    createMember(Role.SA, Grade.MIDDLE, new BigDecimal("6")),
-                    createMember(Role.DEV, Grade.MIDDLE, new BigDecimal("8")),
-                    createMember(Role.QA, Grade.MIDDLE, new BigDecimal("6"))
+                    createMember("SA", Grade.MIDDLE, new BigDecimal("6")),
+                    createMember("DEV", Grade.MIDDLE, new BigDecimal("8")),
+                    createMember("QA", Grade.MIDDLE, new BigDecimal("6"))
             ));
             setupEmptyUnifiedPlanningResult();
 
@@ -81,16 +87,16 @@ class ForecastServiceTest {
             ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
 
             // Then: Middle coefficient = 1.0, so capacity = hours
-            assertEquals(new BigDecimal("6.00"), response.teamCapacity().saHoursPerDay());
-            assertEquals(new BigDecimal("8.00"), response.teamCapacity().devHoursPerDay());
-            assertEquals(new BigDecimal("6.00"), response.teamCapacity().qaHoursPerDay());
+            assertEquals(new BigDecimal("6.00"), response.roleCapacity().get("SA"));
+            assertEquals(new BigDecimal("8.00"), response.roleCapacity().get("DEV"));
+            assertEquals(new BigDecimal("6.00"), response.roleCapacity().get("QA"));
         }
 
         @Test
         void seniorGradeIncreasesEffectiveCapacity() {
             // Given: Senior with 8h/day, coefficient 0.8
             when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                    createMember(Role.DEV, Grade.SENIOR, new BigDecimal("8"))
+                    createMember("DEV", Grade.SENIOR, new BigDecimal("8"))
             ));
             setupEmptyUnifiedPlanningResult();
 
@@ -98,14 +104,14 @@ class ForecastServiceTest {
             ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
 
             // Then: 8 / 0.8 = 10 effective hours
-            assertEquals(new BigDecimal("10.00"), response.teamCapacity().devHoursPerDay());
+            assertEquals(new BigDecimal("10.00"), response.roleCapacity().get("DEV"));
         }
 
         @Test
         void juniorGradeDecreasesEffectiveCapacity() {
             // Given: Junior with 8h/day, coefficient 1.5
             when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                    createMember(Role.DEV, Grade.JUNIOR, new BigDecimal("8"))
+                    createMember("DEV", Grade.JUNIOR, new BigDecimal("8"))
             ));
             setupEmptyUnifiedPlanningResult();
 
@@ -113,15 +119,15 @@ class ForecastServiceTest {
             ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
 
             // Then: 8 / 1.5 = 5.33 effective hours
-            assertEquals(new BigDecimal("5.33"), response.teamCapacity().devHoursPerDay());
+            assertEquals(new BigDecimal("5.33"), response.roleCapacity().get("DEV"));
         }
 
         @Test
         void aggregatesCapacityFromMultipleMembers() {
             // Given: 2 DEVs with different grades
             when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
-                    createMember(Role.DEV, Grade.SENIOR, new BigDecimal("8")),  // 8/0.8 = 10
-                    createMember(Role.DEV, Grade.MIDDLE, new BigDecimal("6"))   // 6/1.0 = 6
+                    createMember("DEV", Grade.SENIOR, new BigDecimal("8")),  // 8/0.8 = 10
+                    createMember("DEV", Grade.MIDDLE, new BigDecimal("6"))   // 6/1.0 = 6
             ));
             setupEmptyUnifiedPlanningResult();
 
@@ -129,7 +135,7 @@ class ForecastServiceTest {
             ForecastResponse response = forecastService.calculateForecast(TEAM_ID);
 
             // Then: 10 + 6 = 16 effective hours
-            assertEquals(new BigDecimal("16.00"), response.teamCapacity().devHoursPerDay());
+            assertEquals(new BigDecimal("16.00"), response.roleCapacity().get("DEV"));
         }
     }
 
@@ -144,6 +150,17 @@ class ForecastServiceTest {
             setupEmptyTeam();
             LocalDate today = LocalDate.now();
 
+            Map<String, PhaseSchedule> phases = new LinkedHashMap<>();
+            phases.put("SA", new PhaseSchedule("user-1", "SA User", today, today.plusDays(1), new BigDecimal("8"), false));
+            phases.put("DEV", new PhaseSchedule("user-2", "DEV User", today.plusDays(2), today.plusDays(4), new BigDecimal("24"), false));
+            phases.put("QA", new PhaseSchedule("user-3", "QA User", today.plusDays(5), today.plusDays(5), new BigDecimal("8"), false));
+
+            Map<String, PhaseProgressInfo> emptyRoleProgress = Map.of(
+                    "SA", new PhaseProgressInfo(0L, 0L, false),
+                    "DEV", new PhaseProgressInfo(0L, 0L, false),
+                    "QA", new PhaseProgressInfo(0L, 0L, false)
+            );
+
             PlannedStory story = new PlannedStory(
                     "STORY-1",
                     "Test Story",
@@ -151,11 +168,7 @@ class ForecastServiceTest {
                     "To Do",
                     today,
                     today.plusDays(5),
-                    new PlannedPhases(
-                            new UnifiedPlanningResult.PhaseSchedule("user-1", "SA User", today, today.plusDays(1), new BigDecimal("8"), false),
-                            new UnifiedPlanningResult.PhaseSchedule("user-2", "DEV User", today.plusDays(2), today.plusDays(4), new BigDecimal("24"), false),
-                            new UnifiedPlanningResult.PhaseSchedule("user-3", "QA User", today.plusDays(5), today.plusDays(5), new BigDecimal("8"), false)
-                    ),
+                    phases,
                     List.of(),
                     List.of(),
                     "Story",
@@ -164,16 +177,18 @@ class ForecastServiceTest {
                     null,
                     null,
                     null,
-                    RoleProgressInfo.empty()
+                    emptyRoleProgress
             );
 
-            PhaseAggregation aggregation = new PhaseAggregation(
-                    new BigDecimal("8"),  // SA hours
-                    new BigDecimal("24"), // DEV hours
-                    new BigDecimal("8"),  // QA hours
-                    today, today.plusDays(1),
-                    today.plusDays(2), today.plusDays(4),
-                    today.plusDays(5), today.plusDays(5)
+            Map<String, PhaseAggregationEntry> aggregation = new LinkedHashMap<>();
+            aggregation.put("SA", new PhaseAggregationEntry(new BigDecimal("8"), today, today.plusDays(1)));
+            aggregation.put("DEV", new PhaseAggregationEntry(new BigDecimal("24"), today.plusDays(2), today.plusDays(4)));
+            aggregation.put("QA", new PhaseAggregationEntry(new BigDecimal("8"), today.plusDays(5), today.plusDays(5)));
+
+            Map<String, PhaseProgressInfo> epicRoleProgress = Map.of(
+                    "SA", new PhaseProgressInfo(0L, 0L, false),
+                    "DEV", new PhaseProgressInfo(0L, 0L, false),
+                    "QA", new PhaseProgressInfo(0L, 0L, false)
             );
 
             PlannedEpic plannedEpic = new PlannedEpic(
@@ -189,12 +204,10 @@ class ForecastServiceTest {
                     0L,
                     0L,
                     0,
-                    RoleProgressInfo.empty(),
+                    epicRoleProgress,
                     1,
                     1,
                     false,
-                    null,
-                    null,
                     null
             );
 
@@ -222,14 +235,14 @@ class ForecastServiceTest {
             assertEquals(today.plusDays(5), forecast.expectedDone());
 
             // Check remaining by role (hours converted to days)
-            assertEquals(new BigDecimal("1.0"), forecast.remainingByRole().sa().days());
-            assertEquals(new BigDecimal("3.0"), forecast.remainingByRole().dev().days());
-            assertEquals(new BigDecimal("1.0"), forecast.remainingByRole().qa().days());
+            assertEquals(new BigDecimal("1.0"), forecast.remainingByRole().get("SA").days());
+            assertEquals(new BigDecimal("3.0"), forecast.remainingByRole().get("DEV").days());
+            assertEquals(new BigDecimal("1.0"), forecast.remainingByRole().get("QA").days());
 
             // Check phase schedule
             assertNotNull(forecast.phaseSchedule());
-            assertEquals(today, forecast.phaseSchedule().sa().startDate());
-            assertEquals(today.plusDays(1), forecast.phaseSchedule().sa().endDate());
+            assertEquals(today, forecast.phaseSchedule().get("SA").startDate());
+            assertEquals(today.plusDays(1), forecast.phaseSchedule().get("SA").endDate());
         }
 
         @Test
@@ -292,25 +305,32 @@ class ForecastServiceTest {
             setupEmptyTeam();
             LocalDate today = LocalDate.now();
 
+            Map<String, PhaseSchedule> emptyPhases = Map.of();
+            Map<String, PhaseProgressInfo> emptyRoleProgress = Map.of(
+                    "SA", new PhaseProgressInfo(0L, 0L, false),
+                    "DEV", new PhaseProgressInfo(0L, 0L, false),
+                    "QA", new PhaseProgressInfo(0L, 0L, false)
+            );
+
             PlannedStory story1 = new PlannedStory("STORY-1", "Story 1", BigDecimal.TEN, "To Do",
-                    today, today.plusDays(2), PlannedPhases.empty(), List.of(), List.of(),
-                    "Story", "Medium", false, null, null, null, RoleProgressInfo.empty());
+                    today, today.plusDays(2), emptyPhases, List.of(), List.of(),
+                    "Story", "Medium", false, null, null, null, emptyRoleProgress);
             PlannedStory story2 = new PlannedStory("STORY-2", "Story 2", BigDecimal.TEN, "To Do",
-                    today, today.plusDays(2), PlannedPhases.empty(), List.of(), List.of(),
-                    "Story", "Medium", false, null, null, null, RoleProgressInfo.empty());
+                    today, today.plusDays(2), emptyPhases, List.of(), List.of(),
+                    "Story", "Medium", false, null, null, null, emptyRoleProgress);
+
+            Map<String, PhaseAggregationEntry> aggregation = new LinkedHashMap<>();
+            aggregation.put("SA", new PhaseAggregationEntry(new BigDecimal("8"), today, today.plusDays(1)));
+            aggregation.put("DEV", new PhaseAggregationEntry(new BigDecimal("24"), today.plusDays(2), today.plusDays(4)));
+            aggregation.put("QA", new PhaseAggregationEntry(new BigDecimal("8"), today.plusDays(5), today.plusDays(5)));
 
             PlannedEpic plannedEpic = new PlannedEpic(
                     "EPIC-1", "Test Epic", new BigDecimal("80"),
                     today, today.plusDays(5),
                     List.of(story1, story2),
-                    new PhaseAggregation(
-                            new BigDecimal("8"), new BigDecimal("24"), new BigDecimal("8"),
-                            today, today.plusDays(1),
-                            today.plusDays(2), today.plusDays(4),
-                            today.plusDays(5), today.plusDays(5)
-                    ),
-                    "Developing", null, 0L, 0L, 0, RoleProgressInfo.empty(), 2, 2,
-                    false, null, null, null
+                    aggregation,
+                    "Developing", null, 0L, 0L, 0, emptyRoleProgress, 2, 2,
+                    false, null
             );
 
             List<PlanningWarning> warnings = List.of(
@@ -459,8 +479,7 @@ class ForecastServiceTest {
                 PlanningConfigDto.GradeCoefficients.defaults(),
                 new BigDecimal("0.2"),
                 null, // WIP limits
-                PlanningConfigDto.StoryDuration.defaults(),
-                null  // statusMapping
+                PlanningConfigDto.StoryDuration.defaults()
         );
         when(teamService.getPlanningConfig(TEAM_ID)).thenReturn(config);
     }
@@ -480,7 +499,7 @@ class ForecastServiceTest {
         when(unifiedPlanningService.calculatePlan(TEAM_ID)).thenReturn(emptyResult);
     }
 
-    private TeamMemberEntity createMember(Role role, Grade grade, BigDecimal hoursPerDay) {
+    private TeamMemberEntity createMember(String role, Grade grade, BigDecimal hoursPerDay) {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setRole(role);
         member.setGrade(grade);
@@ -502,6 +521,13 @@ class ForecastServiceTest {
 
     private PlannedEpic createPlannedEpic(String epicKey, LocalDate startDate, LocalDate endDate,
                                           BigDecimal saHours, BigDecimal devHours, BigDecimal qaHours) {
+        Map<String, PhaseSchedule> emptyPhases = Map.of();
+        Map<String, PhaseProgressInfo> emptyRoleProgress = Map.of(
+                "SA", new PhaseProgressInfo(0L, 0L, false),
+                "DEV", new PhaseProgressInfo(0L, 0L, false),
+                "QA", new PhaseProgressInfo(0L, 0L, false)
+        );
+
         PlannedStory story = new PlannedStory(
                 epicKey + "-STORY-1",
                 "Story for " + epicKey,
@@ -509,7 +535,7 @@ class ForecastServiceTest {
                 "To Do",
                 startDate,
                 endDate,
-                PlannedPhases.empty(),
+                emptyPhases,
                 List.of(),
                 List.of(),
                 "Story",
@@ -518,15 +544,13 @@ class ForecastServiceTest {
                 null,
                 null,
                 null,
-                RoleProgressInfo.empty()
+                emptyRoleProgress
         );
 
-        PhaseAggregation aggregation = new PhaseAggregation(
-                saHours, devHours, qaHours,
-                startDate, startDate.plusDays(1),
-                startDate.plusDays(2), endDate.minusDays(1),
-                endDate, endDate
-        );
+        Map<String, PhaseAggregationEntry> aggregation = new LinkedHashMap<>();
+        aggregation.put("SA", new PhaseAggregationEntry(saHours, startDate, startDate.plusDays(1)));
+        aggregation.put("DEV", new PhaseAggregationEntry(devHours, startDate.plusDays(2), endDate.minusDays(1)));
+        aggregation.put("QA", new PhaseAggregationEntry(qaHours, endDate, endDate));
 
         return new PlannedEpic(
                 epicKey,
@@ -541,12 +565,10 @@ class ForecastServiceTest {
                 0L,
                 0L,
                 0,
-                RoleProgressInfo.empty(),
+                emptyRoleProgress,
                 1,
                 1,
                 false,
-                null,
-                null,
                 null
         );
     }

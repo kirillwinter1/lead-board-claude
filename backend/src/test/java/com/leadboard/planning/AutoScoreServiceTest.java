@@ -53,8 +53,7 @@ class AutoScoreServiceTest {
             JiraIssueEntity epic1 = createEpic("LB-1", "Epic 1");
             JiraIssueEntity epic2 = createEpic("LB-2", "Epic 2");
 
-            when(issueRepository.findByIssueType("Epic")).thenReturn(List.of(epic1, epic2));
-            when(issueRepository.findByIssueType("Эпик")).thenReturn(Collections.emptyList());
+            when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic1, epic2));
             when(calculator.calculate(epic1)).thenReturn(BigDecimal.valueOf(75));
             when(calculator.calculate(epic2)).thenReturn(BigDecimal.valueOf(50));
 
@@ -70,8 +69,7 @@ class AutoScoreServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Epic");
             epic.setAutoScoreCalculatedAt(null);
 
-            when(issueRepository.findByIssueType("Epic")).thenReturn(List.of(epic));
-            when(issueRepository.findByIssueType("Эпик")).thenReturn(Collections.emptyList());
+            when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
             when(calculator.calculate(epic)).thenReturn(BigDecimal.valueOf(80));
 
             autoScoreService.recalculateAll();
@@ -85,8 +83,7 @@ class AutoScoreServiceTest {
         @Test
         @DisplayName("should handle empty epic list")
         void shouldHandleEmptyEpicList() {
-            when(issueRepository.findByIssueType("Epic")).thenReturn(Collections.emptyList());
-            when(issueRepository.findByIssueType("Эпик")).thenReturn(Collections.emptyList());
+            when(issueRepository.findByBoardCategory("EPIC")).thenReturn(Collections.emptyList());
 
             int count = autoScoreService.recalculateAll();
 
@@ -95,16 +92,15 @@ class AutoScoreServiceTest {
         }
 
         @Test
-        @DisplayName("should handle both English and Russian epic types")
-        void shouldHandleBothEpicTypes() {
+        @DisplayName("should handle both English and Russian epic types via board_category")
+        void shouldHandleBothEpicTypesViaBoardCategory() {
             JiraIssueEntity englishEpic = createEpic("LB-1", "English Epic");
             englishEpic.setIssueType("Epic");
 
             JiraIssueEntity russianEpic = createEpic("LB-2", "Russian Epic");
             russianEpic.setIssueType("Эпик");
 
-            when(issueRepository.findByIssueType("Epic")).thenReturn(List.of(englishEpic));
-            when(issueRepository.findByIssueType("Эпик")).thenReturn(List.of(russianEpic));
+            when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(englishEpic, russianEpic));
             when(calculator.calculate(any())).thenReturn(BigDecimal.valueOf(60));
 
             int count = autoScoreService.recalculateAll();
@@ -125,8 +121,7 @@ class AutoScoreServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Team Epic");
             epic.setTeamId(1L);
 
-            when(issueRepository.findByIssueTypeAndTeamId("Epic", 1L)).thenReturn(List.of(epic));
-            when(issueRepository.findByIssueTypeAndTeamId("Эпик", 1L)).thenReturn(Collections.emptyList());
+            when(issueRepository.findByBoardCategoryAndTeamId("EPIC", 1L)).thenReturn(List.of(epic));
             when(calculator.calculate(epic)).thenReturn(BigDecimal.valueOf(90));
 
             int count = autoScoreService.recalculateForTeam(1L);
@@ -142,10 +137,8 @@ class AutoScoreServiceTest {
             JiraIssueEntity epic2 = createEpic("LB-2", "Epic 2");
             JiraIssueEntity epic3 = createEpic("LB-3", "Epic 3");
 
-            when(issueRepository.findByIssueTypeAndTeamId("Epic", 1L))
+            when(issueRepository.findByBoardCategoryAndTeamId("EPIC", 1L))
                     .thenReturn(List.of(epic1, epic2, epic3));
-            when(issueRepository.findByIssueTypeAndTeamId("Эпик", 1L))
-                    .thenReturn(Collections.emptyList());
             when(calculator.calculate(any())).thenReturn(BigDecimal.valueOf(50));
 
             int count = autoScoreService.recalculateForTeam(1L);
@@ -156,8 +149,7 @@ class AutoScoreServiceTest {
         @Test
         @DisplayName("should return zero for team with no epics")
         void shouldReturnZeroForTeamWithNoEpics() {
-            when(issueRepository.findByIssueTypeAndTeamId("Epic", 99L)).thenReturn(Collections.emptyList());
-            when(issueRepository.findByIssueTypeAndTeamId("Эпик", 99L)).thenReturn(Collections.emptyList());
+            when(issueRepository.findByBoardCategoryAndTeamId("EPIC", 99L)).thenReturn(Collections.emptyList());
 
             int count = autoScoreService.recalculateForTeam(99L);
 
@@ -267,8 +259,7 @@ class AutoScoreServiceTest {
             JiraIssueEntity epic1 = createEpic("LB-1", "Epic 1");
             JiraIssueEntity epic2 = createEpic("LB-2", "Epic 2");
 
-            when(issueRepository.findByIssueTypeInAndTeamIdOrderByAutoScoreDesc(
-                    List.of("Epic", "Эпик"), 1L))
+            when(issueRepository.findByBoardCategoryAndTeamIdOrderByAutoScoreDesc("EPIC", 1L))
                     .thenReturn(List.of(epic2, epic1));
 
             List<JiraIssueEntity> epics = autoScoreService.getEpicsByPriority(1L);
@@ -291,8 +282,8 @@ class AutoScoreServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Epic");
             epic.setStatus("Developing");
 
-            when(issueRepository.findByIssueTypeInAndTeamIdAndStatusInOrderByAutoScoreDesc(
-                    List.of("Epic", "Эпик"), 1L, List.of("Developing", "В разработке")))
+            when(issueRepository.findByBoardCategoryAndTeamIdAndStatusInOrderByAutoScoreDesc(
+                    "EPIC", 1L, List.of("Developing", "В разработке")))
                     .thenReturn(List.of(epic));
 
             List<JiraIssueEntity> epics = autoScoreService.getEpicsByPriorityAndStatus(
@@ -311,6 +302,7 @@ class AutoScoreServiceTest {
         entity.setIssueId("id-" + key);
         entity.setSummary(summary);
         entity.setIssueType("Epic");
+        entity.setBoardCategory("EPIC");
         entity.setProjectKey("LB");
         entity.setSubtask(false);
         return entity;

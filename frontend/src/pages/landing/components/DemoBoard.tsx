@@ -5,7 +5,7 @@ import storyIcon from '../../../icons/story.png'
 import cursorHandIcon from '../../../icons/cursor-hand.png'
 import thumbsUpIcon from '../../../icons/thumbs-up.png'
 
-const ROLE_NAMES = {
+const ROLE_NAMES: Record<string, string> = {
   SA: 'Системный анализ',
   DEV: 'Разработка',
   QA: 'Тестирование'
@@ -39,9 +39,9 @@ function SuccessMessage({ show }: { show: boolean }) {
   )
 }
 
-function RoleChip({ role, progress }: { role: 'SA' | 'DEV' | 'QA'; progress: number }) {
+function RoleChip({ role, progress }: { role: string; progress: number }) {
   return (
-    <div className={`demo-role-chip ${role.toLowerCase()}`} data-tooltip={`${ROLE_NAMES[role]}: ${progress}%`}>
+    <div className={`demo-role-chip ${role.toLowerCase()}`} data-tooltip={`${ROLE_NAMES[role] || role}: ${progress}%`}>
       <span className="demo-role-label">{role}</span>
       <div className="demo-role-progress-bar">
         <div
@@ -194,9 +194,9 @@ function DemoEpicRow({
         <span className="demo-progress-percent">{epic.totalProgress}%</span>
       </div>
       <div className="demo-epic-cell demo-epic-roles">
-        <RoleChip role="SA" progress={epic.progress.sa} />
-        <RoleChip role="DEV" progress={epic.progress.dev} />
-        <RoleChip role="QA" progress={epic.progress.qa} />
+        {Object.entries(epic.progress).map(([role, value]) => (
+          <RoleChip key={role} role={role} progress={value} />
+        ))}
       </div>
       <div className="demo-epic-cell demo-epic-status">
         <span

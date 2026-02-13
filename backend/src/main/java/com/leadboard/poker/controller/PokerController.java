@@ -17,8 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -33,7 +32,7 @@ public class PokerController {
     private final PokerSessionRepository pokerSessionRepository;
     private final WorkflowConfigService workflowConfigService;
 
-    // Статусы эпиков, подходящие для Planning Poker
+    // Statuses of epics eligible for Planning Poker
     private static final List<String> ELIGIBLE_STATUSES = List.of(
             "планирование", "planning",
             "грязная оценка", "rough estimation",
@@ -68,49 +67,35 @@ public class PokerController {
                     // Load subtasks for this story
                     List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
 
-                    boolean hasSa = false, hasDev = false, hasQa = false;
-                    Integer saEstimate = null, devEstimate = null, qaEstimate = null;
+                    List<String> subtaskRoles = new ArrayList<>();
+                    Map<String, Integer> roleEstimates = new HashMap<>();
 
                     for (JiraIssueEntity subtask : subtasks) {
                         String type = subtask.getIssueType();
                         if (type == null) continue;
 
                         String roleCode = workflowConfigService.getSubtaskRole(type);
-                        if ("SA".equals(roleCode)) {
-                            hasSa = true;
-                            if (subtask.getOriginalEstimateSeconds() != null) {
-                                saEstimate = (int) (subtask.getOriginalEstimateSeconds() / 3600); // seconds to hours
+                        if (roleCode != null) {
+                            if (!subtaskRoles.contains(roleCode)) {
+                                subtaskRoles.add(roleCode);
                             }
-                        } else if ("DEV".equals(roleCode)) {
-                            hasDev = true;
                             if (subtask.getOriginalEstimateSeconds() != null) {
-                                devEstimate = (int) (subtask.getOriginalEstimateSeconds() / 3600);
-                            }
-                        } else if ("QA".equals(roleCode)) {
-                            hasQa = true;
-                            if (subtask.getOriginalEstimateSeconds() != null) {
-                                qaEstimate = (int) (subtask.getOriginalEstimateSeconds() / 3600);
+                                roleEstimates.put(roleCode, (int) (subtask.getOriginalEstimateSeconds() / 3600));
                             }
                         }
                     }
 
                     // If no subtasks, assume all roles needed
-                    if (!hasSa && !hasDev && !hasQa) {
-                        hasSa = true;
-                        hasDev = true;
-                        hasQa = true;
+                    if (subtaskRoles.isEmpty()) {
+                        subtaskRoles.addAll(workflowConfigService.getRoleCodesInPipelineOrder());
                     }
 
                     return new EpicStoryResponse(
                             story.getIssueKey(),
                             story.getSummary(),
                             story.getStatus(),
-                            hasSa,
-                            hasDev,
-                            hasQa,
-                            saEstimate,
-                            devEstimate,
-                            qaEstimate
+                            subtaskRoles,
+                            roleEstimates
                     );
                 })
                 .toList();
@@ -218,14 +203,12 @@ public class PokerController {
             @RequestParam(defaultValue = "false") boolean createInJira) {
 
         if (createInJira) {
-            // Create in Jira FIRST — Jira is the single source of truth
+            // Create in Jira FIRST -- Jira is the single source of truth
             PokerSessionEntity session = sessionService.getSession(sessionId)
                     .orElseThrow(() -> new IllegalArgumentException("Session not found"));
-            String storyKey = jiraService.createStoryInJira(session.getEpicKey(), request.title(),
-                    request.needsSa(), request.needsDev(), request.needsQa());
+            String storyKey = jiraService.createStoryInJira(session.getEpicKey(), request.title(), request.needsRoles());
             // Only save to poker session after Jira succeeds
-            AddStoryRequest enriched = new AddStoryRequest(request.title(),
-                    request.needsSa(), request.needsDev(), request.needsQa(), storyKey);
+            AddStoryRequest enriched = new AddStoryRequest(request.title(), request.needsRoles(), storyKey);
             PokerStoryEntity story = sessionService.addStory(sessionId, enriched);
             return ResponseEntity.ok(StoryResponse.from(story));
         }
@@ -263,20 +246,10 @@ public class PokerController {
             @RequestBody SetFinalRequest request,
             @RequestParam(defaultValue = "true") boolean updateJira) {
 
-        PokerStoryEntity story = sessionService.setFinalEstimate(
-                storyId,
-                request.saHours(),
-                request.devHours(),
-                request.qaHours()
-        );
+        PokerStoryEntity story = sessionService.setFinalEstimate(storyId, request.finalEstimates());
 
         if (updateJira && story.getStoryKey() != null) {
-            jiraService.updateSubtaskEstimates(
-                    story.getStoryKey(),
-                    request.saHours(),
-                    request.devHours(),
-                    request.qaHours()
-            );
+            jiraService.updateSubtaskEstimates(story.getStoryKey(), request.finalEstimates());
         }
 
         return ResponseEntity.ok(StoryResponse.from(story));

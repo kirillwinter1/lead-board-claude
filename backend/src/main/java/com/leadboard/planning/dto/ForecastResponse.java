@@ -3,6 +3,7 @@ package com.leadboard.planning.dto;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Ответ API прогнозирования.
@@ -10,54 +11,34 @@ import java.util.List;
 public record ForecastResponse(
         OffsetDateTime calculatedAt,
         Long teamId,
-        TeamCapacity teamCapacity,
+        Map<String, BigDecimal> roleCapacity,
         WipStatus wipStatus,
         List<EpicForecast> epics
 ) {
-    /**
-     * Суммарный capacity команды по ролям (часы в день).
-     */
-    public record TeamCapacity(
-            BigDecimal saHoursPerDay,
-            BigDecimal devHoursPerDay,
-            BigDecimal qaHoursPerDay
-    ) {}
-
     /**
      * Статус WIP лимитов — ИНФОРМАЦИОННЫЙ.
      *
      * ВАЖНО: С версии F21 (Unified Planning) WIP лимиты НЕ влияют на планирование.
      * Это поле сохраняется для обратной совместимости API и отображения рекомендаций.
-     *
-     * В текущей реализации:
-     * - limit = current = количество эпиков (все "активны")
-     * - exceeded = false (нет превышения)
      */
     public record WipStatus(
-            Integer limit,      // Рекомендуемый WIP лимит команды
-            Integer current,    // Текущее количество эпиков в плане
-            Boolean exceeded,   // Всегда false (WIP не применяется)
-            RoleWipStatus sa,   // Информация по SA
-            RoleWipStatus dev,  // Информация по DEV
-            RoleWipStatus qa    // Информация по QA
+            Integer limit,
+            Integer current,
+            Boolean exceeded,
+            Map<String, RoleWipStatus> roleWip
     ) {
-        public static WipStatus of(int limit, int current) {
-            return new WipStatus(limit, current, current > limit, null, null, null);
-        }
-
-        public static WipStatus of(int limit, int current, RoleWipStatus sa, RoleWipStatus dev, RoleWipStatus qa) {
-            return new WipStatus(limit, current, current > limit, sa, dev, qa);
+        public static WipStatus of(int limit, int current, Map<String, RoleWipStatus> roleWip) {
+            return new WipStatus(limit, current, current > limit, roleWip);
         }
     }
 
     /**
      * WIP статус для конкретной роли — ИНФОРМАЦИОННЫЙ.
-     * Сохраняется для обратной совместимости.
      */
     public record RoleWipStatus(
-            Integer limit,      // Рекомендуемый лимит для роли
-            Integer current,    // Количество эпиков
-            Boolean exceeded    // Всегда false (WIP не применяется)
+            Integer limit,
+            Integer current,
+            Boolean exceeded
     ) {
         public static RoleWipStatus of(int limit, int current) {
             return new RoleWipStatus(limit, current, current > limit);

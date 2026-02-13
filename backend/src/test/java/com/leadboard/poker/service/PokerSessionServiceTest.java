@@ -7,27 +7,24 @@ import com.leadboard.poker.entity.PokerSessionEntity.SessionStatus;
 import com.leadboard.poker.entity.PokerStoryEntity;
 import com.leadboard.poker.entity.PokerStoryEntity.StoryStatus;
 import com.leadboard.poker.entity.PokerVoteEntity;
-import com.leadboard.poker.entity.PokerVoteEntity.VoterRole;
 import com.leadboard.poker.repository.PokerSessionRepository;
 import com.leadboard.poker.repository.PokerStoryRepository;
 import com.leadboard.poker.repository.PokerVoteRepository;
-import com.leadboard.team.Grade;
-import com.leadboard.team.Role;
 import com.leadboard.team.TeamMemberEntity;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.team.TeamMemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -50,6 +47,9 @@ class PokerSessionServiceTest {
     @Mock
     private TeamMemberRepository teamMemberRepository;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private PokerSessionService pokerSessionService;
 
     @BeforeEach
@@ -58,7 +58,8 @@ class PokerSessionServiceTest {
                 sessionRepository,
                 storyRepository,
                 voteRepository,
-                teamMemberRepository
+                teamMemberRepository,
+                workflowConfigService
         );
     }
 
@@ -164,18 +165,17 @@ class PokerSessionServiceTest {
         void shouldRecordVote() {
             PokerStoryEntity story = createStory(1L, null, "Story", 0);
             story.setStatus(StoryStatus.VOTING);
-            story.setNeedsDev(true);
 
             when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
-            when(voteRepository.findByStoryIdAndVoterAccountIdAndVoterRole(1L, "voter-123", VoterRole.DEV))
+            when(voteRepository.findByStoryIdAndVoterAccountIdAndVoterRole(1L, "voter-123", "DEV"))
                     .thenReturn(Optional.empty());
             when(voteRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            PokerVoteEntity vote = pokerSessionService.castVote(1L, "voter-123", "John", VoterRole.DEV, 8);
+            PokerVoteEntity vote = pokerSessionService.castVote(1L, "voter-123", "John", "DEV", 8);
 
             assertEquals("voter-123", vote.getVoterAccountId());
             assertEquals("John", vote.getVoterDisplayName());
-            assertEquals(VoterRole.DEV, vote.getVoterRole());
+            assertEquals("DEV", vote.getVoterRole());
             assertEquals(8, vote.getVoteHours());
         }
 
@@ -184,20 +184,19 @@ class PokerSessionServiceTest {
         void shouldUpdateOnRevote() {
             PokerStoryEntity story = createStory(1L, null, "Story", 0);
             story.setStatus(StoryStatus.VOTING);
-            story.setNeedsDev(true);
 
             PokerVoteEntity existingVote = new PokerVoteEntity();
             existingVote.setStory(story);
             existingVote.setVoterAccountId("voter-123");
-            existingVote.setVoterRole(VoterRole.DEV);
+            existingVote.setVoterRole("DEV");
             existingVote.setVoteHours(4);
 
             when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
-            when(voteRepository.findByStoryIdAndVoterAccountIdAndVoterRole(1L, "voter-123", VoterRole.DEV))
+            when(voteRepository.findByStoryIdAndVoterAccountIdAndVoterRole(1L, "voter-123", "DEV"))
                     .thenReturn(Optional.of(existingVote));
             when(voteRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            PokerVoteEntity vote = pokerSessionService.castVote(1L, "voter-123", "John", VoterRole.DEV, 16);
+            PokerVoteEntity vote = pokerSessionService.castVote(1L, "voter-123", "John", "DEV", 16);
 
             assertEquals(16, vote.getVoteHours());
         }
@@ -207,12 +206,11 @@ class PokerSessionServiceTest {
         void shouldRejectAfterReveal() {
             PokerStoryEntity story = createStory(1L, null, "Story", 0);
             story.setStatus(StoryStatus.REVEALED);
-            story.setNeedsDev(true);
 
             when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
 
             assertThrows(IllegalStateException.class, () ->
-                    pokerSessionService.castVote(1L, "voter", "John", VoterRole.DEV, 8));
+                    pokerSessionService.castVote(1L, "voter", "John", "DEV", 8));
         }
 
         @Test
@@ -220,14 +218,12 @@ class PokerSessionServiceTest {
         void shouldRejectUnneededRole() {
             PokerStoryEntity story = createStory(1L, null, "Story", 0);
             story.setStatus(StoryStatus.VOTING);
-            story.setNeedsSa(false);
-            story.setNeedsDev(true);
-            story.setNeedsQa(false);
+            story.setNeedsRoles(List.of("DEV"));
 
             when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
 
             assertThrows(IllegalArgumentException.class, () ->
-                    pokerSessionService.castVote(1L, "voter", "John", VoterRole.SA, 4));
+                    pokerSessionService.castVote(1L, "voter", "John", "SA", 4));
         }
     }
 
@@ -278,11 +274,12 @@ class PokerSessionServiceTest {
             when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
             when(storyRepository.save(any())).thenAnswer(i -> i.getArgument(0));
 
-            PokerStoryEntity completed = pokerSessionService.setFinalEstimate(1L, 4, 16, 8);
+            Map<String, Integer> estimates = Map.of("SA", 4, "DEV", 16, "QA", 8);
+            PokerStoryEntity completed = pokerSessionService.setFinalEstimate(1L, estimates);
 
-            assertEquals(4, completed.getFinalSaHours());
-            assertEquals(16, completed.getFinalDevHours());
-            assertEquals(8, completed.getFinalQaHours());
+            assertEquals(4, completed.getFinalEstimate("SA"));
+            assertEquals(16, completed.getFinalEstimate("DEV"));
+            assertEquals(8, completed.getFinalEstimate("QA"));
             assertEquals(StoryStatus.COMPLETED, completed.getStatus());
         }
     }
@@ -357,18 +354,18 @@ class PokerSessionServiceTest {
     class GetParticipantRoleTests {
 
         @Test
-        @DisplayName("should map team member role to voter role")
-        void shouldMapRoleToVoterRole() {
+        @DisplayName("should map team member role to string")
+        void shouldMapRoleToString() {
             TeamMemberEntity member = new TeamMemberEntity();
-            member.setRole(Role.DEV);
+            member.setRole("DEV");
 
             when(teamMemberRepository.findByTeamIdAndJiraAccountId(1L, "account-1"))
                     .thenReturn(Optional.of(member));
 
-            Optional<VoterRole> role = pokerSessionService.getParticipantRole(1L, "account-1");
+            Optional<String> role = pokerSessionService.getParticipantRole(1L, "account-1");
 
             assertTrue(role.isPresent());
-            assertEquals(VoterRole.DEV, role.get());
+            assertEquals("DEV", role.get());
         }
 
         @Test
@@ -377,7 +374,7 @@ class PokerSessionServiceTest {
             when(teamMemberRepository.findByTeamIdAndJiraAccountId(1L, "unknown"))
                     .thenReturn(Optional.empty());
 
-            Optional<VoterRole> role = pokerSessionService.getParticipantRole(1L, "unknown");
+            Optional<String> role = pokerSessionService.getParticipantRole(1L, "unknown");
 
             assertTrue(role.isEmpty());
         }
@@ -402,9 +399,7 @@ class PokerSessionServiceTest {
         story.setTitle(title);
         story.setOrderIndex(orderIndex);
         story.setStatus(StoryStatus.PENDING);
-        story.setNeedsSa(true);
-        story.setNeedsDev(true);
-        story.setNeedsQa(true);
+        story.setNeedsRoles(List.of("SA", "DEV", "QA"));
         return story;
     }
 }

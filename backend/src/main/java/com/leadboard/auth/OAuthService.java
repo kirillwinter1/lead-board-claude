@@ -95,10 +95,15 @@ public class OAuthService {
             String cloudId = getCloudId(tokenResponse.accessToken);
 
             // Save or update user
+            boolean isFirstUser = userRepository.count() == 0;
             UserEntity user = userRepository.findByAtlassianAccountId(userInfo.accountId)
                     .orElseGet(() -> {
                         UserEntity newUser = new UserEntity();
                         newUser.setAtlassianAccountId(userInfo.accountId);
+                        if (isFirstUser) {
+                            newUser.setAppRole(AppRole.ADMIN);
+                            log.info("First user registered — assigning ADMIN role");
+                        }
                         return newUser;
                     });
 

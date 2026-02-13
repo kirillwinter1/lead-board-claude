@@ -104,7 +104,7 @@ public class IssueOrderService {
 
         Integer currentOrder = story.getManualOrder();
         if (currentOrder == null) {
-            currentOrder = issueRepository.findMaxStoryOrderForParent(parentKey, workflowConfigService.getStoryTypeNames()) + 1;
+            currentOrder = issueRepository.findMaxStoryOrderForParent(parentKey) + 1;
         }
 
         if (newPosition < 1) {
@@ -112,7 +112,7 @@ public class IssueOrderService {
         }
 
         // Get max order to cap the position
-        int maxOrder = issueRepository.findMaxStoryOrderForParent(parentKey, workflowConfigService.getStoryTypeNames());
+        int maxOrder = issueRepository.findMaxStoryOrderForParent(parentKey);
         if (newPosition > maxOrder) {
             newPosition = maxOrder;
         }
@@ -151,7 +151,7 @@ public class IssueOrderService {
             issueRepository.save(issue);
             log.debug("Assigned order {} to new epic {}", issue.getManualOrder(), issue.getIssueKey());
         } else if (workflowConfigService.isStory(issue.getIssueType()) && issue.getParentKey() != null) {
-            int maxOrder = issueRepository.findMaxStoryOrderForParent(issue.getParentKey(), workflowConfigService.getStoryTypeNames());
+            int maxOrder = issueRepository.findMaxStoryOrderForParent(issue.getParentKey());
             issue.setManualOrder(maxOrder + 1);
             issueRepository.save(issue);
             log.debug("Assigned order {} to new story {}", issue.getManualOrder(), issue.getIssueKey());

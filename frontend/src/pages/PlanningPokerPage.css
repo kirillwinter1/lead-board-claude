@@ -264,9 +264,7 @@
   font-weight: 600;
 }
 
-.estimate-badge.sa { background: #deebff; color: #0747a6; }
-.estimate-badge.dev { background: #e3fcef; color: #006644; }
-.estimate-badge.qa { background: #fff0b3; color: #974f0c; }
+/* Role-specific colors are now applied via inline styles */
 
 /* Main area */
 .poker-main {
@@ -375,9 +373,7 @@
   color: white;
 }
 
-.role-badge.sa { background: #0052cc; }
-.role-badge.dev { background: #36b37e; }
-.role-badge.qa { background: #ff991f; }
+/* Role-specific badge colors are now applied via inline styles */
 
 /* Role selector buttons */
 .poker-role-select-btn {
@@ -387,9 +383,7 @@
   border-radius: 8px !important;
 }
 
-.poker-role-select-btn.sa { background: #0052cc !important; }
-.poker-role-select-btn.dev { background: #36b37e !important; }
-.poker-role-select-btn.qa { background: #ff991f !important; }
+/* Role-specific button colors are now applied via inline styles */
 
 /* Voting */
 .votes-status {
@@ -415,9 +409,7 @@
   color: #006644;
 }
 
-.vote-indicator.sa.voted { background: #deebff; color: #0747a6; }
-.vote-indicator.dev.voted { background: #e3fcef; color: #006644; }
-.vote-indicator.qa.voted { background: #fff0b3; color: #974f0c; }
+/* Role-specific vote indicator colors are now applied via inline styles */
 
 .voting-cards {
   margin-bottom: 32px;
@@ -656,9 +648,7 @@
   border-radius: 3px;
 }
 
-.participant-role.role-sa { background: #deebff; color: #0747a6; }
-.participant-role.role-dev { background: #e3fcef; color: #006644; }
-.participant-role.role-qa { background: #fff0b3; color: #974f0c; }
+/* Role-specific participant colors are now applied via inline styles */
 
 /* Checkbox group */
 .checkbox-group {
@@ -818,17 +808,4 @@
   border-radius: 3px;
 }
 
-.subtask-badge.sa {
-  background: #e3f2fd;
-  color: #1565c0;
-}
-
-.subtask-badge.dev {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.subtask-badge.qa {
-  background: #fff3e0;
-  color: #e65100;
-}
+/* Role-specific subtask badge colors are now applied via inline styles */

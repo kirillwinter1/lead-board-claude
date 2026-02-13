@@ -1,8 +1,8 @@
 package com.leadboard.metrics.service;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
-import com.leadboard.status.StatusMappingService;
 import com.leadboard.sync.JiraIssueEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,13 +25,13 @@ class StatusChangelogServiceTest {
     private StatusChangelogRepository repository;
 
     @Mock
-    private StatusMappingService statusMappingService;
+    private WorkflowConfigService workflowConfigService;
 
     private StatusChangelogService service;
 
     @BeforeEach
     void setUp() {
-        service = new StatusChangelogService(repository, statusMappingService);
+        service = new StatusChangelogService(repository, workflowConfigService);
     }
 
     @Test
@@ -116,7 +116,7 @@ class StatusChangelogServiceTest {
         entity.setStatus("Done");
         entity.setDoneAt(null);
 
-        when(statusMappingService.isDone("Done", null)).thenReturn(true);
+        when(workflowConfigService.isDone("Done", null)).thenReturn(true);
 
         // When
         service.updateDoneAtIfNeeded(entity);
@@ -133,7 +133,7 @@ class StatusChangelogServiceTest {
         entity.setStatus("In Progress");
         entity.setDoneAt(OffsetDateTime.now().minusDays(1));
 
-        when(statusMappingService.isDone("In Progress", null)).thenReturn(false);
+        when(workflowConfigService.isDone("In Progress", null)).thenReturn(false);
 
         // When
         service.updateDoneAtIfNeeded(entity);
@@ -151,7 +151,7 @@ class StatusChangelogServiceTest {
         entity.setStatus("Done");
         entity.setDoneAt(existingDoneAt);
 
-        when(statusMappingService.isDone("Done", null)).thenReturn(true);
+        when(workflowConfigService.isDone("Done", null)).thenReturn(true);
 
         // When
         service.updateDoneAtIfNeeded(entity);

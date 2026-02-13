@@ -190,16 +190,23 @@ public class JiraClient {
     }
 
     /**
-     * Create a subtask under a parent issue
+     * Create a subtask under a parent issue.
+     * @param parentKey parent issue key
+     * @param summary subtask summary/title
+     * @param projectKey Jira project key
+     * @param subtaskTypeName Jira issue type name for subtasks (e.g. "Sub-task", "Подзадача")
      */
-    public String createSubtask(String parentKey, String summary, String projectKey) {
+    public String createSubtask(String parentKey, String summary, String projectKey, String subtaskTypeName) {
         String accessToken = oauthService.getValidAccessToken();
         String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        String typeName = (subtaskTypeName != null && !subtaskTypeName.isEmpty())
+                ? subtaskTypeName : "Sub-task";
 
         Map<String, Object> fields = new java.util.HashMap<>();
         fields.put("project", Map.of("key", projectKey));
         fields.put("summary", summary);
-        fields.put("issuetype", Map.of("name", "Sub-task"));
+        fields.put("issuetype", Map.of("name", typeName));
         fields.put("parent", Map.of("key", parentKey));
 
         Map<String, Object> body = Map.of("fields", fields);
@@ -208,6 +215,14 @@ public class JiraClient {
             return createIssueWithOAuth(body, accessToken, cloudId);
         }
         return createIssueWithBasicAuth(body);
+    }
+
+    /**
+     * @deprecated Use {@link #createSubtask(String, String, String, String)} with explicit subtask type name.
+     */
+    @Deprecated
+    public String createSubtask(String parentKey, String summary, String projectKey) {
+        return createSubtask(parentKey, summary, projectKey, "Sub-task");
     }
 
     /**

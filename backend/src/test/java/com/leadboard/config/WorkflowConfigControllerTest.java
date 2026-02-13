@@ -5,6 +5,7 @@ import com.leadboard.config.controller.WorkflowConfigController;
 import com.leadboard.config.dto.*;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
+import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.MappingValidationService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusCategory;
@@ -51,6 +52,8 @@ class WorkflowConfigControllerTest {
     private WorkflowConfigService workflowConfigService;
     @MockBean
     private MappingValidationService validationService;
+    @MockBean
+    private MappingAutoDetectService autoDetectService;
     @MockBean
     private SessionRepository sessionRepository;
     @MockBean

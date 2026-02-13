@@ -37,45 +37,22 @@ public class PokerJiraService {
 
     /**
      * Create a Story in Jira with subtasks. Returns the Jira story key.
-     * Does NOT save anything to local DB — Jira is the single source of truth.
+     * Does NOT save anything to local DB -- Jira is the single source of truth.
      */
-    public String createStoryInJira(String epicKey, String title,
-                                     boolean needsSa, boolean needsDev, boolean needsQa) {
+    public String createStoryInJira(String epicKey, String title, List<String> needsRoles) {
         String storyTypeName = workflowConfigService.getStoryTypeName();
         log.info("Creating story in Jira: type='{}', epic={}, title='{}'", storyTypeName, epicKey, title);
 
         String storyKey = jiraClient.createIssue(projectKey, storyTypeName, title, epicKey);
         log.info("Created Jira Story: {}", storyKey);
 
-        if (needsSa) {
-            String saSubtaskName = workflowConfigService.getSubtaskTypeName("SA");
-            String subtaskKey = jiraClient.createSubtask(storyKey, saSubtaskName != null ? saSubtaskName : "Анализ", projectKey);
-            log.info("Created SA subtask: {}", subtaskKey);
-        }
-        if (needsDev) {
-            String devSubtaskName = workflowConfigService.getSubtaskTypeName("DEV");
-            String subtaskKey = jiraClient.createSubtask(storyKey, devSubtaskName != null ? devSubtaskName : "Разработка", projectKey);
-            log.info("Created DEV subtask: {}", subtaskKey);
-        }
-        if (needsQa) {
-            String qaSubtaskName = workflowConfigService.getSubtaskTypeName("QA");
-            String subtaskKey = jiraClient.createSubtask(storyKey, qaSubtaskName != null ? qaSubtaskName : "Тестирование", projectKey);
-            log.info("Created QA subtask: {}", subtaskKey);
+        for (String roleCode : needsRoles) {
+            String subtaskTypeName = workflowConfigService.getSubtaskTypeName(roleCode);
+            String subtaskKey = jiraClient.createSubtask(storyKey,
+                    subtaskTypeName != null ? subtaskTypeName : roleCode, projectKey, subtaskTypeName);
+            log.info("Created {} subtask: {}", roleCode, subtaskKey);
         }
 
-        return storyKey;
-    }
-
-    /**
-     * @deprecated Use {@link #createStoryInJira} instead. Kept for backward compatibility.
-     */
-    @Deprecated
-    @Transactional
-    public String createStoryWithSubtasks(PokerStoryEntity pokerStory, String epicKey) {
-        String storyKey = createStoryInJira(epicKey, pokerStory.getTitle(),
-                pokerStory.isNeedsSa(), pokerStory.isNeedsDev(), pokerStory.isNeedsQa());
-        pokerStory.setStoryKey(storyKey);
-        storyRepository.save(pokerStory);
         return storyKey;
     }
 
@@ -83,7 +60,9 @@ public class PokerJiraService {
      * Update estimates on subtasks after voting is complete.
      */
     @SuppressWarnings("unchecked")
-    public void updateSubtaskEstimates(String storyKey, Integer saHours, Integer devHours, Integer qaHours) {
+    public void updateSubtaskEstimates(String storyKey, Map<String, Integer> finalEstimates) {
+        if (finalEstimates == null || finalEstimates.isEmpty()) return;
+
         try {
             List<Map<String, Object>> subtasks = jiraClient.getSubtasks(storyKey);
 
@@ -106,19 +85,12 @@ public class PokerJiraService {
                     }
                 }
 
-                Integer hours = null;
                 if (roleCode != null) {
-                    hours = switch (roleCode) {
-                        case "SA" -> saHours;
-                        case "DEV" -> devHours;
-                        case "QA" -> qaHours;
-                        default -> null;
-                    };
-                }
-
-                if (hours != null && hours > 0) {
-                    jiraClient.updateEstimate(subtaskKey, hours * 3600); // Convert hours to seconds
-                    log.info("Updated estimate for {} (role={}): {} hours", subtaskKey, roleCode, hours);
+                    Integer hours = finalEstimates.get(roleCode);
+                    if (hours != null && hours > 0) {
+                        jiraClient.updateEstimate(subtaskKey, hours * 3600); // Convert hours to seconds
+                        log.info("Updated estimate for {} (role={}): {} hours", subtaskKey, roleCode, hours);
+                    }
                 }
             }
         } catch (Exception e) {
