@@ -423,20 +423,15 @@ public class MappingAutoDetectService {
             return;
         }
 
-        // Correct statusCategory from transitions API data (overrides heuristic mapping)
+        // Correct statusCategory from transitions API data — only for DONE (reliable).
+        // Jira's "new" (To Do) category is too broad (includes intermediate waiting statuses),
+        // so we keep our heuristic mapping for non-done statuses.
         for (StatusMappingEntity m : mappings) {
             String apiCatKey = statusCategoryKeys.get(m.getJiraStatusName());
-            if (apiCatKey != null) {
-                StatusCategory corrected = switch (apiCatKey) {
-                    case "new" -> StatusCategory.NEW;
-                    case "done" -> StatusCategory.DONE;
-                    default -> null;
-                };
-                if (corrected != null && corrected != m.getStatusCategory()) {
-                    log.info("Correcting statusCategory for '{}' in {}: {} → {}",
-                            m.getJiraStatusName(), category, m.getStatusCategory(), corrected);
-                    m.setStatusCategory(corrected);
-                }
+            if ("done".equals(apiCatKey) && m.getStatusCategory() != StatusCategory.DONE) {
+                log.info("Correcting statusCategory for '{}' in {}: {} → DONE",
+                        m.getJiraStatusName(), category, m.getStatusCategory());
+                m.setStatusCategory(StatusCategory.DONE);
             }
         }
 
@@ -450,7 +445,8 @@ public class MappingAutoDetectService {
             statusCategoryKeys.putIfAbsent(m.getJiraStatusName(), catKey);
         }
 
-        // Find NEW statuses (BFS start points) — use corrected statusCategory
+        // Find the TRUE workflow start status.
+        // Step 1: Collect all statuses with StatusCategory.NEW
         Set<String> newStatuses = new LinkedHashSet<>();
         for (StatusMappingEntity m : mappings) {
             if (m.getStatusCategory() == StatusCategory.NEW) {
@@ -467,26 +463,108 @@ public class MappingAutoDetectService {
             }
         }
 
+        // Step 2: If multiple NEW candidates, narrow down to find the TRUE start.
+        // Strategy: prefer candidates that are SOURCES in the graph (have issues),
+        // then pick the one with lowest in-degree among those.
+        if (newStatuses.size() > 1 && !graph.isEmpty()) {
+            // First, prefer candidates that are sources (have issues → have outgoing transitions)
+            Set<String> sourceCandidates = new LinkedHashSet<>();
+            for (String s : newStatuses) {
+                if (graph.containsKey(s)) {
+                    sourceCandidates.add(s);
+                }
+            }
+            Set<String> pool = sourceCandidates.isEmpty() ? newStatuses : sourceCandidates;
+
+            // Among the pool, find the one with lowest in-degree
+            Map<String, Integer> inDegree = new LinkedHashMap<>();
+            for (String s : pool) {
+                inDegree.put(s, 0);
+            }
+            for (Map.Entry<String, Set<String>> gEntry : graph.entrySet()) {
+                for (String target : gEntry.getValue()) {
+                    if (inDegree.containsKey(target)) {
+                        inDegree.merge(target, 1, Integer::sum);
+                    }
+                }
+            }
+            int minDeg = inDegree.values().stream().mapToInt(Integer::intValue).min().orElse(0);
+            Set<String> narrowed = new LinkedHashSet<>();
+            for (Map.Entry<String, Integer> e : inDegree.entrySet()) {
+                if (e.getValue() == minDeg) {
+                    narrowed.add(e.getKey());
+                }
+            }
+            if (!narrowed.isEmpty()) {
+                String start = narrowed.iterator().next();
+                newStatuses = new LinkedHashSet<>();
+                newStatuses.add(start);
+                log.info("Narrowed workflow start for {} to '{}' (in-degree={}, was {} candidates)",
+                        category, start, minDeg, pool.size());
+            }
+        }
+
         if (newStatuses.isEmpty()) {
             log.debug("No NEW statuses found for {} — skipping graph enhancement", category);
             return;
         }
 
-        // Longest forward path from NEW statuses (each status gets unique position)
-        Map<String, Integer> levels = longestForwardPath(newStatuses, graph);
-
-        // Assign levels to statuses not reached by BFS (e.g., orphan statuses)
-        int maxLevel = levels.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        for (String statusName : statusNames) {
-            if (!levels.containsKey(statusName)) {
-                // Place DONE statuses at max+1, others at max
-                String catKey = statusCategoryKeys.getOrDefault(statusName, "indeterminate");
-                if ("done".equals(catKey)) {
-                    levels.put(statusName, maxLevel + 1);
-                } else {
-                    levels.put(statusName, maxLevel);
+        // Build enhanced graph: add REVERSE edges for statuses that have no issues
+        // (non-source statuses). These statuses only appear as targets in the original graph.
+        // By reversing their incoming edges, BFS can traverse through them and establish ordering.
+        Map<String, Set<String>> enhancedGraph = new LinkedHashMap<>(graph);
+        for (Map.Entry<String, Set<String>> gEntry : graph.entrySet()) {
+            String source = gEntry.getKey();
+            for (String target : gEntry.getValue()) {
+                if (!graph.containsKey(target) && statusNames.contains(target)) {
+                    // target is not a source (no issues) — add reverse edge
+                    enhancedGraph.computeIfAbsent(target, k -> new LinkedHashSet<>()).add(source);
                 }
             }
+        }
+
+        if (enhancedGraph.size() != graph.size()) {
+            log.info("Enhanced graph for {} with reverse edges: {} → {} nodes",
+                    category, graph.size(), enhancedGraph.size());
+        }
+
+        // Longest forward path from start status (each status gets unique position)
+        Map<String, Integer> levels = longestForwardPath(newStatuses, enhancedGraph);
+
+        // Assign levels to orphan statuses (not reached by graph traversal).
+        // Sort orphans by statusCategory so they're placed in workflow order:
+        // IN_PROGRESS (active work) → NEW (Jira "To Do"/waiting) → DONE (terminal).
+        // Within same category, names containing "review" go after others.
+        int maxLevel = levels.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        List<String> orphans = new ArrayList<>();
+        List<String> doneOrphans = new ArrayList<>();
+        for (String statusName : statusNames) {
+            if (!levels.containsKey(statusName)) {
+                String catKey = statusCategoryKeys.getOrDefault(statusName, "indeterminate");
+                if ("done".equals(catKey)) {
+                    doneOrphans.add(statusName);
+                } else {
+                    orphans.add(statusName);
+                }
+            }
+        }
+        // Sort non-done orphans: IN_PROGRESS first, then NEW; "review" names last within group
+        orphans.sort((a, b) -> {
+            String catA = statusCategoryKeys.getOrDefault(a, "indeterminate");
+            String catB = statusCategoryKeys.getOrDefault(b, "indeterminate");
+            int catOrder = orphanCategoryOrder(catA) - orphanCategoryOrder(catB);
+            if (catOrder != 0) return catOrder;
+            boolean reviewA = a.toLowerCase().contains("review");
+            boolean reviewB = b.toLowerCase().contains("review");
+            if (reviewA != reviewB) return reviewA ? 1 : -1;
+            return a.compareToIgnoreCase(b);
+        });
+        int nextLevel = maxLevel + 1;
+        for (String orphan : orphans) {
+            levels.put(orphan, nextLevel++);
+        }
+        for (String done : doneOrphans) {
+            levels.put(done, nextLevel);
         }
 
         // Recalculate maxLevel after assigning orphans
@@ -588,8 +666,18 @@ public class MappingAutoDetectService {
         return longest;
     }
 
+    private int orphanCategoryOrder(String catKey) {
+        return switch (catKey) {
+            case "indeterminate" -> 0; // IN_PROGRESS — active work first
+            case "new" -> 1;           // NEW/To Do — waiting states after
+            default -> 2;
+        };
+    }
+
     int computeWeightFromLevel(int level, int maxLevel, String statusCategoryKey) {
-        if ("new".equals(statusCategoryKey) || level == 0) return -5;
+        // Only the first status (level 0) gets -5; don't use statusCategory "new"
+        // because Jira marks intermediate statuses (Ready to Release) as "To Do"
+        if (level == 0) return -5;
         if ("done".equals(statusCategoryKey) || level == maxLevel) return 0;
         if (maxLevel <= 1) return 20;
 
