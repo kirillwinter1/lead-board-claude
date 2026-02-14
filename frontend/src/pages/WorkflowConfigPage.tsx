@@ -283,6 +283,62 @@ function suggestStatuses(
     }
   }
 
+  // Fallback: if EPIC or STORY have 0 statuses, copy from the first non-empty category
+  const epicStatuses = result.filter(s => s.issueCategory === 'EPIC')
+  const storyStatuses = result.filter(s => s.issueCategory === 'STORY')
+  const allUniqueStatuses = [...new Map(result.map(s => [s.jiraStatusName, s])).values()]
+
+  if (epicStatuses.length === 0 && allUniqueStatuses.length > 0) {
+    for (const src of allUniqueStatuses) {
+      const key = `${src.jiraStatusName}|EPIC`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      const lower = src.jiraStatusName.toLowerCase()
+      let statusCategory = src.statusCategory
+      let scoreWeight = src.scoreWeight
+      if (statusCategory === 'IN_PROGRESS') {
+        if (lower.includes('requirement') || lower.includes('требовани')) {
+          statusCategory = 'REQUIREMENTS'
+          scoreWeight = 25
+        } else if (lower.includes('plan') || lower.includes('заплан')) {
+          statusCategory = 'PLANNED'
+          scoreWeight = 50
+        }
+      }
+
+      result.push({
+        id: null,
+        jiraStatusName: src.jiraStatusName,
+        issueCategory: 'EPIC',
+        statusCategory,
+        workflowRoleCode: null,
+        sortOrder: result.length + 1,
+        scoreWeight,
+        color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
+      })
+    }
+  }
+
+  if (storyStatuses.length === 0 && allUniqueStatuses.length > 0) {
+    for (const src of allUniqueStatuses) {
+      const key = `${src.jiraStatusName}|STORY`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      result.push({
+        id: null,
+        jiraStatusName: src.jiraStatusName,
+        issueCategory: 'STORY',
+        statusCategory: src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' ? 'IN_PROGRESS' : src.statusCategory,
+        workflowRoleCode: src.workflowRoleCode,
+        sortOrder: result.length + 1,
+        scoreWeight: src.scoreWeight,
+        color: STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' ? 'IN_PROGRESS' : src.statusCategory] || '#DFE1E6',
+      })
+    }
+  }
+
   return result
 }
 
