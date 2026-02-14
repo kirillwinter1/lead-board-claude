@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   workflowConfigApi,
   WorkflowConfigResponse,
@@ -45,6 +45,9 @@ const STATUS_BG_COLORS = [
   { hex: '#F3E8FF', name: 'Lavender' },
   { hex: '#E0F2FE', name: 'Sky' },
   { hex: '#FEF3C7', name: 'Amber' },
+  { hex: '#FCE7F3', name: 'Pink' },
+  { hex: '#D1FAE5', name: 'Mint' },
+  { hex: '#FED7AA', name: 'Peach' },
 ] as const
 
 const STATUS_CATEGORY_DEFAULT_COLORS: Record<string, string> = {
@@ -90,32 +93,52 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (color: str
 
 function StatusColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const handleOpen = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setPos({ top: rect.bottom + 4, left: rect.left })
+    }
+    setOpen(!open)
+  }
 
   return (
-    <div className="color-picker">
+    <div className="color-picker" ref={ref}>
       <button
+        ref={triggerRef}
         className="color-picker-trigger"
         style={{ backgroundColor: value, width: 22, height: 22 }}
-        onClick={() => setOpen(!open)}
+        onClick={handleOpen}
         type="button"
         title="Choose color"
       />
       {open && (
-        <>
-          <div className="color-picker-backdrop" onClick={() => setOpen(false)} />
-          <div className="color-picker-dropdown">
-            {STATUS_BG_COLORS.map(c => (
-              <button
-                key={c.hex}
-                className={`color-swatch ${value.toUpperCase() === c.hex ? 'selected' : ''}`}
-                style={{ backgroundColor: c.hex }}
-                title={c.name}
-                onClick={() => { onChange(c.hex); setOpen(false) }}
-                type="button"
-              />
-            ))}
-          </div>
-        </>
+        <div className="color-picker-dropdown" style={{ top: pos.top, left: pos.left }}>
+          {STATUS_BG_COLORS.map(c => (
+            <button
+              key={c.hex}
+              className={`color-swatch ${value.toUpperCase() === c.hex ? 'selected' : ''}`}
+              style={{ backgroundColor: c.hex }}
+              title={c.name}
+              onClick={() => onChange(c.hex)}
+              type="button"
+            />
+          ))}
+        </div>
       )}
     </div>
   )
@@ -1047,7 +1070,7 @@ export function WorkflowConfigPage() {
                                 value={st.statusCategory}
                                 onChange={e => updateWizardStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">
@@ -1403,7 +1426,7 @@ export function WorkflowConfigPage() {
                                 value={st.statusCategory}
                                 onChange={e => updateStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">

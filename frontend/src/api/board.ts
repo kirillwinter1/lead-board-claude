@@ -17,3 +17,13 @@ export async function getScoreBreakdown(issueKey: string): Promise<ScoreBreakdow
   const response = await axios.get(`/api/board/${issueKey}/score-breakdown`)
   return response.data
 }
+
+export interface StatusStyle {
+  color: string | null
+  statusCategory: string
+}
+
+export async function getStatusStyles(): Promise<Record<string, StatusStyle>> {
+  const response = await axios.get('/api/config/workflow/status-styles')
+  return response.data
+}

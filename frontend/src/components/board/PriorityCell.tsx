@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { getRecommendationIcon } from './helpers'
 import { getScoreBreakdown } from '../../api/board'
 import type { PriorityCellProps, ScoreBreakdown } from './types'
@@ -125,13 +126,14 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
         </span>
       )}
 
-      {showTooltip && tooltipPos && (
+      {showTooltip && tooltipPos && createPortal(
         <div
           className="priority-tooltip"
           style={{
             top: `${tooltipPos.top}px`,
             left: `${tooltipPos.left}px`,
-            transform: tooltipPos.showAbove ? 'translateY(-100%)' : 'none'
+            transform: tooltipPos.showAbove ? 'translateY(-100%)' : 'none',
+            pointerEvents: 'none'
           }}
         >
           <div className="priority-tooltip-header">
@@ -192,7 +194,8 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
               })}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

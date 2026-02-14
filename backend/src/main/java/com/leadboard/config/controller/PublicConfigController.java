@@ -3,8 +3,10 @@ package com.leadboard.config.controller;
 import com.leadboard.config.dto.WorkflowRoleDto;
 import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.entity.IssueTypeMappingEntity;
+import com.leadboard.config.entity.StatusMappingEntity;
 import com.leadboard.config.entity.WorkflowRoleEntity;
 import com.leadboard.config.repository.IssueTypeMappingRepository;
+import com.leadboard.config.repository.StatusMappingRepository;
 import com.leadboard.config.service.WorkflowConfigService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,13 +27,16 @@ public class PublicConfigController {
 
     private final WorkflowConfigService workflowConfigService;
     private final IssueTypeMappingRepository issueTypeRepo;
+    private final StatusMappingRepository statusMappingRepo;
 
     public PublicConfigController(
             WorkflowConfigService workflowConfigService,
-            IssueTypeMappingRepository issueTypeRepo
+            IssueTypeMappingRepository issueTypeRepo,
+            StatusMappingRepository statusMappingRepo
     ) {
         this.workflowConfigService = workflowConfigService;
         this.issueTypeRepo = issueTypeRepo;
+        this.statusMappingRepo = statusMappingRepo;
     }
 
     @GetMapping("/roles")
@@ -54,6 +59,26 @@ public class PublicConfigController {
         Map<String, String> result = new LinkedHashMap<>();
         for (IssueTypeMappingEntity m : mappings) {
             result.put(m.getJiraTypeName(), m.getBoardCategory().name());
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/status-styles")
+    public ResponseEntity<Map<String, Map<String, String>>> getStatusStyles() {
+        Long configId = workflowConfigService.getDefaultConfigId();
+        if (configId == null) {
+            return ResponseEntity.ok(Map.of());
+        }
+        List<StatusMappingEntity> statuses = statusMappingRepo.findByConfigId(configId);
+        Map<String, Map<String, String>> result = new LinkedHashMap<>();
+        for (StatusMappingEntity s : statuses) {
+            String name = s.getJiraStatusName();
+            if (!result.containsKey(name)) {
+                Map<String, String> style = new LinkedHashMap<>();
+                style.put("color", s.getColor());
+                style.put("statusCategory", s.getStatusCategory().name());
+                result.put(name, style);
+            }
         }
         return ResponseEntity.ok(result);
     }

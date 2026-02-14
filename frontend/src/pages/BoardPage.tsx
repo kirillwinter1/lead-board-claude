@@ -1,12 +1,20 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { updateEpicOrder, updateStoryOrder } from '../api/epics'
+import { getStatusStyles, type StatusStyle } from '../api/board'
 import { FilterPanel, BoardTable } from '../components/board'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { useBoardData } from '../hooks/useBoardData'
 import { useBoardFilters } from '../hooks/useBoardFilters'
 import { useBoardForecasts } from '../hooks/useBoardForecasts'
 import './BoardPage.css'
 
 export function BoardPage() {
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
+
+  useEffect(() => {
+    getStatusStyles().then(setStatusStyles).catch(() => {})
+  }, [])
+
   const {
     board,
     setBoard,
@@ -121,7 +129,7 @@ export function BoardPage() {
   }, [setBoard, fetchBoard, loadForecasts])
 
   return (
-    <>
+    <StatusStylesProvider value={statusStyles}>
       <FilterPanel
         searchKey={searchKey}
         onSearchKeyChange={setSearchKey}
@@ -156,6 +164,6 @@ export function BoardPage() {
           />
         )}
       </main>
-    </>
+    </StatusStylesProvider>
   )
 }

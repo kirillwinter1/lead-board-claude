@@ -116,9 +116,19 @@ public class TeamSyncService {
     private TeamEntity syncTeam(AtlassianTeam atlassianTeam) {
         Optional<TeamEntity> existing = teamRepository.findByAtlassianTeamId(atlassianTeam.getTeamId());
 
+        // Fallback: find by jiraTeamValue if not found by atlassianTeamId
+        // (handles teams created manually before Atlassian sync was set up)
+        if (existing.isEmpty()) {
+            existing = teamRepository.findByJiraTeamValue(atlassianTeam.getDisplayName());
+        }
+
         TeamEntity team;
         if (existing.isPresent()) {
             team = existing.get();
+            if (team.getAtlassianTeamId() == null) {
+                team.setAtlassianTeamId(atlassianTeam.getTeamId());
+                log.info("Linked existing team '{}' to Atlassian ID {}", team.getName(), atlassianTeam.getTeamId());
+            }
             log.debug("Updating existing team: {}", team.getName());
         } else {
             team = new TeamEntity();
