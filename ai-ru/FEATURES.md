@@ -28,7 +28,9 @@
 | F24 | Team Metrics v2 (5 визуализаций) | 2026-02-04 | [features/F24](features/F24_TEAM_METRICS_V2.md) |
 | F27 | RBAC | 2026-02-01 | [features/F27](features/F27_RBAC.md) |
 | F28 | AI Simulation | 2026-02-08 | [features/F28](features/F28_SIMULATION.md) |
-| F29 | Workflow Configuration | 🚧 В работе | [features/F29](features/F29_WORKFLOW_CONFIGURATION.md) |
+| F29 | Workflow Configuration | 2026-02-13 | [features/F29](features/F29_WORKFLOW_CONFIGURATION.md) |
+| F30 | Member Profile Page | 2026-02-14 | [features/F30](features/F30_MEMBER_PROFILE.md) |
+| F31 | Dynamic Status Colors on Board | 2026-02-14 | [features/F31](features/F31_DYNAMIC_STATUS_COLORS.md) |
 
 ## Бэклог (BF)
 
@@ -42,7 +44,7 @@
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |
-| BF9 | Universal Workflow Configuration | 🚧 В работе → [F29](features/F29_WORKFLOW_CONFIGURATION.md) | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
+| BF9 | Universal Workflow Configuration | ✅ Done → [F29](features/F29_WORKFLOW_CONFIGURATION.md) | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
 | BF11 | Competency Matrix | 📋 Planned | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
 | BF12 | Sprint Integration | 📋 Planned | [backlog/BF12](backlog/BF12_SPRINT_INTEGRATION.md) |
@@ -82,6 +84,23 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-14: F31 Dynamic Status Colors + Story AutoScore fix
+- Цвета статусов на Board из Workflow Config (color в status_mappings)
+- Public endpoint `GET /api/config/workflow/status-styles`
+- StatusBadge: inline color + W3C luminance contrast
+- StatusColorPicker: fixed positioning, click-outside close, 13 цветов
+- Story AutoScore: score_weight вместо sort_order для веса статуса
+
+### 2026-02-14: F30 Member Profile Page
+- Backend: MemberProfileService — completed/active/upcoming tasks, weekly DSR trend
+- Frontend: MemberProfilePage с реальными данными из Jira
+- `GET /api/teams/{teamId}/members/{memberId}/profile`
+
+### 2026-02-13: F29 Workflow Configuration (final)
+- Pipeline view для статусов (drag-and-drop карточки)
+- MappingAutoDetectService — автодетект маппингов из Jira metadata
+- Wizard для первичной настройки
 
 ### 2026-02-04: F24 Team Metrics v2
 - Scatter Plot для Forecast Accuracy (plan vs fact)
