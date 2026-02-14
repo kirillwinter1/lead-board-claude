@@ -39,7 +39,7 @@ class SimulationExecutorTest {
     @Test
     void execute_transition_success() {
         JiraTransition transition = new JiraTransition("21", "In Progress",
-                new JiraTransition.TransitionTarget("3", "In Progress"));
+                new JiraTransition.TransitionTarget("3", "In Progress", null));
         when(jiraClient.getTransitionsBasicAuth("PROJ-11"))
                 .thenReturn(List.of(transition));
 
@@ -57,7 +57,7 @@ class SimulationExecutorTest {
     void execute_transition_notFound() {
         // Only "Done" transition available, but we want "In Progress"
         JiraTransition transition = new JiraTransition("31", "Done",
-                new JiraTransition.TransitionTarget("5", "Done"));
+                new JiraTransition.TransitionTarget("5", "Done", null));
         when(jiraClient.getTransitionsBasicAuth("PROJ-11"))
                 .thenReturn(List.of(transition));
 
@@ -115,7 +115,7 @@ class SimulationExecutorTest {
     @Test
     void execute_multipleActions_processedInOrder() {
         JiraTransition transition = new JiraTransition("21", "In Progress",
-                new JiraTransition.TransitionTarget("3", "In Progress"));
+                new JiraTransition.TransitionTarget("3", "In Progress", null));
         when(jiraClient.getTransitionsBasicAuth(anyString()))
                 .thenReturn(List.of(transition));
 

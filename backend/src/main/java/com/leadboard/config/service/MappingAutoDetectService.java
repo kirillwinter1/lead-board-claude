@@ -2,7 +2,11 @@ package com.leadboard.config.service;
 
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
+import com.leadboard.jira.JiraClient;
+import com.leadboard.jira.JiraTransition;
 import com.leadboard.status.StatusCategory;
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -28,6 +32,8 @@ public class MappingAutoDetectService {
     private final StatusMappingRepository statusMappingRepo;
     private final LinkTypeMappingRepository linkTypeRepo;
     private final WorkflowConfigService workflowConfigService;
+    private final JiraClient jiraClient;
+    private final JiraIssueRepository jiraIssueRepository;
 
     public MappingAutoDetectService(
             JiraMetadataService jiraMetadataService,
@@ -36,7 +42,9 @@ public class MappingAutoDetectService {
             IssueTypeMappingRepository issueTypeRepo,
             StatusMappingRepository statusMappingRepo,
             LinkTypeMappingRepository linkTypeRepo,
-            WorkflowConfigService workflowConfigService
+            WorkflowConfigService workflowConfigService,
+            JiraClient jiraClient,
+            JiraIssueRepository jiraIssueRepository
     ) {
         this.jiraMetadataService = jiraMetadataService;
         this.configRepo = configRepo;
@@ -45,6 +53,8 @@ public class MappingAutoDetectService {
         this.statusMappingRepo = statusMappingRepo;
         this.linkTypeRepo = linkTypeRepo;
         this.workflowConfigService = workflowConfigService;
+        this.jiraClient = jiraClient;
+        this.jiraIssueRepository = jiraIssueRepository;
     }
 
     /**
@@ -78,11 +88,15 @@ public class MappingAutoDetectService {
             warnings.add("No issue types returned from Jira — check project configuration");
         }
 
-        // Clear existing mappings
+        // Clear existing mappings and flush to avoid unique constraint violations
         roleRepo.deleteByConfigId(configId);
         issueTypeRepo.deleteByConfigId(configId);
         statusMappingRepo.deleteByConfigId(configId);
         linkTypeRepo.deleteByConfigId(configId);
+        roleRepo.flush();
+        issueTypeRepo.flush();
+        statusMappingRepo.flush();
+        linkTypeRepo.flush();
 
         // 1. Detect issue types and roles from subtask names
         Set<String> detectedRoles = new LinkedHashSet<>();
@@ -159,17 +173,29 @@ public class MappingAutoDetectService {
             if (boardCat == BoardCategory.IGNORE) continue;
 
             int statusSortOrder = 0;
+            Map<String, StatusMappingEntity> savedMappings = new LinkedHashMap<>();
             for (Map<String, Object> status : statuses) {
                 String statusName = (String) status.get("name");
                 String statusCategoryKey = (String) status.get("statusCategory");
                 if (statusName == null) continue;
 
-                // Avoid duplicates per (statusName, boardCat)
                 String dedupeKey = boardCat.name() + ":" + statusName;
-                if (processedStatuses.contains(dedupeKey)) continue;
+                StatusCategory mappedCategory = mapJiraStatusCategory(statusCategoryKey, statusName, boardCat);
+
+                // Handle duplicate status names (same name, different statusCategory)
+                if (processedStatuses.contains(dedupeKey)) {
+                    // Prefer "done" over "new" — Jira may return same-name statuses with different categories
+                    StatusMappingEntity existing = savedMappings.get(dedupeKey);
+                    if (existing != null && mappedCategory == StatusCategory.DONE
+                            && existing.getStatusCategory() != StatusCategory.DONE) {
+                        existing.setStatusCategory(mappedCategory);
+                        existing.setScoreWeight(computeScoreWeight(mappedCategory, statusName));
+                        statusMappingRepo.save(existing);
+                    }
+                    continue;
+                }
                 processedStatuses.add(dedupeKey);
 
-                StatusCategory mappedCategory = mapJiraStatusCategory(statusCategoryKey, statusName, boardCat);
                 String roleCode = detectRoleFromStatusName(statusName, detectedRoles);
                 int scoreWeight = computeScoreWeight(mappedCategory, statusName);
 
@@ -181,7 +207,9 @@ public class MappingAutoDetectService {
                 sm.setWorkflowRoleCode(roleCode);
                 sm.setSortOrder(statusSortOrder);
                 sm.setScoreWeight(scoreWeight);
+                sm.setColor(computeDefaultColor(mappedCategory));
                 statusMappingRepo.save(sm);
+                savedMappings.put(dedupeKey, sm);
                 statusCount++;
                 statusSortOrder += 10;
             }
@@ -202,6 +230,9 @@ public class MappingAutoDetectService {
             linkTypeRepo.save(lm);
             linkCount++;
         }
+
+        // Enhance with real workflow graph from Jira Transitions API
+        enhanceWithTransitionsGraph(configId, warnings);
 
         // Refresh caches
         workflowConfigService.clearCache();
@@ -312,6 +343,268 @@ public class MappingAutoDetectService {
                 yield 20;
             }
             default -> 0;
+        };
+    }
+
+    // ==================== Workflow Graph Enhancement ====================
+
+    /**
+     * Enhances status mappings with real workflow order from Jira Transitions API.
+     * For each board category, fetches transitions from sample issues,
+     * builds a directed graph, and uses BFS from NEW statuses to compute accurate
+     * sortOrder and scoreWeight based on actual workflow position.
+     */
+    void enhanceWithTransitionsGraph(Long configId, List<String> warnings) {
+        for (BoardCategory category : List.of(BoardCategory.EPIC, BoardCategory.STORY, BoardCategory.SUBTASK)) {
+            try {
+                enhanceCategoryWithGraph(configId, category, warnings);
+            } catch (Exception e) {
+                log.warn("Failed to enhance {} workflow with transitions graph: {}",
+                        category, e.getMessage());
+                warnings.add("Could not build workflow graph for " + category + ": " + e.getMessage());
+            }
+        }
+    }
+
+    private void enhanceCategoryWithGraph(Long configId, BoardCategory category, List<String> warnings) {
+        List<StatusMappingEntity> mappings = statusMappingRepo.findByConfigIdAndIssueCategory(configId, category);
+        if (mappings.isEmpty()) return;
+
+        // Collect unique status names
+        Set<String> statusNames = new LinkedHashSet<>();
+        for (StatusMappingEntity m : mappings) {
+            statusNames.add(m.getJiraStatusName());
+        }
+
+        // Find a sample issue for each status
+        Map<String, String> statusToIssueKey = new LinkedHashMap<>();
+        for (String statusName : statusNames) {
+            List<JiraIssueEntity> issues = jiraIssueRepository.findByStatusAndBoardCategory(
+                    statusName, category.name());
+            if (!issues.isEmpty()) {
+                statusToIssueKey.put(statusName, issues.getFirst().getIssueKey());
+            }
+        }
+
+        if (statusToIssueKey.isEmpty()) {
+            log.debug("No sample issues found for {} — skipping graph enhancement", category);
+            return;
+        }
+
+        // Build transition graph: currentStatus → Set<targetStatus>
+        // Also track statusCategory from transition targets
+        Map<String, Set<String>> graph = new LinkedHashMap<>();
+        Map<String, String> statusCategoryKeys = new LinkedHashMap<>();
+
+        for (Map.Entry<String, String> entry : statusToIssueKey.entrySet()) {
+            String currentStatus = entry.getKey();
+            String issueKey = entry.getValue();
+
+            try {
+                List<JiraTransition> transitions = jiraClient.getTransitionsBasicAuth(issueKey);
+                Set<String> targets = new LinkedHashSet<>();
+                for (JiraTransition t : transitions) {
+                    if (t.to() != null && t.to().name() != null) {
+                        targets.add(t.to().name());
+                        // Track statusCategory for targets
+                        if (t.to().statusCategory() != null && t.to().statusCategory().key() != null) {
+                            statusCategoryKeys.put(t.to().name(), t.to().statusCategory().key());
+                        }
+                    }
+                }
+                graph.put(currentStatus, targets);
+            } catch (Exception e) {
+                log.debug("Failed to get transitions for {} ({}): {}", issueKey, currentStatus, e.getMessage());
+            }
+        }
+
+        if (graph.isEmpty()) {
+            log.debug("No transitions retrieved for {} — skipping graph enhancement", category);
+            return;
+        }
+
+        // Correct statusCategory from transitions API data (overrides heuristic mapping)
+        for (StatusMappingEntity m : mappings) {
+            String apiCatKey = statusCategoryKeys.get(m.getJiraStatusName());
+            if (apiCatKey != null) {
+                StatusCategory corrected = switch (apiCatKey) {
+                    case "new" -> StatusCategory.NEW;
+                    case "done" -> StatusCategory.DONE;
+                    default -> null;
+                };
+                if (corrected != null && corrected != m.getStatusCategory()) {
+                    log.info("Correcting statusCategory for '{}' in {}: {} → {}",
+                            m.getJiraStatusName(), category, m.getStatusCategory(), corrected);
+                    m.setStatusCategory(corrected);
+                }
+            }
+        }
+
+        // Also populate statusCategoryKeys from existing mappings (for statuses not seen as targets)
+        for (StatusMappingEntity m : mappings) {
+            String catKey = switch (m.getStatusCategory()) {
+                case NEW -> "new";
+                case DONE -> "done";
+                default -> "indeterminate";
+            };
+            statusCategoryKeys.putIfAbsent(m.getJiraStatusName(), catKey);
+        }
+
+        // Find NEW statuses (BFS start points) — use corrected statusCategory
+        Set<String> newStatuses = new LinkedHashSet<>();
+        for (StatusMappingEntity m : mappings) {
+            if (m.getStatusCategory() == StatusCategory.NEW) {
+                newStatuses.add(m.getJiraStatusName());
+            }
+        }
+
+        // Fallback: if no NEW statuses found, look for statusCategory "new" from transitions
+        if (newStatuses.isEmpty()) {
+            for (Map.Entry<String, String> e : statusCategoryKeys.entrySet()) {
+                if ("new".equals(e.getValue())) {
+                    newStatuses.add(e.getKey());
+                }
+            }
+        }
+
+        if (newStatuses.isEmpty()) {
+            log.debug("No NEW statuses found for {} — skipping graph enhancement", category);
+            return;
+        }
+
+        // Longest forward path from NEW statuses (each status gets unique position)
+        Map<String, Integer> levels = longestForwardPath(newStatuses, graph);
+
+        // Assign levels to statuses not reached by BFS (e.g., orphan statuses)
+        int maxLevel = levels.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        for (String statusName : statusNames) {
+            if (!levels.containsKey(statusName)) {
+                // Place DONE statuses at max+1, others at max
+                String catKey = statusCategoryKeys.getOrDefault(statusName, "indeterminate");
+                if ("done".equals(catKey)) {
+                    levels.put(statusName, maxLevel + 1);
+                } else {
+                    levels.put(statusName, maxLevel);
+                }
+            }
+        }
+
+        // Recalculate maxLevel after assigning orphans
+        maxLevel = levels.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+
+        // Update sortOrder and scoreWeight
+        int edgeCount = graph.values().stream().mapToInt(Set::size).sum();
+        log.info("Built workflow graph for {}: {} statuses, {} edges, max depth {}",
+                category, levels.size(), edgeCount, maxLevel);
+
+        for (StatusMappingEntity m : mappings) {
+            Integer level = levels.get(m.getJiraStatusName());
+            if (level == null) continue;
+
+            m.setSortOrder(level * 10);
+            m.setScoreWeight(computeWeightFromLevel(level, maxLevel,
+                    statusCategoryKeys.getOrDefault(m.getJiraStatusName(), "indeterminate")));
+            statusMappingRepo.save(m);
+        }
+    }
+
+    Map<String, Integer> bfsFromStatuses(Set<String> startStatuses, Map<String, Set<String>> graph) {
+        Map<String, Integer> levels = new LinkedHashMap<>();
+        Queue<String> queue = new LinkedList<>();
+
+        for (String start : startStatuses) {
+            levels.put(start, 0);
+            queue.add(start);
+        }
+
+        while (!queue.isEmpty()) {
+            String current = queue.poll();
+            int currentLevel = levels.get(current);
+            Set<String> neighbors = graph.getOrDefault(current, Set.of());
+
+            for (String neighbor : neighbors) {
+                if (!levels.containsKey(neighbor)) {
+                    levels.put(neighbor, currentLevel + 1);
+                    queue.add(neighbor);
+                }
+            }
+        }
+
+        return levels;
+    }
+
+    /**
+     * Computes the longest forward path from start statuses.
+     * Uses BFS to establish edge direction, then relaxes forward-only edges
+     * to find the longest path (unique position for each status in the pipeline).
+     */
+    Map<String, Integer> longestForwardPath(Set<String> startStatuses, Map<String, Set<String>> graph) {
+        // Step 1: BFS for shortest-path levels (to detect forward vs back edges)
+        Map<String, Integer> bfsLevels = bfsFromStatuses(startStatuses, graph);
+
+        // Step 2: Build forward-only graph (keep only edges where target BFS level > source)
+        Map<String, Set<String>> forwardGraph = new LinkedHashMap<>();
+        for (Map.Entry<String, Set<String>> entry : graph.entrySet()) {
+            String current = entry.getKey();
+            Integer currentBfs = bfsLevels.get(current);
+            if (currentBfs == null) continue;
+
+            Set<String> forwardNeighbors = new LinkedHashSet<>();
+            for (String neighbor : entry.getValue()) {
+                Integer neighborBfs = bfsLevels.get(neighbor);
+                if (neighborBfs != null && neighborBfs > currentBfs) {
+                    forwardNeighbors.add(neighbor);
+                }
+            }
+            if (!forwardNeighbors.isEmpty()) {
+                forwardGraph.put(current, forwardNeighbors);
+            }
+        }
+
+        // Step 3: Longest path on DAG via topological-order relaxation
+        List<String> topoOrder = bfsLevels.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .toList();
+
+        Map<String, Integer> longest = new LinkedHashMap<>();
+        for (String start : startStatuses) {
+            longest.put(start, 0);
+        }
+
+        for (String current : topoOrder) {
+            Integer currentLevel = longest.get(current);
+            if (currentLevel == null) continue;
+
+            for (String neighbor : forwardGraph.getOrDefault(current, Set.of())) {
+                int newLevel = currentLevel + 1;
+                Integer existing = longest.get(neighbor);
+                if (existing == null || newLevel > existing) {
+                    longest.put(neighbor, newLevel);
+                }
+            }
+        }
+
+        return longest;
+    }
+
+    int computeWeightFromLevel(int level, int maxLevel, String statusCategoryKey) {
+        if ("new".equals(statusCategoryKey) || level == 0) return -5;
+        if ("done".equals(statusCategoryKey) || level == maxLevel) return 0;
+        if (maxLevel <= 1) return 20;
+
+        // Linearly interpolate 5..30 based on position between level 1 and maxLevel-1
+        double ratio = (double) (level - 1) / (maxLevel - 2);
+        return 5 + (int) Math.round(ratio * 25);
+    }
+
+    String computeDefaultColor(StatusCategory cat) {
+        return switch (cat) {
+            case NEW, TODO -> "#DFE1E6";
+            case REQUIREMENTS -> "#E6FCFF";
+            case PLANNED -> "#EAE6FF";
+            case IN_PROGRESS -> "#DEEBFF";
+            case DONE -> "#E3FCEF";
         };
     }
 

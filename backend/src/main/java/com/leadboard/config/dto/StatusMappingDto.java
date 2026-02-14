@@ -10,5 +10,6 @@ public record StatusMappingDto(
         StatusCategory statusCategory,
         String workflowRoleCode,
         int sortOrder,
-        int scoreWeight
+        int scoreWeight,
+        String color
 ) {}

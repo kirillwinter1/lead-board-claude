@@ -107,4 +107,50 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     Integer findMaxStoryOrderForParent(
             @Param("parentKey") String parentKey
     );
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE JiraIssueEntity e SET e.teamId = :teamId WHERE e.teamFieldValue = :teamFieldValue")
+    int linkIssuesToTeam(@Param("teamId") Long teamId, @Param("teamFieldValue") String teamFieldValue);
+
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE jira_issues child SET team_id = parent.team_id " +
+           "FROM jira_issues parent " +
+           "WHERE child.parent_key = parent.issue_key AND child.team_id IS NULL AND parent.team_id IS NOT NULL",
+           nativeQuery = true)
+    int inheritTeamFromParent();
+
+    // ==================== Workflow Graph queries ====================
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.status = :status AND e.boardCategory = :boardCategory ORDER BY e.id ASC")
+    List<JiraIssueEntity> findByStatusAndBoardCategory(
+            @Param("status") String status,
+            @Param("boardCategory") String boardCategory);
+
+    // ==================== Status Issue Counts ====================
+
+    @Query("SELECT e.status, e.boardCategory, COUNT(e) FROM JiraIssueEntity e " +
+           "WHERE e.boardCategory IN ('EPIC','STORY','SUBTASK') " +
+           "GROUP BY e.status, e.boardCategory")
+    List<Object[]> countByStatusAndBoardCategory();
+
+    // ==================== Member Profile queries ====================
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.assigneeAccountId = :accountId " +
+           "AND e.teamId = :teamId AND e.boardCategory = 'SUBTASK'")
+    List<JiraIssueEntity> findSubtasksByAssigneeAndTeam(
+            @Param("accountId") String accountId,
+            @Param("teamId") Long teamId
+    );
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.assigneeAccountId = :accountId " +
+           "AND e.teamId = :teamId AND e.boardCategory = 'SUBTASK' " +
+           "AND e.doneAt BETWEEN :from AND :to ORDER BY e.doneAt DESC")
+    List<JiraIssueEntity> findCompletedSubtasksByAssigneeInPeriod(
+            @Param("accountId") String accountId,
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to
+    );
 }

@@ -37,9 +37,9 @@ class MappingValidationServiceTest {
         );
 
         List<StatusMappingDto> statuses = List.of(
-                new StatusMappingDto(1L, "Done", BoardCategory.EPIC, StatusCategory.DONE, null, 10, 100),
-                new StatusMappingDto(2L, "Done", BoardCategory.STORY, StatusCategory.DONE, null, 10, 100),
-                new StatusMappingDto(3L, "Done", BoardCategory.SUBTASK, StatusCategory.DONE, null, 10, 100)
+                new StatusMappingDto(1L, "Done", BoardCategory.EPIC, StatusCategory.DONE, null, 10, 100, null),
+                new StatusMappingDto(2L, "Done", BoardCategory.STORY, StatusCategory.DONE, null, 10, 100, null),
+                new StatusMappingDto(3L, "Done", BoardCategory.SUBTASK, StatusCategory.DONE, null, 10, 100, null)
         );
 
         List<LinkTypeMappingDto> linkTypes = List.of(
@@ -142,7 +142,7 @@ class MappingValidationServiceTest {
         );
 
         List<StatusMappingDto> statuses = List.of(
-                new StatusMappingDto(1L, "New", BoardCategory.EPIC, StatusCategory.NEW, null, 1, 0)
+                new StatusMappingDto(1L, "New", BoardCategory.EPIC, StatusCategory.NEW, null, 1, 0, null)
         );
 
         ValidationResult result = service.validate(roles, List.of(), statuses, List.of());

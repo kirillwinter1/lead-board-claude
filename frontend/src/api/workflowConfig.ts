@@ -24,6 +24,13 @@ export interface StatusMappingDto {
   workflowRoleCode: string | null
   sortOrder: number
   scoreWeight: number
+  color: string | null
+}
+
+export interface StatusIssueCountDto {
+  jiraStatusName: string
+  issueCategory: string
+  count: number
 }
 
 export interface LinkTypeMappingDto {
@@ -101,6 +108,9 @@ export const workflowConfigApi = {
 
   runAutoDetect: () =>
     axios.post<AutoDetectResult>('/api/admin/workflow-config/auto-detect').then(r => r.data),
+
+  getStatusIssueCounts: () =>
+    axios.get<StatusIssueCountDto[]>('/api/admin/workflow-config/status-issue-counts').then(r => r.data),
 
   fetchJiraIssueTypes: () =>
     axios.get<JiraIssueTypeMetadata[]>('/api/admin/jira-metadata/issue-types').then(r => r.data),

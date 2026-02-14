@@ -1,5 +1,7 @@
 package com.leadboard.planning.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -8,6 +10,7 @@ import java.util.Map;
 /**
  * Ответ API прогнозирования.
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record ForecastResponse(
         OffsetDateTime calculatedAt,
         Long teamId,
@@ -21,6 +24,7 @@ public record ForecastResponse(
      * ВАЖНО: С версии F21 (Unified Planning) WIP лимиты НЕ влияют на планирование.
      * Это поле сохраняется для обратной совместимости API и отображения рекомендаций.
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record WipStatus(
             Integer limit,
             Integer current,

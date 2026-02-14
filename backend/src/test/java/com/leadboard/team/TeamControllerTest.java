@@ -44,6 +44,9 @@ class TeamControllerTest {
     private TeamSyncService teamSyncService;
 
     @MockBean
+    private MemberProfileService memberProfileService;
+
+    @MockBean
     private JiraProperties jiraProperties;
 
     @MockBean

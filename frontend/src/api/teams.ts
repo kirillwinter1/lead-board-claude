@@ -81,6 +81,65 @@ export interface PlanningConfig {
   storyDuration: StoryDuration
 }
 
+// ==================== Member Profile ====================
+
+export interface MemberInfo {
+  id: number
+  displayName: string
+  role: string
+  grade: string
+  hoursPerDay: number
+  teamName: string
+  teamId: number
+}
+
+export interface CompletedTask {
+  key: string
+  summary: string
+  epicKey: string | null
+  epicSummary: string | null
+  estimateH: number
+  spentH: number
+  dsr: number | null
+  doneDate: string
+}
+
+export interface ActiveTask {
+  key: string
+  summary: string
+  epicKey: string | null
+  epicSummary: string | null
+  estimateH: number
+  spentH: number
+  status: string
+}
+
+export interface WeeklyTrend {
+  week: string
+  weekStart: string
+  dsr: number | null
+  tasksCompleted: number
+  hoursLogged: number
+}
+
+export interface MemberSummary {
+  completedCount: number
+  avgDsr: number
+  avgCycleTimeDays: number
+  utilization: number
+  totalSpentH: number
+  totalEstimateH: number
+}
+
+export interface MemberProfileResponse {
+  member: MemberInfo
+  completedTasks: CompletedTask[]
+  activeTasks: ActiveTask[]
+  upcomingTasks: ActiveTask[]
+  weeklyTrend: WeeklyTrend[]
+  summary: MemberSummary
+}
+
 export const teamsApi = {
   getConfig: () => axios.get<TeamsConfig>('/api/teams/config').then(r => r.data),
 
@@ -117,4 +176,9 @@ export const teamsApi = {
 
   updatePlanningConfig: (teamId: number, config: PlanningConfig) =>
     axios.put<PlanningConfig>(`/api/teams/${teamId}/planning-config`, config).then(r => r.data),
+
+  getMemberProfile: (teamId: number, memberId: number, from: string, to: string) =>
+    axios.get<MemberProfileResponse>(`/api/teams/${teamId}/members/${memberId}/profile`, {
+      params: { from, to }
+    }).then(r => r.data),
 }

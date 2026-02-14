@@ -6,6 +6,7 @@ import com.leadboard.config.repository.*;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.MappingValidationService;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.sync.JiraIssueRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -35,6 +37,7 @@ public class WorkflowConfigController {
     private final MappingValidationService validationService;
     private final MappingAutoDetectService autoDetectService;
     private final ObjectMapper objectMapper;
+    private final JiraIssueRepository jiraIssueRepository;
 
     public WorkflowConfigController(
             ProjectConfigurationRepository configRepo,
@@ -45,7 +48,8 @@ public class WorkflowConfigController {
             WorkflowConfigService workflowConfigService,
             MappingValidationService validationService,
             MappingAutoDetectService autoDetectService,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            JiraIssueRepository jiraIssueRepository
     ) {
         this.configRepo = configRepo;
         this.roleRepo = roleRepo;
@@ -56,6 +60,7 @@ public class WorkflowConfigController {
         this.validationService = validationService;
         this.autoDetectService = autoDetectService;
         this.objectMapper = objectMapper;
+        this.jiraIssueRepository = jiraIssueRepository;
     }
 
     // ==================== Full Config ====================
@@ -129,6 +134,7 @@ public class WorkflowConfigController {
 
         // Delete existing and replace
         roleRepo.deleteByConfigId(configId);
+        roleRepo.flush();
 
         for (WorkflowRoleDto dto : roles) {
             WorkflowRoleEntity entity = new WorkflowRoleEntity();
@@ -164,6 +170,7 @@ public class WorkflowConfigController {
         Long configId = config.getId();
 
         issueTypeRepo.deleteByConfigId(configId);
+        issueTypeRepo.flush();
 
         for (IssueTypeMappingDto dto : issueTypes) {
             IssueTypeMappingEntity entity = new IssueTypeMappingEntity();
@@ -197,6 +204,7 @@ public class WorkflowConfigController {
         Long configId = config.getId();
 
         statusMappingRepo.deleteByConfigId(configId);
+        statusMappingRepo.flush();
 
         for (StatusMappingDto dto : statuses) {
             StatusMappingEntity entity = new StatusMappingEntity();
@@ -207,6 +215,7 @@ public class WorkflowConfigController {
             entity.setWorkflowRoleCode(dto.workflowRoleCode());
             entity.setSortOrder(dto.sortOrder());
             entity.setScoreWeight(dto.scoreWeight());
+            entity.setColor(dto.color());
             statusMappingRepo.save(entity);
         }
 
@@ -214,6 +223,22 @@ public class WorkflowConfigController {
         log.info("Updated {} status mappings", statuses.size());
 
         return ResponseEntity.ok(mapStatuses(statusMappingRepo.findByConfigId(configId)));
+    }
+
+    // ==================== Status Issue Counts ====================
+
+    @GetMapping("/status-issue-counts")
+    public ResponseEntity<List<Map<String, Object>>> getStatusIssueCounts() {
+        List<Object[]> rows = jiraIssueRepository.countByStatusAndBoardCategory();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object[] row : rows) {
+            result.add(Map.of(
+                    "jiraStatusName", row[0],
+                    "issueCategory", row[1],
+                    "count", row[2]
+            ));
+        }
+        return ResponseEntity.ok(result);
     }
 
     // ==================== Link Types ====================
@@ -233,6 +258,7 @@ public class WorkflowConfigController {
         Long configId = config.getId();
 
         linkTypeRepo.deleteByConfigId(configId);
+        linkTypeRepo.flush();
 
         for (LinkTypeMappingDto dto : linkTypes) {
             LinkTypeMappingEntity entity = new LinkTypeMappingEntity();
@@ -326,7 +352,8 @@ public class WorkflowConfigController {
         return entities.stream()
                 .map(e -> new StatusMappingDto(e.getId(), e.getJiraStatusName(),
                         e.getIssueCategory(), e.getStatusCategory(),
-                        e.getWorkflowRoleCode(), e.getSortOrder(), e.getScoreWeight()))
+                        e.getWorkflowRoleCode(), e.getSortOrder(), e.getScoreWeight(),
+                        e.getColor()))
                 .toList();
     }
 

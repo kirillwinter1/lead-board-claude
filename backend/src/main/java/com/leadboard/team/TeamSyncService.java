@@ -28,6 +28,7 @@ public class TeamSyncService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
     private final JiraProperties jiraProperties;
+    private final com.leadboard.sync.JiraIssueRepository issueRepository;
 
     private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
     private volatile String lastSyncError = null;
@@ -37,11 +38,13 @@ public class TeamSyncService {
             AtlassianTeamsClient teamsClient,
             TeamRepository teamRepository,
             TeamMemberRepository memberRepository,
-            JiraProperties jiraProperties) {
+            JiraProperties jiraProperties,
+            com.leadboard.sync.JiraIssueRepository issueRepository) {
         this.teamsClient = teamsClient;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
         this.jiraProperties = jiraProperties;
+        this.issueRepository = issueRepository;
     }
 
     public TeamSyncStatus getStatus() {
@@ -127,7 +130,24 @@ public class TeamSyncService {
         team.setJiraTeamValue(atlassianTeam.getDisplayName()); // Use display name as jira team value
         team.setActive(true);
 
-        return teamRepository.save(team);
+        TeamEntity saved = teamRepository.save(team);
+
+        // Link existing issues that have matching team_field_value
+        if (saved.getJiraTeamValue() != null && !saved.getJiraTeamValue().isEmpty()) {
+            int linked = issueRepository.linkIssuesToTeam(saved.getId(), saved.getJiraTeamValue());
+            if (linked > 0) {
+                log.info("Linked {} issues to team '{}' (id={})", linked, saved.getName(), saved.getId());
+                // Cascade: children inherit team from their parent
+                int inherited = issueRepository.inheritTeamFromParent();
+                if (inherited > 0) {
+                    log.info("Inherited team for {} child issues", inherited);
+                    // Second pass for subtasks (subtask → story → epic)
+                    issueRepository.inheritTeamFromParent();
+                }
+            }
+        }
+
+        return saved;
     }
 
     private void syncTeamMembers(TeamEntity team, String atlassianTeamId) {

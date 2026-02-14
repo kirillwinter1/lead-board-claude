@@ -7,10 +7,10 @@ import {
   StatusMappingDto,
   LinkTypeMappingDto,
   ValidationResult,
-  AutoDetectResult,
   JiraIssueTypeMetadata,
   JiraStatusesByType,
   JiraLinkTypeMetadata,
+  StatusIssueCountDto,
 } from '../api/workflowConfig'
 import './WorkflowConfigPage.css'
 
@@ -21,6 +21,105 @@ const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DON
 const LINK_CATEGORIES = ['BLOCKS', 'RELATED', 'IGNORE'] as const
 
 const WIZARD_STEPS = ['Fetch', 'Issue Types', 'Roles', 'Statuses', 'Link Types', 'Review & Save']
+
+const ATLASSIAN_COLORS = [
+  { hex: '#1868DB', name: 'Blue' },
+  { hex: '#227D9B', name: 'Teal' },
+  { hex: '#1F845A', name: 'Green' },
+  { hex: '#82B536', name: 'Lime' },
+  { hex: '#946F00', name: 'Yellow' },
+  { hex: '#E06C00', name: 'Orange' },
+  { hex: '#F15B50', name: 'Red' },
+  { hex: '#964AC0', name: 'Purple' },
+  { hex: '#CD519D', name: 'Magenta' },
+] as const
+
+const STATUS_BG_COLORS = [
+  { hex: '#DFE1E6', name: 'Gray' },
+  { hex: '#DEEBFF', name: 'Blue' },
+  { hex: '#E6FCFF', name: 'Teal' },
+  { hex: '#E3FCEF', name: 'Green' },
+  { hex: '#EAE6FF', name: 'Purple' },
+  { hex: '#FFF0B3', name: 'Yellow' },
+  { hex: '#FFEBE6', name: 'Red' },
+  { hex: '#F3E8FF', name: 'Lavender' },
+  { hex: '#E0F2FE', name: 'Sky' },
+  { hex: '#FEF3C7', name: 'Amber' },
+] as const
+
+const STATUS_CATEGORY_DEFAULT_COLORS: Record<string, string> = {
+  NEW: '#DFE1E6',
+  REQUIREMENTS: '#E6FCFF',
+  PLANNED: '#EAE6FF',
+  IN_PROGRESS: '#DEEBFF',
+  DONE: '#E3FCEF',
+}
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="color-picker">
+      <button
+        className="color-picker-trigger"
+        style={{ backgroundColor: value }}
+        onClick={() => setOpen(!open)}
+        type="button"
+        title="Choose color"
+      />
+      {open && (
+        <>
+          <div className="color-picker-backdrop" onClick={() => setOpen(false)} />
+          <div className="color-picker-dropdown">
+            {ATLASSIAN_COLORS.map(c => (
+              <button
+                key={c.hex}
+                className={`color-swatch ${value.toUpperCase() === c.hex ? 'selected' : ''}`}
+                style={{ backgroundColor: c.hex }}
+                title={c.name}
+                onClick={() => { onChange(c.hex); setOpen(false) }}
+                type="button"
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function StatusColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <div className="color-picker">
+      <button
+        className="color-picker-trigger"
+        style={{ backgroundColor: value, width: 22, height: 22 }}
+        onClick={() => setOpen(!open)}
+        type="button"
+        title="Choose color"
+      />
+      {open && (
+        <>
+          <div className="color-picker-backdrop" onClick={() => setOpen(false)} />
+          <div className="color-picker-dropdown">
+            {STATUS_BG_COLORS.map(c => (
+              <button
+                key={c.hex}
+                className={`color-swatch ${value.toUpperCase() === c.hex ? 'selected' : ''}`}
+                style={{ backgroundColor: c.hex }}
+                title={c.name}
+                onClick={() => { onChange(c.hex); setOpen(false) }}
+                type="button"
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // --- Auto-suggest functions ---
 
@@ -59,9 +158,9 @@ function suggestRolesFromIssueTypes(suggestedTypes: IssueTypeMappingDto[]): Work
   })
 
   const roleDefaults: Record<string, { displayName: string; color: string; order: number; isDefault: boolean }> = {
-    SA: { displayName: 'System Analysis', color: '#3b82f6', order: 1, isDefault: false },
-    DEV: { displayName: 'Development', color: '#10b981', order: 2, isDefault: true },
-    QA: { displayName: 'Quality Assurance', color: '#f59e0b', order: 3, isDefault: false },
+    SA: { displayName: 'System Analysis', color: '#1868DB', order: 1, isDefault: false },
+    DEV: { displayName: 'Development', color: '#1F845A', order: 2, isDefault: true },
+    QA: { displayName: 'Quality Assurance', color: '#227D9B', order: 3, isDefault: false },
   }
 
   if (roleSet.size === 0) {
@@ -117,7 +216,6 @@ function suggestStatuses(
           statusCategory = 'DONE'
           scoreWeight = 100
         } else {
-          // indeterminate
           const lower = st.name.toLowerCase()
 
           if (issueCat === 'EPIC') {
@@ -132,7 +230,6 @@ function suggestStatuses(
               scoreWeight = 75
             }
           } else {
-            // STORY or SUBTASK
             if (lower.includes('analy') || lower.includes('анализ') || lower.includes('requirement') || lower.includes('требовани')) {
               workflowRoleCode = 'SA'
               scoreWeight = 25
@@ -157,6 +254,7 @@ function suggestStatuses(
           workflowRoleCode,
           sortOrder: result.length + 1,
           scoreWeight,
+          color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
         })
       }
     }
@@ -196,11 +294,8 @@ export function WorkflowConfigPage() {
   const [issueTypes, setIssueTypes] = useState<IssueTypeMappingDto[]>([])
   const [statuses, setStatuses] = useState<StatusMappingDto[]>([])
   const [linkTypes, setLinkTypes] = useState<LinkTypeMappingDto[]>([])
-  const [statusFilter, setStatusFilter] = useState<string>('ALL')
-
-  // --- Auto-detect state ---
-  const [autoDetecting, setAutoDetecting] = useState(false)
-  const [autoDetectResult, setAutoDetectResult] = useState<AutoDetectResult | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>('EPIC')
+  const [issueCounts, setIssueCounts] = useState<StatusIssueCountDto[]>([])
 
   // --- Wizard state ---
   const [wizardMode, setWizardMode] = useState(false)
@@ -222,37 +317,32 @@ export function WorkflowConfigPage() {
     loadConfig()
   }, [])
 
+  // Auto-start wizard when config is empty
+  useEffect(() => {
+    if (!loading && isConfigEmpty && !wizardMode) {
+      startWizard()
+    }
+  }, [loading])
+
   const loadConfig = async () => {
     try {
       setLoading(true)
       setError(null)
-      const data = await workflowConfigApi.getConfig()
+      const [data, counts] = await Promise.all([
+        workflowConfigApi.getConfig(),
+        workflowConfigApi.getStatusIssueCounts().catch(() => [] as StatusIssueCountDto[]),
+      ])
       setConfig(data)
       setRoles(data.roles)
       setIssueTypes(data.issueTypes)
       setStatuses(data.statuses)
       setLinkTypes(data.linkTypes)
+      setIssueCounts(counts)
     } catch (err) {
       setError('Failed to load workflow configuration')
       console.error('Failed to load config:', err)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleAutoDetect = async () => {
-    try {
-      setAutoDetecting(true)
-      setError(null)
-      setAutoDetectResult(null)
-      const result = await workflowConfigApi.runAutoDetect()
-      setAutoDetectResult(result)
-      await loadConfig()
-      showSaveSuccess(`Auto-detected: ${result.roleCount} roles, ${result.issueTypeCount} types, ${result.statusMappingCount} statuses`)
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Auto-detection failed. Check Jira connection.')
-    } finally {
-      setAutoDetecting(false)
     }
   }
 
@@ -376,23 +466,33 @@ export function WorkflowConfigPage() {
   const addStatus = () => {
     const maxOrder = statuses.reduce((max, s) => Math.max(max, s.sortOrder), 0)
     setStatuses([...statuses, {
-      id: null, jiraStatusName: '', issueCategory: 'STORY',
+      id: null, jiraStatusName: '', issueCategory: statusFilter === 'EPIC' || statusFilter === 'STORY' || statusFilter === 'SUBTASK' ? statusFilter as any : 'STORY',
       statusCategory: 'NEW', workflowRoleCode: null,
       sortOrder: maxOrder + 1, scoreWeight: 0,
+      color: STATUS_CATEGORY_DEFAULT_COLORS['NEW'],
     }])
   }
 
   const updateStatus = (index: number, field: keyof StatusMappingDto, value: any) => {
-    setStatuses(statuses.map((s, i) => i === index ? { ...s, [field]: value } : s))
+    setStatuses(statuses.map((s, i) => {
+      if (i !== index) return s
+      const next = { ...s, [field]: value }
+      // Auto-update color when statusCategory changes, if current color is a default
+      if (field === 'statusCategory') {
+        const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
+        if (!s.color || s.color === oldDefault) {
+          next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
+        }
+      }
+      return next
+    }))
   }
 
   const deleteStatus = (index: number) => {
     setStatuses(statuses.filter((_, i) => i !== index))
   }
 
-  const filteredStatuses = statusFilter === 'ALL'
-    ? statuses
-    : statuses.filter(s => s.issueCategory === statusFilter)
+  const filteredStatuses = statuses.filter(s => s.issueCategory === statusFilter)
 
   // -- Link Type helpers --
   const addLinkType = () => {
@@ -450,7 +550,17 @@ export function WorkflowConfigPage() {
       const suggestedRoles = suggestRolesFromIssueTypes(suggestedTypes)
       setWizardRoles(suggestedRoles)
 
+      // DEBUG: log raw data for status mapping investigation
+      console.log('[WIZARD DEBUG] jiraStatuses issueTypes:', jiraStatuses.map(g => g.issueType))
+      console.log('[WIZARD DEBUG] suggestedTypes map:', suggestedTypes.map(t => `${t.jiraTypeName} → ${t.boardCategory}`))
+      console.log('[WIZARD DEBUG] full jiraStatuses:', JSON.stringify(jiraStatuses, null, 2))
+
       const suggestedStatuses = suggestStatuses(jiraStatuses, suggestedTypes)
+      console.log('[WIZARD DEBUG] suggestedStatuses by category:', {
+        EPIC: suggestedStatuses.filter(s => s.issueCategory === 'EPIC').length,
+        STORY: suggestedStatuses.filter(s => s.issueCategory === 'STORY').length,
+        SUBTASK: suggestedStatuses.filter(s => s.issueCategory === 'SUBTASK').length,
+      })
       setWizardStatuses(suggestedStatuses)
 
       const suggestedLinks = suggestLinkTypes(jiraLinks)
@@ -517,16 +627,22 @@ export function WorkflowConfigPage() {
   }
 
   const updateWizardStatus = (index: number, field: keyof StatusMappingDto, value: any) => {
-    setWizardStatuses(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s))
+    setWizardStatuses(prev => prev.map((s, i) => {
+      if (i !== index) return s
+      const next = { ...s, [field]: value }
+      if (field === 'statusCategory') {
+        const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
+        if (!s.color || s.color === oldDefault) {
+          next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
+        }
+      }
+      return next
+    }))
   }
 
   const updateWizardLinkType = (index: number, field: keyof LinkTypeMappingDto, value: any) => {
     setWizardLinkTypes(prev => prev.map((l, i) => i === index ? { ...l, [field]: value } : l))
   }
-
-  const filteredWizardStatuses = wizardStatusFilter === 'ALL'
-    ? wizardStatuses
-    : wizardStatuses.filter(s => s.issueCategory === wizardStatusFilter)
 
   // -- Rendering --
 
@@ -563,8 +679,8 @@ export function WorkflowConfigPage() {
         <h1 className="workflow-title">Workflow Configuration</h1>
         <div className="workflow-header-actions">
           {saveMessage && <span className="save-success">{saveMessage}</span>}
-          <button className="btn btn-wizard" onClick={startWizard}>
-            Setup Wizard
+          <button className="btn btn-secondary" onClick={startWizard}>
+            Re-run Wizard
           </button>
           <button className="btn btn-validate" onClick={handleValidate} disabled={validating}>
             {validating ? 'Validating...' : 'Validate'}
@@ -575,36 +691,6 @@ export function WorkflowConfigPage() {
       {error && (
         <div style={{ color: '#DE350B', marginBottom: 16, padding: '8px 12px', background: '#FFEBE6', borderRadius: 4 }}>
           {error}
-        </div>
-      )}
-
-      {isConfigEmpty && (
-        <div className="empty-config-banner">
-          <div className="empty-config-icon">&#9881;</div>
-          <h2>Workflow configuration is empty</h2>
-          <p>
-            No roles, issue types, or status mappings configured yet.
-            Auto-detect from your Jira project to get started quickly.
-          </p>
-          <div className="empty-config-actions">
-            <button
-              className="btn btn-primary"
-              onClick={handleAutoDetect}
-              disabled={autoDetecting}
-            >
-              {autoDetecting ? 'Detecting...' : 'Auto-detect from Jira'}
-            </button>
-            <button className="btn btn-secondary" onClick={startWizard}>
-              Setup Wizard
-            </button>
-          </div>
-          {autoDetectResult && autoDetectResult.warnings.length > 0 && (
-            <div className="auto-detect-warnings">
-              {autoDetectResult.warnings.map((w, i) => (
-                <div key={i} className="auto-detect-warning">{w}</div>
-              ))}
-            </div>
-          )}
         </div>
       )}
 
@@ -653,7 +739,7 @@ export function WorkflowConfigPage() {
     return (
       <div className="workflow-page">
         <div className="workflow-header">
-          <h1 className="workflow-title">Setup Wizard</h1>
+          <h1 className="workflow-title">Workflow Setup</h1>
           <button className="btn btn-secondary" onClick={cancelWizard}>Cancel</button>
         </div>
 
@@ -719,8 +805,8 @@ export function WorkflowConfigPage() {
       return (
         <div className="wizard-fetch">
           <div className="wizard-spinner" />
-          <div>Fetching metadata from Jira...</div>
-          <div className="wizard-step-hint">Loading issue types, statuses, and link types from your Jira project</div>
+          <div>Connecting to Jira...</div>
+          <div className="wizard-step-hint">Fetching issue types, statuses & link types from your Jira project.</div>
         </div>
       )
     }
@@ -735,61 +821,78 @@ export function WorkflowConfigPage() {
   }
 
   function renderWizardIssueTypes() {
+    const subtaskTypes = wizardIssueTypes
+      .map((it, idx) => ({ it, idx }))
+      .filter(({ it }) => wizardJiraIssueTypes.find(j => j.name === it.jiraTypeName)?.subtask)
+    const standardTypes = wizardIssueTypes
+      .map((it, idx) => ({ it, idx }))
+      .filter(({ it }) => !wizardJiraIssueTypes.find(j => j.name === it.jiraTypeName)?.subtask)
+
+    const renderIssueTypeRow = (it: IssueTypeMappingDto, idx: number) => {
+      const jiraMeta = wizardJiraIssueTypes.find(j => j.name === it.jiraTypeName)
+      return (
+        <tr key={idx}>
+          <td><strong>{it.jiraTypeName}</strong></td>
+          <td>
+            {jiraMeta?.subtask
+              ? <span className="jira-badge subtask">Subtask</span>
+              : <span className="jira-badge standard">Standard</span>
+            }
+          </td>
+          <td>
+            <select
+              className="workflow-select"
+              value={it.boardCategory}
+              onChange={e => updateWizardIssueType(idx, 'boardCategory', e.target.value)}
+            >
+              {BOARD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </td>
+          <td>
+            {it.boardCategory === 'SUBTASK' ? (
+              <select
+                className="workflow-select"
+                value={it.workflowRoleCode || ''}
+                onChange={e => updateWizardIssueType(idx, 'workflowRoleCode', e.target.value || null)}
+              >
+                <option value="">-- none --</option>
+                {wizardRoles.map(r => (
+                  <option key={r.code} value={r.code}>{r.displayName || r.code}</option>
+                ))}
+              </select>
+            ) : (
+              <span style={{ color: '#B3BAC5', fontSize: 13 }}>—</span>
+            )}
+          </td>
+        </tr>
+      )
+    }
+
     return (
       <>
-        <div className="wizard-step-hint">
-          Review how Jira issue types map to board categories. Subtasks need a workflow role assignment.
+        <div className="wizard-info-block">
+          Сопоставьте типы задач Jira с категориями OneLane:
+          {' '}<strong>EPIC</strong> — фичи,
+          {' '}<strong>STORY</strong> — рабочие задачи,
+          {' '}<strong>SUBTASK</strong> — подзадачи с привязкой к роли,
+          {' '}<strong>IGNORE</strong> — не отслеживать.
         </div>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
             <thead>
               <tr>
-                <th>Jira Type</th>
-                <th>Subtask</th>
-                <th>Board Category</th>
-                <th>Role</th>
+                <th title="The issue type name as it appears in your Jira project">Jira Type</th>
+                <th title="Whether this type is a Jira subtask (lives under a parent story) or a standard top-level issue">Subtask</th>
+                <th title="EPIC = high-level feature, STORY = work item, SUBTASK = role-specific work under a story, IGNORE = don't track">Board Category</th>
+                <th title="Which team role handles this subtask type (e.g. analyst, developer, tester)">Role</th>
               </tr>
             </thead>
             <tbody>
-              {wizardIssueTypes.map((it, idx) => {
-                const jiraMeta = wizardJiraIssueTypes.find(j => j.name === it.jiraTypeName)
-                return (
-                  <tr key={idx}>
-                    <td><strong>{it.jiraTypeName}</strong></td>
-                    <td>
-                      {jiraMeta?.subtask
-                        ? <span className="jira-badge subtask">Subtask</span>
-                        : <span className="jira-badge standard">Standard</span>
-                      }
-                    </td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={it.boardCategory}
-                        onChange={e => updateWizardIssueType(idx, 'boardCategory', e.target.value)}
-                      >
-                        {BOARD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      {it.boardCategory === 'SUBTASK' ? (
-                        <select
-                          className="workflow-select"
-                          value={it.workflowRoleCode || ''}
-                          onChange={e => updateWizardIssueType(idx, 'workflowRoleCode', e.target.value || null)}
-                        >
-                          <option value="">-- none --</option>
-                          {wizardRoles.map(r => (
-                            <option key={r.code} value={r.code}>{r.displayName || r.code}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span style={{ color: '#6B778C', fontSize: 13 }}>N/A</span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
+              {subtaskTypes.map(({ it, idx }) => renderIssueTypeRow(it, idx))}
+              {subtaskTypes.length > 0 && standardTypes.length > 0 && (
+                <tr><td colSpan={4} style={{ padding: 0, borderBottom: '2px solid #DFE1E6' }} /></tr>
+              )}
+              {standardTypes.map(({ it, idx }) => renderIssueTypeRow(it, idx))}
             </tbody>
           </table>
         </div>
@@ -800,8 +903,9 @@ export function WorkflowConfigPage() {
   function renderWizardRoles() {
     return (
       <>
-        <div className="wizard-step-hint">
-          Define workflow roles. These are used to track progress by role (e.g. SA, DEV, QA).
+        <div className="wizard-info-block">
+          Роли отражают типы работ в команде (анализ, разработка, тестирование).
+          OneLane использует роли для расчёта прогресса и прогноза сроков.
         </div>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
@@ -811,7 +915,6 @@ export function WorkflowConfigPage() {
                 <th>Display Name</th>
                 <th>Color</th>
                 <th>Sort Order</th>
-                <th>Default</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -836,15 +939,10 @@ export function WorkflowConfigPage() {
                     />
                   </td>
                   <td>
-                    <div className="color-cell">
-                      <input
-                        type="color"
-                        className="workflow-input"
-                        value={role.color}
-                        onChange={e => updateWizardRole(idx, 'color', e.target.value)}
-                      />
-                      <div className="color-preview" style={{ backgroundColor: role.color }} />
-                    </div>
+                    <ColorPicker
+                      value={role.color}
+                      onChange={color => updateWizardRole(idx, 'color', color)}
+                    />
                   </td>
                   <td>
                     <input
@@ -856,14 +954,6 @@ export function WorkflowConfigPage() {
                     />
                   </td>
                   <td>
-                    <input
-                      type="checkbox"
-                      className="workflow-checkbox"
-                      checked={role.isDefault}
-                      onChange={e => updateWizardRole(idx, 'isDefault', e.target.checked)}
-                    />
-                  </td>
-                  <td>
                     <button className="btn-danger-text" onClick={() => deleteWizardRole(idx)}>
                       Delete
                     </button>
@@ -871,7 +961,7 @@ export function WorkflowConfigPage() {
                 </tr>
               ))}
               {wizardRoles.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6B778C' }}>No roles configured</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#6B778C' }}>No roles configured</td></tr>
               )}
             </tbody>
           </table>
@@ -884,10 +974,31 @@ export function WorkflowConfigPage() {
   }
 
   function renderWizardStatuses() {
+    const wizardFilteredStatuses = wizardStatusFilter === 'ALL'
+      ? wizardStatuses
+      : wizardStatuses.filter(s => s.issueCategory === wizardStatusFilter)
+
+    // Group by sortOrder for pipeline
+    const sortOrderGroups = new Map<number, StatusMappingDto[]>()
+    for (const st of wizardFilteredStatuses) {
+      const group = sortOrderGroups.get(st.sortOrder) || []
+      group.push(st)
+      sortOrderGroups.set(st.sortOrder, group)
+    }
+    const sortedOrders = Array.from(sortOrderGroups.keys()).sort((a, b) => a - b)
+
     return (
       <>
-        <div className="wizard-step-hint">
-          Review status mappings. Each Jira status is mapped to a category and optionally a role.
+        <div className="wizard-info-block">
+          Сопоставьте статусы Jira с категориями OneLane:
+          <br /><br />
+          <strong>NEW</strong> — задача не начата,
+          <strong> REQUIREMENTS</strong> — сбор требований (эпики),
+          <strong> PLANNED</strong> — запланировано (эпики),
+          <strong> IN_PROGRESS</strong> — в работе,
+          <strong> DONE</strong> — завершено.
+          <br />
+          <strong>Score Weight</strong> — вес для расчёта % завершения.
         </div>
         <div className="status-filter">
           {['ALL', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
@@ -903,82 +1014,73 @@ export function WorkflowConfigPage() {
             </button>
           ))}
         </div>
-        <div className="workflow-table-wrapper">
-          <table className="workflow-table">
-            <thead>
-              <tr>
-                <th>Jira Status</th>
-                <th>Issue Category</th>
-                <th>Status Category</th>
-                <th>Role</th>
-                <th>Sort Order</th>
-                <th>Score Weight</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredWizardStatuses.map((st) => {
-                const realIdx = wizardStatuses.indexOf(st)
-                return (
-                  <tr key={realIdx}>
-                    <td><strong>{st.jiraStatusName}</strong></td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={st.issueCategory}
-                        onChange={e => updateWizardStatus(realIdx, 'issueCategory', e.target.value)}
-                      >
-                        {BOARD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={st.statusCategory}
-                        onChange={e => updateWizardStatus(realIdx, 'statusCategory', e.target.value)}
-                      >
-                        {STATUS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={st.workflowRoleCode || ''}
-                        onChange={e => updateWizardStatus(realIdx, 'workflowRoleCode', e.target.value || null)}
-                      >
-                        <option value="">-- none --</option>
-                        {wizardRoles.map(r => (
-                          <option key={r.code} value={r.code}>{r.displayName || r.code}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        className="workflow-input"
-                        value={st.sortOrder}
-                        onChange={e => updateWizardStatus(realIdx, 'sortOrder', parseInt(e.target.value) || 0)}
-                        min={0}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        className="workflow-input"
-                        value={st.scoreWeight}
-                        onChange={e => updateWizardStatus(realIdx, 'scoreWeight', parseInt(e.target.value) || 0)}
-                        min={0}
-                        max={100}
-                      />
-                    </td>
-                  </tr>
-                )
-              })}
-              {filteredWizardStatuses.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6B778C' }}>No statuses for this filter</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        {wizardFilteredStatuses.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>
+            No statuses for this filter
+          </div>
+        ) : (
+          <div className="pipeline-container">
+            {sortedOrders.map((order, colIdx) => {
+              const group = sortOrderGroups.get(order)!
+              return (
+                <div key={order} className="pipeline-column-wrapper">
+                  <div className="pipeline-column">
+                    <div className="pipeline-column-header">
+                      Order {order}
+                    </div>
+                    {group.map(st => {
+                      const realIdx = wizardStatuses.indexOf(st)
+                      const bgColor = st.color || STATUS_CATEGORY_DEFAULT_COLORS[st.statusCategory] || '#DFE1E6'
+                      return (
+                        <div
+                          key={realIdx}
+                          className="pipeline-card"
+                          style={{ backgroundColor: bgColor }}
+                        >
+                          <div className="pipeline-card-name">{st.jiraStatusName}</div>
+                          <div className="pipeline-card-fields">
+                            <label className="pipeline-field">
+                              <span className="pipeline-field-label">Category</span>
+                              <select
+                                className="pipeline-select"
+                                value={st.statusCategory}
+                                onChange={e => updateWizardStatus(realIdx, 'statusCategory', e.target.value)}
+                              >
+                                {STATUS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </label>
+                            <label className="pipeline-field">
+                              <span className="pipeline-field-label">Weight</span>
+                              <input
+                                type="number"
+                                className="pipeline-input"
+                                value={st.scoreWeight}
+                                onChange={e => updateWizardStatus(realIdx, 'scoreWeight', parseInt(e.target.value) || 0)}
+                                min={-100}
+                                max={100}
+                              />
+                            </label>
+                            <label className="pipeline-field">
+                              <span className="pipeline-field-label">Color</span>
+                              <StatusColorPicker
+                                value={bgColor}
+                                onChange={color => updateWizardStatus(realIdx, 'color', color)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {colIdx < sortedOrders.length - 1 && (
+                    <div className="pipeline-arrow" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </>
     )
   }
@@ -986,17 +1088,20 @@ export function WorkflowConfigPage() {
   function renderWizardLinkTypes() {
     return (
       <>
-        <div className="wizard-step-hint">
-          Review link type mappings. "Blocks" links are used for dependency tracking.
+        <div className="wizard-info-block">
+          Типы связей определяют зависимости между задачами:
+          {' '}<strong>BLOCKS</strong> — блокирующие зависимости (отображаются на доске),
+          {' '}<strong>RELATED</strong> — информационные связи,
+          {' '}<strong>IGNORE</strong> — не отслеживать.
         </div>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
             <thead>
               <tr>
-                <th>Jira Link Type</th>
+                <th title="The link type name as it appears in your Jira project">Jira Link Type</th>
                 <th>Inward</th>
                 <th>Outward</th>
-                <th>Category</th>
+                <th title="BLOCKS = dependency, RELATED = informational, IGNORE = skip">Link Category</th>
               </tr>
             </thead>
             <tbody>
@@ -1032,8 +1137,9 @@ export function WorkflowConfigPage() {
 
     return (
       <>
-        <div className="wizard-step-hint">
-          Review the summary below, then save to apply your configuration.
+        <div className="wizard-info-block">
+          Проверьте конфигурацию перед сохранением. OneLane будет использовать
+          эти маппинги для доски, метрик и прогнозов.
         </div>
         <div className="wizard-review">
           <div className="wizard-review-card">
@@ -1100,7 +1206,6 @@ export function WorkflowConfigPage() {
                 <th>Display Name</th>
                 <th>Color</th>
                 <th>Sort Order</th>
-                <th>Default</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -1125,15 +1230,10 @@ export function WorkflowConfigPage() {
                     />
                   </td>
                   <td>
-                    <div className="color-cell">
-                      <input
-                        type="color"
-                        className="workflow-input"
-                        value={role.color}
-                        onChange={e => updateRole(idx, 'color', e.target.value)}
-                      />
-                      <div className="color-preview" style={{ backgroundColor: role.color }} />
-                    </div>
+                    <ColorPicker
+                      value={role.color}
+                      onChange={color => updateRole(idx, 'color', color)}
+                    />
                   </td>
                   <td>
                     <input
@@ -1145,14 +1245,6 @@ export function WorkflowConfigPage() {
                     />
                   </td>
                   <td>
-                    <input
-                      type="checkbox"
-                      className="workflow-checkbox"
-                      checked={role.isDefault}
-                      onChange={e => updateRole(idx, 'isDefault', e.target.checked)}
-                    />
-                  </td>
-                  <td>
                     <button className="btn-danger-text" onClick={() => deleteRole(idx)}>
                       Delete
                     </button>
@@ -1160,7 +1252,7 @@ export function WorkflowConfigPage() {
                 </tr>
               ))}
               {roles.length === 0 && (
-                <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6B778C' }}>No roles configured</td></tr>
+                <tr><td colSpan={5} style={{ textAlign: 'center', color: '#6B778C' }}>No roles configured</td></tr>
               )}
             </tbody>
           </table>
@@ -1250,112 +1342,114 @@ export function WorkflowConfigPage() {
   }
 
   function renderStatusesTab() {
+    // Group by sortOrder for pipeline columns
+    const sortOrderGroups = new Map<number, StatusMappingDto[]>()
+    for (const st of filteredStatuses) {
+      const group = sortOrderGroups.get(st.sortOrder) || []
+      group.push(st)
+      sortOrderGroups.set(st.sortOrder, group)
+    }
+    const sortedOrders = Array.from(sortOrderGroups.keys()).sort((a, b) => a - b)
+
+    const getIssueCount = (statusName: string, category: string) => {
+      const found = issueCounts.find(c => c.jiraStatusName === statusName && c.issueCategory === category)
+      return found?.count ?? 0
+    }
+
     return (
       <>
         <div className="status-filter">
-          {['ALL', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
+          {['EPIC', 'STORY', 'SUBTASK'].map(f => (
             <button
               key={f}
               className={`status-filter-btn ${statusFilter === f ? 'active' : ''}`}
               onClick={() => setStatusFilter(f)}
             >
-              {f === 'ALL' ? `All (${statuses.length})` : `${f} (${statuses.filter(s => s.issueCategory === f).length})`}
+              {f} ({statuses.filter(s => s.issueCategory === f).length})
             </button>
           ))}
         </div>
-        <div className="workflow-table-wrapper">
-          <table className="workflow-table">
-            <thead>
-              <tr>
-                <th>Jira Status</th>
-                <th>Issue Category</th>
-                <th>Status Category</th>
-                <th>Role</th>
-                <th>Sort Order</th>
-                <th>Score Weight</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStatuses.map((st) => {
-                const realIdx = statuses.indexOf(st)
-                return (
-                  <tr key={st.id ?? `new-${realIdx}`}>
-                    <td>
-                      <input
-                        className="workflow-input"
-                        value={st.jiraStatusName}
-                        onChange={e => updateStatus(realIdx, 'jiraStatusName', e.target.value)}
-                        placeholder="e.g. In Progress"
-                      />
-                    </td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={st.issueCategory}
-                        onChange={e => updateStatus(realIdx, 'issueCategory', e.target.value)}
-                      >
-                        {BOARD_CATEGORIES.map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={st.statusCategory}
-                        onChange={e => updateStatus(realIdx, 'statusCategory', e.target.value)}
-                      >
-                        {STATUS_CATEGORIES.map(c => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="workflow-select"
-                        value={st.workflowRoleCode || ''}
-                        onChange={e => updateStatus(realIdx, 'workflowRoleCode', e.target.value || null)}
-                      >
-                        <option value="">-- none --</option>
-                        {roles.map(r => (
-                          <option key={r.code} value={r.code}>{r.displayName || r.code}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        className="workflow-input"
-                        value={st.sortOrder}
-                        onChange={e => updateStatus(realIdx, 'sortOrder', parseInt(e.target.value) || 0)}
-                        min={0}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        className="workflow-input"
-                        value={st.scoreWeight}
-                        onChange={e => updateStatus(realIdx, 'scoreWeight', parseInt(e.target.value) || 0)}
-                        min={0}
-                        max={100}
-                      />
-                    </td>
-                    <td>
-                      <button className="btn-danger-text" onClick={() => deleteStatus(realIdx)}>
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-              {filteredStatuses.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: '#6B778C' }}>No statuses for this filter</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        {filteredStatuses.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>
+            No statuses for {statusFilter}
+          </div>
+        ) : (
+          <div className="pipeline-container">
+            {sortedOrders.map((order, colIdx) => {
+              const group = sortOrderGroups.get(order)!
+              return (
+                <div key={order} className="pipeline-column-wrapper">
+                  <div className="pipeline-column">
+                    <div className="pipeline-column-header">
+                      Order {order}
+                    </div>
+                    {group.map(st => {
+                      const realIdx = statuses.indexOf(st)
+                      const count = getIssueCount(st.jiraStatusName, st.issueCategory)
+                      const bgColor = st.color || STATUS_CATEGORY_DEFAULT_COLORS[st.statusCategory] || '#DFE1E6'
+                      return (
+                        <div
+                          key={st.id ?? `new-${realIdx}`}
+                          className="pipeline-card"
+                          style={{ backgroundColor: bgColor }}
+                        >
+                          <div className="pipeline-card-name">{st.jiraStatusName || '(unnamed)'}</div>
+                          <div className="pipeline-card-fields">
+                            <label className="pipeline-field">
+                              <span className="pipeline-field-label">Category</span>
+                              <select
+                                className="pipeline-select"
+                                value={st.statusCategory}
+                                onChange={e => updateStatus(realIdx, 'statusCategory', e.target.value)}
+                              >
+                                {STATUS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </label>
+                            <label className="pipeline-field">
+                              <span className="pipeline-field-label">Weight</span>
+                              <input
+                                type="number"
+                                className="pipeline-input"
+                                value={st.scoreWeight}
+                                onChange={e => updateStatus(realIdx, 'scoreWeight', parseInt(e.target.value) || 0)}
+                                min={-100}
+                                max={100}
+                              />
+                            </label>
+                            <label className="pipeline-field">
+                              <span className="pipeline-field-label">Color</span>
+                              <StatusColorPicker
+                                value={bgColor}
+                                onChange={color => updateStatus(realIdx, 'color', color)}
+                              />
+                            </label>
+                          </div>
+                          {count > 0 && (
+                            <div className="pipeline-card-count">
+                              {count} issue{count !== 1 ? 's' : ''}
+                            </div>
+                          )}
+                          <button
+                            className="pipeline-card-delete"
+                            onClick={() => deleteStatus(realIdx)}
+                            title="Delete"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {colIdx < sortedOrders.length - 1 && (
+                    <div className="pipeline-arrow" />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <div className="workflow-actions">
           <button className="btn btn-secondary" onClick={addStatus}>Add Status</button>
           <button className="btn btn-primary" onClick={handleSaveStatuses} disabled={saving}>

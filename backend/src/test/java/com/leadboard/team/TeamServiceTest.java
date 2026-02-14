@@ -1,6 +1,7 @@
 package com.leadboard.team;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.dto.PlanningConfigDto;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,13 +28,16 @@ class TeamServiceTest {
     @Mock
     private TeamMemberRepository memberRepository;
 
+    @Mock
+    private JiraIssueRepository issueRepository;
+
     private ObjectMapper objectMapper;
     private TeamService teamService;
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        teamService = new TeamService(teamRepository, memberRepository, objectMapper);
+        teamService = new TeamService(teamRepository, memberRepository, objectMapper, issueRepository);
     }
 
     // ==================== Team Tests ====================

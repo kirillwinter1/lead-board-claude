@@ -3,6 +3,7 @@ package com.leadboard.team;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.AtlassianTeamsClient;
 import com.leadboard.jira.AtlassianTeamsClient.*;
+import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,6 +39,9 @@ class TeamSyncServiceTest {
     @Mock
     private JiraProperties jiraProperties;
 
+    @Mock
+    private JiraIssueRepository issueRepository;
+
     private TeamSyncService teamSyncService;
 
     @BeforeEach
@@ -46,7 +50,8 @@ class TeamSyncServiceTest {
                 teamsClient,
                 teamRepository,
                 memberRepository,
-                jiraProperties
+                jiraProperties,
+                issueRepository
         );
 
         // Common setup

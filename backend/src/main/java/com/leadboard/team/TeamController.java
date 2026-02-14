@@ -2,13 +2,16 @@ package com.leadboard.team;
 
 import com.leadboard.auth.AuthorizationService;
 import com.leadboard.config.JiraProperties;
+import com.leadboard.team.dto.MemberProfileResponse;
 import com.leadboard.team.dto.PlanningConfigDto;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -18,13 +21,16 @@ public class TeamController {
 
     private final TeamService teamService;
     private final TeamSyncService teamSyncService;
+    private final MemberProfileService memberProfileService;
     private final JiraProperties jiraProperties;
     private final AuthorizationService authorizationService;
 
     public TeamController(TeamService teamService, TeamSyncService teamSyncService,
+                          MemberProfileService memberProfileService,
                           JiraProperties jiraProperties, AuthorizationService authorizationService) {
         this.teamService = teamService;
         this.teamSyncService = teamSyncService;
+        this.memberProfileService = memberProfileService;
         this.jiraProperties = jiraProperties;
         this.authorizationService = authorizationService;
     }
@@ -137,6 +143,17 @@ public class TeamController {
             @PathVariable Long teamId,
             @RequestBody PlanningConfigDto config) {
         return teamService.updatePlanningConfig(teamId, config);
+    }
+
+    // ==================== Member Profile Endpoint ====================
+
+    @GetMapping("/{teamId}/members/{memberId}/profile")
+    public MemberProfileResponse getMemberProfile(
+            @PathVariable Long teamId,
+            @PathVariable Long memberId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return memberProfileService.getMemberProfile(teamId, memberId, from, to);
     }
 
     // ==================== Exception Handlers ====================

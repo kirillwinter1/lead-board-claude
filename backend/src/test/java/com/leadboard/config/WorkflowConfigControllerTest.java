@@ -9,6 +9,7 @@ import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.MappingValidationService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusCategory;
+import com.leadboard.sync.JiraIssueRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,8 @@ class WorkflowConfigControllerTest {
     private MappingValidationService validationService;
     @MockBean
     private MappingAutoDetectService autoDetectService;
+    @MockBean
+    private JiraIssueRepository jiraIssueRepository;
     @MockBean
     private SessionRepository sessionRepository;
     @MockBean

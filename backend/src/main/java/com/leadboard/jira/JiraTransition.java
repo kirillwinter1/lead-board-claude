@@ -12,6 +12,13 @@ public record JiraTransition(
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record TransitionTarget(
             @JsonProperty("id") String id,
+            @JsonProperty("name") String name,
+            @JsonProperty("statusCategory") StatusCategoryInfo statusCategory
+    ) {}
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record StatusCategoryInfo(
+            @JsonProperty("key") String key,
             @JsonProperty("name") String name
     ) {}
 }

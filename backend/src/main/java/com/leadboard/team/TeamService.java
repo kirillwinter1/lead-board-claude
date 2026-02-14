@@ -16,11 +16,14 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
     private final ObjectMapper objectMapper;
+    private final com.leadboard.sync.JiraIssueRepository issueRepository;
 
-    public TeamService(TeamRepository teamRepository, TeamMemberRepository memberRepository, ObjectMapper objectMapper) {
+    public TeamService(TeamRepository teamRepository, TeamMemberRepository memberRepository,
+                       ObjectMapper objectMapper, com.leadboard.sync.JiraIssueRepository issueRepository) {
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
         this.objectMapper = objectMapper;
+        this.issueRepository = issueRepository;
     }
 
     // ==================== Team Operations ====================
@@ -49,6 +52,7 @@ public class TeamService {
         team.setJiraTeamValue(request.jiraTeamValue());
 
         TeamEntity saved = teamRepository.save(team);
+        linkIssuesToTeam(saved);
         return TeamDto.from(saved);
     }
 
@@ -70,6 +74,7 @@ public class TeamService {
         }
 
         TeamEntity saved = teamRepository.save(team);
+        linkIssuesToTeam(saved);
         return TeamDto.from(saved);
     }
 
@@ -223,6 +228,20 @@ public class TeamService {
                         throw new InvalidPlanningConfigException(
                                 entry.getKey() + " WIP limit must be at least 1");
                     }
+                }
+            }
+        }
+    }
+
+    private void linkIssuesToTeam(TeamEntity team) {
+        if (team.getJiraTeamValue() != null && !team.getJiraTeamValue().isEmpty()) {
+            int linked = issueRepository.linkIssuesToTeam(team.getId(), team.getJiraTeamValue());
+            if (linked > 0) {
+                // Cascade: children inherit team from their parent
+                int inherited = issueRepository.inheritTeamFromParent();
+                // Second pass for subtasks (subtask → story → epic)
+                if (inherited > 0) {
+                    issueRepository.inheritTeamFromParent();
                 }
             }
         }

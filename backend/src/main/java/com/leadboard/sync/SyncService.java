@@ -225,6 +225,26 @@ public class SyncService {
                 log.error("Failed to recalculate AutoScore after sync", e);
             }
 
+            // Re-link issues to teams (handles cases where teams were created after initial sync)
+            try {
+                int totalLinked = 0;
+                for (var team : teamRepository.findByActiveTrue()) {
+                    if (team.getJiraTeamValue() != null && !team.getJiraTeamValue().isEmpty()) {
+                        totalLinked += issueRepository.linkIssuesToTeam(team.getId(), team.getJiraTeamValue());
+                    }
+                }
+                if (totalLinked > 0) {
+                    log.info("Linked {} issues to teams by team_field_value", totalLinked);
+                    int inherited = issueRepository.inheritTeamFromParent();
+                    if (inherited > 0) {
+                        log.info("Inherited team for {} child issues", inherited);
+                        issueRepository.inheritTeamFromParent();
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to re-link issues to teams after sync", e);
+            }
+
         } catch (Exception e) {
             log.error("Sync failed for project: {}", projectKey, e);
             state.setSyncInProgress(false);

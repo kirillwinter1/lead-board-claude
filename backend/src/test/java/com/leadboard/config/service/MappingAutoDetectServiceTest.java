@@ -2,6 +2,10 @@ package com.leadboard.config.service;
 
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
+import com.leadboard.jira.JiraClient;
+import com.leadboard.jira.JiraTransition;
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -17,6 +21,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +36,8 @@ class MappingAutoDetectServiceTest {
     @Mock private StatusMappingRepository statusMappingRepo;
     @Mock private LinkTypeMappingRepository linkTypeRepo;
     @Mock private WorkflowConfigService workflowConfigService;
+    @Mock private JiraClient jiraClient;
+    @Mock private JiraIssueRepository jiraIssueRepository;
 
     private MappingAutoDetectService service;
 
@@ -38,7 +45,8 @@ class MappingAutoDetectServiceTest {
     void setUp() {
         service = new MappingAutoDetectService(
                 jiraMetadataService, configRepo, roleRepo, issueTypeRepo,
-                statusMappingRepo, linkTypeRepo, workflowConfigService
+                statusMappingRepo, linkTypeRepo, workflowConfigService,
+                jiraClient, jiraIssueRepository
         );
 
         // Default config setup
@@ -527,6 +535,199 @@ class MappingAutoDetectServiceTest {
         void shouldDefaultToIgnore() {
             assertEquals(LinkCategory.IGNORE, service.detectLinkCategory("Duplicate"));
             assertEquals(LinkCategory.IGNORE, service.detectLinkCategory("Cloners"));
+        }
+    }
+
+    // ==================== Workflow Graph Enhancement ====================
+
+    @Nested
+    @DisplayName("enhanceWithTransitionsGraph()")
+    class WorkflowGraphTests {
+
+        @Test
+        @DisplayName("BFS should compute correct levels from NEW status")
+        void bfsShouldComputeCorrectLevels() {
+            Map<String, Set<String>> graph = new LinkedHashMap<>();
+            graph.put("New", Set.of("In Progress", "Cancelled"));
+            graph.put("In Progress", Set.of("Review", "New"));
+            graph.put("Review", Set.of("Done", "In Progress"));
+            graph.put("Done", Set.of());
+
+            Map<String, Integer> levels = service.bfsFromStatuses(Set.of("New"), graph);
+
+            assertEquals(0, levels.get("New"));
+            assertEquals(1, levels.get("In Progress"));
+            assertEquals(1, levels.get("Cancelled"));
+            assertEquals(2, levels.get("Review"));
+            assertEquals(3, levels.get("Done"));
+        }
+
+        @Test
+        @DisplayName("BFS should handle multiple start statuses")
+        void bfsShouldHandleMultipleStarts() {
+            Map<String, Set<String>> graph = new LinkedHashMap<>();
+            graph.put("Open", Set.of("In Progress"));
+            graph.put("Reopened", Set.of("In Progress"));
+            graph.put("In Progress", Set.of("Done"));
+
+            Map<String, Integer> levels = service.bfsFromStatuses(
+                    new LinkedHashSet<>(List.of("Open", "Reopened")), graph);
+
+            assertEquals(0, levels.get("Open"));
+            assertEquals(0, levels.get("Reopened"));
+            assertEquals(1, levels.get("In Progress"));
+            assertEquals(2, levels.get("Done"));
+        }
+
+        @Test
+        @DisplayName("computeWeightFromLevel should return correct weights")
+        void computeWeightFromLevelShouldWork() {
+            // NEW → -5
+            assertEquals(-5, service.computeWeightFromLevel(0, 4, "new"));
+            // DONE → 0
+            assertEquals(0, service.computeWeightFromLevel(4, 4, "done"));
+            // Intermediate: level 1 of maxLevel 4 → 5 (start of range)
+            assertEquals(5, service.computeWeightFromLevel(1, 4, "indeterminate"));
+            // Intermediate: level 3 of maxLevel 4 → 30 (end of range)
+            assertEquals(30, service.computeWeightFromLevel(3, 4, "indeterminate"));
+            // Intermediate: level 2 of maxLevel 4 → ~18 (midpoint)
+            int mid = service.computeWeightFromLevel(2, 4, "indeterminate");
+            assertTrue(mid > 5 && mid < 30, "Mid-level weight should be between 5 and 30, was: " + mid);
+        }
+
+        @Test
+        @DisplayName("longestForwardPath should compute unique levels for linear workflow")
+        void longestForwardPathShouldGiveUniqueLevels() {
+            // Simulate: New → WaitingSA → Analysis → AnalysisReview → WaitingDev → Development → Done
+            // with back-edges: AnalysisReview → Analysis, Development → WaitingDev
+            Map<String, Set<String>> graph = new LinkedHashMap<>();
+            graph.put("New", Set.of("WaitingSA"));
+            graph.put("WaitingSA", Set.of("Analysis"));
+            graph.put("Analysis", Set.of("AnalysisReview"));
+            graph.put("AnalysisReview", Set.of("WaitingDev", "Analysis")); // back-edge to Analysis
+            graph.put("WaitingDev", Set.of("Development"));
+            graph.put("Development", Set.of("Done", "WaitingDev")); // back-edge to WaitingDev
+            graph.put("Done", Set.of());
+
+            Map<String, Integer> levels = service.longestForwardPath(Set.of("New"), graph);
+
+            assertEquals(0, levels.get("New"));
+            assertEquals(1, levels.get("WaitingSA"));
+            assertEquals(2, levels.get("Analysis"));
+            assertEquals(3, levels.get("AnalysisReview"));
+            assertEquals(4, levels.get("WaitingDev"));
+            assertEquals(5, levels.get("Development"));
+            assertEquals(6, levels.get("Done"));
+        }
+
+        @Test
+        @DisplayName("enhanceWithTransitionsGraph should update sortOrder and scoreWeight")
+        void shouldEnhanceMappingsWithGraph() {
+            // Setup status mappings
+            StatusMappingEntity newStatus = createStatusMapping(1L, "New", BoardCategory.EPIC,
+                    com.leadboard.status.StatusCategory.NEW, 0, -5);
+            StatusMappingEntity inProgress = createStatusMapping(2L, "In Progress", BoardCategory.EPIC,
+                    com.leadboard.status.StatusCategory.IN_PROGRESS, 10, 20);
+            StatusMappingEntity done = createStatusMapping(3L, "Done", BoardCategory.EPIC,
+                    com.leadboard.status.StatusCategory.DONE, 20, 0);
+
+            when(statusMappingRepo.findByConfigIdAndIssueCategory(1L, BoardCategory.EPIC))
+                    .thenReturn(List.of(newStatus, inProgress, done));
+            when(statusMappingRepo.findByConfigIdAndIssueCategory(1L, BoardCategory.STORY))
+                    .thenReturn(List.of());
+            when(statusMappingRepo.findByConfigIdAndIssueCategory(1L, BoardCategory.SUBTASK))
+                    .thenReturn(List.of());
+
+            // Setup sample issues
+            JiraIssueEntity newIssue = createJiraIssue("PROJ-1", "New", "EPIC");
+            JiraIssueEntity ipIssue = createJiraIssue("PROJ-2", "In Progress", "EPIC");
+            JiraIssueEntity doneIssue = createJiraIssue("PROJ-3", "Done", "EPIC");
+
+            when(jiraIssueRepository.findByStatusAndBoardCategory("New", "EPIC"))
+                    .thenReturn(List.of(newIssue));
+            when(jiraIssueRepository.findByStatusAndBoardCategory("In Progress", "EPIC"))
+                    .thenReturn(List.of(ipIssue));
+            when(jiraIssueRepository.findByStatusAndBoardCategory("Done", "EPIC"))
+                    .thenReturn(List.of(doneIssue));
+
+            // Setup transitions
+            when(jiraClient.getTransitionsBasicAuth("PROJ-1")).thenReturn(List.of(
+                    transition("11", "Start", "2", "In Progress", "indeterminate")
+            ));
+            when(jiraClient.getTransitionsBasicAuth("PROJ-2")).thenReturn(List.of(
+                    transition("21", "Finish", "3", "Done", "done"),
+                    transition("22", "Reopen", "1", "New", "new")
+            ));
+            when(jiraClient.getTransitionsBasicAuth("PROJ-3")).thenReturn(List.of(
+                    transition("31", "Reopen", "1", "New", "new")
+            ));
+
+            when(statusMappingRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            List<String> warnings = new ArrayList<>();
+            service.enhanceWithTransitionsGraph(1L, warnings);
+
+            // Verify sortOrder: New=0, InProgress=10, Done=20
+            assertEquals(0, newStatus.getSortOrder());
+            assertEquals(10, inProgress.getSortOrder());
+            assertEquals(20, done.getSortOrder());
+
+            // Verify scoreWeight: New=-5, InProgress=interpolated, Done=0
+            assertEquals(-5, newStatus.getScoreWeight());
+            assertEquals(0, done.getScoreWeight());
+            assertTrue(inProgress.getScoreWeight() > 0, "In Progress weight should be > 0");
+        }
+
+        @Test
+        @DisplayName("should handle missing sample issues gracefully")
+        void shouldHandleMissingSampleIssues() {
+            StatusMappingEntity newStatus = createStatusMapping(1L, "New", BoardCategory.STORY,
+                    com.leadboard.status.StatusCategory.NEW, 0, -5);
+
+            when(statusMappingRepo.findByConfigIdAndIssueCategory(1L, BoardCategory.EPIC))
+                    .thenReturn(List.of());
+            when(statusMappingRepo.findByConfigIdAndIssueCategory(1L, BoardCategory.STORY))
+                    .thenReturn(List.of(newStatus));
+            when(statusMappingRepo.findByConfigIdAndIssueCategory(1L, BoardCategory.SUBTASK))
+                    .thenReturn(List.of());
+
+            when(jiraIssueRepository.findByStatusAndBoardCategory("New", "STORY"))
+                    .thenReturn(List.of());
+
+            List<String> warnings = new ArrayList<>();
+            service.enhanceWithTransitionsGraph(1L, warnings);
+
+            // Should not fail, just skip
+            verify(jiraClient, never()).getTransitionsBasicAuth(any());
+        }
+
+        private StatusMappingEntity createStatusMapping(Long id, String name, BoardCategory cat,
+                                                         com.leadboard.status.StatusCategory statusCat,
+                                                         int sortOrder, int scoreWeight) {
+            StatusMappingEntity m = new StatusMappingEntity();
+            m.setId(id);
+            m.setConfigId(1L);
+            m.setJiraStatusName(name);
+            m.setIssueCategory(cat);
+            m.setStatusCategory(statusCat);
+            m.setSortOrder(sortOrder);
+            m.setScoreWeight(scoreWeight);
+            return m;
+        }
+
+        private JiraIssueEntity createJiraIssue(String key, String status, String boardCategory) {
+            JiraIssueEntity e = new JiraIssueEntity();
+            e.setIssueKey(key);
+            e.setStatus(status);
+            e.setBoardCategory(boardCategory);
+            return e;
+        }
+
+        private JiraTransition transition(String id, String name,
+                                           String targetId, String targetName, String categoryKey) {
+            return new JiraTransition(id, name,
+                    new JiraTransition.TransitionTarget(targetId, targetName,
+                            new JiraTransition.StatusCategoryInfo(categoryKey, categoryKey)));
         }
     }
 
