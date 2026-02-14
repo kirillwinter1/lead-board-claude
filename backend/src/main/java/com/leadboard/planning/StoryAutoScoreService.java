@@ -115,11 +115,10 @@ public class StoryAutoScoreService {
 
         String status = story.getStatus();
 
-        // Use WorkflowConfigService DB-driven sort order (scaled to 0-100 range)
-        int sortOrder = workflowConfigService.getStoryStatusSortOrder(status);
-        if (sortOrder > 0) {
-            // Sort order maps directly to weight (e.g., 10, 20, 30, ..., 100)
-            return BigDecimal.valueOf(sortOrder);
+        // Use WorkflowConfigService DB-driven score_weight
+        int scoreWeight = workflowConfigService.getStoryStatusScoreWeight(status);
+        if (scoreWeight > 0) {
+            return BigDecimal.valueOf(scoreWeight);
         }
 
         // Fallback: hardcoded matching for unmapped statuses

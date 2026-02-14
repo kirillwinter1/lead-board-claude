@@ -140,10 +140,6 @@
   min-height: 0;
 }
 
-.children-wrapper.expanded .children-container {
-  overflow: visible;
-}
-
 /* Staggered animation for rows appearing */
 .children-wrapper.expanded .board-row {
   animation: rowSlideIn 0.25s ease-out forwards;

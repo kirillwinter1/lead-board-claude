@@ -406,6 +406,23 @@ public class WorkflowConfigService {
         return 0;
     }
 
+    public int getStoryStatusScoreWeight(String storyStatus) {
+        if (storyStatus == null) return 0;
+        String key = buildStatusKey("STORY", storyStatus);
+        Integer weight = statusScoreWeight.get(key);
+        if (weight != null) return weight;
+
+        // Case-insensitive
+        for (Map.Entry<String, Integer> entry : statusScoreWeight.entrySet()) {
+            if (entry.getKey().startsWith("STORY:") &&
+                entry.getKey().substring(6).equalsIgnoreCase(storyStatus)) {
+                return entry.getValue();
+            }
+        }
+
+        return 0;
+    }
+
     // ==================== Link Types ====================
 
     public LinkCategory categorizeLinkType(String linkTypeName) {
