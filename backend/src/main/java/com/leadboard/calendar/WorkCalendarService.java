@@ -259,11 +259,12 @@ public class WorkCalendarService {
         return loadFromApi(year, country);
     }
 
-    @Transactional
     private void saveToDatabase(Set<LocalDate> nonWorkingDays, int year, String country) {
         try {
-            // Удаляем старые записи за год
-            holidayRepository.deleteByCountryAndYear(country, year);
+            // Если данные за этот год уже есть, не перезаписываем
+            if (holidayRepository.existsByCountryAndYear(country, year)) {
+                return;
+            }
 
             // Сохраняем только праздники (не выходные)
             List<CalendarHolidayEntity> holidays = nonWorkingDays.stream()

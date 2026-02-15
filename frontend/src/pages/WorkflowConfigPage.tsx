@@ -400,7 +400,11 @@ function suggestLinkTypes(jiraLinks: JiraLinkTypeMetadata[]): LinkTypeMappingDto
 
 // --- Component ---
 
-export function WorkflowConfigPage() {
+interface WorkflowConfigPageProps {
+  onComplete?: () => void
+}
+
+export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {}) {
   const { refresh: refreshWorkflowContext } = useWorkflowConfig()
   const [config, setConfig] = useState<WorkflowConfigResponse | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('roles')
@@ -679,6 +683,10 @@ export function WorkflowConfigPage() {
   }
 
   const cancelWizard = () => {
+    if (onComplete) {
+      onComplete()
+      return
+    }
     setWizardMode(false)
     setWizardStep(0)
     setWizardError(null)
@@ -736,7 +744,11 @@ export function WorkflowConfigPage() {
       refreshWorkflowContext()
       setWizardMode(false)
       setWizardStep(0)
-      showSaveSuccess('Wizard configuration saved successfully!')
+      if (onComplete) {
+        onComplete()
+      } else {
+        showSaveSuccess('Wizard configuration saved successfully!')
+      }
     } catch (err: any) {
       setWizardError(err.response?.data?.message || 'Failed to save configuration')
     } finally {
@@ -886,7 +898,7 @@ export function WorkflowConfigPage() {
       <div className="workflow-page">
         <div className="workflow-header">
           <h1 className="workflow-title">Workflow Setup</h1>
-          <button className="btn btn-secondary" onClick={cancelWizard}>Cancel</button>
+          <button className="btn btn-secondary" onClick={cancelWizard}>{onComplete ? 'Skip' : 'Cancel'}</button>
         </div>
 
         <div className="wizard-progress">

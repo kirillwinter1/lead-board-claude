@@ -13,6 +13,7 @@ import com.leadboard.planning.IssueOrderService;
 import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.team.TeamSyncService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -28,12 +29,14 @@ import org.mockito.quality.Strictness;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -76,6 +79,12 @@ class SyncServiceTest {
     @Mock
     private MappingAutoDetectService autoDetectService;
 
+    @Mock
+    private ChangelogImportService changelogImportService;
+
+    @Mock
+    private TeamSyncService teamSyncService;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -92,7 +101,9 @@ class SyncServiceTest {
                 flagChangelogService,
                 issueOrderService,
                 workflowConfigService,
-                autoDetectService
+                autoDetectService,
+                changelogImportService,
+                teamSyncService
         );
 
         // Common setup
@@ -480,6 +491,92 @@ class SyncServiceTest {
             // Then
             verify(autoScoreService).recalculateAll();
             verify(storyAutoScoreService).recalculateAll();
+        }
+    }
+
+    // ==================== countIssuesInJira Tests ====================
+
+    @Nested
+    @DisplayName("countIssuesInJira()")
+    class CountIssuesInJiraTests {
+
+        @Test
+        @DisplayName("should return total count with months filter")
+        void shouldReturnTotalCountWithMonths() {
+            when(jiraProperties.getProjectKey()).thenReturn("LB");
+            when(jiraClient.countByJql(anyString())).thenReturn(245);
+
+            var result = syncService.countIssuesInJira(6);
+
+            assertEquals(245, result.get("total"));
+            assertEquals(6, result.get("months"));
+
+            ArgumentCaptor<String> jqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jiraClient).countByJql(jqlCaptor.capture());
+            assertTrue(jqlCaptor.getValue().contains("-180d"));
+        }
+
+        @Test
+        @DisplayName("should return total count without months filter")
+        void shouldReturnTotalCountWithoutMonths() {
+            when(jiraProperties.getProjectKey()).thenReturn("LB");
+            when(jiraClient.countByJql(anyString())).thenReturn(500);
+
+            var result = syncService.countIssuesInJira(null);
+
+            assertEquals(500, result.get("total"));
+            assertEquals(0, result.get("months"));
+
+            ArgumentCaptor<String> jqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jiraClient).countByJql(jqlCaptor.capture());
+            assertFalse(jqlCaptor.getValue().contains("-"));
+        }
+    }
+
+    // ==================== First sync with months filter ====================
+
+    @Nested
+    @DisplayName("syncProject() with months parameter")
+    class SyncWithMonthsTests {
+
+        @Test
+        @DisplayName("should use months filter for first sync when months provided")
+        void shouldUseMonthsFilterForFirstSync() {
+            String projectKey = "LB";
+            JiraSyncStateEntity syncState = createSyncState(projectKey);
+            syncState.setLastSyncCompletedAt(null);
+            JiraSearchResponse response = createSearchResponse(List.of(), true);
+
+            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
+            when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
+            when(syncStateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            syncService.syncProject(projectKey, 6);
+
+            ArgumentCaptor<String> jqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jiraClient).search(jqlCaptor.capture(), anyInt(), any());
+            assertTrue(jqlCaptor.getValue().contains("-180d"), "JQL should contain months filter converted to days");
+        }
+
+        @Test
+        @DisplayName("should ignore months for incremental sync")
+        void shouldIgnoreMonthsForIncrementalSync() {
+            String projectKey = "LB";
+            JiraSyncStateEntity syncState = createSyncState(projectKey);
+            syncState.setLastSyncCompletedAt(OffsetDateTime.now().minusHours(2));
+            JiraSearchResponse response = createSearchResponse(List.of(), true);
+
+            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
+            when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
+
+            syncService.syncProject(projectKey, 6);
+
+            ArgumentCaptor<String> jqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jiraClient).search(jqlCaptor.capture(), anyInt(), any());
+            assertFalse(jqlCaptor.getValue().contains("-180d"), "JQL should NOT contain months filter for incremental sync");
+            assertTrue(jqlCaptor.getValue().contains("updated >="), "JQL should use lastSync time");
         }
     }
 

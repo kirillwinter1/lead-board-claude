@@ -29,6 +29,9 @@ public class StatusChangelogEntity {
     @Column(name = "time_in_previous_status_seconds")
     private Long timeInPreviousStatusSeconds;
 
+    @Column(name = "source", nullable = false, length = 20)
+    private String source = "SYNC";
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -95,6 +98,14 @@ public class StatusChangelogEntity {
 
     public void setTimeInPreviousStatusSeconds(Long timeInPreviousStatusSeconds) {
         this.timeInPreviousStatusSeconds = timeInPreviousStatusSeconds;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 
     public OffsetDateTime getCreatedAt() {

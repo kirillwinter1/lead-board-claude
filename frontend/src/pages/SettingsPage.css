@@ -181,3 +181,118 @@
   color: #FF8B00;
   font-size: 13px;
 }
+
+.changelog-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.changelog-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.changelog-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #172B4D;
+  font-weight: 500;
+}
+
+.changelog-months-input {
+  width: 64px;
+  padding: 6px 8px;
+  border: 1px solid #DFE1E6;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.changelog-months-input:focus {
+  outline: none;
+  border-color: #4C9AFF;
+  box-shadow: 0 0 0 2px rgba(76, 154, 255, 0.2);
+}
+
+.changelog-hint {
+  color: #6B778C;
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.changelog-check-btn {
+  padding: 6px 14px;
+  background: #F4F5F7;
+  color: #172B4D;
+  border: 1px solid #DFE1E6;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.changelog-check-btn:hover {
+  background: #EBECF0;
+}
+
+.changelog-check-btn:disabled {
+  background: #F4F5F7;
+  color: #A5ADBA;
+  cursor: not-allowed;
+}
+
+.changelog-count-info {
+  font-size: 14px;
+  color: #172B4D;
+  font-weight: 500;
+}
+
+.changelog-confirm {
+  padding: 12px;
+  background: #FFFAE6;
+  border: 1px solid #FFE380;
+  border-radius: 4px;
+}
+
+.changelog-import-btn {
+  padding: 8px 16px;
+  background: #0052CC;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.changelog-import-btn:hover {
+  background: #0065FF;
+}
+
+.changelog-import-btn:disabled {
+  background: #B3BAC5;
+  cursor: not-allowed;
+}
+
+.changelog-warn {
+  color: #974F0C;
+  font-size: 13px;
+}
+
+.changelog-result-success {
+  color: #00875A;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.changelog-result-error {
+  color: #DE350B;
+  font-size: 14px;
+  font-weight: 500;
+}

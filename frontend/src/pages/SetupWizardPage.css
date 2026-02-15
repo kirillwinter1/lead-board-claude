@@ -1,0 +1,306 @@
+.setup-wizard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: calc(100vh - 56px);
+  padding: 48px 24px;
+  background: #f4f5f7;
+}
+
+/* Stepper */
+.wizard-stepper {
+  display: flex;
+  align-items: center;
+  margin-bottom: 40px;
+}
+
+.wizard-step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wizard-step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  border: 2px solid #dfe1e6;
+  background: #fff;
+  color: #6b778c;
+  transition: all 0.2s;
+}
+
+.wizard-step-circle.active {
+  border-color: #0052cc;
+  background: #0052cc;
+  color: #fff;
+}
+
+.wizard-step-circle.completed {
+  border-color: #00875a;
+  background: #00875a;
+  color: #fff;
+}
+
+.wizard-step-label {
+  font-size: 13px;
+  color: #6b778c;
+  font-weight: 500;
+}
+
+.wizard-step-label.active {
+  color: #0052cc;
+  font-weight: 600;
+}
+
+.wizard-step-label.completed {
+  color: #00875a;
+}
+
+.wizard-step-line {
+  width: 48px;
+  height: 2px;
+  background: #dfe1e6;
+  margin: 0 8px;
+  transition: background 0.2s;
+}
+
+.wizard-step-line.completed {
+  background: #00875a;
+}
+
+/* Card */
+.wizard-card {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  padding: 40px;
+  max-width: 560px;
+  width: 100%;
+  text-align: center;
+}
+
+.wizard-card h2 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  color: #172b4d;
+}
+
+.wizard-card p {
+  margin: 0 0 24px;
+  color: #6b778c;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Period input */
+.wizard-period-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.wizard-period-row label {
+  font-size: 14px;
+  color: #172b4d;
+  font-weight: 500;
+}
+
+.wizard-period-input {
+  width: 80px;
+  padding: 8px 12px;
+  border: 2px solid #dfe1e6;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.wizard-period-input:focus {
+  outline: none;
+  border-color: #0052cc;
+}
+
+.wizard-period-row span {
+  font-size: 14px;
+  color: #6b778c;
+}
+
+/* Issue count result */
+.wizard-issue-count {
+  background: #e3fcef;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 14px;
+  color: #006644;
+  font-weight: 500;
+}
+
+.wizard-issue-count.error {
+  background: #ffebe6;
+  color: #bf2600;
+}
+
+/* Buttons */
+.wizard-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.wizard-btn {
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.wizard-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wizard-btn-primary {
+  background: #0052cc;
+  color: #fff;
+}
+
+.wizard-btn-primary:hover:not(:disabled) {
+  background: #0747a6;
+}
+
+.wizard-btn-secondary {
+  background: #f4f5f7;
+  color: #172b4d;
+  border: 1px solid #dfe1e6;
+}
+
+.wizard-btn-secondary:hover:not(:disabled) {
+  background: #ebecf0;
+}
+
+.wizard-btn-success {
+  background: #00875a;
+  color: #fff;
+}
+
+.wizard-btn-success:hover:not(:disabled) {
+  background: #006644;
+}
+
+/* Progress / sync */
+.wizard-sync-progress {
+  margin: 24px 0;
+}
+
+.wizard-progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #dfe1e6;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.wizard-progress-bar {
+  height: 100%;
+  background: #0052cc;
+  border-radius: 4px;
+  transition: width 0.3s;
+  animation: wizard-progress-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes wizard-progress-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.wizard-sync-status {
+  font-size: 14px;
+  color: #6b778c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.wizard-spinner-inline {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #dfe1e6;
+  border-top-color: #0052cc;
+  border-radius: 50%;
+  animation: wizard-spin 0.8s linear infinite;
+}
+
+@keyframes wizard-spin {
+  to { transform: rotate(360deg); }
+}
+
+.wizard-sync-done {
+  font-size: 16px;
+  color: #00875a;
+  font-weight: 600;
+  margin: 16px 0;
+}
+
+/* Workflow summary */
+.wizard-workflow-summary {
+  text-align: left;
+  background: #f4f5f7;
+  border-radius: 4px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.wizard-workflow-summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+  color: #172b4d;
+}
+
+.wizard-workflow-summary-row span:first-child {
+  color: #6b778c;
+}
+
+/* Workflow inline container */
+.wizard-workflow-inline {
+  width: 100%;
+  max-width: 900px;
+}
+
+/* Done step */
+.wizard-done-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+/* Waiting message (non-admin) */
+.setup-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 56px);
+  gap: 12px;
+  color: #6b778c;
+}
+
+.setup-waiting h2 {
+  margin: 0;
+  color: #172b4d;
+}

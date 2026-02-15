@@ -35,6 +35,7 @@ public class WorkflowConfigService {
     private final ConcurrentHashMap<String, Integer> statusSortOrder = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> statusScoreWeight = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LinkCategory> linkTypeLookup = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> statusColor = new ConcurrentHashMap<>();
     private volatile List<WorkflowRoleEntity> cachedRoles = List.of();
     private volatile Map<String, Integer> scoreWeightsMap = Map.of();
 
@@ -109,6 +110,7 @@ public class WorkflowConfigService {
             statusToRoleCode.clear();
             statusSortOrder.clear();
             statusScoreWeight.clear();
+            statusColor.clear();
             List<StatusMappingEntity> statusMappings = statusMappingRepo.findByConfigId(defaultConfigId);
             for (StatusMappingEntity sm : statusMappings) {
                 String key = buildStatusKey(sm.getIssueCategory().name(), sm.getJiraStatusName());
@@ -118,6 +120,9 @@ public class WorkflowConfigService {
                 }
                 statusSortOrder.put(key, sm.getSortOrder());
                 statusScoreWeight.put(key, sm.getScoreWeight());
+                if (sm.getColor() != null) {
+                    statusColor.put(key, sm.getColor());
+                }
             }
 
             // Load score weights from JSONB
@@ -404,6 +409,23 @@ public class WorkflowConfigService {
         }
 
         return 0;
+    }
+
+    public String getStoryStatusColor(String storyStatus) {
+        if (storyStatus == null) return null;
+        String key = buildStatusKey("STORY", storyStatus);
+        String color = statusColor.get(key);
+        if (color != null) return color;
+
+        // Case-insensitive
+        for (Map.Entry<String, String> entry : statusColor.entrySet()) {
+            if (entry.getKey().startsWith("STORY:") &&
+                entry.getKey().substring(6).equalsIgnoreCase(storyStatus)) {
+                return entry.getValue();
+            }
+        }
+
+        return null;
     }
 
     public int getStoryStatusScoreWeight(String storyStatus) {

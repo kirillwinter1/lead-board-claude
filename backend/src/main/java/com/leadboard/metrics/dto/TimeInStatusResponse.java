@@ -6,5 +6,9 @@ public record TimeInStatusResponse(
     String status,
     BigDecimal avgHours,
     BigDecimal medianHours,
-    int transitionsCount
+    BigDecimal p85Hours,
+    BigDecimal p99Hours,
+    int transitionsCount,
+    int sortOrder,
+    String color
 ) {}

@@ -2,6 +2,7 @@ import { NavLink, Outlet, useSearchParams } from 'react-router-dom'
 import { useEffect, useState, useCallback } from 'react'
 import axios from 'axios'
 import logo from '../icons/logo.png'
+import { SetupWizardPage } from '../pages/SetupWizardPage'
 import './Header.css'
 
 interface AuthUser {
@@ -23,9 +24,18 @@ function isAdmin(user: AuthUser | null | undefined): boolean {
   return user?.role === 'ADMIN'
 }
 
+interface SyncStatus {
+  syncInProgress: boolean
+  lastSyncStartedAt: string | null
+  lastSyncCompletedAt: string | null
+  issuesCount: number
+  error: string | null
+}
+
 export function Layout() {
   const [searchParams] = useSearchParams()
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const [setupRequired, setSetupRequired] = useState<boolean | null>(null)
 
   // Preserve teamId in navigation links
   const teamId = searchParams.get('teamId')
@@ -45,6 +55,19 @@ export function Layout() {
     fetchAuthStatus()
   }, [fetchAuthStatus])
 
+  // Check if initial setup is needed
+  useEffect(() => {
+    if (authStatus?.authenticated) {
+      axios.get<SyncStatus>('/api/sync/status')
+        .then(res => {
+          setSetupRequired(res.data.lastSyncCompletedAt === null)
+        })
+        .catch(() => {
+          setSetupRequired(false)
+        })
+    }
+  }, [authStatus?.authenticated])
+
   const handleLogin = () => {
     window.location.href = '/oauth/atlassian/authorize'
   }
@@ -59,6 +82,9 @@ export function Layout() {
       })
   }
 
+  const showWizard = authStatus?.authenticated && setupRequired === true
+  const showNav = authStatus?.authenticated && !showWizard
+
   return (
     <div className="app">
       <header className="header">
@@ -66,7 +92,7 @@ export function Layout() {
           <NavLink to="/board" className="logo-link">
             <img src={logo} alt="OneLane" className="header-logo" />
           </NavLink>
-          {authStatus?.authenticated && (
+          {showNav && (
             <nav className="nav-tabs">
               <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
                 Board
@@ -115,7 +141,18 @@ export function Layout() {
         </div>
       </header>
       {authStatus?.authenticated ? (
-        <Outlet />
+        showWizard ? (
+          isAdmin(authStatus?.user) ? (
+            <SetupWizardPage onComplete={() => setSetupRequired(false)} />
+          ) : (
+            <div className="setup-waiting">
+              <h2>Initial Setup Required</h2>
+              <p>Waiting for an admin to complete the initial project setup.</p>
+            </div>
+          )
+        ) : setupRequired === false ? (
+          <Outlet />
+        ) : null
       ) : authStatus !== null ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 56px)', gap: '16px' }}>
           <h2 style={{ margin: 0, color: '#333' }}>Log in to continue</h2>

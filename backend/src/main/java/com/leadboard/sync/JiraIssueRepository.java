@@ -36,6 +36,21 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     @Query("DELETE FROM JiraIssueEntity e WHERE e.issueKey IN :issueKeys")
     void deleteByIssueKeyIn(@Param("issueKeys") List<String> issueKeys);
 
+    @Query("SELECT COUNT(e) FROM JiraIssueEntity e WHERE e.projectKey = :projectKey " +
+           "AND e.updatedAt >= :since")
+    long countByProjectKeyAndUpdatedAtAfter(
+            @Param("projectKey") String projectKey,
+            @Param("since") OffsetDateTime since);
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.projectKey = :projectKey " +
+           "AND e.updatedAt >= :since")
+    List<JiraIssueEntity> findByProjectKeyAndUpdatedAtAfter(
+            @Param("projectKey") String projectKey,
+            @Param("since") OffsetDateTime since);
+
+    @Query("SELECT COUNT(e) FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")
+    long countByProjectKey(@Param("projectKey") String projectKey);
+
     // ==================== Board Category based queries ====================
 
     List<JiraIssueEntity> findByBoardCategoryAndTeamId(String boardCategory, Long teamId);

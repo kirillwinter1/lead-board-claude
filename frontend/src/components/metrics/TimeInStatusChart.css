@@ -1,57 +1,282 @@
-/* Time in Status Chart */
-.time-status-chart {
+/* Time in Status — Combined Bar + Line Chart */
+
+.tis-wrapper {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 12px;
+}
+
+/* Y-axes */
+.tis-y-axis {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  width: 48px;
+  flex-shrink: 0;
+  padding-bottom: 0;
 }
 
-.time-status-row {
+.tis-y-left {
+  align-items: flex-end;
+  padding-right: 8px;
+}
+
+.tis-y-right {
+  align-items: flex-start;
+  padding-left: 8px;
+}
+
+.tis-y-tick {
+  font-size: 11px;
+  color: #6b778c;
+  line-height: 1;
+}
+
+.tis-y-label {
+  font-size: 10px;
+  color: #97a0af;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 6px;
+}
+
+/* Chart area */
+.tis-chart-area {
+  flex: 1;
+  position: relative;
+  border-left: 1px solid #dfe1e6;
+  border-bottom: 1px solid #dfe1e6;
+  border-right: 1px solid #dfe1e6;
+}
+
+/* Grid lines */
+.tis-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tis-grid-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #f4f5f7;
+}
+
+/* Bars container */
+.tis-bars {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+}
+
+.tis-bar-col {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tis-bar {
+  width: 50%;
+  max-width: 48px;
+  background: #dfe1e6;
+  border-radius: 3px 3px 0 0;
+  transition: background 0.15s;
+}
+
+.tis-bar-col:hover .tis-bar {
+  background: #c1c7d0;
+}
+
+/* SVG lines overlay */
+.tis-lines-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.tis-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.tis-line-median {
+  stroke: #0052CC;
+}
+
+.tis-line-p85 {
+  stroke: #FF991F;
+}
+
+.tis-line-p99 {
+  stroke: #DE350B;
+  stroke-dasharray: 6 4;
+}
+
+/* Dots overlay (HTML) */
+.tis-dots-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+
+.tis-dot-col {
+  position: relative;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.tis-dot {
+  position: absolute;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transform: translate(-50%, 50%);
+}
+
+.tis-dot-median {
+  background: #0052CC;
+}
+
+.tis-dot-p85 {
+  background: #FF991F;
+  width: 10px;
+  height: 10px;
+  border: 2.5px solid #FF991F;
+  background: white;
+}
+
+.tis-dot-p99 {
+  width: 7px;
+  height: 7px;
+  background: #DE350B;
+}
+
+/* Tooltip */
+.tis-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: #172b4d;
+  color: white;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.tis-tooltip-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 6px;
+}
+
+.tis-tooltip-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  line-height: 1.8;
 }
 
-.time-status-label {
-  width: 150px;
-  font-size: 13px;
+.tis-tooltip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tis-tooltip-muted {
+  color: #97a0af;
+}
+
+/* X-axis */
+.tis-x-axis {
+  display: flex;
+  margin-top: 6px;
+}
+
+.tis-x-spacer {
+  width: 48px;
+  flex-shrink: 0;
+}
+
+.tis-x-labels {
+  flex: 1;
+  display: flex;
+}
+
+.tis-x-label {
+  font-size: 11px;
   color: #172b4d;
-  white-space: nowrap;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 4px 2px 0;
 }
 
-.time-status-bar-container {
-  flex: 1;
-  height: 24px;
-  background: #f4f5f7;
-  border-radius: 4px;
-  overflow: hidden;
+/* Legend */
+.tis-legend {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
 }
 
-.time-status-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #0052cc, #0065ff);
-  border-radius: 4px;
+.tis-legend-item {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 8px;
-  min-width: fit-content;
-}
-
-.time-status-value {
-  font-size: 12px;
-  font-weight: 600;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-.time-status-count {
-  width: 50px;
+  gap: 6px;
   font-size: 12px;
   color: #6b778c;
-  text-align: right;
-  flex-shrink: 0;
 }
 
+.tis-legend-bar {
+  width: 14px;
+  height: 10px;
+  background: #dfe1e6;
+  border-radius: 2px;
+}
+
+.tis-legend-line {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.tis-legend-median {
+  background: #0052CC;
+}
+
+.tis-legend-p85 {
+  background: #FF991F;
+}
+
+.tis-legend-p99 {
+  background: #DE350B;
+  background: repeating-linear-gradient(
+    90deg,
+    #DE350B 0px,
+    #DE350B 4px,
+    transparent 4px,
+    transparent 7px
+  );
+}

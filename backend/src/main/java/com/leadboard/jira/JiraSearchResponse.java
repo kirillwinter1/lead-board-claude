@@ -1,6 +1,7 @@
 package com.leadboard.jira;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
@@ -13,6 +14,7 @@ public class JiraSearchResponse {
     private int total;
 
     // New cursor-based pagination fields (for /search/jql)
+    @JsonProperty("isLast")
     private boolean isLast;
     private String nextPageToken;
 

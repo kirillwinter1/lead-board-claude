@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
@@ -17,6 +18,7 @@ public class LeadBoardApplication {
 
     @Configuration
     @EnableScheduling
+    @EnableAsync
     @ConditionalOnProperty(name = "scheduling.enabled", havingValue = "true", matchIfMissing = true)
     static class SchedulingConfiguration {
     }

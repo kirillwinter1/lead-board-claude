@@ -1,5 +1,6 @@
 package com.leadboard.metrics.service;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.repository.MetricsQueryRepository;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
@@ -25,11 +26,14 @@ public class TeamMetricsService {
 
     private final MetricsQueryRepository metricsRepository;
     private final StatusChangelogRepository changelogRepository;
+    private final WorkflowConfigService workflowConfig;
 
     public TeamMetricsService(MetricsQueryRepository metricsRepository,
-                              StatusChangelogRepository changelogRepository) {
+                              StatusChangelogRepository changelogRepository,
+                              WorkflowConfigService workflowConfig) {
         this.metricsRepository = metricsRepository;
         this.changelogRepository = changelogRepository;
+        this.workflowConfig = workflowConfig;
     }
 
     /**
@@ -144,19 +148,48 @@ public class TeamMetricsService {
 
         List<Object[]> data = changelogRepository.getTimeInStatusStats(teamId, fromDt, toDt);
 
+        // Get STORY status names for filtering
+        List<String> storyStatuses = workflowConfig.getStoryTypeNames().stream()
+                .findFirst()
+                .map(t -> {
+                    // Collect all STORY-category status names
+                    List<String> names = new ArrayList<>();
+                    for (var cat : com.leadboard.status.StatusCategory.values()) {
+                        names.addAll(workflowConfig.getStatusNames(
+                                com.leadboard.config.entity.BoardCategory.STORY, cat));
+                    }
+                    return names;
+                })
+                .orElse(List.of());
+
         return data.stream()
                 .map(row -> {
                     String status = (String) row[0];
                     BigDecimal avgSeconds = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
                     BigDecimal medianSeconds = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
-                    int transitionsCount = ((Number) row[3]).intValue();
+                    BigDecimal p85Seconds = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
+                    BigDecimal p99Seconds = row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO;
+                    int transitionsCount = ((Number) row[5]).intValue();
 
-                    // Convert seconds to hours
-                    BigDecimal avgHours = avgSeconds.divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
-                    BigDecimal medianHours = medianSeconds.divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+                    BigDecimal divisor = BigDecimal.valueOf(3600);
+                    BigDecimal avgHours = avgSeconds.divide(divisor, 2, RoundingMode.HALF_UP);
+                    BigDecimal medianHours = medianSeconds.divide(divisor, 2, RoundingMode.HALF_UP);
+                    BigDecimal p85Hours = p85Seconds.divide(divisor, 2, RoundingMode.HALF_UP);
+                    BigDecimal p99Hours = p99Seconds.divide(divisor, 2, RoundingMode.HALF_UP);
 
-                    return new TimeInStatusResponse(status, avgHours, medianHours, transitionsCount);
+                    int sortOrder = workflowConfig.getStoryStatusSortOrder(status);
+                    String color = workflowConfig.getStoryStatusColor(status);
+
+                    return new TimeInStatusResponse(status, avgHours, medianHours,
+                            p85Hours, p99Hours, transitionsCount, sortOrder, color);
                 })
+                .filter(r -> {
+                    // Filter to STORY statuses only if we have config
+                    if (storyStatuses.isEmpty()) return true;
+                    return storyStatuses.stream()
+                            .anyMatch(s -> s.equalsIgnoreCase(r.status()));
+                })
+                .sorted(Comparator.comparingInt(TimeInStatusResponse::sortOrder))
                 .collect(Collectors.toList());
     }
 

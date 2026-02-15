@@ -706,10 +706,11 @@ public class UnifiedPlanningService {
         return new AssigneeSchedule.WorkCalendarHelper() {
             @Override
             public LocalDate ensureWorkday(LocalDate date) {
-                if (calendarService.isWorkday(date)) {
-                    return date;
+                LocalDate current = date;
+                while (!calendarService.isWorkday(current)) {
+                    current = current.plusDays(1);
                 }
-                return calendarService.addWorkdays(date, 1);
+                return current;
             }
 
             @Override

@@ -14,6 +14,7 @@ import com.leadboard.planning.IssueOrderService;
 import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.team.TeamSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -53,6 +54,8 @@ public class SyncService {
     private final IssueOrderService issueOrderService;
     private final WorkflowConfigService workflowConfigService;
     private final MappingAutoDetectService autoDetectService;
+    private final ChangelogImportService changelogImportService;
+    private final TeamSyncService teamSyncService;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
@@ -65,7 +68,9 @@ public class SyncService {
                        FlagChangelogService flagChangelogService,
                        IssueOrderService issueOrderService,
                        WorkflowConfigService workflowConfigService,
-                       MappingAutoDetectService autoDetectService) {
+                       MappingAutoDetectService autoDetectService,
+                       ChangelogImportService changelogImportService,
+                       TeamSyncService teamSyncService) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
@@ -78,6 +83,8 @@ public class SyncService {
         this.issueOrderService = issueOrderService;
         this.workflowConfigService = workflowConfigService;
         this.autoDetectService = autoDetectService;
+        this.changelogImportService = changelogImportService;
+        this.teamSyncService = teamSyncService;
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -86,6 +93,14 @@ public class SyncService {
         if (projectKey == null || projectKey.isEmpty()) {
             return;
         }
+
+        // Skip scheduled sync if initial setup hasn't been done yet (wizard not completed)
+        JiraSyncStateEntity existingState = syncStateRepository.findByProjectKey(projectKey).orElse(null);
+        if (existingState == null || existingState.getLastSyncCompletedAt() == null) {
+            log.debug("Skipping scheduled sync — initial setup not completed yet");
+            return;
+        }
+
         autoDetectIfNeeded(projectKey);
         log.info("Starting scheduled sync for project: {}", projectKey);
         syncProject(projectKey);
@@ -98,6 +113,11 @@ public class SyncService {
 
     @Transactional
     public SyncStatus triggerSync() {
+        return triggerSync(null);
+    }
+
+    @Transactional
+    public SyncStatus triggerSync(Integer months) {
         String projectKey = jiraProperties.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return new SyncStatus(false, null, null, 0, "Project key not configured");
@@ -111,7 +131,7 @@ public class SyncService {
 
         new Thread(() -> {
             autoDetectIfNeeded(projectKey);
-            syncProject(projectKey);
+            syncProject(projectKey, months);
             reconcileDeletedIssues(projectKey);
         }).start();
 
@@ -141,6 +161,11 @@ public class SyncService {
 
     @Transactional
     public void syncProject(String projectKey) {
+        syncProject(projectKey, null);
+    }
+
+    @Transactional
+    public void syncProject(String projectKey, Integer months) {
         JiraSyncStateEntity state = getOrCreateSyncState(projectKey);
 
         if (state.isSyncInProgress()) {
@@ -153,6 +178,8 @@ public class SyncService {
         state.setLastError(null);
         syncStateRepository.save(state);
 
+        List<String> statusChangedKeys = new ArrayList<>();
+
         try {
             int totalSynced = 0;
 
@@ -162,6 +189,10 @@ public class SyncService {
                 String lastSyncTime = lastSync.minusMinutes(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
                 jql = String.format("project = %s AND updated >= '%s' ORDER BY updated DESC", projectKey, lastSyncTime);
                 log.info("Incremental sync for project: {} (changes since {})", projectKey, lastSyncTime);
+            } else if (months != null && months > 0) {
+                int days = months * 30;
+                jql = String.format("project = %s AND updated >= -%dd ORDER BY updated DESC", projectKey, days);
+                log.info("First sync for project: {} (last {} months / ~{}d)", projectKey, months, days);
             } else {
                 jql = String.format("project = %s ORDER BY updated DESC", projectKey);
                 log.info("Full sync for project: {} (first run)", projectKey);
@@ -179,7 +210,10 @@ public class SyncService {
                 }
 
                 for (JiraIssue issue : issues) {
-                    saveOrUpdateIssue(issue, projectKey);
+                    boolean statusChanged = saveOrUpdateIssue(issue, projectKey);
+                    if (statusChanged) {
+                        statusChangedKeys.add(issue.getKey());
+                    }
                     totalSynced++;
                 }
 
@@ -249,6 +283,23 @@ public class SyncService {
                 log.error("Failed to re-link issues to teams after sync", e);
             }
 
+            // Import real Jira changelogs async for issues that changed status
+            if (!statusChangedKeys.isEmpty()) {
+                log.info("Scheduling async changelog import for {} issues with status changes", statusChangedKeys.size());
+                changelogImportService.importChangelogsForIssuesAsync(statusChangedKeys);
+            }
+
+            // Trigger team sync if organization ID is configured
+            try {
+                String orgId = jiraProperties.getOrganizationId();
+                if (orgId != null && !orgId.isEmpty()) {
+                    log.info("Triggering team sync after issue sync");
+                    teamSyncService.syncTeams();
+                }
+            } catch (Exception e) {
+                log.error("Team sync after issue sync failed", e);
+            }
+
         } catch (Exception e) {
             log.error("Sync failed for project: {}", projectKey, e);
             state.setSyncInProgress(false);
@@ -280,7 +331,10 @@ public class SyncService {
         }
     }
 
-    private JiraIssueEntity saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
+    /**
+     * @return true if the issue's status changed during this sync
+     */
+    private boolean saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
         JiraIssueEntity existing = issueRepository.findByIssueKey(jiraIssue.getKey())
                 .orElse(null);
         JiraIssueEntity entity = existing != null ? existing : new JiraIssueEntity();
@@ -343,9 +397,10 @@ public class SyncService {
         }
 
         // Detect "In Progress" using WorkflowConfigService
+        // started_at will be corrected to real Jira timestamp by changelog import
         String status = jiraIssue.getFields().getStatus().getName();
         if (workflowConfigService.isInProgress(status, issueTypeName) && entity.getStartedAt() == null) {
-            entity.setStartedAt(OffsetDateTime.now());
+            entity.setStartedAt(OffsetDateTime.now()); // Temporary fallback, will be fixed by changelog import
         }
 
         List<Object> flaggedList = jiraIssue.getFields().getFlagged();
@@ -407,7 +462,11 @@ public class SyncService {
 
         issueOrderService.assignOrderIfMissing(entity);
 
-        if (!java.util.Objects.equals(previousStatus, entity.getStatus())) {
+        boolean statusChanged = !java.util.Objects.equals(previousStatus, entity.getStatus());
+
+        if (statusChanged) {
+            // Record synthetic changelog immediately (fast, no extra API calls).
+            // Real Jira changelog will be imported async after sync completes.
             JiraIssueEntity previousEntity = existing != null ? new JiraIssueEntity() : null;
             if (previousEntity != null) {
                 previousEntity.setStatus(previousStatus);
@@ -427,7 +486,7 @@ public class SyncService {
             flagChangelogService.detectAndRecordFlagChange(prevEntity, entity);
         }
 
-        return entity;
+        return statusChanged;
     }
 
     private LocalDate parseLocalDate(String dateStr) {
@@ -525,6 +584,27 @@ public class SyncService {
         } catch (Exception e) {
             log.error("Failed to reconcile deleted issues for project: {}", projectKey, e);
         }
+    }
+
+    public Map<String, Object> countIssuesInJira(Integer months) {
+        String projectKey = jiraProperties.getProjectKey();
+        if (projectKey == null || projectKey.isEmpty()) {
+            return Map.of("total", 0, "months", 0, "error", "Project key not configured");
+        }
+
+        String jql;
+        if (months != null && months > 0) {
+            int days = months * 30;
+            jql = String.format("project = %s AND updated >= -%dd", projectKey, days);
+        } else {
+            jql = String.format("project = %s", projectKey);
+        }
+
+        int total = jiraClient.countByJql(jql);
+        return Map.of(
+                "total", total,
+                "months", months != null ? months : 0
+        );
     }
 
     public record SyncStatus(

@@ -15,19 +15,21 @@
 .timeline-mode-toggle {
   display: inline-flex;
   border: 1px solid #dfe1e6;
-  border-radius: 6px;
+  border-radius: 4px;
   overflow: hidden;
+  height: 38px;
 }
 
 .mode-toggle-btn {
-  padding: 6px 14px;
+  padding: 7px 14px;
   border: none;
   background: white;
   color: #42526e;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
+  line-height: 1.2;
 }
 
 .mode-toggle-btn:not(:last-child) {

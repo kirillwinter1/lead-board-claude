@@ -40,7 +40,11 @@ export interface TimeInStatusResponse {
   status: string
   avgHours: number
   medianHours: number
+  p85Hours: number
+  p99Hours: number
   transitionsCount: number
+  sortOrder: number
+  color: string | null
 }
 
 export interface AssigneeMetrics {

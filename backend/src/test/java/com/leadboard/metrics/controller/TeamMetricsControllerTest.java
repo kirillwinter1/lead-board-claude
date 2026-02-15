@@ -197,8 +197,10 @@ class TeamMetricsControllerTest {
         // Given
         when(metricsService.calculateTimeInStatuses(eq(1L), any(), any()))
                 .thenReturn(Arrays.asList(
-                        new TimeInStatusResponse("In Progress", new BigDecimal("24.5"), new BigDecimal("20.0"), 50),
-                        new TimeInStatusResponse("In Review", new BigDecimal("8.2"), new BigDecimal("6.0"), 45)
+                        new TimeInStatusResponse("In Progress", new BigDecimal("24.5"), new BigDecimal("20.0"),
+                                new BigDecimal("30.0"), new BigDecimal("45.0"), 50, 2, "#0052CC"),
+                        new TimeInStatusResponse("In Review", new BigDecimal("8.2"), new BigDecimal("6.0"),
+                                new BigDecimal("12.0"), new BigDecimal("18.0"), 45, 3, "#FF991F")
                 ));
 
         // When & Then

@@ -19,6 +19,11 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState<number | null>(null)
+  const [changelogMonths, setChangelogMonths] = useState(6)
+  const [changelogCount, setChangelogCount] = useState<{ issueCount: number; totalIssues: number } | null>(null)
+  const [countingChangelogs, setCountingChangelogs] = useState(false)
+  const [importingChangelogs, setImportingChangelogs] = useState(false)
+  const [changelogResult, setChangelogResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -50,6 +55,38 @@ export function SettingsPage() {
       alert('Failed to update role')
     } finally {
       setUpdating(null)
+    }
+  }
+
+  const checkChangelogCount = async () => {
+    try {
+      setCountingChangelogs(true)
+      setChangelogCount(null)
+      setChangelogResult(null)
+      const params = changelogMonths > 0 ? { months: changelogMonths } : {}
+      const response = await axios.get<{ issueCount: number; totalIssues: number }>('/api/sync/import-changelogs/count', { params })
+      setChangelogCount(response.data)
+    } catch (err) {
+      setChangelogResult({ type: 'error', message: 'Failed to count issues' })
+      console.error('Failed to count issues:', err)
+    } finally {
+      setCountingChangelogs(false)
+    }
+  }
+
+  const importChangelogs = async () => {
+    try {
+      setImportingChangelogs(true)
+      setChangelogResult(null)
+      const params = changelogMonths > 0 ? { months: changelogMonths } : {}
+      const response = await axios.post<{ status: string; message: string }>('/api/sync/import-changelogs', null, { params })
+      setChangelogResult({ type: 'success', message: response.data.message })
+      setChangelogCount(null)
+    } catch (err) {
+      setChangelogResult({ type: 'error', message: 'Failed to start changelog import' })
+      console.error('Failed to import changelogs:', err)
+    } finally {
+      setImportingChangelogs(false)
     }
   }
 
@@ -136,6 +173,83 @@ export function SettingsPage() {
         <Link to="/board/workflow" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
           Open Workflow Configuration
         </Link>
+      </section>
+
+      <section className="settings-section">
+        <h2 className="settings-section-title">Jira Changelog Import</h2>
+        <p className="settings-section-description">
+          Import full status transition history from Jira.
+          Fixes started_at/done_at dates and enables accurate metrics (DSR, cycle time).
+          Each issue requires a separate Jira API call (~100ms between calls).
+        </p>
+
+        <div className="changelog-controls">
+          <div className="changelog-row">
+            <label className="changelog-label">
+              Period (months):
+              <input
+                type="number"
+                min={0}
+                max={120}
+                value={changelogMonths}
+                onChange={(e) => {
+                  setChangelogMonths(parseInt(e.target.value) || 0)
+                  setChangelogCount(null)
+                }}
+                className="changelog-months-input"
+              />
+              <span className="changelog-hint">
+                {changelogMonths > 0 ? `Issues updated in last ${changelogMonths} months` : 'All issues (no filter)'}
+              </span>
+            </label>
+          </div>
+
+          <div className="changelog-row">
+            <button
+              onClick={checkChangelogCount}
+              disabled={countingChangelogs}
+              className="changelog-check-btn"
+            >
+              {countingChangelogs ? 'Counting...' : 'Check Count'}
+            </button>
+
+            {changelogCount && (
+              <span className="changelog-count-info">
+                {changelogCount.issueCount} issues to process (out of {changelogCount.totalIssues} total)
+                {' '}— ~{Math.ceil(changelogCount.issueCount * 0.15)} sec
+              </span>
+            )}
+          </div>
+
+          {changelogCount && changelogCount.issueCount > 0 && (
+            <div className="changelog-row changelog-confirm">
+              <button
+                onClick={importChangelogs}
+                disabled={importingChangelogs}
+                className="changelog-import-btn"
+              >
+                {importingChangelogs ? 'Starting...' : `Import ${changelogCount.issueCount} issues`}
+              </button>
+              <span className="changelog-warn">
+                Runs in background. Will make {changelogCount.issueCount} Jira API calls.
+              </span>
+            </div>
+          )}
+
+          {changelogCount && changelogCount.issueCount === 0 && (
+            <div className="changelog-row">
+              <span className="changelog-hint">No issues found for the selected period.</span>
+            </div>
+          )}
+
+          {changelogResult && (
+            <div className="changelog-row">
+              <span className={changelogResult.type === 'success' ? 'changelog-result-success' : 'changelog-result-error'}>
+                {changelogResult.message}
+              </span>
+            </div>
+          )}
+        </div>
       </section>
 
       <section className="settings-section">

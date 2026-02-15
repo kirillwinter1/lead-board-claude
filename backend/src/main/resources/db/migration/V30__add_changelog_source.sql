@@ -1,0 +1,1 @@
+ALTER TABLE status_changelog ADD COLUMN source VARCHAR(20) NOT NULL DEFAULT 'SYNC';

@@ -131,6 +131,27 @@ public class JiraClient {
     }
 
     /**
+     * Count total issues matching a JQL query by paginating through results
+     * using GET /search/jql (cursor-based, since POST /search is 410 Gone).
+     */
+    public int countByJql(String jql) {
+        int total = 0;
+        String nextPageToken = null;
+
+        while (true) {
+            JiraSearchResponse response = searchKeysOnly(jql, 100, nextPageToken);
+            List<JiraIssue> issues = response.getIssues();
+            if (issues == null || issues.isEmpty()) break;
+            total += issues.size();
+            if (response.getNextPageToken() == null) break;
+            nextPageToken = response.getNextPageToken();
+        }
+
+        log.debug("countByJql: total={} for jql={}", total, jql);
+        return total;
+    }
+
+    /**
      * Create a new issue in Jira (Story, Epic, etc.)
      */
     public String createIssue(String projectKey, String issueType, String summary, String parentKey) {
@@ -423,6 +444,113 @@ public class JiraClient {
                 ))
                 .retrieve()
                 .toBodilessEntity()
+                .block();
+    }
+
+    /**
+     * Fetch full changelog for an issue. Uses expand=changelog first,
+     * then paginates via /changelog endpoint if there are more than 100 entries.
+     */
+    public List<JiraChangelogResponse.ChangelogHistory> fetchIssueChangelog(String issueKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        if (accessToken != null && cloudId != null) {
+            return fetchChangelogWithOAuth(issueKey, accessToken, cloudId);
+        }
+        return fetchChangelogWithBasicAuth(issueKey);
+    }
+
+    private List<JiraChangelogResponse.ChangelogHistory> fetchChangelogWithOAuth(
+            String issueKey, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        JiraChangelogResponse response = webClient.get()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "?expand=changelog&fields=status")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .bodyToMono(JiraChangelogResponse.class)
+                .block();
+
+        if (response == null || response.getChangelog() == null) {
+            return List.of();
+        }
+
+        var changelog = response.getChangelog();
+        List<JiraChangelogResponse.ChangelogHistory> allHistories =
+                new java.util.ArrayList<>(changelog.getHistories() != null ? changelog.getHistories() : List.of());
+
+        // Paginate if there are more entries
+        if (changelog.getTotal() > changelog.getMaxResults()) {
+            int startAt = changelog.getMaxResults();
+            while (startAt < changelog.getTotal()) {
+                var page = fetchChangelogPageOAuth(issueKey, startAt, accessToken, cloudId);
+                if (page == null || page.getValues() == null || page.getValues().isEmpty()) break;
+                allHistories.addAll(page.getValues());
+                if (page.isLast()) break;
+                startAt += page.getMaxResults();
+            }
+        }
+
+        return allHistories;
+    }
+
+    private JiraChangelogResponse.PaginatedChangelog fetchChangelogPageOAuth(
+            String issueKey, int startAt, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        return webClient.get()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .retrieve()
+                .bodyToMono(JiraChangelogResponse.PaginatedChangelog.class)
+                .block();
+    }
+
+    private List<JiraChangelogResponse.ChangelogHistory> fetchChangelogWithBasicAuth(String issueKey) {
+        if (jiraProperties.getBaseUrl() == null || jiraProperties.getBaseUrl().isEmpty()) {
+            throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
+        }
+
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        JiraChangelogResponse response = webClient.get()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "?expand=changelog&fields=status")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .retrieve()
+                .bodyToMono(JiraChangelogResponse.class)
+                .block();
+
+        if (response == null || response.getChangelog() == null) {
+            return List.of();
+        }
+
+        var changelog = response.getChangelog();
+        List<JiraChangelogResponse.ChangelogHistory> allHistories =
+                new java.util.ArrayList<>(changelog.getHistories() != null ? changelog.getHistories() : List.of());
+
+        if (changelog.getTotal() > changelog.getMaxResults()) {
+            int startAt = changelog.getMaxResults();
+            while (startAt < changelog.getTotal()) {
+                var page = fetchChangelogPageBasicAuth(issueKey, startAt, encodedAuth);
+                if (page == null || page.getValues() == null || page.getValues().isEmpty()) break;
+                allHistories.addAll(page.getValues());
+                if (page.isLast()) break;
+                startAt += page.getMaxResults();
+            }
+        }
+
+        return allHistories;
+    }
+
+    private JiraChangelogResponse.PaginatedChangelog fetchChangelogPageBasicAuth(
+            String issueKey, int startAt, String encodedAuth) {
+        return webClient.get()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt)
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .retrieve()
+                .bodyToMono(JiraChangelogResponse.PaginatedChangelog.class)
                 .block();
     }
 

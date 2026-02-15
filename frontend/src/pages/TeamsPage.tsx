@@ -15,7 +15,6 @@ export function TeamsPage() {
 
   const [config, setConfig] = useState<TeamsConfig | null>(null)
   const [syncStatus, setSyncStatus] = useState<TeamSyncStatus | null>(null)
-  const [syncing, setSyncing] = useState(false)
 
   const fetchTeams = useCallback(() => {
     setLoading(true)
@@ -40,7 +39,6 @@ export function TeamsPage() {
     teamsApi.getSyncStatus()
       .then(status => {
         setSyncStatus(status)
-        setSyncing(status.syncInProgress)
       })
       .catch(() => {})
   }, [])
@@ -50,28 +48,6 @@ export function TeamsPage() {
     fetchTeams()
     fetchSyncStatus()
   }, [fetchConfig, fetchTeams, fetchSyncStatus])
-
-  const handleSync = () => {
-    setSyncing(true)
-    teamsApi.triggerSync()
-      .then(() => {
-        const pollInterval = setInterval(() => {
-          teamsApi.getSyncStatus()
-            .then(status => {
-              setSyncStatus(status)
-              if (!status.syncInProgress) {
-                setSyncing(false)
-                clearInterval(pollInterval)
-                fetchTeams()
-              }
-            })
-        }, 2000)
-      })
-      .catch(err => {
-        setSyncing(false)
-        alert('Sync failed: ' + (err.response?.data?.error || err.message))
-      })
-  }
 
   const openCreateModal = () => {
     setEditingTeam(null)
@@ -140,21 +116,12 @@ export function TeamsPage() {
       <div className="page-header">
         <h2>Teams</h2>
         <div className="page-header-actions">
-          {canSync && (
+          {canSync && syncStatus && (
             <div className="sync-status">
-              {syncStatus && (
-                <span className="sync-info">
-                  Last sync: {formatSyncTime(syncStatus.lastSyncTime)}
-                  {syncStatus.error && <span className="sync-error"> (Error)</span>}
-                </span>
-              )}
-              <button
-                className={`btn btn-secondary ${syncing ? 'syncing' : ''}`}
-                onClick={handleSync}
-                disabled={syncing}
-              >
-                {syncing ? 'Syncing...' : 'Sync from Atlassian'}
-              </button>
+              <span className="sync-info">
+                Last sync: {formatSyncTime(syncStatus.lastSyncTime)}
+                {syncStatus.error && <span className="sync-error"> (Error)</span>}
+              </span>
             </div>
           )}
           {canManageTeams && (
