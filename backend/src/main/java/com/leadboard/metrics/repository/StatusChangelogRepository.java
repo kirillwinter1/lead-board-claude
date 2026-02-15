@@ -25,6 +25,8 @@ public interface StatusChangelogRepository extends JpaRepository<StatusChangelog
             @Param("toStatus") String toStatus,
             @Param("transitionedAt") OffsetDateTime transitionedAt);
 
+    List<StatusChangelogEntity> findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List<String> issueKeys);
+
     @Query(value = """
         SELECT to_status, AVG(time_in_previous_status_seconds) as avg_seconds,
                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_in_previous_status_seconds) as median_seconds,

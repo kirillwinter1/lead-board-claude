@@ -11,6 +11,55 @@
   flex-wrap: wrap;
 }
 
+/* Timeline mode toggle */
+.timeline-mode-toggle {
+  display: inline-flex;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.mode-toggle-btn {
+  padding: 6px 14px;
+  border: none;
+  background: white;
+  color: #42526e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.mode-toggle-btn:not(:last-child) {
+  border-right: 1px solid #dfe1e6;
+}
+
+.mode-toggle-btn:hover {
+  background: #f4f5f7;
+}
+
+.mode-toggle-active {
+  background: #0052cc;
+  color: white;
+}
+
+.mode-toggle-active:hover {
+  background: #0747a6;
+}
+
+/* Retrospective mode banner */
+.retrospective-mode-banner {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border: 1px solid #a5d6a7;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #2e7d32;
+}
+
 .historical-mode-banner {
   display: flex;
   align-items: center;

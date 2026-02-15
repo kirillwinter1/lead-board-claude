@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.ForecastResponse;
+import com.leadboard.planning.dto.RetrospectiveResult;
 import com.leadboard.planning.dto.RoleBreakdown;
 import com.leadboard.planning.dto.RoleLoadResponse;
 import com.leadboard.planning.dto.StoryForecastResponse;
@@ -33,6 +34,7 @@ public class ForecastController {
     private final AutoScoreService autoScoreService;
     private final WipSnapshotService wipSnapshotService;
     private final RoleLoadService roleLoadService;
+    private final RetrospectiveTimelineService retrospectiveTimelineService;
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
 
@@ -43,6 +45,7 @@ public class ForecastController {
             AutoScoreService autoScoreService,
             WipSnapshotService wipSnapshotService,
             RoleLoadService roleLoadService,
+            RetrospectiveTimelineService retrospectiveTimelineService,
             JiraIssueRepository issueRepository,
             WorkflowConfigService workflowConfigService
     ) {
@@ -52,6 +55,7 @@ public class ForecastController {
         this.autoScoreService = autoScoreService;
         this.wipSnapshotService = wipSnapshotService;
         this.roleLoadService = roleLoadService;
+        this.retrospectiveTimelineService = retrospectiveTimelineService;
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
     }
@@ -131,6 +135,12 @@ public class ForecastController {
     public ResponseEntity<RoleLoadResponse> getRoleLoad(@RequestParam Long teamId) {
         RoleLoadResponse roleLoad = roleLoadService.calculateRoleLoad(teamId);
         return ResponseEntity.ok(roleLoad);
+    }
+
+    @GetMapping("/retrospective")
+    public ResponseEntity<RetrospectiveResult> getRetrospective(@RequestParam Long teamId) {
+        RetrospectiveResult result = retrospectiveTimelineService.calculateRetrospective(teamId);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/epics/{epicKey}/story-forecast")

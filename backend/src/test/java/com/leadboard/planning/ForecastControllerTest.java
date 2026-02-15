@@ -54,6 +54,9 @@ class ForecastControllerTest {
     private RoleLoadService roleLoadService;
 
     @MockBean
+    private RetrospectiveTimelineService retrospectiveTimelineService;
+
+    @MockBean
     private JiraIssueRepository issueRepository;
 
     @MockBean

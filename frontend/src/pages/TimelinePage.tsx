@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetroEpic } from '../api/forecast'
 import { getConfig } from '../api/config'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './TimelinePage.css'
@@ -14,6 +14,7 @@ import epicIcon from '../icons/epic.png'
 import subtaskIcon from '../icons/subtask.png'
 
 type ZoomLevel = 'day' | 'week' | 'month'
+type TimelineMode = 'forecast' | 'retrospective'
 
 // Width per unit in pixels for each zoom level
 const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
@@ -1151,6 +1152,66 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
   )
 }
 
+// --- Retrospective Adapter ---
+// Converts RetroEpic[] to PlannedEpic[] so existing Gantt rendering works unchanged
+function retroToPlannedEpics(retroEpics: RetroEpic[]): PlannedEpic[] {
+  const today = new Date().toISOString().split('T')[0]
+  return retroEpics.map(epic => {
+    const stories: PlannedStory[] = epic.stories.map(story => {
+      const phases: Record<string, UnifiedPhaseSchedule> = {}
+      for (const [role, phase] of Object.entries(story.phases)) {
+        phases[role] = {
+          assigneeAccountId: null,
+          assigneeDisplayName: null,
+          startDate: phase.startDate,
+          endDate: phase.endDate ?? (phase.active ? today : null),
+          hours: phase.durationDays * 8,
+          noCapacity: false,
+        }
+      }
+      return {
+        storyKey: story.storyKey,
+        summary: story.summary,
+        autoScore: null,
+        status: story.status,
+        startDate: story.startDate,
+        endDate: story.endDate ?? (story.completed ? story.startDate : today),
+        phases,
+        blockedBy: [],
+        warnings: [],
+        issueType: null,
+        priority: null,
+        flagged: null,
+        totalEstimateSeconds: null,
+        totalLoggedSeconds: null,
+        progressPercent: story.progressPercent,
+        roleProgress: null,
+      }
+    })
+
+    return {
+      epicKey: epic.epicKey,
+      summary: epic.summary,
+      autoScore: 0,
+      startDate: epic.startDate,
+      endDate: epic.endDate ?? today,
+      stories,
+      phaseAggregation: {},
+      status: epic.status,
+      dueDate: null,
+      totalEstimateSeconds: null,
+      totalLoggedSeconds: null,
+      progressPercent: epic.progressPercent,
+      roleProgress: null,
+      storiesTotal: epic.stories.length,
+      storiesActive: epic.stories.filter(s => !s.completed).length,
+      isRoughEstimate: false,
+      roughEstimates: null,
+      flagged: null,
+    }
+  })
+}
+
 // --- Gantt Row ---
 interface GanttRowProps {
   plannedEpic: PlannedEpic
@@ -1229,6 +1290,7 @@ export function TimelinePage() {
   }
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
+  const [mode, setMode] = useState<TimelineMode>('forecast')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
@@ -1299,7 +1361,28 @@ export function TimelinePage() {
       }, 2000) // 2 seconds should cover all staggered animations
     }
 
-    if (selectedHistoricalDate && isHistoricalMode) {
+    if (mode === 'retrospective') {
+      // Load retrospective data
+      getRetrospective(selectedTeamId)
+        .then(data => {
+          // Convert to unified plan format for rendering
+          const retroEpics = retroToPlannedEpics(data.epics)
+          setUnifiedPlan({
+            teamId: data.teamId,
+            planningDate: data.calculatedAt,
+            epics: retroEpics,
+            warnings: [],
+            assigneeUtilization: {},
+          })
+          setForecast(null)
+          setLoading(false)
+          triggerAnimation()
+        })
+        .catch(err => {
+          setError('Failed to load retrospective: ' + err.message)
+          setLoading(false)
+        })
+    } else if (selectedHistoricalDate && isHistoricalMode) {
       // Load from historical snapshot
       Promise.all([
         getForecastSnapshot(selectedTeamId, selectedHistoricalDate),
@@ -1338,7 +1421,7 @@ export function TimelinePage() {
         clearTimeout(animationTimeoutRef.current)
       }
     }
-  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode])
+  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode, mode])
 
   // Handle historical date selection
   const handleHistoricalDateChange = (date: string) => {
@@ -1455,6 +1538,25 @@ export function TimelinePage() {
         </div>
 
         <div className="filter-group">
+          <label className="filter-label">Режим</label>
+          <div className="timeline-mode-toggle">
+            <button
+              className={`mode-toggle-btn ${mode === 'forecast' ? 'mode-toggle-active' : ''}`}
+              onClick={() => setMode('forecast')}
+            >
+              Прогноз
+            </button>
+            <button
+              className={`mode-toggle-btn ${mode === 'retrospective' ? 'mode-toggle-active' : ''}`}
+              onClick={() => setMode('retrospective')}
+            >
+              Ретроспектива
+            </button>
+          </div>
+        </div>
+
+        {mode === 'forecast' && (
+        <div className="filter-group">
           <label className="filter-label">
             Дата
             {isHistoricalMode && (
@@ -1475,6 +1577,7 @@ export function TimelinePage() {
             ))}
           </select>
         </div>
+        )}
 
         <div className="timeline-legend">
           {getRoleCodes().map(code => (
@@ -1494,7 +1597,7 @@ export function TimelinePage() {
         </div>
       </div>
 
-      {isHistoricalMode && (
+      {isHistoricalMode && mode === 'forecast' && (
         <div className="historical-mode-banner">
           📜 Просмотр исторического снэпшота от {new Date(selectedHistoricalDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
           <button
@@ -1503,6 +1606,13 @@ export function TimelinePage() {
           >
             Вернуться к текущим данным
           </button>
+        </div>
+      )}
+
+      {mode === 'retrospective' && (
+        <div className="retrospective-mode-banner">
+          Ретроспективный таймлайн: фактическое прохождение стори через фазы на основе данных Jira.
+          Активные стори отображаются до сегодняшнего дня.
         </div>
       )}
 

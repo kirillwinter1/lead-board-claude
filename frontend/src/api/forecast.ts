@@ -321,3 +321,47 @@ export async function getRoleLoad(teamId: number): Promise<RoleLoadResponse> {
   )
   return response.data
 }
+
+// ==================== Retrospective Timeline API ====================
+
+export interface RetroPhase {
+  roleCode: string
+  startDate: string | null
+  endDate: string | null
+  durationDays: number
+  active: boolean
+}
+
+export interface RetroStory {
+  storyKey: string
+  summary: string
+  status: string
+  completed: boolean
+  startDate: string | null
+  endDate: string | null
+  progressPercent: number | null
+  phases: Record<string, RetroPhase>
+}
+
+export interface RetroEpic {
+  epicKey: string
+  summary: string
+  status: string | null
+  startDate: string | null
+  endDate: string | null
+  progressPercent: number | null
+  stories: RetroStory[]
+}
+
+export interface RetrospectiveResult {
+  teamId: number
+  calculatedAt: string
+  epics: RetroEpic[]
+}
+
+export async function getRetrospective(teamId: number): Promise<RetrospectiveResult> {
+  const response = await axios.get<RetrospectiveResult>(
+    `/api/planning/retrospective?teamId=${teamId}`
+  )
+  return response.data
+}
