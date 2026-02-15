@@ -76,6 +76,7 @@ public class JiraMetadataService {
                 simplified.put("name", it.get("name"));
                 simplified.put("subtask", it.get("subtask"));
                 simplified.put("description", it.get("description"));
+                simplified.put("iconUrl", it.get("iconUrl"));
                 return simplified;
             }).toList();
 
@@ -111,6 +112,7 @@ public class JiraMetadataService {
             List<Map<String, Object>> result = new ArrayList<>();
             for (Map<String, Object> typeStatuses : response) {
                 Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("issueTypeId", typeStatuses.get("id"));
                 entry.put("issueType", typeStatuses.get("name"));
 
                 List<Map<String, Object>> statuses = (List<Map<String, Object>>) typeStatuses.get("statuses");

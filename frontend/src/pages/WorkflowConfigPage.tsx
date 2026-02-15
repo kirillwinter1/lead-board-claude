@@ -10,7 +10,6 @@ import {
   JiraIssueTypeMetadata,
   JiraStatusesByType,
   JiraLinkTypeMetadata,
-  JiraWorkflow,
   StatusIssueCountDto,
 } from '../api/workflowConfig'
 import './WorkflowConfigPage.css'
@@ -21,7 +20,7 @@ const BOARD_CATEGORIES = ['EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
 const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const
 const LINK_CATEGORIES = ['BLOCKS', 'RELATED', 'IGNORE'] as const
 
-const WIZARD_STEPS = ['Fetch', 'Issue Types', 'Roles', 'Statuses', 'Link Types', 'Review & Save']
+const WIZARD_STEPS = ['Fetch', 'Roles', 'Issue Types', 'Statuses', 'Link Types', 'Review & Save']
 
 const ATLASSIAN_COLORS = [
   { hex: '#1868DB', name: 'Blue' },
@@ -202,25 +201,69 @@ function suggestRolesFromIssueTypes(suggestedTypes: IssueTypeMappingDto[]): Work
   }).sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
+/**
+ * Recalculate scoreWeight for all statuses in a category based on their sortOrder position.
+ * First status (NEW) = -5, last status (DONE) = 0, intermediate = linearly from 5 to 30.
+ */
+function recalcScoreWeights(allStatuses: StatusMappingDto[], category: string): StatusMappingDto[] {
+  const catStatuses = allStatuses
+    .filter(s => s.issueCategory === category)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  const maxLevel = catStatuses.length - 1
+
+  const weightByName = new Map<string, number>()
+  catStatuses.forEach((s, level) => {
+    let w: number
+    if (level === 0) {
+      w = -5 // first = NEW
+    } else if (level === maxLevel) {
+      w = 0 // last = DONE
+    } else if (maxLevel <= 1) {
+      w = 20
+    } else {
+      // Linearly interpolate 5..30 based on position
+      const ratio = (level - 1) / (maxLevel - 2 || 1)
+      w = 5 + Math.round(ratio * 25)
+    }
+    weightByName.set(s.jiraStatusName, w)
+  })
+
+  return allStatuses.map(s => {
+    if (s.issueCategory === category && weightByName.has(s.jiraStatusName)) {
+      return { ...s, scoreWeight: weightByName.get(s.jiraStatusName)! }
+    }
+    return s
+  })
+}
+
 function suggestStatuses(
   jiraStatuses: JiraStatusesByType[],
   suggestedIssueTypes: IssueTypeMappingDto[],
+  jiraIssueTypes: JiraIssueTypeMetadata[],
 ): StatusMappingDto[] {
   const result: StatusMappingDto[] = []
   const seen = new Set<string>()
+  const categoryCounter: Record<string, number> = { EPIC: 0, STORY: 0, SUBTASK: 0 }
 
-  const issueTypeMap = new Map<string, IssueTypeMappingDto['boardCategory']>()
-  suggestedIssueTypes.forEach(t => issueTypeMap.set(t.jiraTypeName, t.boardCategory))
+  // Build mapping: issueTypeId → boardCategory (using jiraIssueTypes to bridge name→id)
+  const nameToId = new Map<string, string>()
+  jiraIssueTypes.forEach(jt => nameToId.set(jt.name, jt.id))
+
+  const issueTypeIdMap = new Map<string, IssueTypeMappingDto['boardCategory']>()
+  suggestedIssueTypes.forEach(t => {
+    const id = nameToId.get(t.jiraTypeName)
+    if (id) issueTypeIdMap.set(id, t.boardCategory)
+  })
 
   const issueCategories: IssueTypeMappingDto['boardCategory'][] = ['EPIC', 'STORY', 'SUBTASK']
 
   for (const group of jiraStatuses) {
-    const boardCat = issueTypeMap.get(group.issueType)
+    const boardCat = issueTypeIdMap.get(group.issueTypeId)
     if (!boardCat || boardCat === 'IGNORE') continue
 
     for (const st of group.statuses) {
       for (const issueCat of issueCategories) {
-        if (issueCat === 'SUBTASK' && boardCat !== 'SUBTASK' && boardCat !== 'STORY') continue
+        if (issueCat === 'SUBTASK' && boardCat !== 'SUBTASK') continue
         if (issueCat === 'EPIC' && boardCat !== 'EPIC') continue
         if (issueCat === 'STORY' && boardCat !== 'STORY') continue
 
@@ -231,53 +274,43 @@ function suggestStatuses(
         const jiraCat = st.statusCategory?.toLowerCase() || ''
         let statusCategory: StatusMappingDto['statusCategory'] = 'IN_PROGRESS'
         let workflowRoleCode: string | null = null
-        let scoreWeight = 0
 
         if (jiraCat === 'new' || jiraCat === 'undefined') {
           statusCategory = 'NEW'
-          scoreWeight = 0
         } else if (jiraCat === 'done') {
           statusCategory = 'DONE'
-          scoreWeight = 100
         } else {
           const lower = st.name.toLowerCase()
 
           if (issueCat === 'EPIC') {
             if (lower.includes('requirement') || lower.includes('требовани')) {
               statusCategory = 'REQUIREMENTS'
-              scoreWeight = 25
             } else if (lower.includes('plan') || lower.includes('заплан')) {
               statusCategory = 'PLANNED'
-              scoreWeight = 50
             } else {
               statusCategory = 'IN_PROGRESS'
-              scoreWeight = 75
             }
           } else {
             if (lower.includes('analy') || lower.includes('анализ') || lower.includes('requirement') || lower.includes('требовани')) {
               workflowRoleCode = 'SA'
-              scoreWeight = 25
             } else if (lower.includes('develop') || lower.includes('разработ') || lower.includes('coding') || lower.includes('implement')) {
               workflowRoleCode = 'DEV'
-              scoreWeight = 50
             } else if (lower.includes('test') || lower.includes('тестирован') || lower.includes('qa') || lower.includes('review')) {
               workflowRoleCode = 'QA'
-              scoreWeight = 75
-            } else {
-              scoreWeight = 50
             }
             statusCategory = 'IN_PROGRESS'
           }
         }
 
+        categoryCounter[issueCat] = (categoryCounter[issueCat] || 0) + 10
         result.push({
           id: null,
           jiraStatusName: st.name,
           issueCategory: issueCat,
           statusCategory,
           workflowRoleCode,
-          sortOrder: result.length + 1,
-          scoreWeight,
+          sortOrder: categoryCounter[issueCat],
+          scoreWeight: 0,
           color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
         })
       }
@@ -297,25 +330,23 @@ function suggestStatuses(
 
       const lower = src.jiraStatusName.toLowerCase()
       let statusCategory = src.statusCategory
-      let scoreWeight = src.scoreWeight
       if (statusCategory === 'IN_PROGRESS') {
         if (lower.includes('requirement') || lower.includes('требовани')) {
           statusCategory = 'REQUIREMENTS'
-          scoreWeight = 25
         } else if (lower.includes('plan') || lower.includes('заплан')) {
           statusCategory = 'PLANNED'
-          scoreWeight = 50
         }
       }
 
+      categoryCounter['EPIC'] = (categoryCounter['EPIC'] || 0) + 10
       result.push({
         id: null,
         jiraStatusName: src.jiraStatusName,
         issueCategory: 'EPIC',
         statusCategory,
         workflowRoleCode: null,
-        sortOrder: result.length + 1,
-        scoreWeight,
+        sortOrder: categoryCounter['EPIC'],
+        scoreWeight: 0,
         color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
       })
     }
@@ -327,20 +358,26 @@ function suggestStatuses(
       if (seen.has(key)) continue
       seen.add(key)
 
+      categoryCounter['STORY'] = (categoryCounter['STORY'] || 0) + 10
       result.push({
         id: null,
         jiraStatusName: src.jiraStatusName,
         issueCategory: 'STORY',
         statusCategory: src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' ? 'IN_PROGRESS' : src.statusCategory,
         workflowRoleCode: src.workflowRoleCode,
-        sortOrder: result.length + 1,
-        scoreWeight: src.scoreWeight,
+        sortOrder: categoryCounter['STORY'],
+        scoreWeight: 0,
         color: STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' ? 'IN_PROGRESS' : src.statusCategory] || '#DFE1E6',
       })
     }
   }
 
-  return result
+  // Recalculate scoreWeight by position for all categories
+  let final = result
+  for (const cat of ['EPIC', 'STORY', 'SUBTASK']) {
+    final = recalcScoreWeights(final, cat)
+  }
+  return final
 }
 
 function suggestLinkTypes(jiraLinks: JiraLinkTypeMetadata[]): LinkTypeMappingDto[] {
@@ -355,116 +392,6 @@ function suggestLinkTypes(jiraLinks: JiraLinkTypeMetadata[]): LinkTypeMappingDto
     }
 
     return { id: null, jiraLinkTypeName: lt.name, linkCategory }
-  })
-}
-
-// --- Workflow matching + ordering ---
-
-function matchWorkflowsToCategories(
-  jiraStatuses: JiraStatusesByType[],
-  workflows: JiraWorkflow[],
-  issueTypeMap: Map<string, string>,
-): Record<string, string> {
-  const result: Record<string, string> = {}
-
-  // Build status ID sets per category
-  const categoryStatusIds: Record<string, Set<string>> = {}
-  for (const group of jiraStatuses) {
-    const cat = issueTypeMap.get(group.issueType)
-    if (!cat || cat === 'IGNORE') continue
-    if (!categoryStatusIds[cat]) categoryStatusIds[cat] = new Set()
-    for (const st of group.statuses) {
-      if (st.id) categoryStatusIds[cat].add(st.id)
-    }
-  }
-
-  // For each category, find the workflow whose status set best matches
-  for (const [category, statusIds] of Object.entries(categoryStatusIds)) {
-    let bestMatch = ''
-    let bestOverlap = 0
-
-    for (const wf of workflows) {
-      const wfStatusIds = new Set(wf.statuses.map(s => s.id))
-      let overlap = 0
-      for (const id of statusIds) {
-        if (wfStatusIds.has(id)) overlap++
-      }
-      if (overlap > bestOverlap) {
-        bestOverlap = overlap
-        bestMatch = wf.name
-      }
-    }
-
-    if (bestMatch) {
-      result[category] = bestMatch
-    }
-  }
-
-  return result
-}
-
-function deriveOrderFromWorkflow(workflow: JiraWorkflow): string[] {
-  const statusNameById = new Map<string, string>()
-  for (const s of workflow.statuses) {
-    statusNameById.set(s.id, s.name)
-  }
-
-  // Find initial transition → start status
-  const initialTransition = workflow.transitions.find(t => t.type === 'initial')
-  if (!initialTransition) {
-    // Fallback: return statuses in original order
-    return workflow.statuses.map(s => s.name)
-  }
-
-  const startId = initialTransition.to
-  const ordered: string[] = []
-  const visited = new Set<string>()
-
-  let currentId: string | null = startId
-
-  while (currentId && !visited.has(currentId)) {
-    visited.add(currentId)
-    const name = statusNameById.get(currentId)
-    if (name) ordered.push(name)
-
-    // Find forward transition from current (type=directed, name not starting with "Назад"/"Back")
-    let nextId: string | null = null
-    for (const tr of workflow.transitions) {
-      if (tr.type !== 'directed') continue
-      const trName = tr.name.toLowerCase()
-      if (trName.startsWith('назад') || trName.startsWith('back')) continue
-      if (tr.from.includes(currentId)) {
-        // Prefer transitions we haven't visited yet
-        if (!visited.has(tr.to)) {
-          nextId = tr.to
-          break
-        }
-      }
-    }
-
-    currentId = nextId
-  }
-
-  // Append any statuses not yet in the ordered list
-  for (const s of workflow.statuses) {
-    if (!visited.has(s.id)) {
-      ordered.push(s.name)
-    }
-  }
-
-  return ordered
-}
-
-function applyWorkflowOrder(
-  statuses: StatusMappingDto[],
-  category: string,
-  orderedNames: string[],
-): StatusMappingDto[] {
-  return statuses.map(s => {
-    if (s.issueCategory !== category) return s
-    const idx = orderedNames.findIndex(n => n === s.jiraStatusName)
-    const sortOrder = idx >= 0 ? (idx + 1) * 10 : (orderedNames.length + 1) * 10
-    return { ...s, sortOrder }
   })
 }
 
@@ -501,9 +428,7 @@ export function WorkflowConfigPage() {
   const [wizardLinkTypes, setWizardLinkTypes] = useState<LinkTypeMappingDto[]>([])
   const [wizardJiraIssueTypes, setWizardJiraIssueTypes] = useState<JiraIssueTypeMetadata[]>([])
   const [wizardJiraLinkTypes, setWizardJiraLinkTypes] = useState<JiraLinkTypeMetadata[]>([])
-  const [wizardStatusFilter, setWizardStatusFilter] = useState<string>('ALL')
-  const [jiraWorkflows, setJiraWorkflows] = useState<JiraWorkflow[]>([])
-  const [selectedWorkflows, setSelectedWorkflows] = useState<Record<string, string>>({})
+  const [wizardStatusFilter, setWizardStatusFilter] = useState<string>('EPIC')
 
   useEffect(() => {
     loadConfig()
@@ -516,14 +441,6 @@ export function WorkflowConfigPage() {
     }
   }, [loading])
 
-  // Load workflows when switching to statuses tab
-  useEffect(() => {
-    if (activeTab === 'statuses' && jiraWorkflows.length === 0 && !wizardMode) {
-      workflowConfigApi.fetchJiraWorkflows()
-        .then(wfs => setJiraWorkflows(wfs))
-        .catch(() => {/* workflows are optional */})
-    }
-  }, [activeTab])
 
   const loadConfig = async () => {
     try {
@@ -710,6 +627,37 @@ export function WorkflowConfigPage() {
     setLinkTypes(linkTypes.filter((_, i) => i !== index))
   }
 
+  // -- Move status left/right --
+  const moveStatus = (
+    allStatuses: StatusMappingDto[],
+    setFn: (s: StatusMappingDto[]) => void,
+    category: string,
+    statusName: string,
+    direction: -1 | 1,
+  ) => {
+    const catStatuses = allStatuses
+      .filter(s => s.issueCategory === category)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+    const idx = catStatuses.findIndex(s => s.jiraStatusName === statusName)
+    if (idx < 0) return
+    const targetIdx = idx + direction
+    if (targetIdx < 0 || targetIdx >= catStatuses.length) return
+    // Swap sortOrders
+    const currentOrder = catStatuses[idx].sortOrder
+    const targetOrder = catStatuses[targetIdx].sortOrder
+    const swapped = allStatuses.map(s => {
+      if (s.issueCategory === category && s.jiraStatusName === catStatuses[idx].jiraStatusName) {
+        return { ...s, sortOrder: targetOrder }
+      }
+      if (s.issueCategory === category && s.jiraStatusName === catStatuses[targetIdx].jiraStatusName) {
+        return { ...s, sortOrder: currentOrder }
+      }
+      return s
+    })
+    // Recalculate scoreWeight by position for this category
+    setFn(recalcScoreWeights(swapped, category))
+  }
+
   // --- Wizard logic ---
 
   const startWizard = () => {
@@ -736,16 +684,14 @@ export function WorkflowConfigPage() {
       setWizardLoading(true)
       setWizardError(null)
 
-      const [jiraTypes, jiraStatuses, jiraLinks, workflows] = await Promise.all([
+      const [jiraTypes, jiraStatuses, jiraLinks] = await Promise.all([
         workflowConfigApi.fetchJiraIssueTypes(),
         workflowConfigApi.fetchJiraStatuses(),
         workflowConfigApi.fetchJiraLinkTypes(),
-        workflowConfigApi.fetchJiraWorkflows().catch(() => [] as JiraWorkflow[]),
       ])
 
       setWizardJiraIssueTypes(jiraTypes)
       setWizardJiraLinkTypes(jiraLinks)
-      setJiraWorkflows(workflows)
 
       const suggestedTypes = suggestIssueTypes(jiraTypes)
       setWizardIssueTypes(suggestedTypes)
@@ -753,24 +699,7 @@ export function WorkflowConfigPage() {
       const suggestedRoles = suggestRolesFromIssueTypes(suggestedTypes)
       setWizardRoles(suggestedRoles)
 
-      let suggestedStatuses = suggestStatuses(jiraStatuses, suggestedTypes)
-
-      // Auto-match workflows and apply ordering
-      if (workflows.length > 0) {
-        const issueTypeMap = new Map<string, string>()
-        suggestedTypes.forEach(t => issueTypeMap.set(t.jiraTypeName, t.boardCategory))
-        const matched = matchWorkflowsToCategories(jiraStatuses, workflows, issueTypeMap)
-        setSelectedWorkflows(matched)
-
-        for (const [category, wfName] of Object.entries(matched)) {
-          const wf = workflows.find(w => w.name === wfName)
-          if (wf) {
-            const orderedNames = deriveOrderFromWorkflow(wf)
-            suggestedStatuses = applyWorkflowOrder(suggestedStatuses, category, orderedNames)
-          }
-        }
-      }
-
+      const suggestedStatuses = suggestStatuses(jiraStatuses, suggestedTypes, jiraTypes)
       setWizardStatuses(suggestedStatuses)
 
       const suggestedLinks = suggestLinkTypes(jiraLinks)
@@ -978,8 +907,8 @@ export function WorkflowConfigPage() {
 
         <div className="workflow-section">
           {wizardStep === 0 && renderWizardFetch()}
-          {wizardStep === 1 && renderWizardIssueTypes()}
-          {wizardStep === 2 && renderWizardRoles()}
+          {wizardStep === 1 && renderWizardRoles()}
+          {wizardStep === 2 && renderWizardIssueTypes()}
           {wizardStep === 3 && renderWizardStatuses()}
           {wizardStep === 4 && renderWizardLinkTypes()}
           {wizardStep === 5 && renderWizardReview()}
@@ -1042,7 +971,14 @@ export function WorkflowConfigPage() {
       const jiraMeta = wizardJiraIssueTypes.find(j => j.name === it.jiraTypeName)
       return (
         <tr key={idx}>
-          <td><strong>{it.jiraTypeName}</strong></td>
+          <td>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {jiraMeta?.iconUrl && (
+                <img src={jiraMeta.iconUrl} alt="" width={16} height={16} style={{ flexShrink: 0 }} />
+              )}
+              <strong>{it.jiraTypeName}</strong>
+            </span>
+          </td>
           <td>
             {jiraMeta?.subtask
               ? <span className="jira-badge subtask">Subtask</span>
@@ -1184,9 +1120,7 @@ export function WorkflowConfigPage() {
   }
 
   function renderWizardStatuses() {
-    const wizardFilteredStatuses = wizardStatusFilter === 'ALL'
-      ? wizardStatuses
-      : wizardStatuses.filter(s => s.issueCategory === wizardStatusFilter)
+    const wizardFilteredStatuses = wizardStatuses.filter(s => s.issueCategory === wizardStatusFilter)
 
     // Group by sortOrder for pipeline
     const sortOrderGroups = new Map<number, StatusMappingDto[]>()
@@ -1211,57 +1145,16 @@ export function WorkflowConfigPage() {
           <strong>Score Weight</strong> — вес для расчёта % завершения.
         </div>
         <div className="status-filter">
-          {['ALL', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
+          {['EPIC', 'STORY', 'SUBTASK'].map(f => (
             <button
               key={f}
               className={`status-filter-btn ${wizardStatusFilter === f ? 'active' : ''}`}
               onClick={() => setWizardStatusFilter(f)}
             >
-              {f === 'ALL'
-                ? `All (${wizardStatuses.length})`
-                : `${f} (${wizardStatuses.filter(s => s.issueCategory === f).length})`
-              }
+              {f} ({wizardStatuses.filter(s => s.issueCategory === f).length})
             </button>
           ))}
         </div>
-
-        {wizardStatusFilter !== 'ALL' && jiraWorkflows.length > 0 && (() => {
-          const catStatuses = wizardStatuses.filter(s => s.issueCategory === wizardStatusFilter)
-          if (catStatuses.length === 0) return null
-          const currentWf = selectedWorkflows[wizardStatusFilter] || ''
-          const wf = jiraWorkflows.find(w => w.name === currentWf)
-          const matchedCount = wf
-            ? catStatuses.filter(s => wf.statuses.some(ws => ws.name === s.jiraStatusName)).length
-            : 0
-          return (
-            <div className="workflow-selector">
-              <span className="workflow-selector-label">Workflow:</span>
-              <select
-                className="workflow-select"
-                value={currentWf}
-                onChange={e => {
-                  const wfName = e.target.value
-                  setSelectedWorkflows(prev => ({ ...prev, [wizardStatusFilter]: wfName }))
-                  const selected = jiraWorkflows.find(w => w.name === wfName)
-                  if (selected) {
-                    const orderedNames = deriveOrderFromWorkflow(selected)
-                    setWizardStatuses(prev => applyWorkflowOrder(prev, wizardStatusFilter, orderedNames))
-                  }
-                }}
-              >
-                <option value="">-- select workflow --</option>
-                {jiraWorkflows.map(w => (
-                  <option key={w.name} value={w.name}>{w.name}</option>
-                ))}
-              </select>
-              {wf && (
-                <span className="workflow-match-badge">
-                  {matchedCount}/{catStatuses.length} statuses matched
-                </span>
-              )}
-            </div>
-          )
-        })()}
 
         {wizardFilteredStatuses.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>
@@ -1275,7 +1168,19 @@ export function WorkflowConfigPage() {
                 <div key={order} className="pipeline-column-wrapper">
                   <div className="pipeline-column">
                     <div className="pipeline-column-header">
-                      Order {order}
+                      <button
+                        className="pipeline-move-btn"
+                        disabled={colIdx === 0}
+                        onClick={() => group.forEach(st => moveStatus(wizardStatuses, setWizardStatuses, wizardStatusFilter, st.jiraStatusName, -1))}
+                        title="Move left"
+                      >&larr;</button>
+                      <span>{colIdx + 1}</span>
+                      <button
+                        className="pipeline-move-btn"
+                        disabled={colIdx === sortedOrders.length - 1}
+                        onClick={() => group.forEach(st => moveStatus(wizardStatuses, setWizardStatuses, wizardStatusFilter, st.jiraStatusName, 1))}
+                        title="Move right"
+                      >&rarr;</button>
                     </div>
                     {group.map(st => {
                       const realIdx = wizardStatuses.indexOf(st)
@@ -1618,44 +1523,6 @@ export function WorkflowConfigPage() {
           ))}
         </div>
 
-        {jiraWorkflows.length > 0 && (() => {
-          const catStatuses = statuses.filter(s => s.issueCategory === statusFilter)
-          if (catStatuses.length === 0) return null
-          const currentWf = selectedWorkflows[statusFilter] || ''
-          const wf = jiraWorkflows.find(w => w.name === currentWf)
-          const matchedCount = wf
-            ? catStatuses.filter(s => wf.statuses.some(ws => ws.name === s.jiraStatusName)).length
-            : 0
-          return (
-            <div className="workflow-selector">
-              <span className="workflow-selector-label">Workflow:</span>
-              <select
-                className="workflow-select"
-                value={currentWf}
-                onChange={e => {
-                  const wfName = e.target.value
-                  setSelectedWorkflows(prev => ({ ...prev, [statusFilter]: wfName }))
-                  const selected = jiraWorkflows.find(w => w.name === wfName)
-                  if (selected) {
-                    const orderedNames = deriveOrderFromWorkflow(selected)
-                    setStatuses(prev => applyWorkflowOrder(prev, statusFilter, orderedNames))
-                  }
-                }}
-              >
-                <option value="">-- select workflow --</option>
-                {jiraWorkflows.map(w => (
-                  <option key={w.name} value={w.name}>{w.name}</option>
-                ))}
-              </select>
-              {wf && (
-                <span className="workflow-match-badge">
-                  {matchedCount}/{catStatuses.length} statuses matched
-                </span>
-              )}
-            </div>
-          )
-        })()}
-
         {filteredStatuses.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>
             No statuses for {statusFilter}
@@ -1668,7 +1535,19 @@ export function WorkflowConfigPage() {
                 <div key={order} className="pipeline-column-wrapper">
                   <div className="pipeline-column">
                     <div className="pipeline-column-header">
-                      Order {order}
+                      <button
+                        className="pipeline-move-btn"
+                        disabled={colIdx === 0}
+                        onClick={() => group.forEach(st => moveStatus(statuses, setStatuses, statusFilter, st.jiraStatusName, -1))}
+                        title="Move left"
+                      >&larr;</button>
+                      <span>{colIdx + 1}</span>
+                      <button
+                        className="pipeline-move-btn"
+                        disabled={colIdx === sortedOrders.length - 1}
+                        onClick={() => group.forEach(st => moveStatus(statuses, setStatuses, statusFilter, st.jiraStatusName, 1))}
+                        title="Move right"
+                      >&rarr;</button>
                     </div>
                     {group.map(st => {
                       const realIdx = statuses.indexOf(st)

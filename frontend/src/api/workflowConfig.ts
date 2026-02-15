@@ -44,9 +44,11 @@ export interface JiraIssueTypeMetadata {
   name: string
   subtask: boolean
   description: string | null
+  iconUrl: string | null
 }
 
 export interface JiraStatusesByType {
+  issueTypeId: string
   issueType: string
   statuses: { id: string; name: string; untranslatedName: string; statusCategory: string; statusCategoryName: string }[]
 }
