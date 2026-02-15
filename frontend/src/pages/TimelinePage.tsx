@@ -391,7 +391,7 @@ interface EpicLabelProps {
 }
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
-  const { getRoleColor } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -580,7 +580,9 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
             <div style={{ borderTop: '1px solid #42526e', paddingTop: 10, marginBottom: 10 }}>
               <table style={{ width: '100%', fontSize: 12 }}>
                 <tbody>
-                  {Object.entries(epic.roleProgress).map(([role, progress]) => progress && (
+                  {getRoleCodes()
+                    .filter(role => epic.roleProgress![role])
+                    .map(role => { const progress = epic.roleProgress![role]; return progress && (
                     <tr key={role}>
                       <td style={{ padding: '3px 0', width: 50 }}>
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
@@ -595,7 +597,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
                           : 0}%
                       </td>
                     </tr>
-                  ))}
+                  ); })}
                 </tbody>
               </table>
             </div>
@@ -729,7 +731,7 @@ interface StoryBarsProps {
 }
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
-  const { getRoleColor } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -868,11 +870,15 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
             <tbody>
               {(() => {
-                // Collect all roles from phases and roleProgress
-                const roles = new Set<string>()
-                if (hoveredStory.phases) Object.keys(hoveredStory.phases).forEach(r => roles.add(r))
-                if (hoveredStory.roleProgress) Object.keys(hoveredStory.roleProgress).forEach(r => roles.add(r))
-                return Array.from(roles).map(role => {
+                // Collect all roles from phases and roleProgress, ordered by config
+                const dataRoles = new Set<string>()
+                if (hoveredStory.phases) Object.keys(hoveredStory.phases).forEach(r => dataRoles.add(r))
+                if (hoveredStory.roleProgress) Object.keys(hoveredStory.roleProgress).forEach(r => dataRoles.add(r))
+                const configOrder = getRoleCodes()
+                const sortedRoles = configOrder.filter(r => dataRoles.has(r))
+                // Append any roles not in config at the end
+                dataRoles.forEach(r => { if (!configOrder.includes(r)) sortedRoles.push(r) })
+                return sortedRoles.map(role => {
                   const phase = hoveredStory.phases?.[role]
                   const progress = hoveredStory.roleProgress?.[role]
                   if (!phaseHasHours(phase) && !progress) return null
@@ -1034,7 +1040,7 @@ interface RoughEstimateBarsProps {
 }
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
-  const { getRoleColor } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1109,13 +1115,15 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
               </div>
               <table style={{ width: '100%', fontSize: '12px' }}>
                 <tbody>
-                  {Object.entries(hoveredEpic.roughEstimates).map(([role, days]) => days > 0 && (
+                  {getRoleCodes()
+                    .filter(role => (hoveredEpic.roughEstimates?.[role] || 0) > 0)
+                    .map(role => (
                     <tr key={role}>
                       <td style={{ padding: '2px 4px' }}>
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
                       </td>
                       <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                        {days} дней
+                        {hoveredEpic.roughEstimates?.[role]} дней
                       </td>
                     </tr>
                   ))}
