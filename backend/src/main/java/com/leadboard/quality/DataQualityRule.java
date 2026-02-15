@@ -134,6 +134,12 @@ public enum DataQualityRule {
     SUBTASK_TIME_LOGGED_BUT_TODO(
             DataQualitySeverity.ERROR,
             "Subtask has time logged (%.1f hours) but is still in TODO status"
+    ),
+
+    // Time logged while epic is flagged (paused)
+    SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED(
+            DataQualitySeverity.WARNING,
+            "Time logged on subtask while parent Epic is flagged (paused)"
     );
 
     private final DataQualitySeverity severity;

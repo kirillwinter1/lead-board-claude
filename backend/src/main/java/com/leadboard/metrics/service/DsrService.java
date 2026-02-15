@@ -20,18 +20,21 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
 /**
  * Delivery Speed Ratio (DSR) Service.
  *
- * DSR = actual working days / current estimate (in days)
+ * DSR = (working_days - flagged_days) / estimate_days
  *
  * Interpretation:
  * - 1.0 = baseline speed
  * - < 1.0 = completed faster than estimated
  * - > 1.0 = completed slower than estimated
+ *
+ * Supports both completed and in-progress epics (live DSR).
  */
 @Service
 public class DsrService {
@@ -43,33 +46,36 @@ public class DsrService {
     private final WorkCalendarService workCalendarService;
     private final ForecastSnapshotRepository snapshotRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final FlagChangelogService flagChangelogService;
     private final ObjectMapper objectMapper;
 
     public DsrService(
             JiraIssueRepository issueRepository,
             WorkCalendarService workCalendarService,
             ForecastSnapshotRepository snapshotRepository,
-            WorkflowConfigService workflowConfigService
+            WorkflowConfigService workflowConfigService,
+            FlagChangelogService flagChangelogService
     ) {
         this.issueRepository = issueRepository;
         this.workCalendarService = workCalendarService;
         this.snapshotRepository = snapshotRepository;
         this.workflowConfigService = workflowConfigService;
+        this.flagChangelogService = flagChangelogService;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     public DsrResponse calculateDsr(Long teamId, LocalDate from, LocalDate to) {
-        List<JiraIssueEntity> completedEpics = issueRepository.findCompletedEpicsInPeriod(
+        List<JiraIssueEntity> epics = issueRepository.findEpicsForDsr(
                 teamId,
                 from.atStartOfDay().atOffset(ZoneOffset.UTC),
                 to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)
         );
 
-        log.info("DSR: Found {} completed epics for team {} between {} and {}",
-                completedEpics.size(), teamId, from, to);
+        log.info("DSR: Found {} epics (completed + in-progress) for team {} between {} and {}",
+                epics.size(), teamId, from, to);
 
-        if (completedEpics.isEmpty()) {
+        if (epics.isEmpty()) {
             return new DsrResponse(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, List.of());
         }
 
@@ -85,7 +91,7 @@ public class DsrService {
         int dsrForecastCount = 0;
         int onTimeCount = 0;
 
-        for (JiraIssueEntity epic : completedEpics) {
+        for (JiraIssueEntity epic : epics) {
             EpicDsr dsr = calculateEpicDsr(epic, snapshotsByDate);
             if (dsr != null) {
                 epicDsrs.add(dsr);
@@ -118,17 +124,27 @@ public class DsrService {
     }
 
     private EpicDsr calculateEpicDsr(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate) {
-        if (epic.getDoneAt() == null) return null;
+        boolean inProgress = epic.getDoneAt() == null;
 
-        LocalDate doneDate = epic.getDoneAt().toLocalDate();
         LocalDate startDate = epic.getStartedAt() != null
                 ? epic.getStartedAt().toLocalDate()
                 : (epic.getJiraCreatedAt() != null ? epic.getJiraCreatedAt().toLocalDate() : null);
 
         if (startDate == null) return null;
 
-        int workingDays = workCalendarService.countWorkdays(startDate, doneDate);
-        if (workingDays <= 0) workingDays = 1;
+        // Determine end date
+        LocalDate endDate;
+        if (inProgress) {
+            endDate = LocalDate.now();
+        } else {
+            endDate = calculateEndDateFromSubtasks(epic);
+        }
+
+        int calendarWorkingDays = workCalendarService.countWorkdays(startDate, endDate);
+        if (calendarWorkingDays <= 0) calendarWorkingDays = 1;
+
+        int flaggedDays = flagChangelogService.calculateFlaggedWorkdays(epic.getIssueKey(), startDate, endDate);
+        int effectiveWorkingDays = Math.max(calendarWorkingDays - flaggedDays, 1);
 
         // Calculate estimateDays from subtasks
         BigDecimal estimateDays = calculateEstimateDays(epic);
@@ -137,22 +153,49 @@ public class DsrService {
         BigDecimal forecastDays = calculateForecastDays(epic, snapshotsByDate);
 
         BigDecimal dsrActual = estimateDays != null && estimateDays.compareTo(BigDecimal.ZERO) > 0
-                ? BigDecimal.valueOf(workingDays).divide(estimateDays, 2, RoundingMode.HALF_UP)
+                ? BigDecimal.valueOf(effectiveWorkingDays).divide(estimateDays, 2, RoundingMode.HALF_UP)
                 : null;
 
         BigDecimal dsrForecast = forecastDays != null && forecastDays.compareTo(BigDecimal.ZERO) > 0
-                ? BigDecimal.valueOf(workingDays).divide(forecastDays, 2, RoundingMode.HALF_UP)
+                ? BigDecimal.valueOf(effectiveWorkingDays).divide(forecastDays, 2, RoundingMode.HALF_UP)
                 : null;
 
         return new EpicDsr(
                 epic.getIssueKey(),
                 epic.getSummary(),
-                workingDays,
+                inProgress,
+                calendarWorkingDays,
+                flaggedDays,
+                effectiveWorkingDays,
                 estimateDays,
                 forecastDays,
                 dsrActual,
                 dsrForecast
         );
+    }
+
+    /**
+     * For completed epics, endDate = max(subtask.doneAt), fallback to epic.doneAt.
+     */
+    private LocalDate calculateEndDateFromSubtasks(JiraIssueEntity epic) {
+        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epic.getIssueKey());
+        if (!stories.isEmpty()) {
+            List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
+            List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+
+            OffsetDateTime maxDoneAt = subtasks.stream()
+                    .map(JiraIssueEntity::getDoneAt)
+                    .filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder())
+                    .orElse(null);
+
+            if (maxDoneAt != null) {
+                return maxDoneAt.toLocalDate();
+            }
+        }
+
+        // Fallback to epic's own doneAt
+        return epic.getDoneAt() != null ? epic.getDoneAt().toLocalDate() : LocalDate.now();
     }
 
     private BigDecimal calculateEstimateDays(JiraIssueEntity epic) {

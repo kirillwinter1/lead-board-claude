@@ -6,6 +6,7 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
+import com.leadboard.metrics.service.FlagChangelogService;
 import com.leadboard.metrics.service.StatusChangelogService;
 import com.leadboard.planning.AutoScoreService;
 import com.leadboard.planning.IssueOrderService;
@@ -64,6 +65,9 @@ class SyncServiceTest {
     private StatusChangelogService statusChangelogService;
 
     @Mock
+    private FlagChangelogService flagChangelogService;
+
+    @Mock
     private IssueOrderService issueOrderService;
 
     @Mock
@@ -85,6 +89,7 @@ class SyncServiceTest {
                 autoScoreService,
                 storyAutoScoreService,
                 statusChangelogService,
+                flagChangelogService,
                 issueOrderService,
                 workflowConfigService,
                 autoDetectService

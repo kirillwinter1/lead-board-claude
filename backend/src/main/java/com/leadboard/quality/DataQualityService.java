@@ -361,6 +361,14 @@ public class DataQualityService {
             }
         }
 
+        // SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED - Time logged on subtask while Epic is flagged
+        if (epic != null && Boolean.TRUE.equals(epic.getFlagged())) {
+            if (subtask.getTimeSpentSeconds() != null && subtask.getTimeSpentSeconds() > 0
+                    && !workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType())) {
+                violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED));
+            }
+        }
+
         return violations;
     }
 

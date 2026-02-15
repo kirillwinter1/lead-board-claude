@@ -152,7 +152,10 @@ export async function getByAssignee(
 export interface EpicDsr {
   epicKey: string
   summary: string
-  workingDaysActual: number
+  inProgress: boolean
+  calendarWorkingDays: number
+  flaggedDays: number
+  effectiveWorkingDays: number
   estimateDays: number | null
   forecastDays: number | null
   dsrActual: number | null

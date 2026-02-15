@@ -60,6 +60,17 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("to") OffsetDateTime to
     );
 
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.boardCategory = 'EPIC' " +
+           "AND e.startedAt IS NOT NULL " +
+           "AND (e.doneAt BETWEEN :from AND :to OR e.doneAt IS NULL) " +
+           "ORDER BY e.startedAt DESC")
+    List<JiraIssueEntity> findEpicsForDsr(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to
+    );
+
     // ==================== Planning Poker (using board_category) ====================
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +

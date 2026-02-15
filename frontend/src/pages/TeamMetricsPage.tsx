@@ -363,7 +363,7 @@ export function TeamMetricsPage() {
                   value={dsr && dsr.totalEpics > 0 ? dsr.avgDsrActual : null}
                   title="DSR Actual"
                   subtitle={dsr && dsr.totalEpics > 0 ? `среднее по ${dsr.totalEpics} эпикам` : 'нет данных'}
-                  tooltip="Delivery Speed Ratio — относительная скорость выполнения эпика с учётом объёма. 1.0 — норма, меньше — быстрее, больше — медленнее."
+                  tooltip="DSR — относительная скорость доставки эпика. Формула: (рабочие дни − дни паузы) / оценка в днях. 1.0 — норма, < 1.0 — быстрее, > 1.0 — медленнее. Пауза (флаг) останавливает таймер."
                 />
                 <DsrGauge
                   value={dsr && dsr.totalEpics > 0 ? dsr.avgDsrForecast : null}
@@ -390,6 +390,61 @@ export function TeamMetricsPage() {
 
               {/* Role Load Block */}
               <RoleLoadBlock teamId={selectedTeamId} />
+
+              {/* DSR Epic Breakdown Table */}
+              {dsr && dsr.epics.length > 0 && (
+                <div className="metrics-section">
+                  <h3>DSR by Epic</h3>
+                  <div className="table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Epic</th>
+                          <th>Status</th>
+                          <th title="Оценка (дни)">Est.</th>
+                          <th title="Календарные рабочие дни">Cal.</th>
+                          <th title="Дни под флагом (пауза)">Pause</th>
+                          <th title="Эффективные рабочие дни">Eff.</th>
+                          <th>DSR</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dsr.epics.map(epic => (
+                          <tr key={epic.epicKey}>
+                            <td>
+                              {jiraBaseUrl ? (
+                                <a href={`${jiraBaseUrl}/browse/${epic.epicKey}`} target="_blank" rel="noreferrer" className="issue-link">
+                                  {epic.epicKey}
+                                </a>
+                              ) : epic.epicKey}
+                              {' '}
+                              <span className="text-secondary">{epic.summary}</span>
+                            </td>
+                            <td>
+                              {epic.inProgress ? (
+                                <span className="badge badge-live">Live</span>
+                              ) : (
+                                <span className="badge badge-done">Done</span>
+                              )}
+                            </td>
+                            <td>{epic.estimateDays != null ? epic.estimateDays.toFixed(1) : '—'}</td>
+                            <td>{epic.calendarWorkingDays}</td>
+                            <td>{epic.flaggedDays > 0 ? epic.flaggedDays : '—'}</td>
+                            <td>{epic.effectiveWorkingDays}</td>
+                            <td>
+                              {epic.dsrActual != null ? (
+                                <span style={{ color: epic.dsrActual <= 1.1 ? '#00875a' : epic.dsrActual <= 1.5 ? '#ff991f' : '#de350b', fontWeight: 600 }}>
+                                  {epic.dsrActual.toFixed(2)}
+                                </span>
+                              ) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Forecast Accuracy */}
               {forecastAccuracy && (

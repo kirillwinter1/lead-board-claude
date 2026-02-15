@@ -7,6 +7,7 @@ import com.leadboard.config.JiraProperties;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
+import com.leadboard.metrics.service.FlagChangelogService;
 import com.leadboard.metrics.service.StatusChangelogService;
 import com.leadboard.planning.AutoScoreService;
 import com.leadboard.planning.IssueOrderService;
@@ -48,6 +49,7 @@ public class SyncService {
     private final AutoScoreService autoScoreService;
     private final StoryAutoScoreService storyAutoScoreService;
     private final StatusChangelogService statusChangelogService;
+    private final FlagChangelogService flagChangelogService;
     private final IssueOrderService issueOrderService;
     private final WorkflowConfigService workflowConfigService;
     private final MappingAutoDetectService autoDetectService;
@@ -60,6 +62,7 @@ public class SyncService {
                        AutoScoreService autoScoreService,
                        StoryAutoScoreService storyAutoScoreService,
                        StatusChangelogService statusChangelogService,
+                       FlagChangelogService flagChangelogService,
                        IssueOrderService issueOrderService,
                        WorkflowConfigService workflowConfigService,
                        MappingAutoDetectService autoDetectService) {
@@ -71,6 +74,7 @@ public class SyncService {
         this.autoScoreService = autoScoreService;
         this.storyAutoScoreService = storyAutoScoreService;
         this.statusChangelogService = statusChangelogService;
+        this.flagChangelogService = flagChangelogService;
         this.issueOrderService = issueOrderService;
         this.workflowConfigService = workflowConfigService;
         this.autoDetectService = autoDetectService;
@@ -282,6 +286,7 @@ public class SyncService {
         JiraIssueEntity entity = existing != null ? existing : new JiraIssueEntity();
 
         String previousStatus = existing != null ? existing.getStatus() : null;
+        Boolean previousFlagged = existing != null ? existing.getFlagged() : null;
 
         // Preserve local Lead Board data
         Map<String, BigDecimal> savedRoughEstimates = entity.getRoughEstimates();
@@ -396,6 +401,17 @@ public class SyncService {
                 previousEntity.setUpdatedAt(existing.getUpdatedAt());
             }
             statusChangelogService.detectAndRecordStatusChange(previousEntity, entity);
+        }
+
+        // Detect flag change
+        boolean wasFlagged = Boolean.TRUE.equals(previousFlagged);
+        boolean nowFlagged = Boolean.TRUE.equals(entity.getFlagged());
+        if (wasFlagged != nowFlagged) {
+            JiraIssueEntity prevEntity = existing != null ? new JiraIssueEntity() : null;
+            if (prevEntity != null) {
+                prevEntity.setFlagged(previousFlagged);
+            }
+            flagChangelogService.detectAndRecordFlagChange(prevEntity, entity);
         }
 
         return entity;

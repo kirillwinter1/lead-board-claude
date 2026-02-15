@@ -5,7 +5,10 @@ import java.math.BigDecimal;
 public record EpicDsr(
         String epicKey,
         String summary,
-        int workingDaysActual,
+        boolean inProgress,
+        int calendarWorkingDays,
+        int flaggedDays,
+        int effectiveWorkingDays,
         BigDecimal estimateDays,
         BigDecimal forecastDays,
         BigDecimal dsrActual,

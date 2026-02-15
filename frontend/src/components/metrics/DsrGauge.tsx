@@ -14,8 +14,10 @@ function getValueColor(v: number): string {
   return '#de350b'
 }
 
-const DEFAULT_TOOLTIP = `Delivery Speed Ratio — относительная скорость выполнения эпика с учётом объёма.
-1.0 — норма, меньше — быстрее, больше — медленнее.`
+const DEFAULT_TOOLTIP = `DSR — относительная скорость доставки эпика.
+Формула: (рабочие дни − дни паузы) / оценка в днях.
+1.0 — норма, < 1.0 — быстрее, > 1.0 — медленнее.
+Пауза (флаг на эпике) останавливает таймер DSR.`
 
 export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: DsrGaugeProps) {
   return (

@@ -31,6 +31,7 @@
 | F29 | Workflow Configuration | 2026-02-13 | [features/F29](features/F29_WORKFLOW_CONFIGURATION.md) |
 | F30 | Member Profile Page | 2026-02-14 | [features/F30](features/F30_MEMBER_PROFILE.md) |
 | F31 | Dynamic Status Colors on Board | 2026-02-14 | [features/F31](features/F31_DYNAMIC_STATUS_COLORS.md) |
+| F32 | DSR v2: Pause Flag + Subtask End Point | 2026-02-15 | [features/F32](features/F32_DSR_V2_PAUSE_FLAG.md) |
 
 ## Бэклог (BF)
 
@@ -83,6 +84,14 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-15: F32 DSR v2 — Pause Flag + Subtask End Point
+- Новая формула: DSR = (рабочие дни − дни паузы) / оценка
+- Флаг на эпике останавливает таймер DSR (flag_changelog table)
+- Конечная точка = max(subtask.done_at) вместо epic.done_at
+- Live DSR для in-progress эпиков (endDate = today)
+- Data Quality: warning при time logging на flagged эпике
+- Frontend: DSR Epic Breakdown таблица с Live/Done бейджами
 
 ### 2026-02-14: F31 Dynamic Status Colors + Story AutoScore fix
 - Цвета статусов на Board из Workflow Config (color в status_mappings)
