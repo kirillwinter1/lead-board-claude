@@ -181,7 +181,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
                 let description = ''
                 if (icon === '🐞') description = 'Баг'
                 else if (icon === '🔒') description = 'Заблокировано другими задачами'
-                else if (icon === '🚩') description = 'Отмечено как impediment'
+                else if (icon === '🚩') description = 'Работа приостановлена'
                 else if (icon === '⚡') description = 'Высокий приоритет (>80)'
                 else if (icon === '⚠️') description = 'Нет оценки времени'
 

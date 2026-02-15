@@ -229,6 +229,7 @@ export interface PlannedEpic {
   storiesActive: number
   isRoughEstimate: boolean
   roughEstimates: Record<string, number> | null
+  flagged: boolean | null
 }
 
 /**

@@ -349,7 +349,20 @@ public class SyncService {
         }
 
         List<Object> flaggedList = jiraIssue.getFields().getFlagged();
-        entity.setFlagged(flaggedList != null && !flaggedList.isEmpty());
+        boolean isFlagged = flaggedList != null && !flaggedList.isEmpty();
+        // Fallback: Jira Cloud may return flagged as customfield_10021 instead of "flagged"
+        if (!isFlagged) {
+            Object cf10021 = jiraIssue.getFields().getCustomFields().get("customfield_10021");
+            if (cf10021 instanceof Map) {
+                Object value = ((Map<?, ?>) cf10021).get("value");
+                if (value instanceof List && !((List<?>) value).isEmpty()) {
+                    isFlagged = true;
+                }
+            } else if (cf10021 instanceof List && !((List<?>) cf10021).isEmpty()) {
+                isFlagged = true;
+            }
+        }
+        entity.setFlagged(isFlagged);
 
         // Extract issue links using WorkflowConfigService for link categorization
         List<JiraIssue.JiraIssueLink> issueLinks = jiraIssue.getFields().getIssuelinks();

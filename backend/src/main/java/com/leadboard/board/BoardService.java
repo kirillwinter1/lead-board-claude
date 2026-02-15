@@ -250,6 +250,7 @@ public class BoardService {
                 }
             }
 
+            node.setFlagged(entity.getFlagged());
             node.setAutoScore(entity.getAutoScore());
             node.setManualOrder(entity.getManualOrder());
         } else if (workflowConfigService.isStory(entity.getIssueType())) {

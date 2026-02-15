@@ -50,7 +50,8 @@ public record UnifiedPlanningResult(
             int storiesActive,
             // Rough estimate fields (for epics without stories)
             boolean isRoughEstimate,
-            Map<String, BigDecimal> roughEstimates
+            Map<String, BigDecimal> roughEstimates,
+            Boolean flagged
     ) {}
 
     /**

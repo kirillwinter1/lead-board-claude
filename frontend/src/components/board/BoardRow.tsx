@@ -15,7 +15,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
   const justDroppedEffects = isJustDropped ? 'just-dropped' : ''
 
   return (
-    <div className={`board-row level-${level} ${justDroppedEffects}`}>
+    <div className={`board-row level-${level} ${node.flagged ? 'flagged' : ''} ${justDroppedEffects}`}>
       <div className="cell cell-expander">
         {hasChildren ? (
           <button
@@ -49,6 +49,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
           <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
             {node.issueKey}
           </a>
+          {node.flagged && <span className="flag-indicator" title="Flagged — work paused">🚩</span>}
           <span className="issue-title">{node.title}</span>
         </div>
       </div>

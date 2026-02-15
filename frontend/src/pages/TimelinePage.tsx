@@ -445,6 +445,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               {epic.epicKey}
             </a>
             {dueDateIndicator}
+            {epic.flagged && <span style={{ color: '#f97316', fontSize: 14 }} title="Flagged">🚩</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span
@@ -685,7 +686,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         top: `${lane * (BAR_HEIGHT + LANE_GAP)}px`,
         height: `${BAR_HEIGHT}px`,
         borderRadius: '4px',
-        border: isBlocked ? '2px solid #ef4444' : '1px solid rgba(0,0,0,0.15)',
+        border: story.flagged ? '2px solid #f97316' : isBlocked ? '2px solid #ef4444' : '1px solid rgba(0,0,0,0.15)',
         overflow: 'hidden',
         background: '#e5e7eb',
         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
@@ -716,7 +717,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
           window.open(`${jiraBaseUrl}${story.storyKey}`, '_blank')
         }}
       >
-        {storyNumber}{hasWarning ? ' ⚠' : ''}
+        {storyNumber}{story.flagged ? ' 🚩' : ''}{hasWarning ? ' ⚠' : ''}
       </span>
     </div>
   )

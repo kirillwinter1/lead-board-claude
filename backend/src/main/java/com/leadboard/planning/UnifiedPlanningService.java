@@ -343,7 +343,8 @@ public class UnifiedPlanningService {
                 storiesTotal,
                 storiesActive,
                 isRoughEstimate,
-                epic.getRoughEstimates()
+                epic.getRoughEstimates(),
+                epic.getFlagged()
         );
     }
 
@@ -823,7 +824,8 @@ public class UnifiedPlanningService {
                 0,
                 0,
                 true,
-                epic.getRoughEstimates()
+                epic.getRoughEstimates(),
+                epic.getFlagged()
         );
     }
 

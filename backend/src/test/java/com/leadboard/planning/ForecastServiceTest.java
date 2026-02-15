@@ -208,6 +208,7 @@ class ForecastServiceTest {
                     1,
                     1,
                     false,
+                    null,
                     null
             );
 
@@ -330,7 +331,7 @@ class ForecastServiceTest {
                     List.of(story1, story2),
                     aggregation,
                     "Developing", null, 0L, 0L, 0, emptyRoleProgress, 2, 2,
-                    false, null
+                    false, null, null
             );
 
             List<PlanningWarning> warnings = List.of(
@@ -569,6 +570,7 @@ class ForecastServiceTest {
                 1,
                 1,
                 false,
+                null,
                 null
         );
     }
