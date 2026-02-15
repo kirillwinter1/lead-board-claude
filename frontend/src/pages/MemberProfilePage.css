@@ -24,6 +24,11 @@
   flex-shrink: 0;
 }
 
+.member-avatar-img {
+  object-fit: cover;
+  background: #f4f5f7;
+}
+
 .member-info {
   flex: 1;
 }

@@ -19,6 +19,7 @@ export interface TeamMember {
   grade: 'JUNIOR' | 'MIDDLE' | 'SENIOR'
   hoursPerDay: number
   active: boolean
+  avatarUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -91,6 +92,7 @@ export interface MemberInfo {
   hoursPerDay: number
   teamName: string
   teamId: number
+  avatarUrl: string | null
 }
 
 export interface CompletedTask {

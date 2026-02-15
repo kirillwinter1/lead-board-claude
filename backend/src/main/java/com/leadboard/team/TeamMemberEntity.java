@@ -32,6 +32,9 @@ public class TeamMemberEntity {
     @Column(name = "hours_per_day", nullable = false, precision = 3, scale = 1)
     private BigDecimal hoursPerDay = new BigDecimal("6.0");
 
+    @Column(name = "avatar_url", length = 500)
+    private String avatarUrl;
+
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
@@ -107,6 +110,14 @@ public class TeamMemberEntity {
 
     public void setHoursPerDay(BigDecimal hoursPerDay) {
         this.hoursPerDay = hoursPerDay;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
     }
 
     public Boolean getActive() {

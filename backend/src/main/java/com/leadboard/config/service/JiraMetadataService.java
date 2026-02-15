@@ -118,7 +118,9 @@ public class JiraMetadataService {
                 if (statuses != null) {
                     for (Map<String, Object> status : statuses) {
                         Map<String, Object> s = new LinkedHashMap<>();
+                        s.put("id", status.get("id"));
                         s.put("name", status.get("name"));
+                        s.put("untranslatedName", status.get("untranslatedName"));
                         Map<String, Object> cat = (Map<String, Object>) status.get("statusCategory");
                         if (cat != null) {
                             s.put("statusCategory", cat.get("key"));
@@ -172,6 +174,85 @@ public class JiraMetadataService {
             return result;
         } catch (Exception e) {
             log.error("Failed to fetch link types from Jira", e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Gets workflows with transitions and statuses from Jira.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getWorkflows() {
+        String cacheKey = "workflows";
+        String cached = getCachedValue(cacheKey, 60);
+        if (cached != null) {
+            try {
+                return objectMapper.readValue(cached, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse cached workflows", e);
+            }
+        }
+
+        try {
+            Map<String, Object> response = callJiraApi(
+                    "/rest/api/3/workflow/search?expand=transitions,statuses");
+
+            List<Map<String, Object>> workflows = (List<Map<String, Object>>) response.get("values");
+            if (workflows == null) workflows = List.of();
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Map<String, Object> wf : workflows) {
+                Map<String, Object> simplified = new LinkedHashMap<>();
+                simplified.put("name", wf.get("name"));
+
+                // Simplify statuses
+                List<Map<String, Object>> wfStatuses = (List<Map<String, Object>>) wf.get("statuses");
+                List<Map<String, Object>> simplifiedStatuses = new ArrayList<>();
+                if (wfStatuses != null) {
+                    for (Map<String, Object> st : wfStatuses) {
+                        Map<String, Object> s = new LinkedHashMap<>();
+                        s.put("id", st.get("id"));
+                        s.put("name", st.get("name"));
+                        simplifiedStatuses.add(s);
+                    }
+                }
+                simplified.put("statuses", simplifiedStatuses);
+
+                // Simplify transitions
+                List<Map<String, Object>> wfTransitions = (List<Map<String, Object>>) wf.get("transitions");
+                List<Map<String, Object>> simplifiedTransitions = new ArrayList<>();
+                if (wfTransitions != null) {
+                    for (Map<String, Object> tr : wfTransitions) {
+                        Map<String, Object> t = new LinkedHashMap<>();
+                        t.put("name", tr.get("name"));
+                        t.put("type", tr.get("type"));
+
+                        // "to" is a status ID string
+                        Object toObj = tr.get("to");
+                        t.put("to", toObj != null ? String.valueOf(toObj) : null);
+
+                        // "from" is a list of status ID strings
+                        List<String> fromList = new ArrayList<>();
+                        Object fromObj = tr.get("from");
+                        if (fromObj instanceof List) {
+                            for (Object f : (List<?>) fromObj) {
+                                fromList.add(String.valueOf(f));
+                            }
+                        }
+                        t.put("from", fromList);
+
+                        simplifiedTransitions.add(t);
+                    }
+                }
+                simplified.put("transitions", simplifiedTransitions);
+
+                result.add(simplified);
+            }
+
+            cacheValue(cacheKey, objectMapper.writeValueAsString(result));
+            return result;
+        } catch (Exception e) {
+            log.error("Failed to fetch workflows from Jira", e);
             return List.of();
         }
     }

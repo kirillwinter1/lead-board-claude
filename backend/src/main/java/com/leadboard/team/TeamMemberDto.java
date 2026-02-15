@@ -12,6 +12,7 @@ public record TeamMemberDto(
     Grade grade,
     BigDecimal hoursPerDay,
     Boolean active,
+    String avatarUrl,
     OffsetDateTime createdAt,
     OffsetDateTime updatedAt
 ) {
@@ -25,6 +26,7 @@ public record TeamMemberDto(
             entity.getGrade(),
             entity.getHoursPerDay(),
             entity.getActive(),
+            entity.getAvatarUrl(),
             entity.getCreatedAt(),
             entity.getUpdatedAt()
         );

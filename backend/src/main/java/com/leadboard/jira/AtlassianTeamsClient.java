@@ -2,6 +2,8 @@ package com.leadboard.jira;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Map;
 import com.leadboard.config.JiraProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -234,6 +236,9 @@ public class AtlassianTeamsClient {
         @JsonProperty("active")
         private boolean active;
 
+        @JsonProperty("avatarUrls")
+        private Map<String, String> avatarUrls;
+
         public String getAccountId() {
             return accountId;
         }
@@ -264,6 +269,11 @@ public class AtlassianTeamsClient {
 
         public void setActive(boolean active) {
             this.active = active;
+        }
+
+        public String getAvatarUrl48() {
+            if (avatarUrls == null) return null;
+            return avatarUrls.get("48x48");
         }
     }
 }

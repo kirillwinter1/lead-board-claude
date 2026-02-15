@@ -211,7 +211,11 @@ export function MemberProfilePage() {
 
       {/* Profile Card */}
       <div className="member-profile-header">
-        <div className="member-avatar">{initials}</div>
+        {member.avatarUrl ? (
+          <img src={member.avatarUrl} alt={member.displayName} className="member-avatar member-avatar-img" />
+        ) : (
+          <div className="member-avatar">{initials}</div>
+        )}
         <div className="member-info">
           <h2>{member.displayName}</h2>
           <div className="member-info-badges">

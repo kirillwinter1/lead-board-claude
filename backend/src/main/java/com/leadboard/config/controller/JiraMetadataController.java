@@ -37,4 +37,9 @@ public class JiraMetadataController {
     public ResponseEntity<List<Map<String, Object>>> getLinkTypes() {
         return ResponseEntity.ok(metadataService.getLinkTypes());
     }
+
+    @GetMapping("/workflows")
+    public ResponseEntity<List<Map<String, Object>>> getWorkflows() {
+        return ResponseEntity.ok(metadataService.getWorkflows());
+    }
 }

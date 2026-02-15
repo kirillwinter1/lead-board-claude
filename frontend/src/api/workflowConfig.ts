@@ -48,7 +48,13 @@ export interface JiraIssueTypeMetadata {
 
 export interface JiraStatusesByType {
   issueType: string
-  statuses: { name: string; statusCategory: string; statusCategoryName: string }[]
+  statuses: { id: string; name: string; untranslatedName: string; statusCategory: string; statusCategoryName: string }[]
+}
+
+export interface JiraWorkflow {
+  name: string
+  statuses: { id: string; name: string }[]
+  transitions: { from: string[]; to: string; name: string; type: string }[]
 }
 
 export interface JiraLinkTypeMetadata {
@@ -120,4 +126,7 @@ export const workflowConfigApi = {
 
   fetchJiraLinkTypes: () =>
     axios.get<JiraLinkTypeMetadata[]>('/api/admin/jira-metadata/link-types').then(r => r.data),
+
+  fetchJiraWorkflows: () =>
+    axios.get<JiraWorkflow[]>('/api/admin/jira-metadata/workflows').then(r => r.data),
 }

@@ -10,6 +10,7 @@ import {
   JiraIssueTypeMetadata,
   JiraStatusesByType,
   JiraLinkTypeMetadata,
+  JiraWorkflow,
   StatusIssueCountDto,
 } from '../api/workflowConfig'
 import './WorkflowConfigPage.css'
@@ -357,6 +358,116 @@ function suggestLinkTypes(jiraLinks: JiraLinkTypeMetadata[]): LinkTypeMappingDto
   })
 }
 
+// --- Workflow matching + ordering ---
+
+function matchWorkflowsToCategories(
+  jiraStatuses: JiraStatusesByType[],
+  workflows: JiraWorkflow[],
+  issueTypeMap: Map<string, string>,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+
+  // Build status ID sets per category
+  const categoryStatusIds: Record<string, Set<string>> = {}
+  for (const group of jiraStatuses) {
+    const cat = issueTypeMap.get(group.issueType)
+    if (!cat || cat === 'IGNORE') continue
+    if (!categoryStatusIds[cat]) categoryStatusIds[cat] = new Set()
+    for (const st of group.statuses) {
+      if (st.id) categoryStatusIds[cat].add(st.id)
+    }
+  }
+
+  // For each category, find the workflow whose status set best matches
+  for (const [category, statusIds] of Object.entries(categoryStatusIds)) {
+    let bestMatch = ''
+    let bestOverlap = 0
+
+    for (const wf of workflows) {
+      const wfStatusIds = new Set(wf.statuses.map(s => s.id))
+      let overlap = 0
+      for (const id of statusIds) {
+        if (wfStatusIds.has(id)) overlap++
+      }
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap
+        bestMatch = wf.name
+      }
+    }
+
+    if (bestMatch) {
+      result[category] = bestMatch
+    }
+  }
+
+  return result
+}
+
+function deriveOrderFromWorkflow(workflow: JiraWorkflow): string[] {
+  const statusNameById = new Map<string, string>()
+  for (const s of workflow.statuses) {
+    statusNameById.set(s.id, s.name)
+  }
+
+  // Find initial transition → start status
+  const initialTransition = workflow.transitions.find(t => t.type === 'initial')
+  if (!initialTransition) {
+    // Fallback: return statuses in original order
+    return workflow.statuses.map(s => s.name)
+  }
+
+  const startId = initialTransition.to
+  const ordered: string[] = []
+  const visited = new Set<string>()
+
+  let currentId: string | null = startId
+
+  while (currentId && !visited.has(currentId)) {
+    visited.add(currentId)
+    const name = statusNameById.get(currentId)
+    if (name) ordered.push(name)
+
+    // Find forward transition from current (type=directed, name not starting with "Назад"/"Back")
+    let nextId: string | null = null
+    for (const tr of workflow.transitions) {
+      if (tr.type !== 'directed') continue
+      const trName = tr.name.toLowerCase()
+      if (trName.startsWith('назад') || trName.startsWith('back')) continue
+      if (tr.from.includes(currentId)) {
+        // Prefer transitions we haven't visited yet
+        if (!visited.has(tr.to)) {
+          nextId = tr.to
+          break
+        }
+      }
+    }
+
+    currentId = nextId
+  }
+
+  // Append any statuses not yet in the ordered list
+  for (const s of workflow.statuses) {
+    if (!visited.has(s.id)) {
+      ordered.push(s.name)
+    }
+  }
+
+  return ordered
+}
+
+function applyWorkflowOrder(
+  statuses: StatusMappingDto[],
+  category: string,
+  orderedNames: string[],
+): StatusMappingDto[] {
+  return statuses.map(s => {
+    if (s.issueCategory !== category) return s
+    const idx = orderedNames.findIndex(n => n === s.jiraStatusName)
+    const sortOrder = idx >= 0 ? (idx + 1) * 10 : (orderedNames.length + 1) * 10
+    return { ...s, sortOrder }
+  })
+}
+
 // --- Component ---
 
 export function WorkflowConfigPage() {
@@ -391,6 +502,8 @@ export function WorkflowConfigPage() {
   const [wizardJiraIssueTypes, setWizardJiraIssueTypes] = useState<JiraIssueTypeMetadata[]>([])
   const [wizardJiraLinkTypes, setWizardJiraLinkTypes] = useState<JiraLinkTypeMetadata[]>([])
   const [wizardStatusFilter, setWizardStatusFilter] = useState<string>('ALL')
+  const [jiraWorkflows, setJiraWorkflows] = useState<JiraWorkflow[]>([])
+  const [selectedWorkflows, setSelectedWorkflows] = useState<Record<string, string>>({})
 
   useEffect(() => {
     loadConfig()
@@ -402,6 +515,15 @@ export function WorkflowConfigPage() {
       startWizard()
     }
   }, [loading])
+
+  // Load workflows when switching to statuses tab
+  useEffect(() => {
+    if (activeTab === 'statuses' && jiraWorkflows.length === 0 && !wizardMode) {
+      workflowConfigApi.fetchJiraWorkflows()
+        .then(wfs => setJiraWorkflows(wfs))
+        .catch(() => {/* workflows are optional */})
+    }
+  }, [activeTab])
 
   const loadConfig = async () => {
     try {
@@ -614,14 +736,16 @@ export function WorkflowConfigPage() {
       setWizardLoading(true)
       setWizardError(null)
 
-      const [jiraTypes, jiraStatuses, jiraLinks] = await Promise.all([
+      const [jiraTypes, jiraStatuses, jiraLinks, workflows] = await Promise.all([
         workflowConfigApi.fetchJiraIssueTypes(),
         workflowConfigApi.fetchJiraStatuses(),
         workflowConfigApi.fetchJiraLinkTypes(),
+        workflowConfigApi.fetchJiraWorkflows().catch(() => [] as JiraWorkflow[]),
       ])
 
       setWizardJiraIssueTypes(jiraTypes)
       setWizardJiraLinkTypes(jiraLinks)
+      setJiraWorkflows(workflows)
 
       const suggestedTypes = suggestIssueTypes(jiraTypes)
       setWizardIssueTypes(suggestedTypes)
@@ -629,17 +753,24 @@ export function WorkflowConfigPage() {
       const suggestedRoles = suggestRolesFromIssueTypes(suggestedTypes)
       setWizardRoles(suggestedRoles)
 
-      // DEBUG: log raw data for status mapping investigation
-      console.log('[WIZARD DEBUG] jiraStatuses issueTypes:', jiraStatuses.map(g => g.issueType))
-      console.log('[WIZARD DEBUG] suggestedTypes map:', suggestedTypes.map(t => `${t.jiraTypeName} → ${t.boardCategory}`))
-      console.log('[WIZARD DEBUG] full jiraStatuses:', JSON.stringify(jiraStatuses, null, 2))
+      let suggestedStatuses = suggestStatuses(jiraStatuses, suggestedTypes)
 
-      const suggestedStatuses = suggestStatuses(jiraStatuses, suggestedTypes)
-      console.log('[WIZARD DEBUG] suggestedStatuses by category:', {
-        EPIC: suggestedStatuses.filter(s => s.issueCategory === 'EPIC').length,
-        STORY: suggestedStatuses.filter(s => s.issueCategory === 'STORY').length,
-        SUBTASK: suggestedStatuses.filter(s => s.issueCategory === 'SUBTASK').length,
-      })
+      // Auto-match workflows and apply ordering
+      if (workflows.length > 0) {
+        const issueTypeMap = new Map<string, string>()
+        suggestedTypes.forEach(t => issueTypeMap.set(t.jiraTypeName, t.boardCategory))
+        const matched = matchWorkflowsToCategories(jiraStatuses, workflows, issueTypeMap)
+        setSelectedWorkflows(matched)
+
+        for (const [category, wfName] of Object.entries(matched)) {
+          const wf = workflows.find(w => w.name === wfName)
+          if (wf) {
+            const orderedNames = deriveOrderFromWorkflow(wf)
+            suggestedStatuses = applyWorkflowOrder(suggestedStatuses, category, orderedNames)
+          }
+        }
+      }
+
       setWizardStatuses(suggestedStatuses)
 
       const suggestedLinks = suggestLinkTypes(jiraLinks)
@@ -1094,6 +1225,44 @@ export function WorkflowConfigPage() {
           ))}
         </div>
 
+        {wizardStatusFilter !== 'ALL' && jiraWorkflows.length > 0 && (() => {
+          const catStatuses = wizardStatuses.filter(s => s.issueCategory === wizardStatusFilter)
+          if (catStatuses.length === 0) return null
+          const currentWf = selectedWorkflows[wizardStatusFilter] || ''
+          const wf = jiraWorkflows.find(w => w.name === currentWf)
+          const matchedCount = wf
+            ? catStatuses.filter(s => wf.statuses.some(ws => ws.name === s.jiraStatusName)).length
+            : 0
+          return (
+            <div className="workflow-selector">
+              <span className="workflow-selector-label">Workflow:</span>
+              <select
+                className="workflow-select"
+                value={currentWf}
+                onChange={e => {
+                  const wfName = e.target.value
+                  setSelectedWorkflows(prev => ({ ...prev, [wizardStatusFilter]: wfName }))
+                  const selected = jiraWorkflows.find(w => w.name === wfName)
+                  if (selected) {
+                    const orderedNames = deriveOrderFromWorkflow(selected)
+                    setWizardStatuses(prev => applyWorkflowOrder(prev, wizardStatusFilter, orderedNames))
+                  }
+                }}
+              >
+                <option value="">-- select workflow --</option>
+                {jiraWorkflows.map(w => (
+                  <option key={w.name} value={w.name}>{w.name}</option>
+                ))}
+              </select>
+              {wf && (
+                <span className="workflow-match-badge">
+                  {matchedCount}/{catStatuses.length} statuses matched
+                </span>
+              )}
+            </div>
+          )
+        })()}
+
         {wizardFilteredStatuses.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>
             No statuses for this filter
@@ -1126,7 +1295,7 @@ export function WorkflowConfigPage() {
                                 value={st.statusCategory}
                                 onChange={e => updateWizardStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => wizardStatusFilter === 'EPIC' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">
@@ -1448,6 +1617,44 @@ export function WorkflowConfigPage() {
             </button>
           ))}
         </div>
+
+        {jiraWorkflows.length > 0 && (() => {
+          const catStatuses = statuses.filter(s => s.issueCategory === statusFilter)
+          if (catStatuses.length === 0) return null
+          const currentWf = selectedWorkflows[statusFilter] || ''
+          const wf = jiraWorkflows.find(w => w.name === currentWf)
+          const matchedCount = wf
+            ? catStatuses.filter(s => wf.statuses.some(ws => ws.name === s.jiraStatusName)).length
+            : 0
+          return (
+            <div className="workflow-selector">
+              <span className="workflow-selector-label">Workflow:</span>
+              <select
+                className="workflow-select"
+                value={currentWf}
+                onChange={e => {
+                  const wfName = e.target.value
+                  setSelectedWorkflows(prev => ({ ...prev, [statusFilter]: wfName }))
+                  const selected = jiraWorkflows.find(w => w.name === wfName)
+                  if (selected) {
+                    const orderedNames = deriveOrderFromWorkflow(selected)
+                    setStatuses(prev => applyWorkflowOrder(prev, statusFilter, orderedNames))
+                  }
+                }}
+              >
+                <option value="">-- select workflow --</option>
+                {jiraWorkflows.map(w => (
+                  <option key={w.name} value={w.name}>{w.name}</option>
+                ))}
+              </select>
+              {wf && (
+                <span className="workflow-match-badge">
+                  {matchedCount}/{catStatuses.length} statuses matched
+                </span>
+              )}
+            </div>
+          )
+        })()}
 
         {filteredStatuses.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>

@@ -19,7 +19,8 @@ public record MemberProfileResponse(
         String grade,
         BigDecimal hoursPerDay,
         String teamName,
-        Long teamId
+        Long teamId,
+        String avatarUrl
     ) {}
 
     public record CompletedTask(

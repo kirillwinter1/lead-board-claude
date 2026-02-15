@@ -199,11 +199,12 @@ public class TeamSyncService {
         if (existingInTeam.isPresent()) {
             // Member exists - don't overwrite local fields (role, grade, hoursPerDay)
             TeamMemberEntity member = existingInTeam.get();
-            // Just update display name if needed
+            // Just update display name and avatar if needed
             try {
                 AtlassianUser user = teamsClient.getUser(accountId);
                 if (user != null && user.getDisplayName() != null) {
                     member.setDisplayName(user.getDisplayName());
+                    member.setAvatarUrl(user.getAvatarUrl48());
                     memberRepository.save(member);
                 }
             } catch (Exception e) {
@@ -229,6 +230,7 @@ public class TeamSyncService {
             AtlassianUser user = teamsClient.getUser(accountId);
             if (user != null) {
                 member.setDisplayName(user.getDisplayName());
+                member.setAvatarUrl(user.getAvatarUrl48());
             }
         } catch (Exception e) {
             log.debug("Could not fetch user info for {}: {}", accountId, e.getMessage());

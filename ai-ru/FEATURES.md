@@ -71,7 +71,6 @@
 - [RULES.md](RULES.md) — бизнес-правила и правила разработки
 - [JIRA_WORKFLOWS.md](JIRA_WORKFLOWS.md) — Jira workflows (Epic, Story, Subtask)
 - [API_PLANNING.md](API_PLANNING.md) — API документация
-- [ROADMAP_V2.md](ROADMAP_V2.md) — роадмап
 - [TECH_DEBT.md](TECH_DEBT.md) — технический долг
 
 ## Диаграмма зависимостей (реализованные)

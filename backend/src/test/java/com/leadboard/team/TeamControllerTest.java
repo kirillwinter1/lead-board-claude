@@ -178,7 +178,7 @@ class TeamControllerTest {
     @Test
     void getTeamMembersReturnsList() throws Exception {
         TeamMemberDto member = new TeamMemberDto(1L, 1L, "acc-123", "John Doe",
-                "DEV", Grade.SENIOR, new BigDecimal("8.0"), true,
+                "DEV", Grade.SENIOR, new BigDecimal("8.0"), true, null,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.getTeamMembers(1L)).thenReturn(List.of(member));
 
@@ -195,7 +195,7 @@ class TeamControllerTest {
         CreateTeamMemberRequest request = new CreateTeamMemberRequest(
                 "acc-456", "Jane Smith", "QA", Grade.MIDDLE, new BigDecimal("6.0"));
         TeamMemberDto member = new TeamMemberDto(2L, 1L, "acc-456", "Jane Smith",
-                "QA", Grade.MIDDLE, new BigDecimal("6.0"), true,
+                "QA", Grade.MIDDLE, new BigDecimal("6.0"), true, null,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.addTeamMember(eq(1L), any())).thenReturn(member);
 
@@ -226,7 +226,7 @@ class TeamControllerTest {
         UpdateTeamMemberRequest request = new UpdateTeamMemberRequest(
                 "Updated Name", "SA", Grade.SENIOR, new BigDecimal("7.5"));
         TeamMemberDto member = new TeamMemberDto(1L, 1L, "acc-123", "Updated Name",
-                "SA", Grade.SENIOR, new BigDecimal("7.5"), true,
+                "SA", Grade.SENIOR, new BigDecimal("7.5"), true, null,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.updateTeamMember(eq(1L), eq(1L), any())).thenReturn(member);
 

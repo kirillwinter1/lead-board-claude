@@ -101,7 +101,8 @@ public class MemberProfileService {
                 member.getGrade().name(),
                 member.getHoursPerDay(),
                 team.getName(),
-                team.getId()
+                team.getId(),
+                member.getAvatarUrl()
         );
 
         return new MemberProfileResponse(memberInfo, completedTasks, activeTasks, upcomingTasks, weeklyTrend, summary);
