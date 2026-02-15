@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import axios from 'axios'
 import { WorkflowRoleDto } from '../api/workflowConfig'
 
@@ -15,6 +15,7 @@ interface WorkflowConfigHelpers extends WorkflowConfig {
   getRoleColor: (code: string) => string
   getRoleDisplayName: (code: string) => string
   getRoleCodes: () => string[]
+  refresh: () => void
 }
 
 const WorkflowConfigContext = createContext<WorkflowConfigHelpers | null>(null)
@@ -32,7 +33,7 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
     loading: true,
   })
 
-  useEffect(() => {
+  const loadConfig = useCallback(() => {
     Promise.all([
       axios.get<WorkflowRoleDto[]>('/api/config/workflow/roles').then(r => r.data),
       axios.get<Record<string, string>>('/api/config/workflow/issue-type-categories').then(r => r.data),
@@ -44,6 +45,10 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
         setConfig(prev => ({ ...prev, loading: false }))
       })
   }, [])
+
+  useEffect(() => {
+    loadConfig()
+  }, [loadConfig])
 
   const helpers: WorkflowConfigHelpers = {
     ...config,
@@ -68,6 +73,7 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       return role?.displayName || code
     },
     getRoleCodes: () => config.roles.map(r => r.code),
+    refresh: loadConfig,
   }
 
   return (
@@ -91,6 +97,7 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       getRoleColor: (code) => DEFAULT_ROLE_COLORS[code] || '#666',
       getRoleDisplayName: (code) => code,
       getRoleCodes: () => [],
+      refresh: () => {},
     }
   }
   return ctx

@@ -12,6 +12,7 @@ import {
   JiraLinkTypeMetadata,
   StatusIssueCountDto,
 } from '../api/workflowConfig'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './WorkflowConfigPage.css'
 
 type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
@@ -400,6 +401,7 @@ function suggestLinkTypes(jiraLinks: JiraLinkTypeMetadata[]): LinkTypeMappingDto
 // --- Component ---
 
 export function WorkflowConfigPage() {
+  const { refresh: refreshWorkflowContext } = useWorkflowConfig()
   const [config, setConfig] = useState<WorkflowConfigResponse | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>('roles')
   const [loading, setLoading] = useState(true)
@@ -479,6 +481,7 @@ export function WorkflowConfigPage() {
       setError(null)
       const updated = await workflowConfigApi.updateRoles(roles)
       setRoles(updated)
+      refreshWorkflowContext()
       showSaveSuccess('Roles saved')
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save roles')
@@ -493,6 +496,7 @@ export function WorkflowConfigPage() {
       setError(null)
       const updated = await workflowConfigApi.updateIssueTypes(issueTypes)
       setIssueTypes(updated)
+      refreshWorkflowContext()
       showSaveSuccess('Issue types saved')
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to save issue types')
@@ -729,6 +733,7 @@ export function WorkflowConfigPage() {
       setWizardValidation(validationResult)
 
       await loadConfig()
+      refreshWorkflowContext()
       setWizardMode(false)
       setWizardStep(0)
       showSaveSuccess('Wizard configuration saved successfully!')
