@@ -77,7 +77,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (color: str
             {ATLASSIAN_COLORS.map(c => (
               <button
                 key={c.hex}
-                className={`color-swatch ${value.toUpperCase() === c.hex ? 'selected' : ''}`}
+                className={`color-swatch ${value.toUpperCase() === c.hex.toUpperCase() ? 'selected' : ''}`}
                 style={{ backgroundColor: c.hex }}
                 title={c.name}
                 onClick={() => { onChange(c.hex); setOpen(false) }}
@@ -131,7 +131,7 @@ function StatusColorPicker({ value, onChange }: { value: string; onChange: (colo
           {STATUS_BG_COLORS.map(c => (
             <button
               key={c.hex}
-              className={`color-swatch ${value.toUpperCase() === c.hex ? 'selected' : ''}`}
+              className={`color-swatch ${value.toUpperCase() === c.hex.toUpperCase() ? 'selected' : ''}`}
               style={{ backgroundColor: c.hex }}
               title={c.name}
               onClick={() => onChange(c.hex)}
@@ -214,15 +214,17 @@ function recalcScoreWeights(allStatuses: StatusMappingDto[], category: string): 
   const weightByName = new Map<string, number>()
   catStatuses.forEach((s, level) => {
     let w: number
-    if (level === 0) {
+    if (maxLevel === 0) {
+      w = -5 // single status
+    } else if (level === 0) {
       w = -5 // first = NEW
     } else if (level === maxLevel) {
       w = 0 // last = DONE
-    } else if (maxLevel <= 1) {
-      w = 20
+    } else if (maxLevel <= 2) {
+      w = 15 // only one intermediate status
     } else {
       // Linearly interpolate 5..30 based on position
-      const ratio = (level - 1) / (maxLevel - 2 || 1)
+      const ratio = (level - 1) / (maxLevel - 2)
       w = 5 + Math.round(ratio * 25)
     }
     weightByName.set(s.jiraStatusName, w)
