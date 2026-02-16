@@ -5,6 +5,8 @@ import logo from '../icons/logo.png'
 import { SetupWizardPage } from '../pages/SetupWizardPage'
 import './Header.css'
 
+declare const __APP_VERSION__: string
+
 interface AuthUser {
   id: number
   accountId: string
@@ -162,6 +164,9 @@ export function Layout() {
           </button>
         </div>
       ) : null}
+      <div style={{ position: 'fixed', bottom: '8px', right: '12px', fontSize: '11px', color: '#aaa', pointerEvents: 'none', zIndex: 1 }}>
+        v{__APP_VERSION__}
+      </div>
     </div>
   )
 }

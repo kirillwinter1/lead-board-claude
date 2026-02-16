@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.leadboard"
-version = "0.0.1-SNAPSHOT"
+version = "0.35.0"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -39,4 +39,8 @@ dependencies {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+springBoot {
+    buildInfo()
 }
