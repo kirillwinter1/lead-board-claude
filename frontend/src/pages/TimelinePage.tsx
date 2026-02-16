@@ -7,7 +7,7 @@ import { getConfig } from '../api/config'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './TimelinePage.css'
 
-// Issue type icons
+// Fallback issue type icons (used when Jira icon URL is not available)
 import storyIcon from '../icons/story.png'
 import bugIcon from '../icons/bug.png'
 import epicIcon from '../icons/epic.png'
@@ -297,8 +297,9 @@ function lightenColor(hex: string, factor: number): string {
   return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
 }
 
-// Get issue type icon
-function getIssueTypeIcon(issueType: string | null): string {
+// Get issue type icon (Jira URL preferred, local fallback)
+function getIssueTypeIcon(issueType: string | null, jiraIconUrl?: string | null): string {
+  if (jiraIconUrl) return jiraIconUrl
   if (!issueType) return storyIcon
   const type = issueType.toLowerCase()
   if (type.includes('bug')) return bugIcon
@@ -392,7 +393,8 @@ interface EpicLabelProps {
 }
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
-  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const epicIconUrl = getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик') || epicIcon
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -436,7 +438,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
         {/* Row 1: Icon + Key + Status badge + Progress */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <img src={epicIcon} alt="Epic" style={{ width: 16, height: 16 }} />
+            <img src={epicIconUrl} alt="Epic" style={{ width: 16, height: 16 }} />
             <a
               href={`${jiraBaseUrl}${epic.epicKey}`}
               target="_blank"
@@ -506,7 +508,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <img src={epicIcon} alt="Epic" style={{ width: 16, height: 16 }} />
+              <img src={epicIconUrl} alt="Epic" style={{ width: 16, height: 16 }} />
               <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{epic.epicKey}</span>
               <span style={{ color: '#8993A4', fontSize: 11 }}>({epic.autoScore?.toFixed(0)})</span>
             </div>
@@ -733,7 +735,7 @@ interface StoryBarsProps {
 }
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
-  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -797,7 +799,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <img
-                src={getIssueTypeIcon(hoveredStory.issueType)}
+                src={getIssueTypeIcon(hoveredStory.issueType, getIssueTypeIconUrl(hoveredStory.issueType))}
                 alt={hoveredStory.issueType || 'Story'}
                 style={{ width: '16px', height: '16px' }}
               />
@@ -1042,7 +1044,8 @@ interface RoughEstimateBarsProps {
 }
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
-  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const epicIconUrl = getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик') || epicIcon
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1087,7 +1090,7 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <img src={epicIcon} alt="Epic" style={{ width: '16px', height: '16px' }} />
+              <img src={epicIconUrl} alt="Epic" style={{ width: '16px', height: '16px' }} />
               <span style={{ fontWeight: 600, color: '#60a5fa' }}>{hoveredEpic.epicKey}</span>
             </div>
             <span

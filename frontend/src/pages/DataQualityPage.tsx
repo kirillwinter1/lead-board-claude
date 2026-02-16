@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
-import { workflowConfigApi, JiraIssueTypeMetadata } from '../api/workflowConfig'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './DataQualityPage.css'
 
 interface ViolationDto {
@@ -108,18 +108,9 @@ function SummaryCard({ title, value, color }: { title: string; value: number; co
   )
 }
 
-function IssueTypeCell({ issueType, iconUrl }: { issueType: string; iconUrl?: string }) {
-  return (
-    <td className="cell-type">
-      <span className="issue-type-cell">
-        {iconUrl && <img src={iconUrl} alt={issueType} className="issue-type-icon" />}
-        {issueType}
-      </span>
-    </td>
-  )
-}
-
-function ViolationRow({ issue, iconMap }: { issue: IssueViolations; iconMap: Record<string, string> }) {
+function ViolationRow({ issue }: { issue: IssueViolations }) {
+  const { getIssueTypeIconUrl } = useWorkflowConfig()
+  const iconUrl = getIssueTypeIconUrl(issue.issueType)
   const [expanded, setExpanded] = useState(false)
   const maxSeverity = issue.violations.reduce((max, v) => {
     const order = { ERROR: 0, WARNING: 1, INFO: 2 }
@@ -142,7 +133,12 @@ function ViolationRow({ issue, iconMap }: { issue: IssueViolations; iconMap: Rec
             {issue.issueKey}
           </a>
         </td>
-        <IssueTypeCell issueType={issue.issueType} iconUrl={iconMap[issue.issueType]} />
+        <td className="cell-type">
+          <span className="issue-type-cell">
+            {iconUrl && <img src={iconUrl} alt={issue.issueType} className="issue-type-icon" />}
+            {issue.issueType}
+          </span>
+        </td>
         <td className="cell-summary">{issue.summary}</td>
         <td className="cell-status">{issue.status}</td>
         <td className="cell-severity">
@@ -183,20 +179,6 @@ export function DataQualityPage() {
     }
   }
   const [ruleFilter, setRuleFilter] = useState<string | null>(null)
-  const [issueTypeIcons, setIssueTypeIcons] = useState<Record<string, string>>({})
-
-  const fetchIssueTypeIcons = useCallback(async () => {
-    try {
-      const types = await workflowConfigApi.fetchJiraIssueTypes()
-      const map: Record<string, string> = {}
-      types.forEach((t: JiraIssueTypeMetadata) => {
-        if (t.iconUrl) map[t.name] = t.iconUrl
-      })
-      setIssueTypeIcons(map)
-    } catch (err) {
-      console.error('Failed to load issue type icons:', err)
-    }
-  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -225,8 +207,7 @@ export function DataQualityPage() {
 
   useEffect(() => {
     fetchTeams()
-    fetchIssueTypeIcons()
-  }, [fetchTeams, fetchIssueTypeIcons])
+  }, [fetchTeams])
 
   useEffect(() => {
     fetchData()
@@ -370,7 +351,7 @@ export function DataQualityPage() {
                   </thead>
                   <tbody>
                     {filteredViolations.map(issue => (
-                      <ViolationRow key={issue.issueKey} issue={issue} iconMap={issueTypeIcons} />
+                      <ViolationRow key={issue.issueKey} issue={issue} />
                     ))}
                   </tbody>
                 </table>

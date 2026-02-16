@@ -4,13 +4,20 @@ import com.leadboard.auth.AppRole;
 import com.leadboard.auth.LeadBoardAuthentication;
 import com.leadboard.auth.UserEntity;
 import com.leadboard.auth.UserRepository;
+import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.jira.JiraClient;
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.team.TeamMemberEntity;
+import com.leadboard.team.TeamMemberRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Admin endpoints for user management.
@@ -20,10 +27,24 @@ import java.util.Map;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final UserRepository userRepository;
+    private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
-    public AdminController(UserRepository userRepository) {
+    private final UserRepository userRepository;
+    private final JiraIssueRepository jiraIssueRepository;
+    private final TeamMemberRepository teamMemberRepository;
+    private final WorkflowConfigService workflowConfigService;
+    private final JiraClient jiraClient;
+
+    public AdminController(UserRepository userRepository,
+                           JiraIssueRepository jiraIssueRepository,
+                           TeamMemberRepository teamMemberRepository,
+                           WorkflowConfigService workflowConfigService,
+                           JiraClient jiraClient) {
         this.userRepository = userRepository;
+        this.jiraIssueRepository = jiraIssueRepository;
+        this.teamMemberRepository = teamMemberRepository;
+        this.workflowConfigService = workflowConfigService;
+        this.jiraClient = jiraClient;
     }
 
     /**
@@ -86,6 +107,67 @@ public class AdminController {
     ) {}
 
     public record UpdateRoleRequest(String role) {}
+
+    /**
+     * Auto-assign unassigned subtasks in Jira based on issue_type → role → team_member mapping.
+     */
+    @PostMapping("/auto-assign-subtasks")
+    public ResponseEntity<Map<String, Object>> autoAssignSubtasks(@RequestParam Long teamId) {
+        List<JiraIssueEntity> unassigned = jiraIssueRepository.findUnassignedSubtasksByTeam(teamId);
+        if (unassigned.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "No unassigned subtasks found", "assigned", 0));
+        }
+
+        // Build role → team_member map (only active members)
+        List<TeamMemberEntity> members = teamMemberRepository.findByTeamIdAndActiveTrue(teamId);
+        Map<String, TeamMemberEntity> roleToMember = new HashMap<>();
+        for (TeamMemberEntity m : members) {
+            roleToMember.put(m.getRole(), m);
+        }
+
+        int assigned = 0;
+        int skipped = 0;
+        int failed = 0;
+        Map<String, Integer> byRole = new LinkedHashMap<>();
+        List<String> errors = new ArrayList<>();
+
+        for (JiraIssueEntity issue : unassigned) {
+            String role = workflowConfigService.getSubtaskRole(issue.getIssueType());
+            TeamMemberEntity member = roleToMember.get(role);
+
+            if (member == null) {
+                skipped++;
+                log.warn("No team member for role '{}' (issue {} type '{}')", role, issue.getIssueKey(), issue.getIssueType());
+                continue;
+            }
+
+            try {
+                jiraClient.assignIssueBasicAuth(issue.getIssueKey(), member.getJiraAccountId());
+                issue.setAssigneeAccountId(member.getJiraAccountId());
+                issue.setAssigneeDisplayName(member.getDisplayName());
+                jiraIssueRepository.save(issue);
+                assigned++;
+                byRole.merge(role, 1, Integer::sum);
+                log.info("Assigned {} → {} ({})", issue.getIssueKey(), member.getDisplayName(), role);
+            } catch (Exception e) {
+                failed++;
+                String error = issue.getIssueKey() + ": " + e.getMessage();
+                errors.add(error);
+                log.error("Failed to assign {}: {}", issue.getIssueKey(), e.getMessage());
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("total_unassigned", unassigned.size());
+        result.put("assigned", assigned);
+        result.put("skipped", skipped);
+        result.put("failed", failed);
+        result.put("by_role", byRole);
+        if (!errors.isEmpty()) {
+            result.put("errors", errors);
+        }
+        return ResponseEntity.ok(result);
+    }
 
     @ResponseStatus(org.springframework.http.HttpStatus.NOT_FOUND)
     public static class UserNotFoundException extends RuntimeException {

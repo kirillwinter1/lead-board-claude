@@ -6,9 +6,11 @@ import { StatusBadge } from './StatusBadge'
 import { ExpectedDoneCell } from './ExpectedDoneCell'
 import { StoryExpectedDoneCell } from './StoryExpectedDoneCell'
 import { AlertIcon } from './AlertIcon'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
+  const { getIssueTypeIconUrl } = useWorkflowConfig()
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
 
@@ -45,7 +47,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
               {...dragHandleProps}
             >⋮⋮</span>
           )}
-          <img src={getIssueIcon(node.issueType)} alt={node.issueType} className="issue-type-icon" />
+          <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType))} alt={node.issueType} className="issue-type-icon" />
           <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
             {node.issueKey}
           </a>

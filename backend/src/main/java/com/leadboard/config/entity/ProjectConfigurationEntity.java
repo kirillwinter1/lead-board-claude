@@ -1,6 +1,8 @@
 package com.leadboard.config.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -21,6 +23,7 @@ public class ProjectConfigurationEntity {
     private boolean isDefault;
 
     @Column(name = "status_score_weights", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
     private String statusScoreWeights;
 
     @Column(name = "planning_allowed_categories", length = 255)

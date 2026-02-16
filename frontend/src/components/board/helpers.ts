@@ -41,7 +41,8 @@ export const issueTypeIcons: Record<string, string> = {
   'Testing': subtaskIcon,
 }
 
-export function getIssueIcon(issueType: string): string {
+export function getIssueIcon(issueType: string, jiraIconUrl?: string | null): string {
+  if (jiraIconUrl) return jiraIconUrl
   return issueTypeIcons[issueType] || storyIcon
 }
 

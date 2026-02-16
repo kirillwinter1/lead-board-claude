@@ -163,6 +163,10 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     // ==================== Member Profile queries ====================
 
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.boardCategory = 'SUBTASK' AND e.assigneeAccountId IS NULL")
+    List<JiraIssueEntity> findUnassignedSubtasksByTeam(@Param("teamId") Long teamId);
+
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.assigneeAccountId = :accountId " +
            "AND e.teamId = :teamId AND e.boardCategory = 'SUBTASK'")
     List<JiraIssueEntity> findSubtasksByAssigneeAndTeam(
