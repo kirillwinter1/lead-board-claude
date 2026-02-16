@@ -33,6 +33,7 @@
 | F31 | Dynamic Status Colors on Board | 2026-02-14 | [features/F31](features/F31_DYNAMIC_STATUS_COLORS.md) |
 | F32 | DSR v2: Pause Flag + Subtask End Point | 2026-02-15 | [features/F32](features/F32_DSR_V2_PAUSE_FLAG.md) |
 | F33 | Setup Wizard + Refresh Teams Sync | 2026-02-15 | [features/F33](features/F33_SETUP_WIZARD.md) |
+| F34 | Project Key → Config Binding | 2026-02-16 | [features/F34](features/F34_PROJECT_KEY_CONFIG.md) |
 
 ## Бэклог (BF)
 
@@ -85,6 +86,12 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-16: F34 Project Key → Config Binding
+- Колонка `project_key` в `project_configurations` (nullable, unique partial index)
+- Резолв конфига: project_key → fallback default → auto-assign из env
+- `WorkflowConfigService`, `MappingAutoDetectService`, `WorkflowConfigController` — inject `JiraProperties`
+- DTO `WorkflowConfigResponse` + frontend: projectKey в заголовке Workflow Config
 
 ### 2026-02-15: F33 Setup Wizard + Refresh Teams Sync
 - 4-step wizard для первоначальной настройки (Period → Sync → Workflow → Done)

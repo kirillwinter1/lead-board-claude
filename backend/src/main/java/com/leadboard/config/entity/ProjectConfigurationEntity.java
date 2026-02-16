@@ -14,6 +14,9 @@ public class ProjectConfigurationEntity {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+    @Column(name = "project_key", length = 50)
+    private String projectKey;
+
     @Column(name = "is_default", nullable = false)
     private boolean isDefault;
 
@@ -49,6 +52,9 @@ public class ProjectConfigurationEntity {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getProjectKey() { return projectKey; }
+    public void setProjectKey(String projectKey) { this.projectKey = projectKey; }
 
     public boolean isDefault() { return isDefault; }
     public void setDefault(boolean isDefault) { this.isDefault = isDefault; }

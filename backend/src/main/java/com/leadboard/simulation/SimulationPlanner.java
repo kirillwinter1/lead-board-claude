@@ -143,6 +143,14 @@ public class SimulationPlanner {
 
             switch (category) {
                 case NEW -> {
+                    // Assign to the planned assignee
+                    actions.add(SimulationAction.assign(
+                            subtask.getIssueKey(),
+                            subtask.getIssueType(),
+                            assigneeName,
+                            assigneeId,
+                            "Phase " + phaseName + " starting, assigning to " + assigneeName
+                    ));
                     // Transition to "In Progress"
                     actions.add(SimulationAction.transition(
                             subtask.getIssueKey(),

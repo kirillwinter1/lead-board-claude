@@ -6,6 +6,7 @@ public record SimulationSummary(
         int totalActions,
         int transitionsExecuted,
         int worklogsExecuted,
+        int assignmentsExecuted,
         int skipped,
         int errors,
         double totalHoursLogged
@@ -13,6 +14,7 @@ public record SimulationSummary(
     public static SimulationSummary fromActions(List<SimulationAction> actions) {
         int transitions = 0;
         int worklogs = 0;
+        int assignments = 0;
         int skipped = 0;
         int errors = 0;
         double totalHours = 0;
@@ -29,10 +31,14 @@ public record SimulationSummary(
                         if (action.hoursLogged() != null) totalHours += action.hoursLogged();
                     } else if (action.error() != null) errors++;
                 }
+                case ASSIGN -> {
+                    if (action.executed()) assignments++;
+                    else if (action.error() != null) errors++;
+                }
                 case SKIP -> skipped++;
             }
         }
 
-        return new SimulationSummary(actions.size(), transitions, worklogs, skipped, errors, totalHours);
+        return new SimulationSummary(actions.size(), transitions, worklogs, assignments, skipped, errors, totalHours);
     }
 }

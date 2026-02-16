@@ -105,6 +105,11 @@ class SimulationPlannerTest {
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 
+        // Should have ASSIGN before TRANSITION
+        assertTrue(actions.stream().anyMatch(a ->
+                a.type() == SimulationAction.ActionType.ASSIGN
+                        && "PROJ-11".equals(a.issueKey())
+                        && "acc-1".equals(a.assigneeAccountId())));
         assertTrue(actions.stream().anyMatch(a ->
                 a.type() == SimulationAction.ActionType.TRANSITION
                         && "PROJ-11".equals(a.issueKey())

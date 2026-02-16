@@ -427,6 +427,22 @@ public class JiraClient {
     }
 
     /**
+     * Assign an issue to a user using Basic Auth (system API token).
+     */
+    public void assignIssueBasicAuth(String issueKey, String accountId) {
+        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        webClient.put()
+                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/assignee")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .bodyValue(Map.of("accountId", accountId))
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    /**
      * Add a worklog using Basic Auth (system API token).
      */
     public void addWorklogBasicAuth(String issueKey, int timeSpentSeconds, LocalDate date) {

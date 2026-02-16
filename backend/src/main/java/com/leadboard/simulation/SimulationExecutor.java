@@ -67,6 +67,9 @@ public class SimulationExecutor {
             case WORKLOG -> {
                 return executeWorklog(action, simDate);
             }
+            case ASSIGN -> {
+                return executeAssign(action);
+            }
             default -> {
                 return action;
             }
@@ -152,6 +155,18 @@ public class SimulationExecutor {
         if (lower.contains("progress") || lower.contains("работ")) return StatusCategory.IN_PROGRESS;
         if (lower.contains("done") || lower.contains("готов") || lower.contains("closed")) return StatusCategory.DONE;
         return null;
+    }
+
+    private SimulationAction executeAssign(SimulationAction action) {
+        if (action.assigneeAccountId() == null) {
+            return action.withError("No assigneeAccountId provided");
+        }
+
+        jiraClient.assignIssueBasicAuth(action.issueKey(), action.assigneeAccountId());
+
+        log.info("Simulation: assigned {} to {} ({})",
+                action.issueKey(), action.assignee(), action.assigneeAccountId());
+        return action.withExecuted();
     }
 
     private SimulationAction executeWorklog(SimulationAction action, LocalDate simDate) {

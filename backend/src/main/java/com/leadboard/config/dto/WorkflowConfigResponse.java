@@ -9,6 +9,7 @@ import java.util.Map;
 public record WorkflowConfigResponse(
         Long configId,
         String configName,
+        String projectKey,
         List<WorkflowRoleDto> roles,
         List<IssueTypeMappingDto> issueTypes,
         List<StatusMappingDto> statuses,

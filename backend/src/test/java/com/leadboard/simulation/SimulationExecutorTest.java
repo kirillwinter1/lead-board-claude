@@ -113,6 +113,31 @@ class SimulationExecutorTest {
     }
 
     @Test
+    void execute_assign_success() {
+        SimulationAction action = SimulationAction.assign(
+                "PROJ-11", "Sub-task", "Dev One", "acc-1", "Assigning to Dev One");
+
+        List<SimulationAction> results = executor.execute(List.of(action), SIM_DATE, TEAM_ID);
+
+        assertEquals(1, results.size());
+        assertTrue(results.get(0).executed());
+        verify(jiraClient).assignIssueBasicAuth("PROJ-11", "acc-1");
+    }
+
+    @Test
+    void execute_assign_noAccountId_returnsError() {
+        SimulationAction action = SimulationAction.assign(
+                "PROJ-11", "Sub-task", "Dev One", null, "Missing account");
+
+        List<SimulationAction> results = executor.execute(List.of(action), SIM_DATE, TEAM_ID);
+
+        assertEquals(1, results.size());
+        assertFalse(results.get(0).executed());
+        assertNotNull(results.get(0).error());
+        verifyNoInteractions(jiraClient);
+    }
+
+    @Test
     void execute_multipleActions_processedInOrder() {
         JiraTransition transition = new JiraTransition("21", "In Progress",
                 new JiraTransition.TransitionTarget("3", "In Progress", null));

@@ -1,5 +1,6 @@
 package com.leadboard.quality;
 
+import com.leadboard.config.JiraProperties;
 import com.leadboard.config.repository.*;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -52,7 +53,7 @@ class DataQualityServiceTest {
     void setUp() {
         // Real WorkflowConfigService with empty caches - fallback substring matching works
         workflowConfigService = new WorkflowConfigService(
-                configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper()
+                configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper(), new JiraProperties()
         );
         dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService);
     }

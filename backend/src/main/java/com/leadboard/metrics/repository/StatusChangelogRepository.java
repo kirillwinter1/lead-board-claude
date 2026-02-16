@@ -43,7 +43,7 @@ public interface StatusChangelogRepository extends JpaRepository<StatusChangelog
     boolean existsByIssueKeyAndSource(String issueKey, String source);
 
     @Query(value = """
-        SELECT to_status,
+        SELECT from_status,
                AVG(time_in_previous_status_seconds) as avg_seconds,
                PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_in_previous_status_seconds) as median_seconds,
                PERCENTILE_CONT(0.85) WITHIN GROUP (ORDER BY time_in_previous_status_seconds) as p85_seconds,
@@ -55,7 +55,8 @@ public interface StatusChangelogRepository extends JpaRepository<StatusChangelog
           AND sc.transitioned_at BETWEEN :from AND :to
           AND sc.time_in_previous_status_seconds IS NOT NULL
           AND sc.time_in_previous_status_seconds > 300
-        GROUP BY to_status
+          AND sc.from_status IS NOT NULL
+        GROUP BY from_status
         """, nativeQuery = true)
     List<Object[]> getTimeInStatusStats(
             @Param("teamId") Long teamId,

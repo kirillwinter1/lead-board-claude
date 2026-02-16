@@ -9,4 +9,5 @@ import java.util.Optional;
 @Repository
 public interface ProjectConfigurationRepository extends JpaRepository<ProjectConfigurationEntity, Long> {
     Optional<ProjectConfigurationEntity> findByIsDefaultTrue();
+    Optional<ProjectConfigurationEntity> findByProjectKey(String projectKey);
 }

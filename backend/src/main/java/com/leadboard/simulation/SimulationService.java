@@ -70,7 +70,7 @@ public class SimulationService {
 
             // Build summary
             SimulationSummary summary = dryRun
-                    ? new SimulationSummary(actions.size(), 0, 0, 0, 0, 0)
+                    ? new SimulationSummary(actions.size(), 0, 0, 0, 0, 0, 0)
                     : SimulationSummary.fromActions(actions);
 
             // Update log

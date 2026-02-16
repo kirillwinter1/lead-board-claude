@@ -1,5 +1,6 @@
 package com.leadboard.config.service;
 
+import com.leadboard.config.JiraProperties;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
@@ -28,6 +29,7 @@ public class MappingAutoDetectService {
     private final StatusMappingRepository statusMappingRepo;
     private final LinkTypeMappingRepository linkTypeRepo;
     private final WorkflowConfigService workflowConfigService;
+    private final JiraProperties jiraProperties;
 
     public MappingAutoDetectService(
             JiraMetadataService jiraMetadataService,
@@ -36,7 +38,8 @@ public class MappingAutoDetectService {
             IssueTypeMappingRepository issueTypeRepo,
             StatusMappingRepository statusMappingRepo,
             LinkTypeMappingRepository linkTypeRepo,
-            WorkflowConfigService workflowConfigService
+            WorkflowConfigService workflowConfigService,
+            JiraProperties jiraProperties
     ) {
         this.jiraMetadataService = jiraMetadataService;
         this.configRepo = configRepo;
@@ -45,6 +48,7 @@ public class MappingAutoDetectService {
         this.statusMappingRepo = statusMappingRepo;
         this.linkTypeRepo = linkTypeRepo;
         this.workflowConfigService = workflowConfigService;
+        this.jiraProperties = jiraProperties;
     }
 
     /**
@@ -374,18 +378,45 @@ public class MappingAutoDetectService {
     }
 
     private Long getDefaultConfigId() {
+        String envProjectKey = jiraProperties.getProjectKey();
+        if (envProjectKey != null && !envProjectKey.isBlank()) {
+            var byKey = configRepo.findByProjectKey(envProjectKey);
+            if (byKey.isPresent()) return byKey.get().getId();
+        }
         return configRepo.findByIsDefaultTrue().map(ProjectConfigurationEntity::getId).orElse(null);
     }
 
     private Long getOrCreateDefaultConfigId() {
-        return configRepo.findByIsDefaultTrue()
-                .orElseGet(() -> {
-                    ProjectConfigurationEntity config = new ProjectConfigurationEntity();
-                    config.setName("Default");
-                    config.setDefault(true);
-                    return configRepo.save(config);
-                })
-                .getId();
+        String envProjectKey = jiraProperties.getProjectKey();
+
+        // Try by project_key first
+        if (envProjectKey != null && !envProjectKey.isBlank()) {
+            var byKey = configRepo.findByProjectKey(envProjectKey);
+            if (byKey.isPresent()) return byKey.get().getId();
+        }
+
+        // Fallback to default, or create new
+        boolean isNew = false;
+        ProjectConfigurationEntity config = configRepo.findByIsDefaultTrue().orElse(null);
+        if (config == null) {
+            config = new ProjectConfigurationEntity();
+            config.setName("Default");
+            config.setDefault(true);
+            isNew = true;
+        }
+
+        // Auto-assign project_key if missing
+        boolean needsSave = isNew;
+        if (config.getProjectKey() == null && envProjectKey != null && !envProjectKey.isBlank()) {
+            config.setProjectKey(envProjectKey);
+            needsSave = true;
+        }
+
+        if (needsSave) {
+            config = configRepo.save(config);
+        }
+
+        return config.getId();
     }
 
     // ==================== Result DTO ====================

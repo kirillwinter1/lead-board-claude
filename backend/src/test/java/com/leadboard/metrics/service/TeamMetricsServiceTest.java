@@ -195,37 +195,44 @@ class TeamMetricsServiceTest {
     }
 
     @Test
-    void calculateTimeInStatuses_convertsToHours() {
+    void calculateTimeInStatuses_usesConfigStatusesWithData() {
         // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
-        // 7200 seconds = 2 hours, p85=10800 (3h), p99=14400 (4h)
-        Object[] row = new Object[]{"In Progress", new BigDecimal("7200"), new BigDecimal("3600"),
-                new BigDecimal("10800"), new BigDecimal("14400"), 15L};
-        List<Object[]> mockData = Collections.singletonList(row);
+        // Config has 2 pipeline statuses
+        when(workflowConfig.getStoryPipelineStatuses()).thenReturn(Arrays.asList(
+                new com.leadboard.config.service.WorkflowConfigService.StoryPipelineStatus("Analysis", 20, "#DEEBFF"),
+                new com.leadboard.config.service.WorkflowConfigService.StoryPipelineStatus("Development", 50, "#DEEBFF")
+        ));
 
+        // Changelog has data for "analysis" (case-insensitive match)
+        Object[] row = new Object[]{"Analysis", new BigDecimal("7200"), new BigDecimal("3600"),
+                new BigDecimal("10800"), new BigDecimal("14400"), 15L};
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
-                .thenReturn(mockData);
-        when(workflowConfig.getStoryTypeNames()).thenReturn(Collections.emptyList());
-        when(workflowConfig.getStoryStatusSortOrder("In Progress")).thenReturn(2);
-        when(workflowConfig.getStoryStatusColor("In Progress")).thenReturn("#0052CC");
+                .thenReturn(Collections.singletonList(row));
 
         // When
         List<TimeInStatusResponse> result = service.calculateTimeInStatuses(teamId, from, to);
 
-        // Then
-        assertEquals(1, result.size());
-        TimeInStatusResponse item = result.get(0);
-        assertEquals("In Progress", item.status());
-        assertEquals(new BigDecimal("2.00"), item.avgHours());
-        assertEquals(new BigDecimal("1.00"), item.medianHours());
-        assertEquals(new BigDecimal("3.00"), item.p85Hours());
-        assertEquals(new BigDecimal("4.00"), item.p99Hours());
-        assertEquals(15, item.transitionsCount());
-        assertEquals(2, item.sortOrder());
-        assertEquals("#0052CC", item.color());
+        // Then — both config statuses returned, Analysis with data, Development with zeros
+        assertEquals(2, result.size());
+
+        TimeInStatusResponse analysis = result.get(0);
+        assertEquals("Analysis", analysis.status());
+        assertEquals(new BigDecimal("2.00"), analysis.avgHours());
+        assertEquals(new BigDecimal("1.00"), analysis.medianHours());
+        assertEquals(new BigDecimal("3.00"), analysis.p85Hours());
+        assertEquals(new BigDecimal("4.00"), analysis.p99Hours());
+        assertEquals(15, analysis.transitionsCount());
+        assertEquals(20, analysis.sortOrder());
+
+        TimeInStatusResponse dev = result.get(1);
+        assertEquals("Development", dev.status());
+        assertEquals(BigDecimal.ZERO, dev.avgHours());
+        assertEquals(0, dev.transitionsCount());
+        assertEquals(50, dev.sortOrder());
     }
 
     @Test
@@ -243,7 +250,6 @@ class TeamMetricsServiceTest {
                 .thenReturn(Collections.emptyList());
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(workflowConfig.getStoryTypeNames()).thenReturn(Collections.emptyList());
         when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 

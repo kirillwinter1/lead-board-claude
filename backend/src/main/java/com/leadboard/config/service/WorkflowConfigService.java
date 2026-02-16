@@ -1,5 +1,6 @@
 package com.leadboard.config.service;
 
+import com.leadboard.config.JiraProperties;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
@@ -25,6 +26,7 @@ public class WorkflowConfigService {
     private final StatusMappingRepository statusMappingRepo;
     private final LinkTypeMappingRepository linkTypeRepo;
     private final ObjectMapper objectMapper;
+    private final JiraProperties jiraProperties;
 
     // Cached lookups
     private volatile Long defaultConfigId;
@@ -43,6 +45,7 @@ public class WorkflowConfigService {
     private volatile Set<String> epicTypeNames = Set.of();
     private volatile Set<String> storyTypeNames = Set.of();
     private volatile Set<String> subtaskTypeNames = Set.of();
+    private volatile String projectKey;
 
     public WorkflowConfigService(
             ProjectConfigurationRepository configRepo,
@@ -50,13 +53,15 @@ public class WorkflowConfigService {
             IssueTypeMappingRepository issueTypeRepo,
             StatusMappingRepository statusMappingRepo,
             LinkTypeMappingRepository linkTypeRepo,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            JiraProperties jiraProperties) {
         this.configRepo = configRepo;
         this.roleRepo = roleRepo;
         this.issueTypeRepo = issueTypeRepo;
         this.statusMappingRepo = statusMappingRepo;
         this.linkTypeRepo = linkTypeRepo;
         this.objectMapper = objectMapper;
+        this.jiraProperties = jiraProperties;
     }
 
     @PostConstruct
@@ -70,14 +75,35 @@ public class WorkflowConfigService {
 
     private void loadConfiguration() {
         try {
-            ProjectConfigurationEntity config = configRepo.findByIsDefaultTrue().orElse(null);
+            String envProjectKey = jiraProperties.getProjectKey();
+            ProjectConfigurationEntity config = null;
+
+            // 1. Try to find by project_key from env
+            if (envProjectKey != null && !envProjectKey.isBlank()) {
+                config = configRepo.findByProjectKey(envProjectKey).orElse(null);
+            }
+
+            // 2. Fallback: find default config
+            if (config == null) {
+                config = configRepo.findByIsDefaultTrue().orElse(null);
+            }
+
             if (config == null) {
                 log.warn("No default project configuration found in DB. Using empty config.");
                 defaultConfigId = null;
+                projectKey = null;
                 return;
             }
 
+            // 3. Auto-assign project_key if config has none and env has one
+            if (config.getProjectKey() == null && envProjectKey != null && !envProjectKey.isBlank()) {
+                config.setProjectKey(envProjectKey);
+                configRepo.save(config);
+                log.info("Auto-assigned project key '{}' to default configuration", envProjectKey);
+            }
+
             defaultConfigId = config.getId();
+            projectKey = config.getProjectKey();
 
             // Load roles
             cachedRoles = roleRepo.findByConfigIdOrderBySortOrderAsc(defaultConfigId);
@@ -507,6 +533,10 @@ public class WorkflowConfigService {
         return defaultConfigId;
     }
 
+    public String getProjectKey() {
+        return projectKey;
+    }
+
     /**
      * Returns all status names mapped for a given board category and status category.
      * Used for backwards compatibility with methods that need lists of status names.
@@ -521,6 +551,29 @@ public class WorkflowConfigService {
         }
         return result;
     }
+
+    /**
+     * Returns STORY pipeline statuses (excluding NEW/DONE) sorted by sort_order.
+     * Each entry: [statusName, sortOrder, color].
+     */
+    public List<StoryPipelineStatus> getStoryPipelineStatuses() {
+        List<StoryPipelineStatus> result = new ArrayList<>();
+        String prefix = "STORY:";
+        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+            if (!entry.getKey().startsWith(prefix)) continue;
+            StatusCategory cat = entry.getValue();
+            if (cat == StatusCategory.NEW || cat == StatusCategory.DONE || cat == StatusCategory.TODO) continue;
+
+            String statusName = entry.getKey().substring(prefix.length());
+            int sortOrder = statusSortOrder.getOrDefault(entry.getKey(), 0);
+            String color = statusColor.getOrDefault(entry.getKey(), null);
+            result.add(new StoryPipelineStatus(statusName, sortOrder, color));
+        }
+        result.sort(Comparator.comparingInt(StoryPipelineStatus::sortOrder));
+        return result;
+    }
+
+    public record StoryPipelineStatus(String statusName, int sortOrder, String color) {}
 
     private String buildStatusKey(String issueCategory, String statusName) {
         return issueCategory + ":" + statusName;

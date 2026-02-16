@@ -834,7 +834,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   return (
     <div className="workflow-page">
       <div className="workflow-header">
-        <h1 className="workflow-title">Workflow Configuration</h1>
+        <h1 className="workflow-title">
+          Workflow Configuration{config?.projectKey ? ` — ${config.projectKey}` : ''}
+        </h1>
         <div className="workflow-header-actions">
           {saveMessage && <span className="save-success">{saveMessage}</span>}
           <button className="btn btn-secondary" onClick={startWizard}>

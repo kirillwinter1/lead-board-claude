@@ -1,5 +1,6 @@
 package com.leadboard.config.controller;
 
+import com.leadboard.config.JiraProperties;
 import com.leadboard.config.dto.*;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
@@ -38,6 +39,7 @@ public class WorkflowConfigController {
     private final MappingAutoDetectService autoDetectService;
     private final ObjectMapper objectMapper;
     private final JiraIssueRepository jiraIssueRepository;
+    private final JiraProperties jiraProperties;
 
     public WorkflowConfigController(
             ProjectConfigurationRepository configRepo,
@@ -49,7 +51,8 @@ public class WorkflowConfigController {
             MappingValidationService validationService,
             MappingAutoDetectService autoDetectService,
             ObjectMapper objectMapper,
-            JiraIssueRepository jiraIssueRepository
+            JiraIssueRepository jiraIssueRepository,
+            JiraProperties jiraProperties
     ) {
         this.configRepo = configRepo;
         this.roleRepo = roleRepo;
@@ -61,6 +64,7 @@ public class WorkflowConfigController {
         this.autoDetectService = autoDetectService;
         this.objectMapper = objectMapper;
         this.jiraIssueRepository = jiraIssueRepository;
+        this.jiraProperties = jiraProperties;
     }
 
     // ==================== Full Config ====================
@@ -78,6 +82,7 @@ public class WorkflowConfigController {
         return ResponseEntity.ok(new WorkflowConfigResponse(
                 configId,
                 config.getName(),
+                config.getProjectKey(),
                 mapRoles(roleRepo.findByConfigIdOrderBySortOrderAsc(configId)),
                 mapIssueTypes(issueTypeRepo.findByConfigId(configId)),
                 mapStatuses(statusMappingRepo.findByConfigId(configId)),
@@ -313,14 +318,27 @@ public class WorkflowConfigController {
     // ==================== Helpers ====================
 
     private ProjectConfigurationEntity getDefaultConfig() {
+        String envProjectKey = jiraProperties.getProjectKey();
+        if (envProjectKey != null && !envProjectKey.isBlank()) {
+            var byKey = configRepo.findByProjectKey(envProjectKey);
+            if (byKey.isPresent()) return byKey.get();
+        }
         return configRepo.findByIsDefaultTrue().orElse(null);
     }
 
     private ProjectConfigurationEntity getOrCreateDefaultConfig() {
+        String envProjectKey = jiraProperties.getProjectKey();
+        if (envProjectKey != null && !envProjectKey.isBlank()) {
+            var byKey = configRepo.findByProjectKey(envProjectKey);
+            if (byKey.isPresent()) return byKey.get();
+        }
         return configRepo.findByIsDefaultTrue().orElseGet(() -> {
             ProjectConfigurationEntity config = new ProjectConfigurationEntity();
             config.setName("Default");
             config.setDefault(true);
+            if (envProjectKey != null && !envProjectKey.isBlank()) {
+                config.setProjectKey(envProjectKey);
+            }
             return configRepo.save(config);
         });
     }

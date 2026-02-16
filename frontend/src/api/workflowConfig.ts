@@ -77,6 +77,7 @@ export interface AutoDetectResult {
 export interface WorkflowConfigResponse {
   configId: number
   configName: string
+  projectKey: string | null
   roles: WorkflowRoleDto[]
   issueTypes: IssueTypeMappingDto[]
   statuses: StatusMappingDto[]

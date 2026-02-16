@@ -141,56 +141,61 @@ public class TeamMetricsService {
 
     /**
      * Calculate time spent in each status.
+     * Uses STORY pipeline statuses from config as fixed X-axis.
+     * Shows 0 for statuses with no data.
      */
     public List<TimeInStatusResponse> calculateTimeInStatuses(Long teamId, LocalDate from, LocalDate to) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
+        // 1. Get STORY pipeline statuses from config (excluding NEW/DONE)
+        var pipelineStatuses = workflowConfig.getStoryPipelineStatuses();
+
+        // 2. Query actual data from changelog (grouped by from_status)
         List<Object[]> data = changelogRepository.getTimeInStatusStats(teamId, fromDt, toDt);
 
-        // Get STORY status names for filtering
-        List<String> storyStatuses = workflowConfig.getStoryTypeNames().stream()
-                .findFirst()
-                .map(t -> {
-                    // Collect all STORY-category status names
-                    List<String> names = new ArrayList<>();
-                    for (var cat : com.leadboard.status.StatusCategory.values()) {
-                        names.addAll(workflowConfig.getStatusNames(
-                                com.leadboard.config.entity.BoardCategory.STORY, cat));
-                    }
-                    return names;
-                })
-                .orElse(List.of());
+        // 3. Build lookup: status name (lowercase) -> parsed row
+        Map<String, Object[]> dataMap = new HashMap<>();
+        for (Object[] row : data) {
+            String status = (String) row[0];
+            if (status != null) {
+                dataMap.put(status.toLowerCase(), row);
+            }
+        }
 
-        return data.stream()
-                .map(row -> {
-                    String status = (String) row[0];
-                    BigDecimal avgSeconds = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
-                    BigDecimal medianSeconds = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
-                    BigDecimal p85Seconds = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
-                    BigDecimal p99Seconds = row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO;
-                    int transitionsCount = ((Number) row[5]).intValue();
+        // 4. For each config status, match data or fill zeros
+        BigDecimal divisor = BigDecimal.valueOf(3600);
+        List<TimeInStatusResponse> result = new ArrayList<>();
 
-                    BigDecimal divisor = BigDecimal.valueOf(3600);
-                    BigDecimal avgHours = avgSeconds.divide(divisor, 2, RoundingMode.HALF_UP);
-                    BigDecimal medianHours = medianSeconds.divide(divisor, 2, RoundingMode.HALF_UP);
-                    BigDecimal p85Hours = p85Seconds.divide(divisor, 2, RoundingMode.HALF_UP);
-                    BigDecimal p99Hours = p99Seconds.divide(divisor, 2, RoundingMode.HALF_UP);
+        for (var ps : pipelineStatuses) {
+            Object[] row = dataMap.get(ps.statusName().toLowerCase());
 
-                    int sortOrder = workflowConfig.getStoryStatusSortOrder(status);
-                    String color = workflowConfig.getStoryStatusColor(status);
+            BigDecimal avgHours = BigDecimal.ZERO;
+            BigDecimal medianHours = BigDecimal.ZERO;
+            BigDecimal p85Hours = BigDecimal.ZERO;
+            BigDecimal p99Hours = BigDecimal.ZERO;
+            int transitionsCount = 0;
 
-                    return new TimeInStatusResponse(status, avgHours, medianHours,
-                            p85Hours, p99Hours, transitionsCount, sortOrder, color);
-                })
-                .filter(r -> {
-                    // Filter to STORY statuses only if we have config
-                    if (storyStatuses.isEmpty()) return true;
-                    return storyStatuses.stream()
-                            .anyMatch(s -> s.equalsIgnoreCase(r.status()));
-                })
-                .sorted(Comparator.comparingInt(TimeInStatusResponse::sortOrder))
-                .collect(Collectors.toList());
+            if (row != null) {
+                BigDecimal avgSec = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
+                BigDecimal medSec = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
+                BigDecimal p85Sec = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
+                BigDecimal p99Sec = row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO;
+                transitionsCount = ((Number) row[5]).intValue();
+
+                avgHours = avgSec.divide(divisor, 2, RoundingMode.HALF_UP);
+                medianHours = medSec.divide(divisor, 2, RoundingMode.HALF_UP);
+                p85Hours = p85Sec.divide(divisor, 2, RoundingMode.HALF_UP);
+                p99Hours = p99Sec.divide(divisor, 2, RoundingMode.HALF_UP);
+            }
+
+            result.add(new TimeInStatusResponse(
+                    ps.statusName(), avgHours, medianHours,
+                    p85Hours, p99Hours, transitionsCount,
+                    ps.sortOrder(), ps.color()));
+        }
+
+        return result;
     }
 
     /**
