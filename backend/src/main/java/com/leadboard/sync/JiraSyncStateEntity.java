@@ -100,7 +100,9 @@ public class JiraSyncStateEntity {
     }
 
     public void setLastError(String lastError) {
-        this.lastError = lastError;
+        this.lastError = lastError != null && lastError.length() > 1000
+                ? lastError.substring(0, 1000)
+                : lastError;
     }
 
     public OffsetDateTime getCreatedAt() {

@@ -1,6 +1,7 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.competency.CompetencyScoreCalculator;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
@@ -41,6 +42,8 @@ class UnifiedPlanningServiceTest {
     private WorkflowConfigService workflowConfigService;
     @Mock
     private StoryDependencyService dependencyService;
+    @Mock
+    private CompetencyScoreCalculator competencyCalculator;
 
     private UnifiedPlanningService service;
 
@@ -54,7 +57,8 @@ class UnifiedPlanningServiceTest {
                 memberRepository,
                 calendarService,
                 workflowConfigService,
-                dependencyService
+                dependencyService,
+                competencyCalculator
         );
 
         // Default config
@@ -72,6 +76,10 @@ class UnifiedPlanningServiceTest {
             int days = invocation.getArgument(1);
             return date.plusDays(days);
         });
+
+        // Competency calculator defaults (neutral: factor = 1.0 when score = 3.0)
+        when(competencyCalculator.loadForMembers(anyList())).thenReturn(java.util.Map.of());
+        when(competencyCalculator.calculateScore(anyMap(), anyList())).thenReturn(3.0);
 
         // WorkflowConfigService defaults
         when(workflowConfigService.getRoleCodesInPipelineOrder()).thenReturn(List.of("SA", "DEV", "QA"));

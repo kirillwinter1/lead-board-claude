@@ -61,6 +61,7 @@ public class JiraIssue {
         private JiraUser assignee;
         private List<Object> flagged; // Jira field for Impediment flag
         private List<JiraIssueLink> issuelinks;
+        private List<JiraComponent> components;
         private Map<String, Object> customFields = new HashMap<>();
 
         @JsonAnySetter
@@ -164,6 +165,14 @@ public class JiraIssue {
 
         public void setIssuelinks(List<JiraIssueLink> issuelinks) {
             this.issuelinks = issuelinks;
+        }
+
+        public List<JiraComponent> getComponents() {
+            return components;
+        }
+
+        public void setComponents(List<JiraComponent> components) {
+            this.components = components;
         }
 
         public JiraUser getAssignee() {
@@ -459,6 +468,28 @@ public class JiraIssue {
 
         public void setEmailAddress(String emailAddress) {
             this.emailAddress = emailAddress;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class JiraComponent {
+        private String id;
+        private String name;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
     }
 }

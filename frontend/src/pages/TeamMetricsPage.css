@@ -256,3 +256,45 @@
   font-size: 12px;
 }
 
+/* DSR by Epic Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #ebecf0;
+  white-space: nowrap;
+}
+
+.data-table th {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #fafbfc;
+}
+
+.data-table td:first-child {
+  white-space: normal;
+  max-width: 400px;
+}
+
+.data-table td:nth-child(n+3) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-table th:nth-child(n+3) {
+  text-align: right;
+}
+
+.data-table tbody tr:hover {
+  background: #f4f5f7;
+}
+

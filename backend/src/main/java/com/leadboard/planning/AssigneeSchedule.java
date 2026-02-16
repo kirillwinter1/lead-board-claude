@@ -187,6 +187,47 @@ public class AssigneeSchedule {
         );
     }
 
+    /**
+     * Simulates allocation without modifying state.
+     * Same logic as allocateHours but read-only — used to compare candidates.
+     */
+    public AllocationResult simulateAllocation(BigDecimal hoursNeeded, LocalDate startAfter, WorkCalendarHelper calendar) {
+        if (hoursNeeded.compareTo(BigDecimal.ZERO) <= 0) {
+            return new AllocationResult(startAfter, startAfter, BigDecimal.ZERO);
+        }
+
+        BigDecimal remaining = hoursNeeded;
+        LocalDate currentDate = calendar.ensureWorkday(startAfter);
+        LocalDate startDate = null;
+        LocalDate endDate = null;
+
+        int maxIterations = 365;
+
+        for (int i = 0; i < maxIterations && remaining.compareTo(BigDecimal.ZERO) > 0; i++) {
+            currentDate = calendar.ensureWorkday(currentDate);
+            BigDecimal available = getAvailableHours(currentDate);
+
+            if (available.compareTo(BigDecimal.ZERO) > 0) {
+                if (startDate == null) {
+                    startDate = currentDate;
+                }
+                BigDecimal toUse = remaining.min(available);
+                remaining = remaining.subtract(toUse);
+                endDate = currentDate;
+            }
+
+            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                currentDate = calendar.nextWorkday(currentDate);
+            }
+        }
+
+        return new AllocationResult(
+                startDate != null ? startDate : startAfter,
+                endDate != null ? endDate : startAfter,
+                hoursNeeded.subtract(remaining)
+        );
+    }
+
     @Override
     public String toString() {
         return String.format("AssigneeSchedule{%s (%s), %.1fh/day, assigned=%.1fh}",

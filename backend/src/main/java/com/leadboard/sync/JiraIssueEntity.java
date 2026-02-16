@@ -118,6 +118,10 @@ public class JiraIssueEntity {
     @Column(name = "workflow_role", length = 50)
     private String workflowRole;
 
+    @Column(name = "components", columnDefinition = "TEXT[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] components;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -259,6 +263,9 @@ public class JiraIssueEntity {
 
     public String getWorkflowRole() { return workflowRole; }
     public void setWorkflowRole(String workflowRole) { this.workflowRole = workflowRole; }
+
+    public String[] getComponents() { return components; }
+    public void setComponents(String[] components) { this.components = components; }
 
     // ==================== Derived/Computed Methods ====================
 

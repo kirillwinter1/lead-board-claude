@@ -1,7 +1,9 @@
 import { Link, useParams } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import { MetricCard } from '../components/metrics/MetricCard'
+import { CompetencyRating } from '../components/competency/CompetencyRating'
 import { teamsApi, MemberProfileResponse, WeeklyTrend } from '../api/teams'
+import { competencyApi, CompetencyLevel } from '../api/competency'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 
@@ -138,6 +140,9 @@ export function MemberProfilePage() {
   const [from, setFrom] = useState(getDefaultFrom)
   const [to, setTo] = useState(getDefaultTo)
 
+  const [competencies, setCompetencies] = useState<CompetencyLevel[]>([])
+  const [availableComponents, setAvailableComponents] = useState<string[]>([])
+
   const loadProfile = useCallback(async () => {
     if (!teamId || !memberId) return
     setLoading(true)
@@ -155,6 +160,24 @@ export function MemberProfilePage() {
   useEffect(() => {
     loadProfile()
   }, [loadProfile])
+
+  useEffect(() => {
+    if (!memberId) return
+    competencyApi.getMember(Number(memberId)).then(setCompetencies).catch(() => {})
+    competencyApi.getComponents().then(setAvailableComponents).catch(() => {})
+  }, [memberId])
+
+  const handleCompetencyChange = async (componentName: string, level: number) => {
+    if (!memberId) return
+    const updated = competencies.some(c => c.componentName === componentName)
+      ? competencies.map(c => c.componentName === componentName ? { ...c, level } : c)
+      : [...competencies, { componentName, level }]
+    setCompetencies(updated)
+    try {
+      const result = await competencyApi.updateMember(Number(memberId), [{ componentName, level }])
+      setCompetencies(result)
+    } catch { /* silent */ }
+  }
 
   if (loading) {
     return (
@@ -263,6 +286,31 @@ export function MemberProfilePage() {
           tooltip="Суммарные затраченные часы vs суммарная оценка за период"
         />
       </div>
+
+      {/* Competency Section */}
+      {availableComponents.length > 0 && (
+        <div className="profile-section" style={{ marginBottom: 16 }}>
+          <div className="profile-section-header">
+            <h3>Компетенции</h3>
+            <span className="section-badge">{competencies.length}/{availableComponents.length}</span>
+          </div>
+          <div className="competency-grid">
+            {availableComponents.map(comp => {
+              const existing = competencies.find(c => c.componentName === comp)
+              return (
+                <div key={comp} className="competency-row">
+                  <span className="competency-component-name">{comp}</span>
+                  <CompetencyRating
+                    level={existing?.level ?? 0}
+                    onChange={level => handleCompetencyChange(comp, level)}
+                    showLabel
+                  />
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Grid */}
       <div className="member-profile-grid">

@@ -1,6 +1,7 @@
 package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.competency.CompetencyScoreCalculator;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
@@ -51,6 +52,7 @@ public class UnifiedPlanningService {
     private final WorkCalendarService calendarService;
     private final WorkflowConfigService workflowConfigService;
     private final StoryDependencyService dependencyService;
+    private final CompetencyScoreCalculator competencyCalculator;
 
     public UnifiedPlanningService(
             JiraIssueRepository issueRepository,
@@ -58,7 +60,8 @@ public class UnifiedPlanningService {
             TeamMemberRepository memberRepository,
             WorkCalendarService calendarService,
             WorkflowConfigService workflowConfigService,
-            StoryDependencyService dependencyService
+            StoryDependencyService dependencyService,
+            CompetencyScoreCalculator competencyCalculator
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
@@ -66,6 +69,7 @@ public class UnifiedPlanningService {
         this.calendarService = calendarService;
         this.workflowConfigService = workflowConfigService;
         this.dependencyService = dependencyService;
+        this.competencyCalculator = competencyCalculator;
     }
 
     /**
@@ -84,6 +88,9 @@ public class UnifiedPlanningService {
         // 2. Load team members and build assignee schedules
         List<TeamMemberEntity> members = memberRepository.findByTeamIdAndActiveTrue(teamId);
         Map<String, AssigneeSchedule> assigneeSchedules = buildAssigneeSchedules(members, gradeCoeffs);
+
+        // 2b. Pre-load competencies for all team members
+        Map<String, Map<String, Integer>> competencyMap = competencyCalculator.loadForMembers(members);
 
         // 3. Load epics sorted by AutoScore
         List<JiraIssueEntity> epics = getEpicsSorted(teamId);
@@ -107,7 +114,8 @@ public class UnifiedPlanningService {
                     calendarHelper,
                     riskBuffer,
                     pipelineRoles,
-                    globalWarnings
+                    globalWarnings,
+                    competencyMap
             );
             plannedEpics.add(plannedEpic);
         }
@@ -137,7 +145,8 @@ public class UnifiedPlanningService {
             AssigneeSchedule.WorkCalendarHelper calendarHelper,
             BigDecimal riskBuffer,
             List<String> pipelineRoles,
-            List<PlanningWarning> globalWarnings
+            List<PlanningWarning> globalWarnings,
+            Map<String, Map<String, Integer>> competencyMap
     ) {
         String epicKey = epic.getIssueKey();
         log.debug("Planning epic {}", epicKey);
@@ -245,7 +254,8 @@ public class UnifiedPlanningService {
                     pipelineRoles,
                     assigneeSchedules,
                     storyEndDates,
-                    calendarHelper
+                    calendarHelper,
+                    competencyMap
             );
 
             plannedStories.add(plannedStory);
@@ -383,7 +393,8 @@ public class UnifiedPlanningService {
             List<String> pipelineRoles,
             Map<String, AssigneeSchedule> assigneeSchedules,
             Map<String, LocalDate> storyEndDates,
-            AssigneeSchedule.WorkCalendarHelper calendarHelper
+            AssigneeSchedule.WorkCalendarHelper calendarHelper,
+            Map<String, Map<String, Integer>> competencyMap
     ) {
         String storyKey = story.getIssueKey();
         List<PlanningWarning> warnings = new ArrayList<>();
@@ -407,6 +418,9 @@ public class UnifiedPlanningService {
         LocalDate currentDate = earliestStart;
         Map<String, PhaseSchedule> roleSchedules = new LinkedHashMap<>();
 
+        // Resolve components: subtasks first, then story fallback
+        List<String> storyComponents = resolveComponents(story);
+
         for (String roleCode : pipelineRoles) {
             BigDecimal hours = phaseHoursMap.getOrDefault(roleCode, BigDecimal.ZERO);
             if (hours.compareTo(BigDecimal.ZERO) > 0) {
@@ -417,7 +431,9 @@ public class UnifiedPlanningService {
                         assigneeSchedules,
                         calendarHelper,
                         warnings,
-                        storyKey
+                        storyKey,
+                        storyComponents,
+                        competencyMap
                 );
                 roleSchedules.put(roleCode, schedule);
                 if (schedule != null && schedule.endDate() != null) {
@@ -463,7 +479,8 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Plans a single phase, finding the earliest available assignee with matching role code.
+     * Plans a single phase, finding the assignee who finishes earliest
+     * (considering both availability and competency-adjusted hours).
      */
     private PhaseSchedule planPhase(
             String roleCode,
@@ -472,27 +489,38 @@ public class UnifiedPlanningService {
             Map<String, AssigneeSchedule> assigneeSchedules,
             AssigneeSchedule.WorkCalendarHelper calendarHelper,
             List<PlanningWarning> warnings,
-            String storyKey
+            String storyKey,
+            List<String> storyComponents,
+            Map<String, Map<String, Integer>> competencyMap
     ) {
-        // Find earliest available assignee with matching role
         AssigneeSchedule bestAssignee = null;
-        LocalDate bestAvailableDate = null;
+        LocalDate bestEndDate = null;
+        BigDecimal bestAdjustedHours = hours;
 
         for (AssigneeSchedule schedule : assigneeSchedules.values()) {
             if (!roleCode.equals(schedule.getRoleCode())) {
                 continue;
             }
 
-            LocalDate availableDate = schedule.findFirstAvailableDate(startAfter, calendarHelper);
+            // Calculate competency-adjusted hours
+            Map<String, Integer> memberComp = competencyMap.getOrDefault(
+                    schedule.getAccountId(), Map.of());
+            double score = competencyCalculator.calculateScore(memberComp, storyComponents);
+            BigDecimal factor = CompetencyScoreCalculator.getCompetencyFactor(score);
+            BigDecimal adjustedHours = hours.multiply(factor).setScale(2, RoundingMode.HALF_UP);
 
-            if (bestAssignee == null || availableDate.isBefore(bestAvailableDate)) {
+            // Simulate allocation to compare end dates without modifying state
+            AssigneeSchedule.AllocationResult simulated = schedule.simulateAllocation(
+                    adjustedHours, startAfter, calendarHelper);
+
+            if (bestAssignee == null || simulated.endDate().isBefore(bestEndDate)) {
                 bestAssignee = schedule;
-                bestAvailableDate = availableDate;
+                bestEndDate = simulated.endDate();
+                bestAdjustedHours = adjustedHours;
             }
         }
 
         if (bestAssignee == null) {
-            // No capacity for this role
             warnings.add(new PlanningWarning(
                     storyKey,
                     WarningType.NO_CAPACITY,
@@ -501,13 +529,14 @@ public class UnifiedPlanningService {
             return PhaseSchedule.noCapacity(hours);
         }
 
-        // Allocate hours to this assignee
+        // Allocate adjusted hours (expert uses less capacity)
         AssigneeSchedule.AllocationResult allocation = bestAssignee.allocateHours(
-                hours,
+                bestAdjustedHours,
                 startAfter,
                 calendarHelper
         );
 
+        // Return original hours in schedule (for display), but allocation used adjusted hours
         return new PhaseSchedule(
                 bestAssignee.getAccountId(),
                 bestAssignee.getDisplayName(),
@@ -776,7 +805,8 @@ public class UnifiedPlanningService {
             BigDecimal hours = roleHours.getOrDefault(roleCode, BigDecimal.ZERO);
             if (hours.compareTo(BigDecimal.ZERO) > 0) {
                 PhaseSchedule schedule = planPhase(
-                        roleCode, hours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey
+                        roleCode, hours, currentDate, assigneeSchedules, calendarHelper, warnings, epicKey,
+                        List.of(), Map.of()
                 );
                 if (schedule != null && schedule.startDate() != null) {
                     startDates.put(roleCode, schedule.startDate());
@@ -849,6 +879,30 @@ public class UnifiedPlanningService {
         }
 
         return result;
+    }
+
+    /**
+     * Resolves components for a story: subtask components first, then story fallback.
+     */
+    private List<String> resolveComponents(JiraIssueEntity story) {
+        // Try subtask components first
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
+        Set<String> subtaskComponents = new LinkedHashSet<>();
+        for (JiraIssueEntity subtask : subtasks) {
+            if (subtask.getComponents() != null) {
+                subtaskComponents.addAll(Arrays.asList(subtask.getComponents()));
+            }
+        }
+        if (!subtaskComponents.isEmpty()) {
+            return new ArrayList<>(subtaskComponents);
+        }
+
+        // Fallback to story's own components
+        if (story.getComponents() != null && story.getComponents().length > 0) {
+            return Arrays.asList(story.getComponents());
+        }
+
+        return List.of();
     }
 
     /**

@@ -11,6 +11,7 @@ import { PokerRoomPage } from './pages/PokerRoomPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WorkflowConfigPage } from './pages/WorkflowConfigPage'
 import { MemberProfilePage } from './pages/MemberProfilePage'
+import { TeamCompetencyPage } from './pages/TeamCompetencyPage'
 import { LandingPage } from './pages/landing/LandingPage'
 import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
 import './App.css'
@@ -32,6 +33,7 @@ function App() {
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
           <Route path="teams/:teamId/member/:memberId" element={<MemberProfilePage />} />
+          <Route path="teams/:teamId/competency" element={<TeamCompetencyPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="workflow" element={<WorkflowConfigPage />} />
         </Route>

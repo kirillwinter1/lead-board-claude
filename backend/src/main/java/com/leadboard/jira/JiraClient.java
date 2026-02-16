@@ -79,7 +79,7 @@ public class JiraClient {
     }
 
     private String buildFieldsList() {
-        String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,assignee,flagged,customfield_10021,issuelinks";
+        String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,assignee,flagged,customfield_10021,issuelinks,components";
         String teamFieldId = jiraProperties.getTeamFieldId();
         if (teamFieldId != null && !teamFieldId.isEmpty()) {
             return baseFields + "," + teamFieldId;
@@ -568,6 +568,41 @@ public class JiraClient {
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.PaginatedChangelog.class)
                 .block();
+    }
+
+    /**
+     * Get project components from Jira.
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> getProjectComponents(String projectKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        List<Map<String, Object>> components;
+        if (accessToken != null && cloudId != null) {
+            String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+            components = webClient.get()
+                    .uri(baseUrl + "/rest/api/3/project/" + projectKey + "/components")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(List.class)
+                    .block();
+        } else {
+            String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+            components = webClient.get()
+                    .uri(jiraProperties.getBaseUrl() + "/rest/api/3/project/" + projectKey + "/components")
+                    .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                    .retrieve()
+                    .bodyToMono(List.class)
+                    .block();
+        }
+
+        if (components == null) return List.of();
+        return components.stream()
+                .map(c -> (String) c.get("name"))
+                .filter(name -> name != null && !name.isEmpty())
+                .toList();
     }
 
     private String formatTimeEstimate(int seconds) {

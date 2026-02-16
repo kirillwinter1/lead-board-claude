@@ -382,6 +382,29 @@
   font-size: 13px;
 }
 
+/* Competency Grid */
+.competency-grid {
+  padding: 12px 20px 16px;
+}
+
+.competency-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #f4f5f7;
+}
+
+.competency-row:last-child {
+  border-bottom: none;
+}
+
+.competency-component-name {
+  font-size: 13px;
+  color: #172b4d;
+  font-weight: 500;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .member-summary-cards {

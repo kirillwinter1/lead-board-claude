@@ -1,0 +1,36 @@
+.competency-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.competency-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.competency-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #dfe1e6;
+  transition: background-color 0.15s, transform 0.15s;
+}
+
+.competency-dot.filled {
+  /* color set inline */
+}
+
+.competency-dot.clickable {
+  cursor: pointer;
+}
+
+.competency-dot.clickable:hover {
+  transform: scale(1.3);
+}
+
+.competency-label {
+  font-size: 11px;
+  font-weight: 500;
+  min-width: 60px;
+}

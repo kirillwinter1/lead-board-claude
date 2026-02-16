@@ -183,4 +183,14 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to
     );
+
+    // ==================== Competency Matrix queries ====================
+
+    @Query(value = "SELECT DISTINCT unnest(components) FROM jira_issues WHERE components IS NOT NULL ORDER BY 1",
+           nativeQuery = true)
+    List<String> findDistinctComponents();
+
+    @Query(value = "SELECT DISTINCT unnest(components) FROM jira_issues WHERE team_id = :teamId AND components IS NOT NULL ORDER BY 1",
+           nativeQuery = true)
+    List<String> findDistinctComponentsByTeamId(@Param("teamId") Long teamId);
 }

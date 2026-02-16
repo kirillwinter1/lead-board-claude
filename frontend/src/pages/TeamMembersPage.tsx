@@ -263,9 +263,15 @@ export function TeamMembersPage() {
             <span className="team-jira-value">{team.jiraTeamValue}</span>
           )}
         </div>
-        <button className="btn btn-primary" onClick={openCreateModal}>
-          + Add Member
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Link to={`/board/teams/${teamId}/competency`} className="btn btn-secondary"
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
+            Competency Matrix
+          </Link>
+          <button className="btn btn-primary" onClick={openCreateModal}>
+            + Add Member
+          </button>
+        </div>
       </div>
 
       {members.length === 0 ? (

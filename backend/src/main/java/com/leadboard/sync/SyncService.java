@@ -396,6 +396,17 @@ public class SyncService {
             entity.setAssigneeDisplayName(null);
         }
 
+        // Extract components
+        List<JiraIssue.JiraComponent> jiraComponents = jiraIssue.getFields().getComponents();
+        if (jiraComponents != null && !jiraComponents.isEmpty()) {
+            entity.setComponents(jiraComponents.stream()
+                    .map(JiraIssue.JiraComponent::getName)
+                    .filter(name -> name != null && !name.isEmpty())
+                    .toArray(String[]::new));
+        } else {
+            entity.setComponents(null);
+        }
+
         // Detect "In Progress" using WorkflowConfigService
         // started_at will be corrected to real Jira timestamp by changelog import
         String status = jiraIssue.getFields().getStatus().getName();
