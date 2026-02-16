@@ -8,7 +8,7 @@ API для прогнозирования дат завершения эпико
 
 ---
 
-## Endpoints
+## Planning Endpoints
 
 ### GET /api/planning/forecast
 
@@ -31,18 +31,20 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 {
   "calculatedAt": "2026-01-24T12:00:00Z",
   "teamId": 1,
-  "teamCapacity": {
-    "saHoursPerDay": 6.0,
-    "devHoursPerDay": 16.0,
-    "qaHoursPerDay": 6.0
+  "roleCapacity": {
+    "SA": 6.0,
+    "DEV": 16.0,
+    "QA": 6.0
   },
   "wipStatus": {
     "limit": 6,
     "current": 3,
     "exceeded": false,
-    "sa": { "limit": 2, "current": 1, "exceeded": false },
-    "dev": { "limit": 3, "current": 2, "exceeded": false },
-    "qa": { "limit": 2, "current": 1, "exceeded": false }
+    "roleWip": {
+      "SA": { "limit": 2, "current": 1, "exceeded": false },
+      "DEV": { "limit": 3, "current": 2, "exceeded": false },
+      "QA": { "limit": 2, "current": 1, "exceeded": false }
+    }
   },
   "epics": [
     {
@@ -54,24 +56,24 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
       "dueDateDeltaDays": -3,
       "dueDate": "2026-03-18",
       "remainingByRole": {
-        "sa": { "hours": 16.0, "days": 2.0 },
-        "dev": { "hours": 80.0, "days": 10.0 },
-        "qa": { "hours": 24.0, "days": 3.0 }
+        "SA": { "hours": 16.0, "days": 2.0 },
+        "DEV": { "hours": 80.0, "days": 10.0 },
+        "QA": { "hours": 24.0, "days": 3.0 }
       },
       "phaseSchedule": {
-        "sa": {
+        "SA": {
           "startDate": "2026-01-27",
           "endDate": "2026-01-28",
           "workDays": 2.0,
           "noCapacity": false
         },
-        "dev": {
+        "DEV": {
           "startDate": "2026-01-29",
           "endDate": "2026-02-11",
           "workDays": 10.0,
           "noCapacity": false
         },
-        "qa": {
+        "QA": {
           "startDate": "2026-02-05",
           "endDate": "2026-03-15",
           "workDays": 3.0,
@@ -82,9 +84,9 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
       "queuedUntil": null,
       "isWithinWip": true,
       "phaseWaitInfo": {
-        "sa": { "waiting": false, "waitingUntil": null, "queuePosition": null },
-        "dev": { "waiting": false, "waitingUntil": null, "queuePosition": null },
-        "qa": { "waiting": false, "waitingUntil": null, "queuePosition": null }
+        "SA": { "waiting": false, "waitingUntil": null, "queuePosition": null },
+        "DEV": { "waiting": false, "waitingUntil": null, "queuePosition": null },
+        "QA": { "waiting": false, "waitingUntil": null, "queuePosition": null }
       }
     }
   ]
@@ -97,8 +99,8 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 |------|-----|----------|
 | calculatedAt | string | Время расчёта (ISO 8601) |
 | teamId | number | ID команды |
-| teamCapacity | object | Capacity команды по ролям (часов/день) |
-| wipStatus | object | Статус WIP лимитов |
+| roleCapacity | Map<string, number> | Capacity команды по ролям (ключ = код роли, значение = часов/день) |
+| wipStatus | WipStatus | Статус WIP лимитов |
 | epics | array | Список прогнозов по эпикам |
 
 **Поля WipStatus:**
@@ -108,9 +110,7 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | limit | number | WIP лимит команды |
 | current | number | Текущее количество эпиков в WIP |
 | exceeded | boolean | Превышен ли лимит |
-| sa | RoleWipStatus | WIP статус для SA (null если не рассчитан) |
-| dev | RoleWipStatus | WIP статус для DEV (null если не рассчитан) |
-| qa | RoleWipStatus | WIP статус для QA (null если не рассчитан) |
+| roleWip | Map<string, RoleWipStatus> | WIP статус по ролям (ключ = код роли) |
 
 **Поля RoleWipStatus:**
 
@@ -131,28 +131,14 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | confidence | string | Уровень уверенности: HIGH, MEDIUM, LOW |
 | dueDateDeltaDays | number | Разница с due date (+ опоздание, - запас) |
 | dueDate | string | Due date из Jira |
-| remainingByRole | object | Остаток работы по ролям |
-| phaseSchedule | object | Расписание фаз SA/DEV/QA |
+| remainingByRole | Map<string, object> | Остаток работы по ролям (ключ = код роли) |
+| phaseSchedule | Map<string, object> | Расписание фаз (ключ = код роли) |
 | queuePosition | number/null | Позиция в очереди (null если в WIP) |
 | queuedUntil | string/null | До какой даты в очереди |
 | isWithinWip | boolean | Входит ли в активный WIP |
-| phaseWaitInfo | PhaseWaitInfo | Информация об ожидании по фазам (null если нет) |
+| phaseWaitInfo | Map<string, RoleWaitInfo> | Информация об ожидании по фазам (ключ = код роли) |
 
-**Поля PhaseWaitInfo:**
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| sa | RoleWaitInfo | Информация об ожидании SA фазы |
-| dev | RoleWaitInfo | Информация об ожидании DEV фазы |
-| qa | RoleWaitInfo | Информация об ожидании QA фазы |
-
-**Поля RoleWaitInfo:**
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| waiting | boolean | Ожидает ли вход в фазу |
-| waitingUntil | string/null | До какой даты ждёт |
-| queuePosition | number/null | Позиция в очереди на эту фазу |
+> **Важно:** Роли динамические (из `workflow_roles`). Ключи в `roleCapacity`, `wipStatus.roleWip`, `remainingByRole`, `phaseSchedule`, `phaseWaitInfo` — коды ролей из конфигурации (SA, DEV, QA и т.д.), а не хардкод.
 
 **Уровни уверенности:**
 
@@ -161,6 +147,48 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | HIGH | Есть rough estimates и все роли с capacity |
 | MEDIUM | Есть оценки, но не хватает одной роли |
 | LOW | Нет оценок или не хватает 2+ ролей |
+
+---
+
+### GET /api/planning/role-load
+
+Получает загруженность команды по ролям.
+
+**Параметры запроса:**
+
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| teamId | number | Да | ID команды |
+
+**Ответ:** `RoleLoadResponse` — данные о capacity/utilization по каждой роли.
+
+---
+
+### GET /api/planning/retrospective
+
+Получает ретроспективную таймлайн-диаграмму (план vs факт).
+
+**Параметры запроса:**
+
+| Параметр | Тип | Обязательный | Описание |
+|----------|-----|--------------|----------|
+| teamId | number | Да | ID команды |
+
+**Ответ:** `RetrospectiveResult` — фактические vs планируемые даты.
+
+---
+
+### GET /api/planning/epics/{epicKey}/story-forecast
+
+Получает детальный story-level прогноз для эпика.
+
+**Path параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| epicKey | string | Ключ эпика (например, LB-123) |
+
+**Ответ:** `StoryForecastResponse` — прогноз по каждой story с assignee capacity.
 
 ---
 
@@ -173,11 +201,6 @@ GET /api/planning/forecast?teamId=1&statuses=In%20Progress&statuses=Backlog
 | Параметр | Тип | Обязательный | Описание |
 |----------|-----|--------------|----------|
 | teamId | number | Нет | ID команды (если не указан — все) |
-
-**Пример запроса:**
-```
-POST /api/planning/recalculate?teamId=1
-```
 
 **Ответ:**
 ```json
@@ -200,11 +223,6 @@ POST /api/planning/recalculate?teamId=1
 | teamId | number | Да | ID команды |
 | days | number | Нет | Количество дней (по умолчанию 30) |
 
-**Пример запроса:**
-```
-GET /api/planning/wip-history?teamId=1&days=30
-```
-
 **Ответ:**
 ```json
 {
@@ -216,18 +234,19 @@ GET /api/planning/wip-history?teamId=1&days=30
       "date": "2026-01-20",
       "teamLimit": 6,
       "teamCurrent": 4,
-      "saLimit": 2,
-      "saCurrent": 1,
-      "devLimit": 3,
-      "devCurrent": 2,
-      "qaLimit": 2,
-      "qaCurrent": 1,
+      "roleData": {
+        "SA": { "limit": 2, "current": 1 },
+        "DEV": { "limit": 3, "current": 2 },
+        "QA": { "limit": 2, "current": 1 }
+      },
       "inQueue": 2,
       "totalEpics": 6
     }
   ]
 }
 ```
+
+> **Важно:** `roleData` — динамическая Map. Ключи — коды ролей из `workflow_roles`.
 
 ---
 
@@ -252,63 +271,7 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 ---
 
-### PUT /api/epics/{epicKey}/order
-
-Обновляет позицию эпика в списке команды (drag & drop).
-
-**Path параметры:**
-
-| Параметр | Тип | Описание |
-|----------|-----|----------|
-| epicKey | string | Ключ эпика (например, LB-123) |
-
-**Body:**
-```json
-{
-  "newPosition": 3
-}
-```
-
-**Ответ:**
-```json
-{
-  "epicKey": "LB-123",
-  "newPosition": 3,
-  "teamId": 1
-}
-```
-
-**Примечание:** `newPosition` — позиция в списке (1-based). Остальные эпики автоматически сдвигаются.
-
----
-
-### PUT /api/stories/{storyKey}/order
-
-Обновляет позицию story внутри эпика (drag & drop).
-
-**Path параметры:**
-
-| Параметр | Тип | Описание |
-|----------|-----|----------|
-| storyKey | string | Ключ story (например, LB-456) |
-
-**Body:**
-```json
-{
-  "newPosition": 2
-}
-```
-
-**Ответ:**
-```json
-{
-  "storyKey": "LB-456",
-  "newPosition": 2,
-  "parentKey": "LB-123"
-}
-```
-
----
+## AutoScore Endpoints
 
 ### GET /api/planning/autoscore/epics/{epicKey}
 
@@ -365,17 +328,75 @@ GET /api/planning/wip-history?teamId=1&days=30
     "summary": "Эпик 1",
     "autoScore": 85.5,
     "calculatedAt": "2026-01-24T12:00:00Z"
-  },
-  {
-    "epicKey": "LB-124",
-    "summary": "Эпик 2",
-    "autoScore": 72.3,
-    "calculatedAt": "2026-01-24T12:00:00Z"
   }
 ]
 ```
 
 **Примечание:** Эпики возвращаются отсортированными по `manual_order` (не по autoScore).
+
+---
+
+### POST /api/planning/autoscore/teams/{teamId}/recalculate
+
+Пересчитывает AutoScore для эпиков конкретной команды.
+
+**Ответ:** количество обновлённых эпиков.
+
+---
+
+### POST /api/planning/autoscore/epics/{epicKey}/recalculate
+
+Пересчитывает AutoScore для одного эпика.
+
+**Ответ:** обновлённый AutoScoreDto.
+
+---
+
+## Issue Order Endpoints
+
+### PUT /api/epics/{epicKey}/order
+
+Обновляет позицию эпика в списке команды (drag & drop).
+
+**Body:**
+```json
+{
+  "newPosition": 3
+}
+```
+
+**Ответ:**
+```json
+{
+  "epicKey": "LB-123",
+  "newPosition": 3,
+  "teamId": 1
+}
+```
+
+**Примечание:** `newPosition` — позиция в списке (1-based). Остальные эпики автоматически сдвигаются.
+
+---
+
+### PUT /api/stories/{storyKey}/order
+
+Обновляет позицию story внутри эпика (drag & drop).
+
+**Body:**
+```json
+{
+  "newPosition": 2
+}
+```
+
+**Ответ:**
+```json
+{
+  "storyKey": "LB-456",
+  "newPosition": 2,
+  "parentKey": "LB-123"
+}
+```
 
 ---
 
@@ -389,14 +410,22 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 | Параметр | Тип | Обязательный | Описание |
 |----------|-----|--------------|----------|
-| from | string | Да | Начальная дата (YYYY-MM-DD) |
-| to | string | Да | Конечная дата (YYYY-MM-DD) |
+| from | LocalDate | Да | Начальная дата (YYYY-MM-DD) |
+| to | LocalDate | Да | Конечная дата (YYYY-MM-DD) |
+| country | string | Нет | Код страны (по умолчанию "RU") |
 
 **Ответ:**
 ```json
 {
-  "workdays": ["2026-01-27", "2026-01-28", "2026-01-29"],
-  "holidays": [
+  "from": "2026-01-01",
+  "to": "2026-01-31",
+  "country": "RU",
+  "totalDays": 31,
+  "workdays": 20,
+  "weekends": 8,
+  "holidays": 3,
+  "workdayDates": ["2026-01-09", "2026-01-12", "..."],
+  "holidayList": [
     { "date": "2026-01-01", "name": "Новый год" }
   ]
 }
@@ -410,13 +439,37 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 | Параметр | Тип | Описание |
 |----------|-----|----------|
-| date | string | Дата (YYYY-MM-DD) |
+| date | LocalDate | Дата (YYYY-MM-DD) |
+| country | string | Код страны (по умолчанию "RU") |
 
 **Ответ:**
 ```json
 {
   "date": "2026-01-27",
-  "isWorkday": true
+  "isWorkday": true,
+  "country": "RU"
+}
+```
+
+### GET /api/calendar/count-workdays
+
+Считает количество рабочих дней за период.
+
+**Параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| from | LocalDate | Начальная дата |
+| to | LocalDate | Конечная дата |
+| country | string | Код страны (по умолчанию "RU") |
+
+**Ответ:**
+```json
+{
+  "from": "2026-01-01",
+  "to": "2026-01-31",
+  "country": "RU",
+  "workdays": 20
 }
 ```
 
@@ -428,17 +481,34 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 | Параметр | Тип | Описание |
 |----------|-----|----------|
-| date | string | Начальная дата |
-| days | number | Количество рабочих дней |
+| from | LocalDate | Начальная дата |
+| days | int | Количество рабочих дней |
+| country | string | Код страны (по умолчанию "RU") |
 
 **Ответ:**
 ```json
 {
-  "startDate": "2026-01-24",
+  "from": "2026-01-24",
   "workdaysToAdd": 5,
+  "country": "RU",
   "resultDate": "2026-01-31"
 }
 ```
+
+### POST /api/calendar/refresh
+
+Обновляет календарь праздников с xmlcalendar.ru.
+
+**Параметры:**
+
+| Параметр | Тип | Описание |
+|----------|-----|----------|
+| year | int | Год для загрузки |
+| country | string | Код страны (по умолчанию "RU") |
+
+### GET /api/calendar/config
+
+Возвращает текущую конфигурацию календаря.
 
 ---
 
@@ -459,17 +529,19 @@ GET /api/planning/wip-history?teamId=1&days=30
   "riskBuffer": 0.2,
   "wipLimits": {
     "team": 6,
-    "sa": 2,
-    "dev": 3,
-    "qa": 2
+    "SA": 2,
+    "DEV": 3,
+    "QA": 2
   },
   "storyDuration": {
-    "sa": 2,
-    "dev": 2,
-    "qa": 2
+    "SA": 2,
+    "DEV": 2,
+    "QA": 2
   }
 }
 ```
+
+> **Важно:** Ключи в `wipLimits` и `storyDuration` — динамические коды ролей из `workflow_roles`.
 
 ### PUT /api/teams/{id}/planning-config
 
@@ -485,10 +557,111 @@ GET /api/planning/wip-history?teamId=1&days=30
 
 ---
 
+## Workflow Config API (Admin)
+
+Base path: `/api/admin/workflow-config` | Требует роль ADMIN.
+
+### GET /api/admin/workflow-config
+
+Получает полную конфигурацию workflow.
+
+### PUT /api/admin/workflow-config
+
+Обновляет проектную конфигурацию.
+
+### GET /api/admin/workflow-config/roles
+
+Список ролей pipeline.
+
+### PUT /api/admin/workflow-config/roles
+
+Обновляет роли (code, displayName, color, sortOrder, isDefault).
+
+### GET /api/admin/workflow-config/issue-types
+
+Список маппингов типов задач.
+
+### PUT /api/admin/workflow-config/issue-types
+
+Обновляет маппинги типов задач → EPIC/STORY/SUBTASK/IGNORE.
+
+### GET /api/admin/workflow-config/statuses
+
+Список маппингов статусов.
+
+### PUT /api/admin/workflow-config/statuses
+
+Обновляет маппинги статусов → TODO/IN_PROGRESS/DONE + фаза роли.
+
+### GET /api/admin/workflow-config/status-issue-counts
+
+Количество задач по каждому статусу/категории (для UI предпросмотра).
+
+### GET /api/admin/workflow-config/link-types
+
+Список маппингов типов связей.
+
+### PUT /api/admin/workflow-config/link-types
+
+Обновляет маппинги связей → BLOCKS/RELATED/IGNORE.
+
+### POST /api/admin/workflow-config/validate
+
+Валидирует текущую конфигурацию workflow.
+
+### POST /api/admin/workflow-config/auto-detect
+
+Автоматически определяет маппинги из метаданных Jira.
+
+### GET /api/admin/workflow-config/status
+
+Проверяет, настроен ли workflow (для Setup Wizard).
+
+---
+
+## Jira Metadata API (Admin)
+
+Base path: `/api/admin/jira-metadata` | Для настройки workflow.
+
+### GET /api/admin/jira-metadata/issue-types
+
+Список типов задач из Jira.
+
+### GET /api/admin/jira-metadata/statuses
+
+Список статусов из Jira.
+
+### GET /api/admin/jira-metadata/link-types
+
+Список типов связей из Jira.
+
+---
+
+## Public Config API
+
+Base path: `/api/config/workflow` | Без авторизации.
+
+### GET /api/config/workflow/roles
+
+Список ролей для фронтенда.
+
+### GET /api/config/workflow/issue-type-categories
+
+Маппинг типов задач → категории.
+
+### GET /api/config/workflow/status-styles
+
+Стили статусов (цвет, категория) для StatusBadge.
+
+---
+
 ## Ошибки
 
 | Код | Описание |
 |-----|----------|
 | 400 | Невалидные параметры |
+| 401 | Не аутентифицирован |
+| 403 | Нет доступа (RBAC) |
 | 404 | Команда или эпик не найдены |
 | 500 | Внутренняя ошибка сервера |
+| 502 | Jira недоступна |

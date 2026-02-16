@@ -17,10 +17,10 @@
 
 | Что дублируется | Где встречается | Рекомендация |
 |-----------------|-----------------|--------------|
-| Проверка статусов (isDone, isInProgress) | BoardService, ForecastService, DataQualityService, SyncService | Уже есть StatusMappingService, но не везде используется |
+| Проверка статусов (isDone, isInProgress) | BoardService, ForecastService, DataQualityService, SyncService | Используется WorkflowConfigService, но не везде |
 | Расчёт прогресса (logged/estimate) | BoardService, UnifiedPlanningService, StoryForecastService | Выделить ProgressCalculator |
 | Парсинг дат из Jira | SyncService, JiraIssue, MetricsService | Утилитный класс JiraDateParser |
-| Списки типов задач (Аналитика, Разработка, Тестирование) | AutoScoreCalculator, StatusMappingService, SyncService | Единый enum или конфиг |
+| ~~Списки типов задач~~ | ~~AutoScoreCalculator, StatusMappingService, SyncService~~ | ✅ Решено: динамическая конфигурация через WorkflowConfigService (F29) |
 | Grade коэффициенты | UnifiedPlanningService, StoryForecastService, ForecastService | Единый GradeService |
 
 ### Отсутствующие абстракции
@@ -38,14 +38,14 @@
 ### Безопасность (CRITICAL)
 
 - [ ] OAuth токены хранятся без шифрования в БД
-- [ ] Нет CSRF защиты
-- [ ] UNIQUE constraint для team_members может быть нарушен
+- [x] ~~Нет CSRF защиты~~ — CSRF отключён намеренно (token-based auth для REST API, см. SecurityConfig)
+- [x] ~~UNIQUE constraint для team_members может быть нарушен~~ — Решено: conditional unique index `WHERE active = TRUE`
 
 ### Производительность (HIGH)
 
-- [ ] N+1 запросы при загрузке Board (stories → subtasks)
+- [ ] N+1 запросы при загрузке Board (stories → subtasks) — `findByParentKeyIn()` существует, но не везде используется
 - [ ] Нет индексов для частых запросов метрик
-- [ ] Memory leak в sync locks (при ошибках не освобождаются)
+- [x] ~~Memory leak в sync locks~~ — SyncService не использует explicit locks (не воспроизводится)
 
 ## Frontend
 
@@ -69,7 +69,7 @@
 
 - [ ] Error Boundaries — при ошибке падает всё приложение
 - [ ] Кеширование запросов (нет React Query / SWR)
-- [ ] Frontend тесты (0 тестов)
+- [x] ~~Frontend тесты (0 тестов)~~ — Решено: 18 файлов тестов
 - [ ] Нет TypeScript strict mode
 - [ ] Нет общего Loading/Error state компонента
 - [ ] Нет стейт-менеджмента (всё в useState, props drilling)
@@ -82,7 +82,7 @@
 
 ## Приоритеты исправления
 
-1. **CRITICAL**: Шифрование OAuth токенов, CSRF
+1. **CRITICAL**: Шифрование OAuth токенов
 2. **HIGH**: N+1 запросы, Error Boundaries, React Query
 3. **MEDIUM**: Декомпозиция god-классов, устранение дублирования
-4. **LOW**: Strict mode, стейт-менеджмент, frontend тесты
+4. **LOW**: Strict mode, стейт-менеджмент
