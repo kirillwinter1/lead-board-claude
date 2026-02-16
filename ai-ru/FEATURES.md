@@ -32,6 +32,7 @@
 | F30 | Member Profile Page | 2026-02-14 | [features/F30](features/F30_MEMBER_PROFILE.md) |
 | F31 | Dynamic Status Colors on Board | 2026-02-14 | [features/F31](features/F31_DYNAMIC_STATUS_COLORS.md) |
 | F32 | DSR v2: Pause Flag + Subtask End Point | 2026-02-15 | [features/F32](features/F32_DSR_V2_PAUSE_FLAG.md) |
+| F33 | Setup Wizard + Refresh Teams Sync | 2026-02-15 | [features/F33](features/F33_SETUP_WIZARD.md) |
 
 ## Бэклог (BF)
 
@@ -85,12 +86,22 @@ F22 → F24
 
 ## Технические исправления (changelog)
 
+### 2026-02-15: F33 Setup Wizard + Refresh Teams Sync
+- 4-step wizard для первоначальной настройки (Period → Sync → Workflow → Done)
+- `GET /api/sync/issue-count?months=N` — подсчёт задач в Jira
+- `POST /api/sync/trigger?months=N` — first sync с фильтром по периоду
+- Team sync автоматически в конце syncProject()
+- Scheduled sync не запускается до завершения wizard
+- Fix: JQL months→days (Jira `m`=minutes), `@JsonProperty("isLast")`
+- Убрана кнопка "Sync from Atlassian" на TeamsPage
+
 ### 2026-02-15: F32 DSR v2 — Pause Flag + Subtask End Point
 - Новая формула: DSR = (рабочие дни − дни паузы) / оценка
 - Флаг на эпике останавливает таймер DSR (flag_changelog table)
 - Конечная точка = max(subtask.done_at) вместо epic.done_at
 - Live DSR для in-progress эпиков (endDate = today)
 - Data Quality: warning при time logging на flagged эпике
+- AutoScore: flagged эпик получает штраф -100 (опускается ниже активных)
 - Frontend: DSR Epic Breakdown таблица с Live/Done бейджами
 
 ### 2026-02-14: F31 Dynamic Status Colors + Story AutoScore fix

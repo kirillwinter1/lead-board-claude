@@ -34,6 +34,7 @@ import java.util.Map;
  * - Прогресс (10): процент выполнения (logged/estimate)
  * - Размер (5): инверсия от estimate (меньше = выше, без оценки = -5)
  * - Возраст (5): логарифм от дней с создания
+ * - Flagged (-100): штраф за приостановку работы
  *
  * Порядок эпиков определяется полем manual_order (drag & drop).
  * AutoScore используется только для рекомендаций.
@@ -95,6 +96,7 @@ public class AutoScoreCalculator {
         factors.put("priority", calculatePriorityScore(epic));
         factors.put("size", calculateSizeScore(epic));
         factors.put("age", calculateAgeScore(epic));
+        factors.put("flagged", calculateFlaggedPenalty(epic));
 
         return factors;
     }
@@ -300,6 +302,16 @@ public class AutoScoreCalculator {
         double score = 5 * Math.log(days + 1) / Math.log(365);
         return BigDecimal.valueOf(Math.min(5, score))
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Flagged penalty: если эпик под флагом (работа приостановлена), штраф -100.
+     */
+    private BigDecimal calculateFlaggedPenalty(JiraIssueEntity epic) {
+        if (Boolean.TRUE.equals(epic.getFlagged())) {
+            return new BigDecimal("-100");
+        }
+        return BigDecimal.ZERO;
     }
 
     /**

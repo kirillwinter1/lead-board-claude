@@ -459,6 +459,57 @@ class AutoScoreCalculatorTest {
         assertEquals(BigDecimal.ZERO, factors.get("age"));
     }
 
+    // ==================== Flagged Penalty Tests ====================
+
+    @Test
+    void flaggedEpicGetsMinusHundredPenalty() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setFlagged(true);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(new BigDecimal("-100"), factors.get("flagged"));
+    }
+
+    @Test
+    void notFlaggedEpicGetsZeroPenalty() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setFlagged(false);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("flagged"));
+    }
+
+    @Test
+    void flaggedNullGetsZeroPenalty() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setFlagged(null);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("flagged"));
+    }
+
+    @Test
+    void flaggedEpicScoresLowerThanUnflagged() {
+        JiraIssueEntity flagged = createBasicEpic();
+        flagged.setStatus("Developing");
+        flagged.setPriority("Highest");
+        flagged.setFlagged(true);
+
+        JiraIssueEntity unflagged = createBasicEpic();
+        unflagged.setStatus("Новое");
+        unflagged.setPriority("Low");
+        unflagged.setFlagged(false);
+
+        BigDecimal flaggedScore = calculator.calculate(flagged);
+        BigDecimal unflaggedScore = calculator.calculate(unflagged);
+
+        assertTrue(flaggedScore.compareTo(unflaggedScore) < 0,
+                "Flagged epic (%s) should score lower than unflagged (%s)".formatted(flaggedScore, unflaggedScore));
+    }
+
     // ==================== Combined Score Tests ====================
 
     @Test

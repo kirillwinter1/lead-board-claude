@@ -24,6 +24,7 @@ DSR = (working_days - flagged_days) / estimate_days
 1. **Pause Flag** — флаг на эпике останавливает таймер DSR. Каждое включение/выключение записывается в `flag_changelog`.
 2. **Subtask End Point** — для завершённых эпиков конечная точка = `max(subtask.done_at)`, а не `epic.done_at`. Это исключает E2E/приёмку.
 3. **Live DSR** — DSR считается для in-progress эпиков (endDate = today). Если DSR > 1.0 — команда отстаёт.
+4. **AutoScore штраф** — flagged эпик получает -100 к AutoScore, что опускает его ниже активных эпиков на Board.
 
 ## Файлы
 
@@ -45,6 +46,7 @@ DSR = (working_days - flagged_days) / estimate_days
 | `SyncService.java` | +FlagChangelogService, детекция изменения флага при sync |
 | `DataQualityRule.java` | +`SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED` |
 | `DataQualityService.java` | Проверка time logged при flagged epic |
+| `AutoScoreCalculator.java` | +фактор `flagged` (-100 штраф за приостановку) |
 | `DsrServiceTest.java` | 9 тестов (4 обновлены + 5 новых) |
 | `SyncServiceTest.java` | +FlagChangelogService mock |
 | `metrics.ts` | Обновлён интерфейс EpicDsr |
