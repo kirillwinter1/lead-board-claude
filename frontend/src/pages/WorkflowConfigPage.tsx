@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import axios from 'axios'
 import {
   workflowConfigApi,
   WorkflowConfigResponse,
@@ -17,7 +18,7 @@ import './WorkflowConfigPage.css'
 
 type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
 
-const BOARD_CATEGORIES = ['EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
+const BOARD_CATEGORIES = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
 const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const
 const LINK_CATEGORIES = ['BLOCKS', 'RELATED', 'IGNORE'] as const
 
@@ -163,6 +164,8 @@ function suggestIssueTypes(jiraTypes: JiraIssueTypeMetadata[]): IssueTypeMapping
     if (jt.subtask) {
       boardCategory = 'SUBTASK'
       workflowRoleCode = guessRoleFromSubtaskName(jt.name)
+    } else if (lower.includes('project') || lower.includes('проект')) {
+      boardCategory = 'PROJECT'
     } else if (lower.includes('epic') || lower.includes('эпик')) {
       boardCategory = 'EPIC'
     } else if (lower === 'story' || lower === 'bug' || lower === 'task' || lower === 'история' || lower === 'баг' || lower === 'задача' || lower.includes('story') || lower.includes('bug') || lower.includes('task')) {
@@ -246,7 +249,7 @@ function suggestStatuses(
 ): StatusMappingDto[] {
   const result: StatusMappingDto[] = []
   const seen = new Set<string>()
-  const categoryCounter: Record<string, number> = { EPIC: 0, STORY: 0, SUBTASK: 0 }
+  const categoryCounter: Record<string, number> = { PROJECT: 0, EPIC: 0, STORY: 0, SUBTASK: 0 }
 
   // Build mapping: issueTypeId → boardCategory (using jiraIssueTypes to bridge name→id)
   const nameToId = new Map<string, string>()
@@ -258,7 +261,7 @@ function suggestStatuses(
     if (id) issueTypeIdMap.set(id, t.boardCategory)
   })
 
-  const issueCategories: IssueTypeMappingDto['boardCategory'][] = ['EPIC', 'STORY', 'SUBTASK']
+  const issueCategories: IssueTypeMappingDto['boardCategory'][] = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK']
 
   for (const group of jiraStatuses) {
     const boardCat = issueTypeIdMap.get(group.issueTypeId)
@@ -267,6 +270,7 @@ function suggestStatuses(
     for (const st of group.statuses) {
       for (const issueCat of issueCategories) {
         if (issueCat === 'SUBTASK' && boardCat !== 'SUBTASK') continue
+        if (issueCat === 'PROJECT' && boardCat !== 'PROJECT') continue
         if (issueCat === 'EPIC' && boardCat !== 'EPIC') continue
         if (issueCat === 'STORY' && boardCat !== 'STORY') continue
 
@@ -285,7 +289,7 @@ function suggestStatuses(
         } else {
           const lower = st.name.toLowerCase()
 
-          if (issueCat === 'EPIC') {
+          if (issueCat === 'EPIC' || issueCat === 'PROJECT') {
             if (lower.includes('requirement') || lower.includes('требовани')) {
               statusCategory = 'REQUIREMENTS'
             } else if (lower.includes('plan') || lower.includes('заплан')) {
@@ -377,7 +381,7 @@ function suggestStatuses(
 
   // Recalculate scoreWeight by position for all categories
   let final = result
-  for (const cat of ['EPIC', 'STORY', 'SUBTASK']) {
+  for (const cat of ['PROJECT', 'EPIC', 'STORY', 'SUBTASK']) {
     final = recalcScoreWeights(final, cat)
   }
   return final
@@ -421,6 +425,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const [linkTypes, setLinkTypes] = useState<LinkTypeMappingDto[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('EPIC')
   const [issueCounts, setIssueCounts] = useState<StatusIssueCountDto[]>([])
+  const [epicLinkType, setEpicLinkType] = useState<string>('parent')
+  const [epicLinkName, setEpicLinkName] = useState<string>('')
 
   // --- Wizard state ---
   const [wizardMode, setWizardMode] = useState(false)
@@ -464,6 +470,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       setStatuses(data.statuses)
       setLinkTypes(data.linkTypes)
       setIssueCounts(counts)
+      setEpicLinkType(data.epicLinkType || 'parent')
+      setEpicLinkName(data.epicLinkName || '')
     } catch (err) {
       setError('Failed to load workflow configuration')
       console.error('Failed to load config:', err)
@@ -1166,7 +1174,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
           <strong>Score Weight</strong> — вес для расчёта % завершения.
         </div>
         <div className="status-filter">
-          {['EPIC', 'STORY', 'SUBTASK'].map(f => (
+          {['PROJECT', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
             <button
               key={f}
               className={`status-filter-btn ${wizardStatusFilter === f ? 'active' : ''}`}
@@ -1221,7 +1229,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                                 value={st.statusCategory}
                                 onChange={e => updateWizardStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.filter(c => wizardStatusFilter === 'EPIC' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => wizardStatusFilter === 'EPIC' || wizardStatusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">
@@ -1511,6 +1519,59 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
             {saving ? 'Saving...' : 'Save Issue Types'}
           </button>
         </div>
+
+        {issueTypes.some(t => t.boardCategory === 'PROJECT') && (
+          <div style={{ marginTop: 24, padding: '16px 20px', background: '#F4F5F7', borderRadius: 8 }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 14, color: '#172B4D' }}>Project → Epic Link Mode</h3>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                <span>Link Type:</span>
+                <select
+                  className="workflow-select"
+                  value={epicLinkType}
+                  onChange={e => setEpicLinkType(e.target.value)}
+                  style={{ width: 140 }}
+                >
+                  <option value="parent">Parent (default)</option>
+                  <option value="issuelink">Issue Link</option>
+                </select>
+              </label>
+              {epicLinkType === 'issuelink' && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+                  <span>Link Name:</span>
+                  <input
+                    className="workflow-input"
+                    value={epicLinkName}
+                    onChange={e => setEpicLinkName(e.target.value)}
+                    placeholder="e.g. is child of"
+                    style={{ width: 200 }}
+                  />
+                </label>
+              )}
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: 13, padding: '4px 12px' }}
+                onClick={async () => {
+                  try {
+                    setSaving(true)
+                    await axios.put('/api/admin/workflow-config', { epicLinkType, epicLinkName: epicLinkName || null })
+                    refreshWorkflowContext()
+                    showSaveSuccess('Epic link config saved')
+                  } catch { setError('Failed to save epic link config') }
+                  finally { setSaving(false) }
+                }}
+                disabled={saving}
+              >
+                Save Link Config
+              </button>
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: '#6B778C' }}>
+              {epicLinkType === 'parent'
+                ? 'Epics are linked to Projects via Jira parent field (Project is the parent of Epic).'
+                : 'Epics are linked to Projects via Jira issue links. Specify the link name used in your Jira project.'}
+            </div>
+          </div>
+        )}
       </>
     )
   }
@@ -1533,7 +1594,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="status-filter">
-          {['EPIC', 'STORY', 'SUBTASK'].map(f => (
+          {['PROJECT', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
             <button
               key={f}
               className={`status-filter-btn ${statusFilter === f ? 'active' : ''}`}
@@ -1589,7 +1650,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                                 value={st.statusCategory}
                                 onChange={e => updateStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || statusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">

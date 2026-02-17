@@ -6,5 +6,7 @@ public record ProjectConfigUpdateRequest(
         String name,
         Map<String, Integer> statusScoreWeights,
         String planningAllowedCategories,
-        String timeLoggingAllowedCategories
+        String timeLoggingAllowedCategories,
+        String epicLinkType,
+        String epicLinkName
 ) {}

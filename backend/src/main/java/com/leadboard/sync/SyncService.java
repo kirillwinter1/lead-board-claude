@@ -435,11 +435,24 @@ public class SyncService {
         if (issueLinks != null && !issueLinks.isEmpty()) {
             List<String> blocks = new ArrayList<>();
             List<String> isBlockedBy = new ArrayList<>();
+            List<String> childEpicKeys = new ArrayList<>();
+            boolean isProjectIssue = "PROJECT".equals(entity.getBoardCategory());
 
             for (JiraIssue.JiraIssueLink link : issueLinks) {
                 if (link.getType() == null) continue;
 
                 String linkTypeName = link.getType().getName();
+
+                // For PROJECT issues, collect ALL linked issue keys (auto-detect mode)
+                if (isProjectIssue) {
+                    if (link.getInwardIssue() != null) {
+                        childEpicKeys.add(link.getInwardIssue().getKey());
+                    }
+                    if (link.getOutwardIssue() != null) {
+                        childEpicKeys.add(link.getOutwardIssue().getKey());
+                    }
+                }
+
                 LinkCategory linkCategory = workflowConfigService.categorizeLinkType(linkTypeName);
 
                 if (linkCategory != LinkCategory.BLOCKS) continue;
@@ -454,6 +467,9 @@ public class SyncService {
 
             entity.setBlocks(blocks.isEmpty() ? null : blocks);
             entity.setIsBlockedBy(isBlockedBy.isEmpty() ? null : isBlockedBy);
+            if (isProjectIssue) {
+                entity.setChildEpicKeys(childEpicKeys.isEmpty() ? null : childEpicKeys.toArray(new String[0]));
+            }
         } else {
             entity.setBlocks(null);
             entity.setIsBlockedBy(null);

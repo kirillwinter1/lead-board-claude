@@ -42,6 +42,7 @@ export interface BoardNode {
   expectedDone: string | null
   assigneeAccountId: string | null
   assigneeDisplayName: string | null
+  parentProjectKey: string | null
   children: BoardNode[]
 }
 

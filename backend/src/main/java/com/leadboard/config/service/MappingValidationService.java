@@ -78,6 +78,11 @@ public class MappingValidationService {
         if (!hasStory) errors.add("At least one STORY issue type mapping is required");
         if (!hasSubtask) errors.add("At least one SUBTASK issue type mapping is required");
 
+        boolean hasProject = issueTypes.stream().anyMatch(t -> t.boardCategory() == BoardCategory.PROJECT);
+        if (!hasProject) {
+            warnings.add("No PROJECT issue type mapping configured — project hierarchy features won't be available");
+        }
+
         // Check that SUBTASK types have role codes
         Set<String> roleCodes = roles != null
                 ? roles.stream().map(WorkflowRoleDto::code).collect(Collectors.toSet())

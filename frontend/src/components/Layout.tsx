@@ -114,6 +114,9 @@ export function Layout() {
               <NavLink to={`/board/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Teams
               </NavLink>
+              <NavLink to={`/board/projects${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Projects
+              </NavLink>
               {isAdmin(authStatus?.user) && (
                 <NavLink to="/board/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                   Settings

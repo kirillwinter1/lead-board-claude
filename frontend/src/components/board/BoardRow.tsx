@@ -52,6 +52,20 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
             {node.issueKey}
           </a>
           {node.flagged && <span className="flag-indicator" title="Flagged — work paused">🚩</span>}
+          {node.parentProjectKey && (
+            <span style={{
+              fontSize: 10,
+              padding: '1px 5px',
+              borderRadius: 3,
+              background: '#DEEBFF',
+              color: '#0747A6',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              lineHeight: '16px',
+            }}>
+              {node.parentProjectKey}
+            </span>
+          )}
           <span className="issue-title">{node.title}</span>
         </div>
       </div>

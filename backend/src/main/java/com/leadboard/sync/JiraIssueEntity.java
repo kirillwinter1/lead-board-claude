@@ -122,6 +122,10 @@ public class JiraIssueEntity {
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] components;
 
+    @Column(name = "child_epic_keys", columnDefinition = "TEXT[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] childEpicKeys;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -266,6 +270,9 @@ public class JiraIssueEntity {
 
     public String[] getComponents() { return components; }
     public void setComponents(String[] components) { this.components = components; }
+
+    public String[] getChildEpicKeys() { return childEpicKeys; }
+    public void setChildEpicKeys(String[] childEpicKeys) { this.childEpicKeys = childEpicKeys; }
 
     // ==================== Derived/Computed Methods ====================
 

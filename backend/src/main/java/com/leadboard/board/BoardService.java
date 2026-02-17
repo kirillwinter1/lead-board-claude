@@ -118,6 +118,38 @@ public class BoardService {
                 epicMap.put(epic.getIssueKey(), node);
             }
 
+            // Build reverse lookup: epicKey → parentProjectKey
+            List<JiraIssueEntity> projectIssues = allIssues.stream()
+                    .filter(e -> "PROJECT".equals(e.getBoardCategory()))
+                    .collect(Collectors.toList());
+            Map<String, String> epicToProjectKey = new HashMap<>();
+            for (JiraIssueEntity proj : projectIssues) {
+                // Parent mode: epics whose parentKey = project key
+                for (JiraIssueEntity issue : allIssues) {
+                    if (proj.getIssueKey().equals(issue.getParentKey()) && "EPIC".equals(issue.getBoardCategory())) {
+                        epicToProjectKey.putIfAbsent(issue.getIssueKey(), proj.getIssueKey());
+                    }
+                }
+                // Link mode: childEpicKeys
+                String[] linkedKeys = proj.getChildEpicKeys();
+                if (linkedKeys != null) {
+                    for (String lk : linkedKeys) {
+                        JiraIssueEntity linked = issueMap.get(lk);
+                        if (linked != null && "EPIC".equals(linked.getBoardCategory())) {
+                            epicToProjectKey.putIfAbsent(lk, proj.getIssueKey());
+                        }
+                    }
+                }
+            }
+
+            // Set parentProjectKey on epic nodes
+            for (Map.Entry<String, BoardNode> entry : epicMap.entrySet()) {
+                String projKey = epicToProjectKey.get(entry.getKey());
+                if (projKey != null) {
+                    entry.getValue().setParentProjectKey(projKey);
+                }
+            }
+
             for (JiraIssueEntity story : stories) {
                 BoardNode storyNode = mapToNode(story, baseUrl, teamNames);
                 storyMap.put(story.getIssueKey(), storyNode);

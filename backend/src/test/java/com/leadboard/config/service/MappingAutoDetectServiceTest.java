@@ -126,6 +126,13 @@ class MappingAutoDetectServiceTest {
         }
 
         @Test
+        @DisplayName("should detect PROJECT for project types")
+        void shouldDetectProject() {
+            assertEquals(BoardCategory.PROJECT, service.detectBoardCategory("Project", false));
+            assertEquals(BoardCategory.PROJECT, service.detectBoardCategory("Проект", false));
+        }
+
+        @Test
         @DisplayName("should default to IGNORE for unknown types")
         void shouldDefaultToIgnore() {
             assertEquals(BoardCategory.IGNORE, service.detectBoardCategory("Documentation", false));

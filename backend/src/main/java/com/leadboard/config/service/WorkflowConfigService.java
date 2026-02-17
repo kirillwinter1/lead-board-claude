@@ -42,10 +42,13 @@ public class WorkflowConfigService {
     private volatile Map<String, Integer> scoreWeightsMap = Map.of();
 
     // Sets for quick lookups
+    private volatile Set<String> projectTypeNames = Set.of();
     private volatile Set<String> epicTypeNames = Set.of();
     private volatile Set<String> storyTypeNames = Set.of();
     private volatile Set<String> subtaskTypeNames = Set.of();
     private volatile String projectKey;
+    private volatile String epicLinkType;
+    private volatile String epicLinkName;
 
     public WorkflowConfigService(
             ProjectConfigurationRepository configRepo,
@@ -112,6 +115,7 @@ public class WorkflowConfigService {
             typeToCategory.clear();
             typeToRoleCode.clear();
             List<IssueTypeMappingEntity> typeMappings = issueTypeRepo.findByConfigId(defaultConfigId);
+            Set<String> projectNames = new HashSet<>();
             Set<String> epicNames = new HashSet<>();
             Set<String> storyNames = new HashSet<>();
             Set<String> subtaskNames = new HashSet<>();
@@ -121,15 +125,21 @@ public class WorkflowConfigService {
                     typeToRoleCode.put(m.getJiraTypeName().toLowerCase(), m.getWorkflowRoleCode());
                 }
                 switch (m.getBoardCategory()) {
+                    case PROJECT -> projectNames.add(m.getJiraTypeName());
                     case EPIC -> epicNames.add(m.getJiraTypeName());
                     case STORY -> storyNames.add(m.getJiraTypeName());
                     case SUBTASK -> subtaskNames.add(m.getJiraTypeName());
                     default -> {}
                 }
             }
+            projectTypeNames = Set.copyOf(projectNames);
             epicTypeNames = Set.copyOf(epicNames);
             storyTypeNames = Set.copyOf(storyNames);
             subtaskTypeNames = Set.copyOf(subtaskNames);
+
+            // Load epic link config
+            epicLinkType = config.getEpicLinkType();
+            epicLinkName = config.getEpicLinkName();
 
             // Load status mappings
             statusLookup.clear();
@@ -190,6 +200,7 @@ public class WorkflowConfigService {
 
         // Fallback: substring matching
         String lower = jiraTypeName.toLowerCase();
+        if (lower.contains("project") || lower.contains("проект")) return BoardCategory.PROJECT;
         if (lower.contains("epic") || lower.contains("эпик")) return BoardCategory.EPIC;
         if (lower.contains("sub-task") || lower.contains("подзадача") ||
             lower.contains("аналитик") || lower.contains("разработк") || lower.contains("тестирован")) {
@@ -204,6 +215,10 @@ public class WorkflowConfigService {
         return BoardCategory.IGNORE;
     }
 
+    public boolean isProject(String jiraTypeName) {
+        return categorizeIssueType(jiraTypeName) == BoardCategory.PROJECT;
+    }
+
     public boolean isEpic(String jiraTypeName) {
         return categorizeIssueType(jiraTypeName) == BoardCategory.EPIC;
     }
@@ -214,6 +229,10 @@ public class WorkflowConfigService {
 
     public boolean isSubtask(String jiraTypeName) {
         return categorizeIssueType(jiraTypeName) == BoardCategory.SUBTASK;
+    }
+
+    public List<String> getProjectTypeNames() {
+        return List.copyOf(projectTypeNames);
     }
 
     public List<String> getEpicTypeNames() {
@@ -535,6 +554,14 @@ public class WorkflowConfigService {
 
     public String getProjectKey() {
         return projectKey;
+    }
+
+    public String getEpicLinkType() {
+        return epicLinkType != null ? epicLinkType : "parent";
+    }
+
+    public String getEpicLinkName() {
+        return epicLinkName;
     }
 
     /**

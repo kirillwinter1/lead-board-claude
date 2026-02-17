@@ -32,6 +32,12 @@ public class ProjectConfigurationEntity {
     @Column(name = "time_logging_allowed_categories", length = 255)
     private String timeLoggingAllowedCategories;
 
+    @Column(name = "epic_link_type", length = 20)
+    private String epicLinkType;
+
+    @Column(name = "epic_link_name", length = 100)
+    private String epicLinkName;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -76,4 +82,10 @@ public class ProjectConfigurationEntity {
 
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public String getEpicLinkType() { return epicLinkType; }
+    public void setEpicLinkType(String epicLinkType) { this.epicLinkType = epicLinkType; }
+
+    public String getEpicLinkName() { return epicLinkName; }
+    public void setEpicLinkName(String epicLinkName) { this.epicLinkName = epicLinkName; }
 }

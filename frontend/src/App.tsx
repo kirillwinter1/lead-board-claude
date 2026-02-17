@@ -12,6 +12,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { WorkflowConfigPage } from './pages/WorkflowConfigPage'
 import { MemberProfilePage } from './pages/MemberProfilePage'
 import { TeamCompetencyPage } from './pages/TeamCompetencyPage'
+import { ProjectsPage } from './pages/ProjectsPage'
 import { LandingPage } from './pages/landing/LandingPage'
 import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
 import './App.css'
@@ -30,6 +31,7 @@ function App() {
           <Route path="data-quality" element={<DataQualityPage />} />
           <Route path="poker" element={<PlanningPokerPage />} />
           <Route path="poker/room/:roomCode" element={<PokerRoomPage />} />
+          <Route path="projects" element={<ProjectsPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
           <Route path="teams/:teamId/member/:memberId" element={<MemberProfilePage />} />

@@ -240,6 +240,7 @@ public class MappingAutoDetectService {
         if (isSubtask) return BoardCategory.SUBTASK;
 
         String lower = typeName.toLowerCase();
+        if (lower.contains("project") || lower.contains("проект")) return BoardCategory.PROJECT;
         if (lower.contains("epic") || lower.contains("эпик")) return BoardCategory.EPIC;
         if (lower.contains("story") || lower.contains("bug") || lower.contains("task")
                 || lower.contains("история") || lower.contains("задача") || lower.contains("баг")

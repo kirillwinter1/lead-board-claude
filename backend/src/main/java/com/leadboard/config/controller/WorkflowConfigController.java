@@ -89,7 +89,9 @@ public class WorkflowConfigController {
                 mapLinkTypes(linkTypeRepo.findByConfigId(configId)),
                 scoreWeights,
                 config.getPlanningAllowedCategories(),
-                config.getTimeLoggingAllowedCategories()
+                config.getTimeLoggingAllowedCategories(),
+                config.getEpicLinkType(),
+                config.getEpicLinkName()
         ));
     }
 
@@ -112,6 +114,12 @@ public class WorkflowConfigController {
         }
         if (request.timeLoggingAllowedCategories() != null) {
             config.setTimeLoggingAllowedCategories(request.timeLoggingAllowedCategories());
+        }
+        if (request.epicLinkType() != null) {
+            config.setEpicLinkType(request.epicLinkType());
+        }
+        if (request.epicLinkName() != null) {
+            config.setEpicLinkName(request.epicLinkName());
         }
 
         configRepo.save(config);

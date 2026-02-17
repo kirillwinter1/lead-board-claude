@@ -62,6 +62,10 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     List<JiraIssueEntity> findByBoardCategory(String boardCategory);
 
+    List<JiraIssueEntity> findByParentKeyAndBoardCategory(String parentKey, String boardCategory);
+
+    List<JiraIssueEntity> findByIssueKeyIn(List<String> issueKeys);
+
     // ==================== Forecast Accuracy (using board_category) ====================
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +

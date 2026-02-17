@@ -10,6 +10,7 @@ interface WorkflowConfig {
 }
 
 interface WorkflowConfigHelpers extends WorkflowConfig {
+  isProject: (type: string | null | undefined) => boolean
   isEpic: (type: string | null | undefined) => boolean
   isStory: (type: string | null | undefined) => boolean
   isSubtask: (type: string | null | undefined) => boolean
@@ -60,6 +61,10 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
 
   const helpers: WorkflowConfigHelpers = {
     ...config,
+    isProject: (type) => {
+      if (!type) return false
+      return config.issueTypeCategories[type] === 'PROJECT'
+    },
     isEpic: (type) => {
       if (!type) return false
       return config.issueTypeCategories[type] === 'EPIC'
@@ -104,6 +109,7 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       issueTypeCategories: {},
       issueTypeIcons: {},
       loading: false,
+      isProject: () => false,
       isEpic: () => false,
       isStory: () => false,
       isSubtask: () => false,

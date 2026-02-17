@@ -19,6 +19,8 @@ export function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState<number | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [changelogMonths, setChangelogMonths] = useState(6)
   const [changelogCount, setChangelogCount] = useState<{ issueCount: number; totalIssues: number } | null>(null)
   const [countingChangelogs, setCountingChangelogs] = useState(false)
@@ -173,6 +175,38 @@ export function SettingsPage() {
         <Link to="/board/workflow" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
           Open Workflow Configuration
         </Link>
+      </section>
+
+      <section className="settings-section">
+        <h2 className="settings-section-title">Jira Sync</h2>
+        <p className="settings-section-description">
+          Sync issues from Jira. Runs automatically on schedule, but you can trigger manually.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            className="changelog-check-btn"
+            disabled={syncing}
+            onClick={async () => {
+              try {
+                setSyncing(true)
+                setSyncResult(null)
+                await axios.post('/api/sync/trigger')
+                setSyncResult({ type: 'success', message: 'Sync started successfully. It will run in the background.' })
+              } catch {
+                setSyncResult({ type: 'error', message: 'Failed to start sync' })
+              } finally {
+                setSyncing(false)
+              }
+            }}
+          >
+            {syncing ? 'Starting...' : 'Sync Now'}
+          </button>
+          {syncResult && (
+            <span className={syncResult.type === 'success' ? 'changelog-result-success' : 'changelog-result-error'}>
+              {syncResult.message}
+            </span>
+          )}
+        </div>
       </section>
 
       <section className="settings-section">

@@ -12,14 +12,14 @@ export interface WorkflowRoleDto {
 export interface IssueTypeMappingDto {
   id: number | null
   jiraTypeName: string
-  boardCategory: 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE'
+  boardCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE'
   workflowRoleCode: string | null
 }
 
 export interface StatusMappingDto {
   id: number | null
   jiraStatusName: string
-  issueCategory: 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE'
+  issueCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE'
   statusCategory: 'NEW' | 'REQUIREMENTS' | 'PLANNED' | 'IN_PROGRESS' | 'DONE'
   workflowRoleCode: string | null
   sortOrder: number
@@ -85,6 +85,8 @@ export interface WorkflowConfigResponse {
   statusScoreWeights: Record<string, number>
   planningAllowedCategories: string | null
   timeLoggingAllowedCategories: string | null
+  epicLinkType: string | null
+  epicLinkName: string | null
 }
 
 export const workflowConfigApi = {

@@ -34,6 +34,7 @@
 | F32 | DSR v2: Pause Flag + Subtask End Point | 2026-02-15 | [features/F32](features/F32_DSR_V2_PAUSE_FLAG.md) |
 | F33 | Setup Wizard + Refresh Teams Sync | 2026-02-15 | [features/F33](features/F33_SETUP_WIZARD.md) |
 | F34 | Project Key → Config Binding | 2026-02-16 | [features/F34](features/F34_PROJECT_KEY_CONFIG.md) |
+| F35 | Projects (Sync + UI + Progress) | 2026-02-16 | [features/F35](features/F35_PROJECTS.md) |
 
 ## Бэклог (BF)
 
@@ -43,7 +44,7 @@
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
 | BF4 | RICE Scoring & AutoScore | 📋 Planned | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
-| BF5 | Projects (Project-Level Management) | 📋 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
+| BF5 | Projects (Project-Level Management) | ✅ Done → [F35](features/F35_PROJECTS.md) | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |
@@ -86,6 +87,26 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-16: F35 Projects — Stage 2 (Progress + Expected Done + Board Badge)
+- ProjectDto/ChildEpicDto/ProjectDetailDto: прогресс, expected done, estimate/logged
+- ProjectService: UnifiedPlanningService + WorkflowConfigService для обогащения данных
+- BoardNode: parentProjectKey — бейдж проекта на Board
+- BoardService: reverse lookup epic→project (parent + issuelink)
+- ProjectsPage: progress bar, StatusBadge с динамическими цветами, expected done
+- BoardRow: бейдж проекта на epic-строках (#DEEBFF/#0747A6)
+- 5 тестов ProjectServiceTest (включая graceful degradation при ошибке планирования)
+
+### 2026-02-16: F35 Projects — Stage 1 (Sync + UI)
+- Тип задачи PROJECT в иерархии: PROJECT → EPIC → STORY → SUBTASK
+- V33 миграция: `epic_link_type`, `epic_link_name` в project_configurations, `child_epic_keys` в jira_issues
+- BoardCategory.PROJECT, WorkflowConfigService: projectTypeNames, isProject()
+- Два режима Project→Epic: parent (default) и issuelink (по имени связи)
+- SyncService: парсинг issueLinks для PROJECT-задач
+- ProjectService + ProjectController: `GET /api/projects`, `GET /api/projects/{key}`
+- Frontend: ProjectsPage (карточки проектов + раскрытие дочерних эпиков)
+- WorkflowConfigPage: PROJECT в категориях + UI для epicLinkType/epicLinkName
+- Навигация: таб "Projects" после Teams
 
 ### 2026-02-16: F34 Project Key → Config Binding
 - Колонка `project_key` в `project_configurations` (nullable, unique partial index)
