@@ -39,12 +39,17 @@ public class AutoScoreService {
         List<JiraIssueEntity> epics = issueRepository.findByBoardCategory("EPIC");
         int count = 0;
 
-        for (JiraIssueEntity epic : epics) {
-            BigDecimal score = calculator.calculate(epic);
-            epic.setAutoScore(score);
-            epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
-            issueRepository.save(epic);
-            count++;
+        calculator.preloadRiceData(epics);
+        try {
+            for (JiraIssueEntity epic : epics) {
+                BigDecimal score = calculator.calculate(epic);
+                epic.setAutoScore(score);
+                epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
+                issueRepository.save(epic);
+                count++;
+            }
+        } finally {
+            calculator.clearRiceData();
         }
 
         log.info("Recalculated AutoScore for {} epics", count);
@@ -62,12 +67,17 @@ public class AutoScoreService {
         List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
         int count = 0;
 
-        for (JiraIssueEntity epic : epics) {
-            BigDecimal score = calculator.calculate(epic);
-            epic.setAutoScore(score);
-            epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
-            issueRepository.save(epic);
-            count++;
+        calculator.preloadRiceData(epics);
+        try {
+            for (JiraIssueEntity epic : epics) {
+                BigDecimal score = calculator.calculate(epic);
+                epic.setAutoScore(score);
+                epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
+                issueRepository.save(epic);
+                count++;
+            }
+        } finally {
+            calculator.clearRiceData();
         }
 
         log.info("Recalculated AutoScore for {} epics of team {}", count, teamId);

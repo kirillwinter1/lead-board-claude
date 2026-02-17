@@ -1,6 +1,8 @@
 package com.leadboard.planning;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.rice.RiceAssessmentService;
+import com.leadboard.rice.dto.RiceAssessmentDto;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -12,9 +14,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Расчёт AutoScore — автоматического приоритета эпика для планирования.
@@ -46,10 +46,17 @@ public class AutoScoreCalculator {
 
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final RiceAssessmentService riceAssessmentService;
 
-    public AutoScoreCalculator(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
+    // Preloaded RICE data for batch operations (epicKey → effective normalized RICE score)
+    private Map<String, BigDecimal> preloadedEffectiveRice;
+
+    public AutoScoreCalculator(JiraIssueRepository issueRepository,
+                               WorkflowConfigService workflowConfigService,
+                               RiceAssessmentService riceAssessmentService) {
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
+        this.riceAssessmentService = riceAssessmentService;
     }
 
     // Веса факторов (обновлены 2026-01-26)
@@ -58,6 +65,8 @@ public class AutoScoreCalculator {
     private static final BigDecimal WEIGHT_PRIORITY = new BigDecimal("20");
     private static final BigDecimal WEIGHT_SIZE = new BigDecimal("5");
     private static final BigDecimal WEIGHT_AGE = new BigDecimal("5");
+    private static final BigDecimal WEIGHT_RICE = new BigDecimal("15");
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     // Баллы за статус в Epic Workflow (чем дальше по workflow — тем выше)
     private static final int STATUS_SCORE_ACCEPTANCE = 30;    // Почти готово
@@ -96,6 +105,7 @@ public class AutoScoreCalculator {
         factors.put("priority", calculatePriorityScore(epic));
         factors.put("size", calculateSizeScore(epic));
         factors.put("age", calculateAgeScore(epic));
+        factors.put("riceBoost", calculateRiceBoost(epic));
         factors.put("flagged", calculateFlaggedPenalty(epic));
 
         return factors;
@@ -302,6 +312,141 @@ public class AutoScoreCalculator {
         double score = 5 * Math.log(days + 1) / Math.log(365);
         return BigDecimal.valueOf(Math.min(5, score))
                 .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Preload RICE data for batch operations.
+     * Builds epicKey → effective normalized RICE score map using inheritance:
+     * - Epic in project → use project's RICE
+     * - Standalone epic → use own RICE
+     */
+    public void preloadRiceData(List<JiraIssueEntity> epics) {
+        preloadedEffectiveRice = new HashMap<>();
+
+        // Collect all epic keys and their parent keys
+        Set<String> allKeys = new HashSet<>();
+        Set<String> parentKeys = new HashSet<>();
+        for (JiraIssueEntity epic : epics) {
+            allKeys.add(epic.getIssueKey());
+            if (epic.getParentKey() != null) {
+                parentKeys.add(epic.getParentKey());
+            }
+        }
+
+        // Find which parents are PROJECTs
+        Map<String, String> epicToProjectKey = new HashMap<>();
+        if (!parentKeys.isEmpty()) {
+            List<JiraIssueEntity> parents = issueRepository.findByIssueKeyIn(new ArrayList<>(parentKeys));
+            Set<String> projectKeys = new HashSet<>();
+            for (JiraIssueEntity parent : parents) {
+                if ("PROJECT".equals(parent.getBoardCategory())) {
+                    projectKeys.add(parent.getIssueKey());
+                }
+            }
+            // Map epic → project key
+            for (JiraIssueEntity epic : epics) {
+                if (epic.getParentKey() != null && projectKeys.contains(epic.getParentKey())) {
+                    epicToProjectKey.put(epic.getIssueKey(), epic.getParentKey());
+                }
+            }
+            allKeys.addAll(projectKeys);
+        }
+
+        // Also check project → epic links (childEpicKeys on projects)
+        List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
+        for (JiraIssueEntity project : allProjects) {
+            String[] childKeys = project.getChildEpicKeys();
+            if (childKeys != null) {
+                for (String childKey : childKeys) {
+                    if (allKeys.contains(childKey) && !epicToProjectKey.containsKey(childKey)) {
+                        epicToProjectKey.put(childKey, project.getIssueKey());
+                        allKeys.add(project.getIssueKey());
+                    }
+                }
+            }
+        }
+
+        // Batch load all RICE assessments
+        Map<String, RiceAssessmentDto> riceMap = allKeys.isEmpty()
+                ? Map.of()
+                : riceAssessmentService.getAssessments(allKeys);
+
+        // Build effective RICE map
+        for (JiraIssueEntity epic : epics) {
+            String key = epic.getIssueKey();
+            String projectKey = epicToProjectKey.get(key);
+
+            BigDecimal normalizedScore = null;
+            if (projectKey != null) {
+                // Inheritance: use project's RICE
+                RiceAssessmentDto projectRice = riceMap.get(projectKey);
+                if (projectRice != null) {
+                    normalizedScore = projectRice.normalizedScore();
+                }
+            }
+            if (normalizedScore == null) {
+                // Standalone: use own RICE
+                RiceAssessmentDto epicRice = riceMap.get(key);
+                if (epicRice != null) {
+                    normalizedScore = epicRice.normalizedScore();
+                }
+            }
+
+            if (normalizedScore != null) {
+                preloadedEffectiveRice.put(key, normalizedScore);
+            }
+        }
+    }
+
+    public void clearRiceData() {
+        preloadedEffectiveRice = null;
+    }
+
+    /**
+     * RICE Boost: (normalizedRiceScore / 100) × 15.
+     * Uses preloaded data if available, otherwise does individual lookup.
+     */
+    private BigDecimal calculateRiceBoost(JiraIssueEntity epic) {
+        BigDecimal normalizedScore = null;
+
+        if (preloadedEffectiveRice != null) {
+            normalizedScore = preloadedEffectiveRice.get(epic.getIssueKey());
+        } else {
+            normalizedScore = resolveEffectiveRiceSingle(epic);
+        }
+
+        if (normalizedScore == null || normalizedScore.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return normalizedScore
+                .multiply(WEIGHT_RICE)
+                .divide(HUNDRED, 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Resolve effective RICE for a single epic (non-batch mode).
+     * Check parent project first, then epic's own RICE.
+     */
+    private BigDecimal resolveEffectiveRiceSingle(JiraIssueEntity epic) {
+        // Check if parent is a PROJECT
+        if (epic.getParentKey() != null) {
+            Optional<JiraIssueEntity> parentOpt = issueRepository.findByIssueKey(epic.getParentKey());
+            if (parentOpt.isPresent() && "PROJECT".equals(parentOpt.get().getBoardCategory())) {
+                RiceAssessmentDto projectRice = riceAssessmentService.getAssessment(parentOpt.get().getIssueKey());
+                if (projectRice != null && projectRice.normalizedScore() != null) {
+                    return projectRice.normalizedScore();
+                }
+            }
+        }
+
+        // Epic's own RICE
+        RiceAssessmentDto epicRice = riceAssessmentService.getAssessment(epic.getIssueKey());
+        if (epicRice != null && epicRice.normalizedScore() != null) {
+            return epicRice.normalizedScore();
+        }
+
+        return null;
     }
 
     /**

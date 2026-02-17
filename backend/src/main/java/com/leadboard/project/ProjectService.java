@@ -4,6 +4,8 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedEpic;
+import com.leadboard.rice.RiceAssessmentService;
+import com.leadboard.rice.dto.RiceAssessmentDto;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
@@ -25,19 +27,28 @@ public class ProjectService {
     private final TeamRepository teamRepository;
     private final UnifiedPlanningService unifiedPlanningService;
     private final WorkflowConfigService workflowConfigService;
+    private final RiceAssessmentService riceAssessmentService;
 
     public ProjectService(JiraIssueRepository issueRepository,
                           TeamRepository teamRepository,
                           UnifiedPlanningService unifiedPlanningService,
-                          WorkflowConfigService workflowConfigService) {
+                          WorkflowConfigService workflowConfigService,
+                          RiceAssessmentService riceAssessmentService) {
         this.issueRepository = issueRepository;
         this.teamRepository = teamRepository;
         this.unifiedPlanningService = unifiedPlanningService;
         this.workflowConfigService = workflowConfigService;
+        this.riceAssessmentService = riceAssessmentService;
     }
 
     public List<ProjectDto> listProjects() {
         List<JiraIssueEntity> projects = issueRepository.findByBoardCategory("PROJECT");
+
+        // Batch load RICE assessments for all projects
+        Set<String> projectKeys = projects.stream().map(JiraIssueEntity::getIssueKey).collect(Collectors.toSet());
+        Map<String, RiceAssessmentDto> riceMap = projectKeys.isEmpty()
+                ? Map.of()
+                : riceAssessmentService.getAssessments(projectKeys);
 
         return projects.stream().map(p -> {
             List<JiraIssueEntity> epics = findChildEpics(p);
@@ -48,6 +59,8 @@ public class ProjectService {
             Map<String, PlannedEpic> planningMap = buildEpicPlanningMap(epics);
             LocalDate expectedDone = computeExpectedDone(epics, planningMap);
 
+            RiceAssessmentDto rice = riceMap.get(p.getIssueKey());
+
             return new ProjectDto(
                     p.getIssueKey(),
                     p.getSummary(),
@@ -56,7 +69,9 @@ public class ProjectService {
                     epicCount,
                     completedCount,
                     progressPct,
-                    expectedDone
+                    expectedDone,
+                    rice != null ? rice.riceScore() : null,
+                    rice != null ? rice.normalizedScore() : null
             );
         }).toList();
     }
@@ -101,6 +116,8 @@ public class ProjectService {
             );
         }).toList();
 
+        RiceAssessmentDto rice = riceAssessmentService.getAssessment(project.getIssueKey());
+
         return new ProjectDetailDto(
                 project.getIssueKey(),
                 project.getSummary(),
@@ -109,6 +126,8 @@ public class ProjectService {
                 completedCount,
                 progressPct,
                 expectedDone,
+                rice != null ? rice.riceScore() : null,
+                rice != null ? rice.normalizedScore() : null,
                 epicDtos
         );
     }

@@ -1,6 +1,7 @@
 package com.leadboard.quality;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.rice.RiceAssessmentRepository;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -27,15 +28,18 @@ public class DataQualityService {
     private final JiraIssueRepository issueRepository;
     private final TeamMemberRepository memberRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final RiceAssessmentRepository riceAssessmentRepository;
 
     public DataQualityService(
             JiraIssueRepository issueRepository,
             TeamMemberRepository memberRepository,
-            WorkflowConfigService workflowConfigService
+            WorkflowConfigService workflowConfigService,
+            RiceAssessmentRepository riceAssessmentRepository
     ) {
         this.issueRepository = issueRepository;
         this.memberRepository = memberRepository;
         this.workflowConfigService = workflowConfigService;
+        this.riceAssessmentRepository = riceAssessmentRepository;
     }
 
     /**
@@ -134,6 +138,21 @@ public class DataQualityService {
         if (workflowConfigService.isEpicInProgress(epic.getStatus())) {
             if (children.isEmpty()) {
                 violations.add(DataQualityViolation.of(DataQualityRule.EPIC_IN_PROGRESS_NO_STORIES));
+            }
+        }
+
+        // RICE_MISSING_ASSESSMENT - Epic in Planned+ without RICE assessment
+        if (epicPastTodo && !workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
+            boolean hasRice = riceAssessmentRepository.findByIssueKey(epic.getIssueKey()).isPresent();
+            if (!hasRice) {
+                // Also check if parent project has RICE (inheritance)
+                boolean parentHasRice = false;
+                if (epic.getParentKey() != null) {
+                    parentHasRice = riceAssessmentRepository.findByIssueKey(epic.getParentKey()).isPresent();
+                }
+                if (!parentHasRice) {
+                    violations.add(DataQualityViolation.of(DataQualityRule.RICE_MISSING_ASSESSMENT));
+                }
             }
         }
 

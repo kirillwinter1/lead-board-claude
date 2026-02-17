@@ -4,6 +4,8 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedEpic;
+import com.leadboard.rice.RiceAssessmentService;
+import com.leadboard.rice.dto.RiceAssessmentDto;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
@@ -20,10 +22,10 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,12 +43,15 @@ class ProjectServiceTest {
     @Mock
     private WorkflowConfigService workflowConfigService;
 
+    @Mock
+    private RiceAssessmentService riceAssessmentService;
+
     private ProjectService projectService;
 
     @BeforeEach
     void setUp() {
         projectService = new ProjectService(issueRepository, teamRepository,
-                unifiedPlanningService, workflowConfigService);
+                unifiedPlanningService, workflowConfigService, riceAssessmentService);
     }
 
     @Test
@@ -195,6 +200,45 @@ class ProjectServiceTest {
         assertEquals(2, result.epics().size());
         assertEquals(1, result.completedEpicCount());
         assertEquals(50, result.progressPercent());
+    }
+
+    @Test
+    void listProjects_includesRiceScore() {
+        JiraIssueEntity project = createIssue("PROJ-1", "My Project", "Open", "PROJECT");
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByParentKeyAndBoardCategory("PROJ-1", "EPIC")).thenReturn(List.of());
+
+        RiceAssessmentDto riceDto = new RiceAssessmentDto(
+                1L, "PROJ-1", 1L, "Business", null,
+                new BigDecimal("5"), new BigDecimal("10"), new BigDecimal("0.8"),
+                null, null, new BigDecimal("2"),
+                new BigDecimal("20.00"), new BigDecimal("65.50"),
+                List.of()
+        );
+        when(riceAssessmentService.getAssessments(Set.of("PROJ-1")))
+                .thenReturn(Map.of("PROJ-1", riceDto));
+
+        List<ProjectDto> result = projectService.listProjects();
+
+        assertEquals(1, result.size());
+        assertEquals(0, new BigDecimal("20.00").compareTo(result.get(0).riceScore()));
+        assertEquals(0, new BigDecimal("65.50").compareTo(result.get(0).riceNormalizedScore()));
+    }
+
+    @Test
+    void listProjects_riceIsNullWhenNoAssessment() {
+        JiraIssueEntity project = createIssue("PROJ-1", "My Project", "Open", "PROJECT");
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByParentKeyAndBoardCategory("PROJ-1", "EPIC")).thenReturn(List.of());
+        when(riceAssessmentService.getAssessments(Set.of("PROJ-1"))).thenReturn(Map.of());
+
+        List<ProjectDto> result = projectService.listProjects();
+
+        assertEquals(1, result.size());
+        assertNull(result.get(0).riceScore());
+        assertNull(result.get(0).riceNormalizedScore());
     }
 
     private JiraIssueEntity createIssue(String key, String summary, String status, String boardCategory) {

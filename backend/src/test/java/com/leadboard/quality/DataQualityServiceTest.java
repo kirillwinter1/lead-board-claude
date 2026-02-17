@@ -3,6 +3,7 @@ package com.leadboard.quality;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.config.repository.*;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.rice.RiceAssessmentRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
@@ -45,6 +46,8 @@ class DataQualityServiceTest {
     private StatusMappingRepository statusMappingRepo;
     @Mock
     private LinkTypeMappingRepository linkTypeRepo;
+    @Mock
+    private RiceAssessmentRepository riceAssessmentRepository;
 
     private WorkflowConfigService workflowConfigService;
     private DataQualityService dataQualityService;
@@ -55,7 +58,7 @@ class DataQualityServiceTest {
         workflowConfigService = new WorkflowConfigService(
                 configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper(), new JiraProperties()
         );
-        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService);
+        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService, riceAssessmentRepository);
     }
 
     // ==================== Helper Methods ====================

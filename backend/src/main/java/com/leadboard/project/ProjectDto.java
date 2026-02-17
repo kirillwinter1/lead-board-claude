@@ -1,5 +1,6 @@
 package com.leadboard.project;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record ProjectDto(
@@ -10,5 +11,7 @@ public record ProjectDto(
         int childEpicCount,
         int completedEpicCount,
         int progressPercent,
-        LocalDate expectedDone
+        LocalDate expectedDone,
+        BigDecimal riceScore,
+        BigDecimal riceNormalizedScore
 ) {}

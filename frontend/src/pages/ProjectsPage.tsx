@@ -3,6 +3,8 @@ import { projectsApi, ProjectDto, ProjectDetailDto } from '../api/projects'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
+import { RiceForm } from '../components/rice/RiceForm'
+import { RiceScoreBadge } from '../components/rice/RiceScoreBadge'
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—'
@@ -136,6 +138,7 @@ export function ProjectsPage() {
                   <span style={{ flex: 1, fontSize: 14, color: '#172B4D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {p.summary}
                   </span>
+                  <RiceScoreBadge score={p.riceScore} normalized={p.riceNormalizedScore} />
                   <StatusBadge status={p.status} />
                   <span style={{
                     fontSize: 16,
@@ -246,6 +249,10 @@ export function ProjectsPage() {
                       No child epics found
                     </div>
                   )}
+                  <RiceForm issueKey={p.issueKey} onSaved={() => {
+                    // Refresh project list to update RICE badge
+                    projectsApi.list().then(setProjects).catch(() => {})
+                  }} />
                 </div>
               )}
             </div>

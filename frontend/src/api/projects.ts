@@ -9,6 +9,8 @@ export interface ProjectDto {
   completedEpicCount: number
   progressPercent: number
   expectedDone: string | null
+  riceScore: number | null
+  riceNormalizedScore: number | null
 }
 
 export interface ChildEpicDto {
@@ -31,6 +33,8 @@ export interface ProjectDetailDto {
   completedEpicCount: number
   progressPercent: number
   expectedDone: string | null
+  riceScore: number | null
+  riceNormalizedScore: number | null
   epics: ChildEpicDto[]
 }
 

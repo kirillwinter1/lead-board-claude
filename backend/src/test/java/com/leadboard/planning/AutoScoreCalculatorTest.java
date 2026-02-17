@@ -1,6 +1,8 @@
 package com.leadboard.planning;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.rice.RiceAssessmentService;
+import com.leadboard.rice.dto.RiceAssessmentDto;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,9 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -24,6 +24,7 @@ class AutoScoreCalculatorTest {
 
     @Mock private JiraIssueRepository issueRepository;
     @Mock private WorkflowConfigService workflowConfigService;
+    @Mock private RiceAssessmentService riceAssessmentService;
 
     private AutoScoreCalculator calculator;
 
@@ -31,7 +32,7 @@ class AutoScoreCalculatorTest {
     void setUp() {
         // WorkflowConfigService returns 0 by default for getStatusScoreWeight,
         // so the fallback substring matching will be used in tests
-        calculator = new AutoScoreCalculator(issueRepository, workflowConfigService);
+        calculator = new AutoScoreCalculator(issueRepository, workflowConfigService, riceAssessmentService);
     }
 
     // ==================== Status Factor Tests (Updated 2026-01-26) ====================
@@ -611,6 +612,139 @@ class AutoScoreCalculatorTest {
 
         // With estimate gets positive size score, without gets -5
         assertTrue(withScore.compareTo(withoutScore) > 0);
+    }
+
+    // ==================== RICE Boost Tests ====================
+
+    @Test
+    void riceBoost_zeroWhenNoAssessment() {
+        JiraIssueEntity epic = createBasicEpic();
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(factors.get("riceBoost")));
+    }
+
+    @Test
+    void riceBoost_calculatesFromOwnRice() {
+        JiraIssueEntity epic = createBasicEpic();
+
+        // Epic has its own RICE assessment with normalized score of 80
+        RiceAssessmentDto riceDto = new RiceAssessmentDto(
+                1L, "TEST-123", 1L, "Business", null,
+                new BigDecimal("5"), new BigDecimal("10"), new BigDecimal("0.8"),
+                null, null, new BigDecimal("2"),
+                new BigDecimal("20.00"), new BigDecimal("80.00"),
+                List.of()
+        );
+        when(riceAssessmentService.getAssessment("TEST-123")).thenReturn(riceDto);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        // 80 / 100 * 15 = 12.00
+        assertEquals(0, new BigDecimal("12.00").compareTo(factors.get("riceBoost")));
+    }
+
+    @Test
+    void riceBoost_inheritsFromProjectParent() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setParentKey("PROJ-1");
+
+        // Parent is a PROJECT
+        JiraIssueEntity project = new JiraIssueEntity();
+        project.setIssueKey("PROJ-1");
+        project.setBoardCategory("PROJECT");
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+
+        // Project has RICE with normalized 60
+        RiceAssessmentDto projectRice = new RiceAssessmentDto(
+                1L, "PROJ-1", 1L, "Business", null,
+                new BigDecimal("5"), new BigDecimal("10"), new BigDecimal("0.8"),
+                null, null, new BigDecimal("2"),
+                new BigDecimal("20.00"), new BigDecimal("60.00"),
+                List.of()
+        );
+        when(riceAssessmentService.getAssessment("PROJ-1")).thenReturn(projectRice);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        // 60 / 100 * 15 = 9.00
+        assertEquals(0, new BigDecimal("9.00").compareTo(factors.get("riceBoost")));
+    }
+
+    @Test
+    void riceBoost_fallsBackToOwnWhenProjectHasNoRice() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setParentKey("PROJ-1");
+
+        // Parent is a PROJECT but has no RICE
+        JiraIssueEntity project = new JiraIssueEntity();
+        project.setIssueKey("PROJ-1");
+        project.setBoardCategory("PROJECT");
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        when(riceAssessmentService.getAssessment("PROJ-1")).thenReturn(null);
+
+        // Epic has its own RICE
+        RiceAssessmentDto epicRice = new RiceAssessmentDto(
+                2L, "TEST-123", 1L, "Business", null,
+                new BigDecimal("3"), new BigDecimal("5"), new BigDecimal("1.0"),
+                null, null, new BigDecimal("1"),
+                new BigDecimal("15.00"), new BigDecimal("40.00"),
+                List.of()
+        );
+        when(riceAssessmentService.getAssessment("TEST-123")).thenReturn(epicRice);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        // 40 / 100 * 15 = 6.00
+        assertEquals(0, new BigDecimal("6.00").compareTo(factors.get("riceBoost")));
+    }
+
+    @Test
+    void riceBoost_preloadBatchMode() {
+        JiraIssueEntity epic1 = createBasicEpic();
+        epic1.setIssueKey("EPIC-1");
+        epic1.setParentKey("PROJ-1");
+
+        JiraIssueEntity epic2 = createBasicEpic();
+        epic2.setIssueKey("EPIC-2");
+
+        // PROJ-1 is a PROJECT
+        JiraIssueEntity project = new JiraIssueEntity();
+        project.setIssueKey("PROJ-1");
+        project.setBoardCategory("PROJECT");
+        when(issueRepository.findByIssueKeyIn(List.of("PROJ-1"))).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+
+        // Batch RICE assessments
+        RiceAssessmentDto projectRice = new RiceAssessmentDto(
+                1L, "PROJ-1", 1L, "Business", null,
+                new BigDecimal("5"), new BigDecimal("10"), new BigDecimal("0.8"),
+                null, null, new BigDecimal("2"),
+                new BigDecimal("20.00"), new BigDecimal("70.00"),
+                List.of()
+        );
+        RiceAssessmentDto epic2Rice = new RiceAssessmentDto(
+                2L, "EPIC-2", 1L, "Business", null,
+                new BigDecimal("3"), new BigDecimal("5"), new BigDecimal("1.0"),
+                null, null, new BigDecimal("1"),
+                new BigDecimal("15.00"), new BigDecimal("50.00"),
+                List.of()
+        );
+        when(riceAssessmentService.getAssessments(anyCollection()))
+                .thenReturn(Map.of("PROJ-1", projectRice, "EPIC-2", epic2Rice));
+
+        calculator.preloadRiceData(List.of(epic1, epic2));
+
+        Map<String, BigDecimal> factors1 = calculator.calculateFactors(epic1);
+        Map<String, BigDecimal> factors2 = calculator.calculateFactors(epic2);
+
+        // Epic1 inherits PROJ-1 RICE: 70/100*15 = 10.50
+        assertEquals(0, new BigDecimal("10.50").compareTo(factors1.get("riceBoost")));
+        // Epic2 uses own RICE: 50/100*15 = 7.50
+        assertEquals(0, new BigDecimal("7.50").compareTo(factors2.get("riceBoost")));
+
+        calculator.clearRiceData();
     }
 
     // ==================== Helper Methods ====================

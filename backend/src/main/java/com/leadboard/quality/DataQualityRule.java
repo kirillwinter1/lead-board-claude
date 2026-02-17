@@ -140,6 +140,12 @@ public enum DataQualityRule {
     SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED(
             DataQualitySeverity.WARNING,
             "Time logged on subtask while parent Epic is flagged (paused)"
+    ),
+
+    // RICE scoring rules
+    RICE_MISSING_ASSESSMENT(
+            DataQualitySeverity.WARNING,
+            "RICE assessment is missing (epic is in Planned+ status)"
     );
 
     private final DataQualitySeverity severity;
