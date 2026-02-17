@@ -160,62 +160,11 @@ public class SimulationPlanner {
                             "In Progress",
                             "Phase " + phaseName + " active, starting subtask"
                     ));
+                    // Also log work in the same day
+                    planWorklog(subtask, member, phaseName, assigneeName, actions);
                 }
                 case IN_PROGRESS -> {
-                    // Calculate hours to log
-                    double hoursPerDay = member.getHoursPerDay() != null
-                            ? member.getHoursPerDay().doubleValue() : 6.0;
-                    double dailyHours = deviation.applyDailyDeviation(hoursPerDay);
-
-                    // Cap by remaining estimate
-                    long remainingSeconds = subtask.getRemainingEstimateSeconds() != null
-                            ? subtask.getRemainingEstimateSeconds() : 0;
-                    if (remainingSeconds <= 0) {
-                        long est = subtask.getOriginalEstimateSeconds() != null
-                                ? subtask.getOriginalEstimateSeconds() : 0;
-                        long spent = subtask.getTimeSpentSeconds() != null
-                                ? subtask.getTimeSpentSeconds() : 0;
-                        remainingSeconds = Math.max(0, est - spent);
-                    }
-
-                    double remainingHours = remainingSeconds / 3600.0;
-
-                    if (remainingHours <= 0) {
-                        // Work is done, transition to Done
-                        actions.add(SimulationAction.transition(
-                                subtask.getIssueKey(),
-                                subtask.getIssueType(),
-                                assigneeName,
-                                subtask.getStatus(),
-                                "Done",
-                                "Remaining estimate is 0, completing subtask"
-                        ));
-                    } else {
-                        double hoursToLog = Math.min(dailyHours, remainingHours);
-                        hoursToLog = roundToHalf(hoursToLog);
-                        if (hoursToLog < 0.5) hoursToLog = 0.5;
-
-                        actions.add(SimulationAction.worklog(
-                                subtask.getIssueKey(),
-                                subtask.getIssueType(),
-                                assigneeName,
-                                hoursToLog,
-                                String.format("Phase %s: logging %.1fh (remaining: %.1fh)",
-                                        phaseName, hoursToLog, remainingHours)
-                        ));
-
-                        // If this log will finish the subtask, also add transition
-                        if (hoursToLog >= remainingHours - 0.25) {
-                            actions.add(SimulationAction.transition(
-                                    subtask.getIssueKey(),
-                                    subtask.getIssueType(),
-                                    assigneeName,
-                                    subtask.getStatus(),
-                                    "Done",
-                                    "Work completed after logging"
-                            ));
-                        }
-                    }
+                    planWorklog(subtask, member, phaseName, assigneeName, actions);
                 }
                 case DONE -> {
                     // Already done, skip
@@ -305,6 +254,68 @@ public class SimulationPlanner {
                     "Done",
                     "All stories completed"
             ));
+        }
+    }
+
+    private void planWorklog(
+            JiraIssueEntity subtask,
+            TeamMemberEntity member,
+            String phaseName,
+            String assigneeName,
+            List<SimulationAction> actions
+    ) {
+        double hoursPerDay = member.getHoursPerDay() != null
+                ? member.getHoursPerDay().doubleValue() : 6.0;
+        double dailyHours = deviation.applyDailyDeviation(hoursPerDay);
+
+        // Cap by remaining estimate
+        long remainingSeconds = subtask.getRemainingEstimateSeconds() != null
+                ? subtask.getRemainingEstimateSeconds() : 0;
+        if (remainingSeconds <= 0) {
+            long est = subtask.getOriginalEstimateSeconds() != null
+                    ? subtask.getOriginalEstimateSeconds() : 0;
+            long spent = subtask.getTimeSpentSeconds() != null
+                    ? subtask.getTimeSpentSeconds() : 0;
+            remainingSeconds = Math.max(0, est - spent);
+        }
+
+        double remainingHours = remainingSeconds / 3600.0;
+
+        if (remainingHours <= 0) {
+            // Work is done, transition to Done
+            actions.add(SimulationAction.transition(
+                    subtask.getIssueKey(),
+                    subtask.getIssueType(),
+                    assigneeName,
+                    subtask.getStatus(),
+                    "Done",
+                    "Remaining estimate is 0, completing subtask"
+            ));
+        } else {
+            double hoursToLog = Math.min(dailyHours, remainingHours);
+            hoursToLog = roundToHalf(hoursToLog);
+            if (hoursToLog < 0.5) hoursToLog = 0.5;
+
+            actions.add(SimulationAction.worklog(
+                    subtask.getIssueKey(),
+                    subtask.getIssueType(),
+                    assigneeName,
+                    hoursToLog,
+                    String.format("Phase %s: logging %.1fh (remaining: %.1fh)",
+                            phaseName, hoursToLog, remainingHours)
+            ));
+
+            // If this log will finish the subtask, also add transition
+            if (hoursToLog >= remainingHours - 0.25) {
+                actions.add(SimulationAction.transition(
+                        subtask.getIssueKey(),
+                        subtask.getIssueType(),
+                        assigneeName,
+                        subtask.getStatus(),
+                        "Done",
+                        "Work completed after logging"
+                ));
+            }
         }
     }
 

@@ -81,7 +81,7 @@ class SimulationPlannerTest {
     }
 
     @Test
-    void planDay_subtaskInTodo_generatesTransition() {
+    void planDay_subtaskInTodo_generatesTransitionAndWorklog() {
         // Setup team member
         TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
@@ -95,7 +95,7 @@ class SimulationPlannerTest {
         when(planningService.calculatePlan(TEAM_ID)).thenReturn(
                 new UnifiedPlanningResult(TEAM_ID, OffsetDateTime.now(), List.of(epic), List.of(), Map.of()));
 
-        // Setup subtask in NEW status
+        // Setup subtask in NEW status with 8h estimate
         JiraIssueEntity subtask = createSubtask("PROJ-11", "New", "Разработка", 28800L, 0L);
         when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
         when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
@@ -105,7 +105,7 @@ class SimulationPlannerTest {
 
         List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
 
-        // Should have ASSIGN before TRANSITION
+        // Should have ASSIGN, then TRANSITION to In Progress, then WORKLOG
         assertTrue(actions.stream().anyMatch(a ->
                 a.type() == SimulationAction.ActionType.ASSIGN
                         && "PROJ-11".equals(a.issueKey())
@@ -114,6 +114,11 @@ class SimulationPlannerTest {
                 a.type() == SimulationAction.ActionType.TRANSITION
                         && "PROJ-11".equals(a.issueKey())
                         && "In Progress".equals(a.toStatus())));
+        assertTrue(actions.stream().anyMatch(a ->
+                a.type() == SimulationAction.ActionType.WORKLOG
+                        && "PROJ-11".equals(a.issueKey())
+                        && a.hoursLogged() != null && a.hoursLogged() > 0),
+                "NEW subtask should also get worklog in the same simulation run");
     }
 
     @Test
