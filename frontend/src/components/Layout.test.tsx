@@ -10,6 +10,31 @@ const mockedAxios = vi.mocked(axios)
 // Mock the logo import
 vi.mock('../icons/logo.png', () => ({ default: 'logo.png' }))
 
+const authenticatedResponse = {
+  data: {
+    authenticated: true,
+    user: {
+      id: 1,
+      accountId: 'acc-123',
+      displayName: 'John Doe',
+      email: 'john@example.com',
+      avatarUrl: 'https://example.com/avatar.jpg',
+      role: 'ADMIN',
+      permissions: [],
+    },
+  },
+}
+
+const syncCompletedResponse = {
+  data: {
+    syncInProgress: false,
+    lastSyncStartedAt: '2024-01-01T00:00:00Z',
+    lastSyncCompletedAt: '2024-01-01T00:00:00Z',
+    issuesCount: 100,
+    error: null,
+  },
+}
+
 describe('Layout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -28,6 +53,18 @@ describe('Layout', () => {
   }
 
   describe('Navigation', () => {
+    beforeEach(() => {
+      mockedAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/oauth/atlassian/status')) {
+          return Promise.resolve(authenticatedResponse)
+        }
+        if (url.includes('/api/sync/status')) {
+          return Promise.resolve(syncCompletedResponse)
+        }
+        return Promise.resolve({ data: {} })
+      })
+    })
+
     it('should render all navigation tabs', async () => {
       renderLayout()
 
@@ -38,6 +75,9 @@ describe('Layout', () => {
         expect(screen.getByText('Data Quality')).toBeInTheDocument()
         expect(screen.getByText('Poker')).toBeInTheDocument()
         expect(screen.getByText('Teams')).toBeInTheDocument()
+        expect(screen.getByText('Projects')).toBeInTheDocument()
+        expect(screen.getByText('Project Timeline')).toBeInTheDocument()
+        expect(screen.getByText('Settings')).toBeInTheDocument()
       })
     })
 
@@ -83,10 +123,11 @@ describe('Layout', () => {
       renderLayout()
 
       await waitFor(() => {
-        expect(screen.getByText('Login with Atlassian')).toBeInTheDocument()
+        expect(screen.getAllByText('Login with Atlassian').length).toBeGreaterThan(0)
       })
 
-      fireEvent.click(screen.getByText('Login with Atlassian'))
+      // Click the header login button (first one)
+      fireEvent.click(screen.getAllByText('Login with Atlassian')[0])
 
       expect(window.location.href).toBe('/oauth/atlassian/authorize')
 
@@ -100,17 +141,14 @@ describe('Layout', () => {
 
   describe('Authentication - Logged in', () => {
     beforeEach(() => {
-      mockedAxios.get.mockResolvedValue({
-        data: {
-          authenticated: true,
-          user: {
-            id: 1,
-            accountId: 'acc-123',
-            displayName: 'John Doe',
-            email: 'john@example.com',
-            avatarUrl: 'https://example.com/avatar.jpg',
-          },
-        },
+      mockedAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/oauth/atlassian/status')) {
+          return Promise.resolve(authenticatedResponse)
+        }
+        if (url.includes('/api/sync/status')) {
+          return Promise.resolve(syncCompletedResponse)
+        }
+        return Promise.resolve({ data: {} })
       })
     })
 
@@ -158,17 +196,27 @@ describe('Layout', () => {
 
   describe('Authentication - No avatar', () => {
     beforeEach(() => {
-      mockedAxios.get.mockResolvedValue({
-        data: {
-          authenticated: true,
-          user: {
-            id: 1,
-            accountId: 'acc-123',
-            displayName: 'Jane Doe',
-            email: 'jane@example.com',
-            avatarUrl: null,
-          },
-        },
+      mockedAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/oauth/atlassian/status')) {
+          return Promise.resolve({
+            data: {
+              authenticated: true,
+              user: {
+                id: 1,
+                accountId: 'acc-123',
+                displayName: 'Jane Doe',
+                email: 'jane@example.com',
+                avatarUrl: null,
+                role: 'MEMBER',
+                permissions: [],
+              },
+            },
+          })
+        }
+        if (url.includes('/api/sync/status')) {
+          return Promise.resolve(syncCompletedResponse)
+        }
+        return Promise.resolve({ data: {} })
       })
     })
 
@@ -205,7 +253,6 @@ describe('Layout', () => {
         expect(container.querySelector('.header')).toBeInTheDocument()
         expect(container.querySelector('.header-left')).toBeInTheDocument()
         expect(container.querySelector('.header-right')).toBeInTheDocument()
-        expect(container.querySelector('.nav-tabs')).toBeInTheDocument()
       })
     })
   })

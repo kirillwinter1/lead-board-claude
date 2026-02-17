@@ -17,8 +17,8 @@ vi.mock('../api/teams', () => ({
 }))
 
 const mockTeams = [
-  { id: 1, name: 'Team Alpha', jiraTeamValue: 'alpha', active: true, memberCount: 5, createdAt: '2024-01-01T00:00:00Z' },
-  { id: 2, name: 'Team Beta', jiraTeamValue: null, active: true, memberCount: 3, createdAt: '2024-01-02T00:00:00Z' },
+  { id: 1, name: 'Team Alpha', jiraTeamValue: 'alpha', color: '#0052CC', active: true, memberCount: 5, createdAt: '2024-01-01T00:00:00Z', updatedAt: '2024-01-01T00:00:00Z' },
+  { id: 2, name: 'Team Beta', jiraTeamValue: null, color: '#00875A', active: true, memberCount: 3, createdAt: '2024-01-02T00:00:00Z', updatedAt: '2024-01-02T00:00:00Z' },
 ]
 
 const renderTeamsPage = () => {
@@ -149,7 +149,7 @@ describe('TeamsPage', () => {
     })
 
     it('should call create API on submit', async () => {
-      vi.mocked(teamsApi.create).mockResolvedValue({ id: 3, name: 'New Team', jiraTeamValue: '', active: true, memberCount: 0, createdAt: '', updatedAt: '' })
+      vi.mocked(teamsApi.create).mockResolvedValue({ id: 3, name: 'New Team', jiraTeamValue: '', color: null, active: true, memberCount: 0, createdAt: '', updatedAt: '' })
 
       renderTeamsPage()
 
@@ -161,7 +161,7 @@ describe('TeamsPage', () => {
       fireEvent.click(screen.getByText('Create'))
 
       await waitFor(() => {
-        expect(teamsApi.create).toHaveBeenCalledWith({ name: 'New Team', jiraTeamValue: '' })
+        expect(teamsApi.create).toHaveBeenCalledWith({ name: 'New Team', jiraTeamValue: '', color: undefined })
       })
     })
   })
@@ -227,25 +227,28 @@ describe('TeamsPage', () => {
     })
   })
 
-  describe('Sync from Atlassian', () => {
-    it('should show Sync button when organizationId is set', async () => {
+  describe('Sync status', () => {
+    it('should show sync info when organizationId is set', async () => {
       vi.mocked(teamsApi.getConfig).mockResolvedValue({ manualTeamManagement: true, organizationId: 'org-123' })
+      vi.mocked(teamsApi.getSyncStatus).mockResolvedValue({ syncInProgress: false, lastSyncTime: '2024-01-15T10:00:00Z', error: null })
 
       renderTeamsPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Sync from Atlassian')).toBeInTheDocument()
+        expect(screen.getByText(/Last sync:/)).toBeInTheDocument()
       })
     })
 
-    it('should not show Sync button when organizationId is empty', async () => {
+    it('should not show sync info when organizationId is empty', async () => {
       vi.mocked(teamsApi.getConfig).mockResolvedValue({ manualTeamManagement: true, organizationId: '' })
 
       renderTeamsPage()
 
       await waitFor(() => {
-        expect(screen.queryByText('Sync from Atlassian')).not.toBeInTheDocument()
+        expect(screen.getByText('Teams')).toBeInTheDocument()
       })
+
+      expect(screen.queryByText(/Last sync:/)).not.toBeInTheDocument()
     })
   })
 
@@ -279,7 +282,7 @@ describe('TeamsPage', () => {
 
       await waitFor(() => {
         const teamLink = screen.getByText('Team Alpha').closest('a')
-        expect(teamLink).toHaveAttribute('href', '/teams/1')
+        expect(teamLink).toHaveAttribute('href', '/board/teams/1')
       })
     })
   })
