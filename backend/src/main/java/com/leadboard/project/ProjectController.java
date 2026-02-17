@@ -10,9 +10,12 @@ import java.util.List;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectAlignmentService alignmentService;
 
-    public ProjectController(ProjectService projectService) {
+    public ProjectController(ProjectService projectService,
+                             ProjectAlignmentService alignmentService) {
         this.projectService = projectService;
+        this.alignmentService = alignmentService;
     }
 
     @GetMapping
@@ -24,6 +27,15 @@ public class ProjectController {
     public ResponseEntity<ProjectDetailDto> getProject(@PathVariable String issueKey) {
         try {
             return ResponseEntity.ok(projectService.getProjectWithEpics(issueKey));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    @GetMapping("/{issueKey}/recommendations")
+    public ResponseEntity<List<ProjectRecommendation>> getRecommendations(@PathVariable String issueKey) {
+        try {
+            return ResponseEntity.ok(alignmentService.getRecommendations(issueKey));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         }

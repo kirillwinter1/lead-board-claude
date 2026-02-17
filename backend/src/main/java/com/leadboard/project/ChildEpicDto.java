@@ -11,5 +11,6 @@ public record ChildEpicDto(
         Long loggedSeconds,
         Integer progressPercent,
         LocalDate expectedDone,
-        LocalDate dueDate
+        LocalDate dueDate,
+        Integer delayDays
 ) {}

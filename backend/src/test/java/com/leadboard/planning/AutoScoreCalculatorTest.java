@@ -747,6 +747,54 @@ class AutoScoreCalculatorTest {
         calculator.clearRiceData();
     }
 
+    // ==================== Alignment Boost Tests ====================
+
+    @Test
+    void alignmentBoost_calculatesFromPreloadedData() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setIssueKey("EPIC-1");
+
+        calculator.preloadAlignmentData(Map.of("EPIC-1", 7));
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(0, new BigDecimal("7.00").compareTo(factors.get("alignmentBoost")));
+
+        calculator.clearAlignmentData();
+    }
+
+    @Test
+    void alignmentBoost_cappedAt10() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setIssueKey("EPIC-1");
+
+        calculator.preloadAlignmentData(Map.of("EPIC-1", 25));
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(0, new BigDecimal("10.00").compareTo(factors.get("alignmentBoost")));
+
+        calculator.clearAlignmentData();
+    }
+
+    @Test
+    void alignmentBoost_zeroWhenNoData() {
+        JiraIssueEntity epic = createBasicEpic();
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(factors.get("alignmentBoost")));
+    }
+
+    @Test
+    void alignmentBoost_factorAppearsInCalculateFactors() {
+        JiraIssueEntity epic = createBasicEpic();
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertTrue(factors.containsKey("alignmentBoost"));
+    }
+
     // ==================== Helper Methods ====================
 
     private JiraIssueEntity createBasicEpic() {

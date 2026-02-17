@@ -50,6 +50,8 @@ public class AutoScoreCalculator {
 
     // Preloaded RICE data for batch operations (epicKey → effective normalized RICE score)
     private Map<String, BigDecimal> preloadedEffectiveRice;
+    // Preloaded alignment data for batch operations (epicKey → delayDays)
+    private Map<String, Integer> preloadedAlignmentData;
 
     public AutoScoreCalculator(JiraIssueRepository issueRepository,
                                WorkflowConfigService workflowConfigService,
@@ -66,6 +68,8 @@ public class AutoScoreCalculator {
     private static final BigDecimal WEIGHT_SIZE = new BigDecimal("5");
     private static final BigDecimal WEIGHT_AGE = new BigDecimal("5");
     private static final BigDecimal WEIGHT_RICE = new BigDecimal("15");
+    private static final BigDecimal WEIGHT_ALIGNMENT_PER_DAY = BigDecimal.ONE;
+    private static final BigDecimal MAX_ALIGNMENT_BOOST = new BigDecimal("10");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     // Баллы за статус в Epic Workflow (чем дальше по workflow — тем выше)
@@ -106,6 +110,7 @@ public class AutoScoreCalculator {
         factors.put("size", calculateSizeScore(epic));
         factors.put("age", calculateAgeScore(epic));
         factors.put("riceBoost", calculateRiceBoost(epic));
+        factors.put("alignmentBoost", calculateAlignmentBoost(epic));
         factors.put("flagged", calculateFlaggedPenalty(epic));
 
         return factors;
@@ -403,6 +408,17 @@ public class AutoScoreCalculator {
     }
 
     /**
+     * Preload alignment data for batch AutoScore calculation.
+     */
+    public void preloadAlignmentData(Map<String, Integer> alignmentData) {
+        this.preloadedAlignmentData = alignmentData;
+    }
+
+    public void clearAlignmentData() {
+        this.preloadedAlignmentData = null;
+    }
+
+    /**
      * RICE Boost: (normalizedRiceScore / 100) × 15.
      * Uses preloaded data if available, otherwise does individual lookup.
      */
@@ -447,6 +463,22 @@ public class AutoScoreCalculator {
         }
 
         return null;
+    }
+
+    /**
+     * Alignment Boost: up to +10 points for epics lagging behind the project average.
+     * Uses preloaded data only (no single-mode to avoid cross-package dependency).
+     */
+    private BigDecimal calculateAlignmentBoost(JiraIssueEntity epic) {
+        if (preloadedAlignmentData == null) {
+            return BigDecimal.ZERO;
+        }
+        Integer delayDays = preloadedAlignmentData.get(epic.getIssueKey());
+        if (delayDays == null || delayDays <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal boost = BigDecimal.valueOf(delayDays).multiply(WEIGHT_ALIGNMENT_PER_DAY);
+        return boost.min(MAX_ALIGNMENT_BOOST).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**

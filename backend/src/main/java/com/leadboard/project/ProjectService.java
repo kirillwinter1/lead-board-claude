@@ -87,6 +87,7 @@ public class ProjectService {
         int completedCount = countCompletedEpics(epics);
         int progressPct = epics.size() > 0 ? (completedCount * 100) / epics.size() : 0;
         LocalDate expectedDone = computeExpectedDone(epics, planningMap);
+        LocalDate averageExpectedDone = computeAverageExpectedDone(epics, planningMap);
 
         List<ChildEpicDto> epicDtos = epics.stream().map(e -> {
             PlannedEpic planned = planningMap.get(e.getIssueKey());
@@ -103,6 +104,13 @@ public class ProjectService {
                 epicExpectedDone = planned.endDate();
             }
 
+            Integer delayDays = null;
+            if (averageExpectedDone != null && epicExpectedDone != null
+                    && !workflowConfigService.isDone(e.getStatus(), e.getIssueType())) {
+                long delay = java.time.temporal.ChronoUnit.DAYS.between(averageExpectedDone, epicExpectedDone);
+                delayDays = (int) Math.max(0, delay);
+            }
+
             return new ChildEpicDto(
                     e.getIssueKey(),
                     e.getSummary(),
@@ -112,7 +120,8 @@ public class ProjectService {
                     loggedSeconds,
                     epicProgressPct,
                     epicExpectedDone,
-                    e.getDueDate()
+                    e.getDueDate(),
+                    delayDays
             );
         }).toList();
 
@@ -136,7 +145,7 @@ public class ProjectService {
      * Build a map of epicKey → PlannedEpic from UnifiedPlanningService.
      * Collects unique teamIds from epics, calls calculatePlan for each team.
      */
-    private Map<String, PlannedEpic> buildEpicPlanningMap(List<JiraIssueEntity> epics) {
+    Map<String, PlannedEpic> buildEpicPlanningMap(List<JiraIssueEntity> epics) {
         Set<Long> teamIds = epics.stream()
                 .map(JiraIssueEntity::getTeamId)
                 .filter(Objects::nonNull)
@@ -199,7 +208,7 @@ public class ProjectService {
      * 1. Parent mode: epics whose parentKey = project issueKey
      * 2. Issue links: keys stored in childEpicKeys during sync, filtered to EPIC category
      */
-    private List<JiraIssueEntity> findChildEpics(JiraIssueEntity project) {
+    List<JiraIssueEntity> findChildEpics(JiraIssueEntity project) {
         Set<String> epicKeys = new LinkedHashSet<>();
 
         // 1. Parent mode
@@ -219,6 +228,36 @@ public class ProjectService {
 
         // Fetch all unique epics
         return issueRepository.findByIssueKeyIn(new ArrayList<>(epicKeys));
+    }
+
+    /**
+     * Compute average expected done date across non-done epics that have a forecast.
+     * Returns null if fewer than 2 epics have forecasts.
+     */
+    LocalDate computeAverageExpectedDone(List<JiraIssueEntity> epics, Map<String, PlannedEpic> planningMap) {
+        List<LocalDate> dates = new ArrayList<>();
+
+        for (JiraIssueEntity epic : epics) {
+            if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
+                continue;
+            }
+            PlannedEpic planned = planningMap.get(epic.getIssueKey());
+            LocalDate endDate = planned != null ? planned.endDate() : null;
+            if (endDate != null) {
+                dates.add(endDate);
+            }
+        }
+
+        if (dates.size() < 2) {
+            return null;
+        }
+
+        long averageEpochDay = (long) dates.stream()
+                .mapToLong(LocalDate::toEpochDay)
+                .average()
+                .orElse(0);
+
+        return LocalDate.ofEpochDay(averageEpochDay);
     }
 
     private Map<Long, String> loadTeamNames() {

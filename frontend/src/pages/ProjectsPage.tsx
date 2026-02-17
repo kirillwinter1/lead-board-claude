@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { projectsApi, ProjectDto, ProjectDetailDto } from '../api/projects'
+import { projectsApi, ProjectDto, ProjectDetailDto, ProjectRecommendation } from '../api/projects'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
@@ -45,6 +45,50 @@ function ProgressBar({ percent, width = 100 }: { percent: number; width?: number
   )
 }
 
+function AlignmentBadge({ delayDays }: { delayDays: number | null }) {
+  if (delayDays == null) {
+    return <span style={{ color: '#97A0AF' }}>—</span>
+  }
+  if (delayDays > 2) {
+    return (
+      <span title={`${delayDays}d behind average`} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        color: '#FF8B00', fontWeight: 600, fontSize: 12,
+      }}>
+        &#9888; +{delayDays}d
+      </span>
+    )
+  }
+  return (
+    <span title="On track" style={{ color: '#36B37E', fontWeight: 600, fontSize: 12 }}>
+      &#10003;
+    </span>
+  )
+}
+
+function RecommendationsBlock({ recommendations }: { recommendations: ProjectRecommendation[] }) {
+  if (recommendations.length === 0) return null
+  return (
+    <div style={{
+      margin: '12px 0 4px',
+      padding: '10px 14px',
+      background: '#FFFAE6',
+      border: '1px solid #FFE380',
+      borderRadius: 6,
+      fontSize: 13,
+    }}>
+      {recommendations.map((r, i) => (
+        <div key={i} style={{ display: 'flex', gap: 6, marginBottom: i < recommendations.length - 1 ? 6 : 0 }}>
+          <span style={{ flexShrink: 0 }}>
+            {r.severity === 'WARNING' ? '\u26A0\uFE0F' : '\u2139\uFE0F'}
+          </span>
+          <span style={{ color: '#172B4D' }}>{r.message}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -53,6 +97,7 @@ export function ProjectsPage() {
   const [detail, setDetail] = useState<ProjectDetailDto | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
+  const [recommendations, setRecommendations] = useState<ProjectRecommendation[]>([])
 
   useEffect(() => {
     projectsApi.list()
@@ -66,14 +111,20 @@ export function ProjectsPage() {
     if (expandedKey === issueKey) {
       setExpandedKey(null)
       setDetail(null)
+      setRecommendations([])
       return
     }
     setExpandedKey(issueKey)
     setDetail(null)
+    setRecommendations([])
     setDetailLoading(true)
     try {
-      const data = await projectsApi.getDetail(issueKey)
+      const [data, recs] = await Promise.all([
+        projectsApi.getDetail(issueKey),
+        projectsApi.getRecommendations(issueKey).catch(() => [] as ProjectRecommendation[]),
+      ])
       setDetail(data)
+      setRecommendations(recs)
     } catch {
       setDetail(null)
     } finally {
@@ -200,6 +251,7 @@ export function ProjectsPage() {
                         <col style={{ width: 110 }} />
                         <col style={{ width: 130 }} />
                         <col style={{ width: 80 }} />
+                        <col style={{ width: 70 }} />
                       </colgroup>
                       <thead>
                         <tr style={{ borderBottom: '2px solid #DFE1E6' }}>
@@ -209,6 +261,7 @@ export function ProjectsPage() {
                           <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Team</th>
                           <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Progress</th>
                           <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Done by</th>
+                          <th style={{ textAlign: 'center', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Align</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -240,6 +293,9 @@ export function ProjectsPage() {
                             <td style={{ padding: '8px', fontSize: 12, color: '#42526E', whiteSpace: 'nowrap' }}>
                               {formatDate(e.expectedDone || e.dueDate)}
                             </td>
+                            <td style={{ padding: '8px', textAlign: 'center' }}>
+                              <AlignmentBadge delayDays={e.delayDays} />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -249,6 +305,7 @@ export function ProjectsPage() {
                       No child epics found
                     </div>
                   )}
+                  <RecommendationsBlock recommendations={recommendations} />
                   <RiceForm issueKey={p.issueKey} onSaved={() => {
                     // Refresh project list to update RICE badge
                     projectsApi.list().then(setProjects).catch(() => {})

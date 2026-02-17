@@ -50,7 +50,9 @@ com.leadboard/
 ├── poker/          — Planning Poker с WebSocket (real-time)
 │   ├── controller/ — PokerController (13 endpoints)
 │   └── service/    — PokerSessionService, PokerJiraService
+├── project/        — Projects: синхронизация, прогресс, alignment (ProjectService, ProjectAlignmentService, ProjectController)
 ├── quality/        — Data Quality: 17 правил проверки (DataQualityService 444 LOC)
+├── rice/           — RICE Scoring: шаблоны, оценки, нормализация (RiceAssessmentService 307 LOC)
 ├── simulation/     — AI Simulation: моделирование сценариев планирования
 │   ├── SimulationController (5 endpoints, ADMIN only)
 │   ├── SimulationService, SimulationExecutor, SimulationPlanner
@@ -74,7 +76,10 @@ com.leadboard/
 | WorkCalendarService | 359 | Рабочие дни, праздники РФ, расчёт дат |
 | WorkflowConfigService | ~350 | Динамическая конфигурация workflow: роли, типы, статусы, маппинги |
 | PokerSessionService | 325 | Planning Poker: сессии, голосование, WebSocket |
-| AutoScoreCalculator | 320 | AutoScore для эпиков: 7 факторов |
+| AutoScoreCalculator | 340 | AutoScore для эпиков: 9 факторов (вкл. RICE + alignment boost) |
+| RiceAssessmentService | 307 | RICE Score: оценки, расчёт, нормализация, effort auto |
+| ProjectService | ~250 | Проекты: список, дочерние эпики, прогресс, RICE |
+| ProjectAlignmentService | ~200 | Cross-team alignment: рекомендации, preload для AutoScore |
 | MappingAutoDetectService | ~200 | Автодетект маппингов из Jira metadata |
 | CompetencyService | ~150 | Матрица компетенций, bus-factor анализ |
 | SimulationService | ~200 | Запуск и хранение результатов симуляций |

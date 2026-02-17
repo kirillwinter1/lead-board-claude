@@ -241,6 +241,70 @@ class ProjectServiceTest {
         assertNull(result.get(0).riceNormalizedScore());
     }
 
+    @Test
+    void getProjectWithEpics_computesDelayDays() {
+        JiraIssueEntity project = createIssue("PROJ-1", "My Project", "In Progress", "PROJECT");
+        JiraIssueEntity epic1 = createIssue("PROJ-10", "Epic 1", "Open", "EPIC");
+        epic1.setTeamId(1L);
+        JiraIssueEntity epic2 = createIssue("PROJ-11", "Epic 2", "Open", "EPIC");
+        epic2.setTeamId(2L);
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        when(issueRepository.findByParentKeyAndBoardCategory("PROJ-1", "EPIC")).thenReturn(List.of(epic1, epic2));
+        when(issueRepository.findByIssueKeyIn(List.of("PROJ-10", "PROJ-11"))).thenReturn(List.of(epic1, epic2));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(workflowConfigService.isDone("Open", "Эпик")).thenReturn(false);
+
+        // Epic1 ends March 10, Epic2 ends March 20 → average = March 15
+        PlannedEpic pe1 = new PlannedEpic("PROJ-10", "Epic 1", BigDecimal.ONE,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 10),
+                List.of(), Map.of(), "Open", null,
+                36000L, 18000L, 50, Map.of(), 5, 3,
+                false, null, false);
+        PlannedEpic pe2 = new PlannedEpic("PROJ-11", "Epic 2", BigDecimal.ONE,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 20),
+                List.of(), Map.of(), "Open", null,
+                36000L, 18000L, 50, Map.of(), 5, 3,
+                false, null, false);
+
+        when(unifiedPlanningService.calculatePlan(1L)).thenReturn(
+                new UnifiedPlanningResult(1L, OffsetDateTime.now(), List.of(pe1), List.of(), Map.of()));
+        when(unifiedPlanningService.calculatePlan(2L)).thenReturn(
+                new UnifiedPlanningResult(2L, OffsetDateTime.now(), List.of(pe2), List.of(), Map.of()));
+
+        ProjectDetailDto result = projectService.getProjectWithEpics("PROJ-1");
+
+        ChildEpicDto dto1 = result.epics().stream().filter(e -> "PROJ-10".equals(e.issueKey())).findFirst().orElseThrow();
+        ChildEpicDto dto2 = result.epics().stream().filter(e -> "PROJ-11".equals(e.issueKey())).findFirst().orElseThrow();
+
+        // PROJ-10 is 5 days ahead → delay = 0
+        assertEquals(0, dto1.delayDays());
+        // PROJ-11 is 5 days behind → delay = 5
+        assertEquals(5, dto2.delayDays());
+    }
+
+    @Test
+    void getProjectWithEpics_delayDaysNullWhenNoForecast() {
+        JiraIssueEntity project = createIssue("PROJ-1", "My Project", "In Progress", "PROJECT");
+        JiraIssueEntity epic1 = createIssue("PROJ-10", "Epic 1", "Open", "EPIC");
+        epic1.setTeamId(1L);
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        when(issueRepository.findByParentKeyAndBoardCategory("PROJ-1", "EPIC")).thenReturn(List.of(epic1));
+        when(issueRepository.findByIssueKeyIn(List.of("PROJ-10"))).thenReturn(List.of(epic1));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(workflowConfigService.isDone("Open", "Эпик")).thenReturn(false);
+
+        // No planning data for this epic's team
+        when(unifiedPlanningService.calculatePlan(1L)).thenReturn(
+                new UnifiedPlanningResult(1L, OffsetDateTime.now(), List.of(), List.of(), Map.of()));
+
+        ProjectDetailDto result = projectService.getProjectWithEpics("PROJ-1");
+
+        assertEquals(1, result.epics().size());
+        assertNull(result.epics().get(0).delayDays());
+    }
+
     private JiraIssueEntity createIssue(String key, String summary, String status, String boardCategory) {
         JiraIssueEntity entity = new JiraIssueEntity();
         entity.setIssueKey(key);

@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.project.ProjectAlignmentService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,11 +35,14 @@ class AutoScoreServiceTest {
     @Mock
     private JiraIssueRepository issueRepository;
 
+    @Mock
+    private ProjectAlignmentService projectAlignmentService;
+
     private AutoScoreService autoScoreService;
 
     @BeforeEach
     void setUp() {
-        autoScoreService = new AutoScoreService(calculator, issueRepository);
+        autoScoreService = new AutoScoreService(calculator, issueRepository, projectAlignmentService);
     }
 
     // ==================== recalculateAll() Tests ====================

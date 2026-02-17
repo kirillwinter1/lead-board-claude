@@ -34,7 +34,8 @@
 | F32 | DSR v2: Pause Flag + Subtask End Point | 2026-02-15 | [features/F32](features/F32_DSR_V2_PAUSE_FLAG.md) |
 | F33 | Setup Wizard + Refresh Teams Sync | 2026-02-15 | [features/F33](features/F33_SETUP_WIZARD.md) |
 | F34 | Project Key → Config Binding | 2026-02-16 | [features/F34](features/F34_PROJECT_KEY_CONFIG.md) |
-| F35 | Projects (Sync + UI + Progress) | 2026-02-16 | [features/F35](features/F35_PROJECTS.md) |
+| F35 | Projects (Sync + UI + Progress + RICE + Alignment) | 2026-02-16 | [features/F35](features/F35_PROJECTS.md) |
+| F36 | RICE Scoring | 2026-02-17 | [features/F36](features/F36_RICE_SCORING.md) |
 
 ## Бэклог (BF)
 
@@ -43,8 +44,8 @@
 | BF1 | Manual Order + Recommendations | ✅ Done | [backlog/BF1](backlog/BF1_MANUAL_ORDER.md) |
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
-| BF4 | RICE Scoring & AutoScore | 📋 Planned | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
-| BF5 | Projects (Project-Level Management) | ✅ Done → [F35](features/F35_PROJECTS.md) | [backlog/BF5](backlog/BF5_PROJECTS.md) |
+| BF4 | RICE Scoring & AutoScore | ✅ Done → [F36](features/F36_RICE_SCORING.md) | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
+| BF5 | Projects (Project-Level Management) | 🚧 Stage 1-4 Done ([F35](features/F35_PROJECTS.md)), Stage 5 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |
@@ -87,6 +88,15 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-17: F36 RICE Scoring (BF4)
+- Шаблонный движок RICE (Business + Technical) с настраиваемыми подкритериями
+- Миграции V34-V36: rice_templates, rice_criteria, rice_criteria_options, rice_assessments, rice_assessment_answers
+- RiceAssessmentService: расчёт (R×I×C)/E, нормализация 0-100, effort auto из subtask estimates
+- AutoScore boost: riceBoost (до +15 баллов), наследование Project→Epic
+- Frontend: RiceForm (универсальная форма), RiceScoreBadge (цветовой бейдж)
+- Data Quality: правило RICE_MISSING (WARNING для проектов/эпиков без оценки)
+- Тесты: RiceTemplateServiceTest, RiceAssessmentServiceTest, AutoScoreCalculatorTest (RICE)
 
 ### 2026-02-16: F35 Projects — Stage 2 (Progress + Expected Done + Board Badge)
 - ProjectDto/ChildEpicDto/ProjectDetailDto: прогресс, expected done, estimate/logged

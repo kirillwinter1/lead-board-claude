@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.project.ProjectAlignmentService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
@@ -23,10 +24,14 @@ public class AutoScoreService {
 
     private final AutoScoreCalculator calculator;
     private final JiraIssueRepository issueRepository;
+    private final ProjectAlignmentService projectAlignmentService;
 
-    public AutoScoreService(AutoScoreCalculator calculator, JiraIssueRepository issueRepository) {
+    public AutoScoreService(AutoScoreCalculator calculator,
+                            JiraIssueRepository issueRepository,
+                            ProjectAlignmentService projectAlignmentService) {
         this.calculator = calculator;
         this.issueRepository = issueRepository;
+        this.projectAlignmentService = projectAlignmentService;
     }
 
     /**
@@ -40,6 +45,7 @@ public class AutoScoreService {
         int count = 0;
 
         calculator.preloadRiceData(epics);
+        calculator.preloadAlignmentData(projectAlignmentService.preloadAlignmentData(epics));
         try {
             for (JiraIssueEntity epic : epics) {
                 BigDecimal score = calculator.calculate(epic);
@@ -50,6 +56,7 @@ public class AutoScoreService {
             }
         } finally {
             calculator.clearRiceData();
+            calculator.clearAlignmentData();
         }
 
         log.info("Recalculated AutoScore for {} epics", count);
@@ -68,6 +75,7 @@ public class AutoScoreService {
         int count = 0;
 
         calculator.preloadRiceData(epics);
+        calculator.preloadAlignmentData(projectAlignmentService.preloadAlignmentData(epics));
         try {
             for (JiraIssueEntity epic : epics) {
                 BigDecimal score = calculator.calculate(epic);
@@ -78,6 +86,7 @@ public class AutoScoreService {
             }
         } finally {
             calculator.clearRiceData();
+            calculator.clearAlignmentData();
         }
 
         log.info("Recalculated AutoScore for {} epics of team {}", count, teamId);

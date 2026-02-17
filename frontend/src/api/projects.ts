@@ -23,6 +23,7 @@ export interface ChildEpicDto {
   progressPercent: number | null
   expectedDone: string | null
   dueDate: string | null
+  delayDays: number | null
 }
 
 export interface ProjectDetailDto {
@@ -38,10 +39,22 @@ export interface ProjectDetailDto {
   epics: ChildEpicDto[]
 }
 
+export interface ProjectRecommendation {
+  type: 'EPIC_LAGGING' | 'ALL_EPICS_DONE' | 'EPIC_NO_FORECAST' | 'RICE_NOT_FILLED'
+  severity: 'WARNING' | 'INFO'
+  message: string
+  epicKey: string | null
+  teamName: string | null
+  delayDays: number | null
+}
+
 export const projectsApi = {
   list: () =>
     axios.get<ProjectDto[]>('/api/projects').then(r => r.data),
 
   getDetail: (issueKey: string) =>
     axios.get<ProjectDetailDto>(`/api/projects/${issueKey}`).then(r => r.data),
+
+  getRecommendations: (issueKey: string) =>
+    axios.get<ProjectRecommendation[]>(`/api/projects/${issueKey}/recommendations`).then(r => r.data),
 }
