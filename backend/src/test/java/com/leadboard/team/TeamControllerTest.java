@@ -80,7 +80,7 @@ class TeamControllerTest {
 
     @Test
     void getAllTeamsReturnsList() throws Exception {
-        TeamDto team = new TeamDto(1L, "Backend Team", "backend", true, 3,
+        TeamDto team = new TeamDto(1L, "Backend Team", "backend", "#0052CC", true, 3,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.getAllTeams()).thenReturn(List.of(team));
 
@@ -93,7 +93,7 @@ class TeamControllerTest {
 
     @Test
     void getTeamReturnsTeam() throws Exception {
-        TeamDto team = new TeamDto(1L, "Backend Team", "backend", true, 3,
+        TeamDto team = new TeamDto(1L, "Backend Team", "backend", "#0052CC", true, 3,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.getTeam(1L)).thenReturn(team);
 
@@ -115,8 +115,8 @@ class TeamControllerTest {
 
     @Test
     void createTeamReturns201() throws Exception {
-        CreateTeamRequest request = new CreateTeamRequest("New Team", "new-team");
-        TeamDto team = new TeamDto(1L, "New Team", "new-team", true, 0,
+        CreateTeamRequest request = new CreateTeamRequest("New Team", "new-team", null);
+        TeamDto team = new TeamDto(1L, "New Team", "new-team", "#0052CC", true, 0,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.createTeam(any())).thenReturn(team);
 
@@ -130,7 +130,7 @@ class TeamControllerTest {
 
     @Test
     void createTeamReturns409WhenDuplicate() throws Exception {
-        CreateTeamRequest request = new CreateTeamRequest("Existing Team", null);
+        CreateTeamRequest request = new CreateTeamRequest("Existing Team", null, null);
         when(teamService.createTeam(any()))
                 .thenThrow(new TeamService.TeamAlreadyExistsException("Team with name already exists: Existing Team"));
 
@@ -151,8 +151,8 @@ class TeamControllerTest {
 
     @Test
     void updateTeamReturnsUpdatedTeam() throws Exception {
-        UpdateTeamRequest request = new UpdateTeamRequest("Updated Name", "updated-value");
-        TeamDto team = new TeamDto(1L, "Updated Name", "updated-value", true, 3,
+        UpdateTeamRequest request = new UpdateTeamRequest("Updated Name", "updated-value", null);
+        TeamDto team = new TeamDto(1L, "Updated Name", "updated-value", "#0052CC", true, 3,
                 OffsetDateTime.now(), OffsetDateTime.now());
         when(teamService.updateTeam(eq(1L), any())).thenReturn(team);
 

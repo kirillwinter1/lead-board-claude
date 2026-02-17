@@ -2,6 +2,7 @@ package com.leadboard.rice;
 
 import com.leadboard.rice.dto.*;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -42,6 +43,7 @@ public class RiceController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")
     @PostMapping("/templates")
     public ResponseEntity<RiceTemplateDto> createTemplate(@RequestBody RiceTemplateUpdateRequest request) {
         try {
@@ -51,6 +53,7 @@ public class RiceController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")
     @PutMapping("/templates/{id}")
     public ResponseEntity<RiceTemplateDto> updateTemplate(@PathVariable Long id,
                                                           @RequestBody RiceTemplateUpdateRequest request) {
@@ -78,6 +81,7 @@ public class RiceController {
         return dto != null ? ResponseEntity.ok(dto) : ResponseEntity.notFound().build();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")
     @PostMapping("/assessments")
     public ResponseEntity<RiceAssessmentDto> saveAssessment(@RequestBody RiceAssessmentRequest request) {
         try {

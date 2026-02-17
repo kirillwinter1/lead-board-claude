@@ -1,6 +1,7 @@
 package com.leadboard.project;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +24,11 @@ public class ProjectController {
         return ResponseEntity.ok(projectService.listProjects());
     }
 
+    @GetMapping("/timeline")
+    public ResponseEntity<List<ProjectTimelineDto>> getTimeline() {
+        return ResponseEntity.ok(projectService.getTimelineData());
+    }
+
     @GetMapping("/{issueKey}")
     public ResponseEntity<ProjectDetailDto> getProject(@PathVariable String issueKey) {
         try {
@@ -32,6 +38,7 @@ public class ProjectController {
         }
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")
     @GetMapping("/{issueKey}/recommendations")
     public ResponseEntity<List<ProjectRecommendation>> getRecommendations(@PathVariable String issueKey) {
         try {

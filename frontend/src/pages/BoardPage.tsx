@@ -34,6 +34,7 @@ export function BoardPage() {
     availableStatuses,
     selectedStatuses,
     availableTeams,
+    teamColorMap,
     selectedTeams,
     filteredBoard,
     canReorder,
@@ -143,6 +144,7 @@ export function BoardPage() {
         syncStatus={syncStatus}
         syncing={syncing}
         onSync={handleSync}
+        teamColorMap={teamColorMap}
       />
 
       <main className="main-content">

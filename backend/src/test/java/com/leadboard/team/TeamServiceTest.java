@@ -75,8 +75,9 @@ class TeamServiceTest {
 
     @Test
     void createTeamSavesAndReturnsTeam() {
-        CreateTeamRequest request = new CreateTeamRequest("New Team", "new-team");
+        CreateTeamRequest request = new CreateTeamRequest("New Team", "new-team", null);
         when(teamRepository.existsByNameAndActiveTrue("New Team")).thenReturn(false);
+        when(teamRepository.countByActiveTrue()).thenReturn(0L);
         when(teamRepository.save(any())).thenAnswer(invocation -> {
             TeamEntity entity = invocation.getArgument(0);
             entity.setId(1L);
@@ -92,7 +93,7 @@ class TeamServiceTest {
 
     @Test
     void createTeamThrowsWhenNameExists() {
-        CreateTeamRequest request = new CreateTeamRequest("Existing Team", null);
+        CreateTeamRequest request = new CreateTeamRequest("Existing Team", null, null);
         when(teamRepository.existsByNameAndActiveTrue("Existing Team")).thenReturn(true);
 
         assertThrows(TeamService.TeamAlreadyExistsException.class,
@@ -109,7 +110,7 @@ class TeamServiceTest {
         when(teamRepository.existsByNameAndActiveTrue("New Name")).thenReturn(false);
         when(teamRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        UpdateTeamRequest request = new UpdateTeamRequest("New Name", "new-value");
+        UpdateTeamRequest request = new UpdateTeamRequest("New Name", "new-value", null);
         TeamDto result = teamService.updateTeam(1L, request);
 
         assertEquals("New Name", result.name());
@@ -352,6 +353,7 @@ class TeamServiceTest {
         TeamEntity team = new TeamEntity();
         team.setId(id);
         team.setName(name);
+        team.setColor("#0052CC");
         team.setActive(true);
         return team;
     }

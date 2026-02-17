@@ -1,5 +1,6 @@
 package com.leadboard.team;
 
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record UpdateTeamRequest(
@@ -7,5 +8,8 @@ public record UpdateTeamRequest(
     String name,
 
     @Size(max = 255, message = "Jira team value must not exceed 255 characters")
-    String jiraTeamValue
+    String jiraTeamValue,
+
+    @Pattern(regexp = "^#[0-9a-fA-F]{6}$", message = "Color must be a valid hex color (e.g. #0052CC)")
+    String color
 ) {}

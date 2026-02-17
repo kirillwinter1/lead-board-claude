@@ -13,7 +13,7 @@
 
 .board-header {
   display: grid;
-  grid-template-columns: 40px minmax(280px, 1fr) 100px 110px 130px 110px 260px 200px 70px;
+  grid-template-columns: 40px minmax(280px, 1fr) 170px 80px 130px 110px 260px 200px 70px;
   gap: 0;
   background: #f4f5f7;
   border-bottom: 1px solid #dfe1e6;
@@ -73,7 +73,7 @@
 /* Grid Rows */
 .board-row {
   display: grid;
-  grid-template-columns: 40px minmax(280px, 1fr) 100px 110px 130px 110px 260px 200px 70px;
+  grid-template-columns: 40px minmax(280px, 1fr) 170px 80px 130px 110px 260px 200px 70px;
   gap: 0;
   border-bottom: 1px solid #ebecf0;
   transition: background-color 0.15s, transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
@@ -270,6 +270,7 @@
 /* Team Cell */
 .cell-team {
   color: #6b778c;
+  overflow: hidden;
 }
 
 /* Priority Cell */

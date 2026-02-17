@@ -4,6 +4,7 @@ export interface Team {
   id: number
   name: string
   jiraTeamValue: string | null
+  color: string | null
   active: boolean
   memberCount: number
   createdAt: string
@@ -27,11 +28,13 @@ export interface TeamMember {
 export interface CreateTeamRequest {
   name: string
   jiraTeamValue?: string
+  color?: string
 }
 
 export interface UpdateTeamRequest {
   name?: string
   jiraTeamValue?: string
+  color?: string
 }
 
 export interface CreateTeamMemberRequest {

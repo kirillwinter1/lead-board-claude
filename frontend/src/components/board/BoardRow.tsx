@@ -6,6 +6,7 @@ import { StatusBadge } from './StatusBadge'
 import { ExpectedDoneCell } from './ExpectedDoneCell'
 import { StoryExpectedDoneCell } from './StoryExpectedDoneCell'
 import { AlertIcon } from './AlertIcon'
+import { TeamBadge } from '../TeamBadge'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
@@ -69,7 +70,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
           <span className="issue-title">{node.title}</span>
         </div>
       </div>
-      <div className="cell cell-team">{node.teamName || '--'}</div>
+      <div className="cell cell-team"><TeamBadge name={node.teamName} color={node.teamColor} /></div>
       <div className="cell cell-priority">
         {node.autoScore !== null && node.autoScore !== undefined ? (
           <PriorityCell

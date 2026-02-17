@@ -57,6 +57,25 @@ public class AuthorizationService {
     }
 
     /**
+     * Check if the current user has PROJECT_MANAGER role.
+     */
+    public boolean isProjectManager() {
+        LeadBoardAuthentication auth = getCurrentAuth();
+        return auth != null && auth.getRole() == AppRole.PROJECT_MANAGER;
+    }
+
+    /**
+     * Check if the current user can manage projects (ADMIN or PROJECT_MANAGER).
+     */
+    public boolean canManageProjects() {
+        LeadBoardAuthentication auth = getCurrentAuth();
+        if (auth == null) {
+            return false;
+        }
+        return auth.getRole() == AppRole.ADMIN || auth.getRole() == AppRole.PROJECT_MANAGER;
+    }
+
+    /**
      * Check if the current user can manage the given team.
      * - ADMIN can manage any team
      * - TEAM_LEAD can manage teams they belong to

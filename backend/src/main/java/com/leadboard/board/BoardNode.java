@@ -19,6 +19,7 @@ public class BoardNode {
     private String role; // workflow role code (for sub-tasks)
     private Long teamId;
     private String teamName;
+    private String teamColor;
     private Long estimateSeconds;
     private Long loggedSeconds;
     private Integer progress; // 0-100
@@ -110,6 +111,14 @@ public class BoardNode {
 
     public void setTeamName(String teamName) {
         this.teamName = teamName;
+    }
+
+    public String getTeamColor() {
+        return teamColor;
+    }
+
+    public void setTeamColor(String teamColor) {
+        this.teamColor = teamColor;
     }
 
     public Long getEstimateSeconds() {

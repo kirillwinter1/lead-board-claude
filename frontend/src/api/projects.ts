@@ -48,6 +48,42 @@ export interface ProjectRecommendation {
   delayDays: number | null
 }
 
+export interface PhaseAggregationInfo {
+  hours: number | null
+  startDate: string | null
+  endDate: string | null
+}
+
+export interface PhaseProgressInfo {
+  estimateSeconds: number | null
+  loggedSeconds: number | null
+  completed: boolean
+}
+
+export interface EpicTimelineDto {
+  epicKey: string
+  summary: string
+  status: string
+  teamName: string | null
+  startDate: string | null
+  endDate: string | null
+  progressPercent: number | null
+  isRoughEstimate: boolean
+  roughEstimates: Record<string, number> | null
+  phaseAggregation: Record<string, PhaseAggregationInfo> | null
+  roleProgress: Record<string, PhaseProgressInfo> | null
+  flagged: boolean | null
+}
+
+export interface ProjectTimelineDto {
+  issueKey: string
+  summary: string
+  status: string
+  progressPercent: number
+  riceNormalizedScore: number | null
+  epics: EpicTimelineDto[]
+}
+
 export const projectsApi = {
   list: () =>
     axios.get<ProjectDto[]>('/api/projects').then(r => r.data),
@@ -57,4 +93,7 @@ export const projectsApi = {
 
   getRecommendations: (issueKey: string) =>
     axios.get<ProjectRecommendation[]>(`/api/projects/${issueKey}/recommendations`).then(r => r.data),
+
+  getTimeline: () =>
+    axios.get<ProjectTimelineDto[]>('/api/projects/timeline').then(r => r.data),
 }

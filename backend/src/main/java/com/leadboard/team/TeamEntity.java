@@ -25,6 +25,9 @@ public class TeamEntity {
     @Column(name = "atlassian_team_id", length = 100)
     private String atlassianTeamId;
 
+    @Column(name = "color", length = 7)
+    private String color;
+
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
@@ -115,6 +118,14 @@ public class TeamEntity {
 
     public void setMembers(List<TeamMemberEntity> members) {
         this.members = members;
+    }
+
+    public String getColor() {
+        return color;
+    }
+
+    public void setColor(String color) {
+        this.color = color;
     }
 
     public String getPlanningConfig() {

@@ -66,9 +66,11 @@ public class BoardService {
             }
 
             Map<Long, String> teamNames = new HashMap<>();
-            teamRepository.findByActiveTrue().forEach(team ->
-                teamNames.put(team.getId(), team.getName())
-            );
+            Map<Long, String> teamColors = new HashMap<>();
+            teamRepository.findByActiveTrue().forEach(team -> {
+                teamNames.put(team.getId(), team.getName());
+                teamColors.put(team.getId(), team.getColor());
+            });
 
             Map<String, JiraIssueEntity> issueMap = allIssues.stream()
                     .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, e -> e));
@@ -114,7 +116,7 @@ public class BoardService {
             Map<String, BoardNode> storyMap = new LinkedHashMap<>();
 
             for (JiraIssueEntity epic : filteredEpics) {
-                BoardNode node = mapToNode(epic, baseUrl, teamNames);
+                BoardNode node = mapToNode(epic, baseUrl, teamNames, teamColors);
                 epicMap.put(epic.getIssueKey(), node);
             }
 
@@ -151,7 +153,7 @@ public class BoardService {
             }
 
             for (JiraIssueEntity story : stories) {
-                BoardNode storyNode = mapToNode(story, baseUrl, teamNames);
+                BoardNode storyNode = mapToNode(story, baseUrl, teamNames, teamColors);
                 storyMap.put(story.getIssueKey(), storyNode);
 
                 String parentKey = story.getParentKey();
@@ -161,7 +163,7 @@ public class BoardService {
             }
 
             for (JiraIssueEntity subtask : subtasks) {
-                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames);
+                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames, teamColors);
 
                 // Use WorkflowConfigService for role detection
                 String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
@@ -236,7 +238,7 @@ public class BoardService {
         return getBoard(null, null, null, 0, 50);
     }
 
-    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames) {
+    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames, Map<Long, String> teamColors) {
         String jiraUrl = baseUrl + "/browse/" + entity.getIssueKey();
         BoardNode node = new BoardNode(
                 entity.getIssueKey(),
@@ -254,6 +256,7 @@ public class BoardService {
         if (entity.getTeamId() != null) {
             node.setTeamId(entity.getTeamId());
             node.setTeamName(teamNames.get(entity.getTeamId()));
+            node.setTeamColor(teamColors.get(entity.getTeamId()));
         } else if (entity.getTeamFieldValue() != null) {
             node.setTeamName(entity.getTeamFieldValue());
         }

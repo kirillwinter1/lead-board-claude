@@ -42,16 +42,21 @@ class TeamSyncServiceTest {
     @Mock
     private JiraIssueRepository issueRepository;
 
+    @Mock
+    private TeamService teamService;
+
     private TeamSyncService teamSyncService;
 
     @BeforeEach
     void setUp() {
+        when(teamService.nextAutoColor()).thenReturn("#0052CC");
         teamSyncService = new TeamSyncService(
                 teamsClient,
                 teamRepository,
                 memberRepository,
                 jiraProperties,
-                issueRepository
+                issueRepository,
+                teamService
         );
 
         // Common setup

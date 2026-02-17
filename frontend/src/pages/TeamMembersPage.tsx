@@ -258,7 +258,19 @@ export function TeamMembersPage() {
       <div className="page-header">
         <div className="page-header-left">
           <Link to="/board/teams" className="back-link">&larr; Back to Teams</Link>
-          <h2>{team.name}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {team.color && (
+              <span style={{
+                display: 'inline-block',
+                width: 14,
+                height: 14,
+                borderRadius: '50%',
+                backgroundColor: team.color,
+                flexShrink: 0,
+              }} />
+            )}
+            <h2 style={{ margin: 0 }}>{team.name}</h2>
+          </div>
           {team.jiraTeamValue && (
             <span className="team-jira-value">{team.jiraTeamValue}</span>
           )}
@@ -293,9 +305,41 @@ export function TeamMembersPage() {
               {members.map(member => (
                 <tr key={member.id}>
                   <td className="cell-name">
-                    <Link to={`/board/teams/${teamId}/member/${member.id}`} className="team-name-link">
-                      {member.displayName || <span className="cell-muted">Not set</span>}
-                    </Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {member.avatarUrl ? (
+                        <img
+                          src={member.avatarUrl}
+                          alt=""
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            border: team.color ? `2px solid ${team.color}` : '2px solid #ddd',
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 28,
+                          height: 28,
+                          borderRadius: '50%',
+                          border: team.color ? `2px solid ${team.color}` : '2px solid #ddd',
+                          backgroundColor: team.color ? team.color + '20' : '#f0f0f0',
+                          color: team.color || '#666',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          flexShrink: 0,
+                        }}>
+                          {(member.displayName || '?')[0].toUpperCase()}
+                        </span>
+                      )}
+                      <Link to={`/board/teams/${teamId}/member/${member.id}`} className="team-name-link">
+                        {member.displayName || <span className="cell-muted">Not set</span>}
+                      </Link>
+                    </div>
                   </td>
                   <td className="cell-account-id">{member.jiraAccountId}</td>
                   <td>

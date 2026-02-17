@@ -7,6 +7,7 @@ interface MultiSelectDropdownProps {
   selected: Set<string>
   onToggle: (value: string) => void
   placeholder?: string
+  colorMap?: Map<string, string>
 }
 
 export function MultiSelectDropdown({
@@ -14,7 +15,8 @@ export function MultiSelectDropdown({
   options,
   selected,
   onToggle,
-  placeholder = 'All'
+  placeholder = 'All',
+  colorMap,
 }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -72,6 +74,18 @@ export function MultiSelectDropdown({
                   checked={selected.has(option)}
                   onChange={() => onToggle(option)}
                 />
+                {colorMap?.get(option) && (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: colorMap.get(option),
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
                 <span>{option}</span>
               </label>
             ))

@@ -45,7 +45,7 @@
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
 | BF4 | RICE Scoring & AutoScore | ✅ Done → [F36](features/F36_RICE_SCORING.md) | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
-| BF5 | Projects (Project-Level Management) | 🚧 Stage 1-4 Done ([F35](features/F35_PROJECTS.md)), Stage 5 Planned | [backlog/BF5](backlog/BF5_PROJECTS.md) |
+| BF5 | Projects (Project-Level Management) | ✅ Done → [F35](features/F35_PROJECTS.md) | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |

@@ -12,7 +12,7 @@ interface User {
   role: string
 }
 
-const ROLES = ['ADMIN', 'TEAM_LEAD', 'MEMBER', 'VIEWER'] as const
+const ROLES = ['ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD', 'MEMBER', 'VIEWER'] as const
 
 export function SettingsPage() {
   const [users, setUsers] = useState<User[]>([])
@@ -294,6 +294,7 @@ export function SettingsPage() {
               <tr>
                 <th>Permission</th>
                 <th>Admin</th>
+                <th>PM</th>
                 <th>Team Lead</th>
                 <th>Member</th>
                 <th>Viewer</th>
@@ -306,9 +307,19 @@ export function SettingsPage() {
                 <td className="permission-yes">Yes</td>
                 <td className="permission-yes">Yes</td>
                 <td className="permission-yes">Yes</td>
+                <td className="permission-yes">Yes</td>
+              </tr>
+              <tr>
+                <td>Manage Projects/RICE</td>
+                <td className="permission-yes">Yes</td>
+                <td className="permission-yes">Yes</td>
+                <td className="permission-yes">Yes</td>
+                <td className="permission-no">No</td>
+                <td className="permission-no">No</td>
               </tr>
               <tr>
                 <td>Planning Poker</td>
+                <td className="permission-yes">Yes</td>
                 <td className="permission-yes">Yes</td>
                 <td className="permission-yes">Yes</td>
                 <td className="permission-yes">Yes</td>
@@ -317,6 +328,7 @@ export function SettingsPage() {
               <tr>
                 <td>Manage Teams</td>
                 <td className="permission-yes">Yes</td>
+                <td className="permission-no">No</td>
                 <td className="permission-partial">Own team</td>
                 <td className="permission-no">No</td>
                 <td className="permission-no">No</td>
@@ -324,6 +336,7 @@ export function SettingsPage() {
               <tr>
                 <td>Edit Priorities</td>
                 <td className="permission-yes">Yes</td>
+                <td className="permission-no">No</td>
                 <td className="permission-yes">Yes</td>
                 <td className="permission-no">No</td>
                 <td className="permission-no">No</td>
@@ -334,10 +347,12 @@ export function SettingsPage() {
                 <td className="permission-no">No</td>
                 <td className="permission-no">No</td>
                 <td className="permission-no">No</td>
+                <td className="permission-no">No</td>
               </tr>
               <tr>
                 <td>Settings/Admin</td>
                 <td className="permission-yes">Yes</td>
+                <td className="permission-no">No</td>
                 <td className="permission-no">No</td>
                 <td className="permission-no">No</td>
                 <td className="permission-no">No</td>

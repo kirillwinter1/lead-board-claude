@@ -69,6 +69,16 @@ export function useBoardFilters(board: BoardNode[]) {
     return Array.from(teams).sort()
   }, [board])
 
+  const teamColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    board.forEach(epic => {
+      if (epic.teamName && epic.teamColor && !map.has(epic.teamName)) {
+        map.set(epic.teamName, epic.teamColor)
+      }
+    })
+    return map
+  }, [board])
+
   const filteredBoard = useMemo(() => {
     return board.filter(epic => {
       if (searchKey) {
@@ -135,6 +145,7 @@ export function useBoardFilters(board: BoardNode[]) {
     selectedTeams,
     availableStatuses,
     availableTeams,
+    teamColorMap,
     filteredBoard,
     canReorder,
     allTeamIds,

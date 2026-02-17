@@ -80,7 +80,9 @@ DB_PASSWORD=leadboard
 | [TECH_DEBT.md](ai-ru/TECH_DEBT.md) | Технический долг и архитектурные проблемы |
 | [JIRA_WORKFLOWS.md](ai-ru/JIRA_WORKFLOWS.md) | Jira workflows (Epic, Story, Subtask) |
 | [JIRA_SETUP.md](ai-ru/JIRA_SETUP.md) | Настройка Jira Cloud (экраны, поля, схемы) |
-| [TEST_PYRAMID.md](ai-ru/TEST_PYRAMID.md) | Тестовая пирамида и инструкции по тестам |
+| [TEST_PLAN.md](ai-ru/testing/TEST_PLAN.md) | Тест-план: стратегия, чек-листы по экранам, порядок |
+| [TEST_PYRAMID.md](ai-ru/testing/TEST_PYRAMID.md) | Тестовая пирамида и инструкции по тестам |
+| [QA_STATUS.md](ai-ru/testing/QA_STATUS.md) | QA статус по экранам, баги, отчёты |
 | [API_PLANNING.md](ai-ru/API_PLANNING.md) | API Planning документация |
 | [features/](ai-ru/features/) | Детальные спецификации фич (F1-F31) |
 | [DEPLOY.md](DEPLOY.md) | Инструкции по деплою на продакшн |

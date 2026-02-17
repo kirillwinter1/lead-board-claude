@@ -27,6 +27,7 @@ export interface BoardNode {
   role: string | null
   teamId: number | null
   teamName: string | null
+  teamColor: string | null
   estimateSeconds: number | null
   loggedSeconds: number | null
   progress: number | null

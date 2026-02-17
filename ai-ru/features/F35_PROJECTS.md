@@ -229,6 +229,88 @@ Stage 3 BF5 полностью покрыт фичей BF4 (RICE Scoring), ко�
 - `AutoScoreCalculatorTest`: +4 теста (alignmentBoost)
 - `ProjectServiceTest`: +2 теста (delayDays)
 
-### Оставшиеся этапы BF5
+---
 
-- **Этап 5:** Роль PROJECT_MANAGER + Project Timeline (Gantt)
+## Stage 5a: PROJECT_MANAGER Role
+
+**Дата:** 2026-02-17
+
+### Описание
+
+Роль PROJECT_MANAGER — менеджер проектов. Видит board/timeline/projects, управляет RICE-оценками, участвует в покере. Не имеет доступа к admin/sync/team management/priorities.
+
+### Backend
+
+#### Миграция V37
+- Расширение CHECK constraint: `app_role IN ('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD', 'MEMBER', 'VIEWER')`
+
+#### AppRole enum
+- Добавлен `PROJECT_MANAGER` между ADMIN и TEAM_LEAD
+- Permissions: `projects:manage`, `board:view`, `poker:participate`
+
+#### AuthorizationService
+- `isProjectManager()`: проверка роли PROJECT_MANAGER
+- `canManageProjects()`: ADMIN || PROJECT_MANAGER
+
+#### ProjectController (@PreAuthorize)
+- `GET /api/projects` — без ограничений
+- `GET /api/projects/{key}` — без ограничений
+- `GET /api/projects/{key}/recommendations` — ADMIN, PROJECT_MANAGER, TEAM_LEAD
+
+#### RiceController (@PreAuthorize)
+- GET endpoints — без ограничений (read-only)
+- `POST /api/rice/templates`, `PUT /api/rice/templates/{id}` — ADMIN, PROJECT_MANAGER, TEAM_LEAD
+- `POST /api/rice/assessments` — ADMIN, PROJECT_MANAGER, TEAM_LEAD
+
+### Frontend
+
+#### SettingsPage
+- `ROLES` array: добавлен `PROJECT_MANAGER`
+- Permissions table: колонка "PM" + строка "Manage Projects/RICE"
+
+---
+
+## Stage 5b: Project Timeline (Gantt)
+
+**Дата:** 2026-02-17
+
+### Описание
+
+Gantt-style визуальный таймлайн проектов. Проект = группа с summary bar, эпики = бары с фазовыми сегментами по ролям (SA/DEV/QA). Штриховка для rough estimates, текст с оставшимися днями. Отдельный таб "Project Timeline".
+
+### Backend
+
+#### DTOs
+- `ProjectTimelineDto` (issueKey, summary, status, progressPercent, riceNormalizedScore, epics)
+- `EpicTimelineDto` (epicKey, summary, status, teamName, startDate, endDate, progressPercent, isRoughEstimate, roughEstimates, phaseAggregation, roleProgress, flagged)
+- `EpicTimelineDto.PhaseAggregationInfo` (hours, startDate, endDate)
+- `EpicTimelineDto.PhaseProgressInfo` (estimateSeconds, loggedSeconds, completed)
+
+#### ProjectService
+- `getTimelineData()`: загружает проекты, эпики, planning data, RICE scores, маппит PlannedEpic → EpicTimelineDto
+- `mapToEpicTimeline()`: конвертация PlannedEpic с phaseAggregation и roleProgress
+
+#### ProjectController
+- `GET /api/projects/timeline` → List<ProjectTimelineDto> (без @PreAuthorize)
+
+### Frontend
+
+#### API (`projects.ts`)
+- Интерфейсы: PhaseAggregationInfo, PhaseProgressInfo, EpicTimelineDto, ProjectTimelineDto
+- `projectsApi.getTimeline()`
+
+#### ProjectTimelinePage (новая)
+- Gantt container: labels panel (left, fixed 300px) + chart panel (right, scrollable)
+- Project rows: expand/collapse chevron + summary bar (progress)
+- Epic rows: phase segments colored by role (from WorkflowConfigContext)
+- Rough estimate epics: hatched pattern (repeating-linear-gradient 135deg)
+- Bar text: remaining days per role (e.g. "SA:10/DEV:5d")
+- Zoom: week (120px, default) / month (100px)
+- Today line (red vertical)
+- Auto-scroll to today on load
+- Expand/Collapse All button
+- Legend: role colors + today + rough estimate
+
+#### Навигация
+- Route: `/board/project-timeline` → ProjectTimelinePage
+- Tab: "Project Timeline" после "Projects"

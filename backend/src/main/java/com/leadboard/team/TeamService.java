@@ -13,6 +13,12 @@ import java.util.List;
 @Transactional
 public class TeamService {
 
+    static final String[] TEAM_PALETTE = {
+        "#0052CC", "#00875A", "#FF5630", "#6554C0",
+        "#FF991F", "#00B8D9", "#36B37E", "#E74C3C",
+        "#8777D9", "#2C3E50", "#F39C12", "#1ABC9C"
+    };
+
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
     private final ObjectMapper objectMapper;
@@ -28,9 +34,10 @@ public class TeamService {
 
     // ==================== Team Operations ====================
 
-    @Transactional(readOnly = true)
     public List<TeamDto> getAllTeams() {
-        return teamRepository.findByActiveTrue().stream()
+        List<TeamEntity> teams = teamRepository.findByActiveTrue();
+        assignMissingColors(teams);
+        return teams.stream()
                 .map(TeamDto::from)
                 .toList();
     }
@@ -50,6 +57,7 @@ public class TeamService {
         TeamEntity team = new TeamEntity();
         team.setName(request.name());
         team.setJiraTeamValue(request.jiraTeamValue());
+        team.setColor(request.color() != null ? request.color() : nextAutoColor());
 
         TeamEntity saved = teamRepository.save(team);
         linkIssuesToTeam(saved);
@@ -71,6 +79,10 @@ public class TeamService {
 
         if (request.jiraTeamValue() != null) {
             team.setJiraTeamValue(request.jiraTeamValue());
+        }
+
+        if (request.color() != null) {
+            team.setColor(request.color());
         }
 
         TeamEntity saved = teamRepository.save(team);
@@ -243,6 +255,27 @@ public class TeamService {
                 if (inherited > 0) {
                     issueRepository.inheritTeamFromParent();
                 }
+            }
+        }
+    }
+
+    // ==================== Color Assignment ====================
+
+    String nextAutoColor() {
+        long count = teamRepository.countByActiveTrue();
+        return TEAM_PALETTE[(int) (count % TEAM_PALETTE.length)];
+    }
+
+    private void assignMissingColors(List<TeamEntity> teams) {
+        boolean hasMissing = teams.stream().anyMatch(t -> t.getColor() == null);
+        if (!hasMissing) return;
+
+        int index = (int) teams.stream().filter(t -> t.getColor() != null).count();
+        for (TeamEntity team : teams) {
+            if (team.getColor() == null) {
+                team.setColor(TEAM_PALETTE[index % TEAM_PALETTE.length]);
+                teamRepository.save(team);
+                index++;
             }
         }
     }

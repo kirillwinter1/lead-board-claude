@@ -30,6 +30,8 @@ public class TeamSyncService {
     private final JiraProperties jiraProperties;
     private final com.leadboard.sync.JiraIssueRepository issueRepository;
 
+    private final TeamService teamService;
+
     private final AtomicBoolean syncInProgress = new AtomicBoolean(false);
     private volatile String lastSyncError = null;
     private volatile java.time.OffsetDateTime lastSyncTime = null;
@@ -39,12 +41,14 @@ public class TeamSyncService {
             TeamRepository teamRepository,
             TeamMemberRepository memberRepository,
             JiraProperties jiraProperties,
-            com.leadboard.sync.JiraIssueRepository issueRepository) {
+            com.leadboard.sync.JiraIssueRepository issueRepository,
+            TeamService teamService) {
         this.teamsClient = teamsClient;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
+        this.teamService = teamService;
     }
 
     public TeamSyncStatus getStatus() {
@@ -139,6 +143,10 @@ public class TeamSyncService {
         team.setName(atlassianTeam.getDisplayName());
         team.setJiraTeamValue(atlassianTeam.getDisplayName()); // Use display name as jira team value
         team.setActive(true);
+
+        if (team.getColor() == null) {
+            team.setColor(teamService.nextAutoColor());
+        }
 
         TeamEntity saved = teamRepository.save(team);
 

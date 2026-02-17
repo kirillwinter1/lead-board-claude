@@ -84,7 +84,7 @@ class TeamComponentTest extends ComponentTestBase {
     @DisplayName("POST /api/teams creates new team")
     void createTeam_createsTeam() {
         // Given
-        CreateTeamRequest request = new CreateTeamRequest("New Team", "new-team-jira");
+        CreateTeamRequest request = new CreateTeamRequest("New Team", "new-team-jira", null);
 
         // When
         ResponseEntity<TeamDto> response = restTemplate.postForEntity(
@@ -103,7 +103,7 @@ class TeamComponentTest extends ComponentTestBase {
     void createTeam_returns409ForDuplicate() {
         // Given
         createTeam("Existing Team");
-        CreateTeamRequest request = new CreateTeamRequest("Existing Team", "jira-value");
+        CreateTeamRequest request = new CreateTeamRequest("Existing Team", "jira-value", null);
 
         // When
         ResponseEntity<Map> response = restTemplate.postForEntity(
@@ -120,7 +120,7 @@ class TeamComponentTest extends ComponentTestBase {
     void updateTeam_updatesTeam() {
         // Given
         TeamEntity team = createTeam("Old Name");
-        UpdateTeamRequest request = new UpdateTeamRequest("New Name", null);
+        UpdateTeamRequest request = new UpdateTeamRequest("New Name", null, null);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);

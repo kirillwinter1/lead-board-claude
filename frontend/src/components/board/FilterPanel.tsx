@@ -14,6 +14,7 @@ interface FilterPanelProps {
   syncStatus: SyncStatus | null
   syncing: boolean
   onSync: () => void
+  teamColorMap?: Map<string, string>
 }
 
 function formatSyncTime(isoString: string | null): string {
@@ -41,6 +42,7 @@ export function FilterPanel({
   syncStatus,
   syncing,
   onSync,
+  teamColorMap,
 }: FilterPanelProps) {
   const hasActiveFilters = searchKey || selectedStatuses.size > 0 || selectedTeams.size > 0
 
@@ -84,6 +86,7 @@ export function FilterPanel({
         selected={selectedTeams}
         onToggle={onTeamToggle}
         placeholder="All teams"
+        colorMap={teamColorMap}
       />
 
       <MultiSelectDropdown

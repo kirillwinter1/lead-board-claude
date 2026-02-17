@@ -35,7 +35,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
     @DisplayName("Should create and retrieve team")
     void shouldCreateAndRetrieveTeam() {
         // When - create team
-        var createRequest = new CreateTeamRequest("Integration Team", "integration-jira-value");
+        var createRequest = new CreateTeamRequest("Integration Team", "integration-jira-value", null);
         var createResponse = restTemplate.postForEntity(
                 "/api/teams",
                 createRequest,
@@ -80,7 +80,7 @@ class TeamIntegrationTest extends IntegrationTestBase {
         var team = createTeam("Original Name");
 
         // When
-        var updateRequest = new UpdateTeamRequest("Updated Name", "updated-jira-value");
+        var updateRequest = new UpdateTeamRequest("Updated Name", "updated-jira-value", null);
         var response = restTemplate.exchange(
                 "/api/teams/" + team.getId(),
                 HttpMethod.PUT,

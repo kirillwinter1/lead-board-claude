@@ -644,7 +644,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const isBlocked = story.blockedBy && story.blockedBy.length > 0
   const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
 
-  const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.5)
+  const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.65)
 
   const renderPhaseSegment = (
     phase: UnifiedPhaseSchedule | null,
@@ -947,7 +947,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
   const leftPercent = (daysFromStart / totalDays) * 100
   const widthPercent = (duration / totalDays) * 100
 
-  const getPhaseColorDimmed = (role: string) => lightenColor(getRoleColor(role), 0.7)
+  const getPhaseColorDimmed = (role: string) => lightenColor(getRoleColor(role), 0.8)
 
   // Calculate phase segments within the bar
   const renderPhaseSegment = (

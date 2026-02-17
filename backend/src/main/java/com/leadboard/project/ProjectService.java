@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -138,6 +139,92 @@ public class ProjectService {
                 rice != null ? rice.riceScore() : null,
                 rice != null ? rice.normalizedScore() : null,
                 epicDtos
+        );
+    }
+
+    public List<ProjectTimelineDto> getTimelineData() {
+        List<JiraIssueEntity> projects = issueRepository.findByBoardCategory("PROJECT");
+
+        Set<String> projectKeys = projects.stream().map(JiraIssueEntity::getIssueKey).collect(Collectors.toSet());
+        Map<String, RiceAssessmentDto> riceMap = projectKeys.isEmpty()
+                ? Map.of()
+                : riceAssessmentService.getAssessments(projectKeys);
+
+        Map<Long, String> teamNames = loadTeamNames();
+
+        return projects.stream().map(p -> {
+            List<JiraIssueEntity> epics = findChildEpics(p);
+            int epicCount = epics.size();
+            int completedCount = countCompletedEpics(epics);
+            int progressPct = epicCount > 0 ? (completedCount * 100) / epicCount : 0;
+
+            Map<String, PlannedEpic> planningMap = buildEpicPlanningMap(epics);
+
+            List<EpicTimelineDto> epicDtos = epics.stream().map(e -> {
+                PlannedEpic planned = planningMap.get(e.getIssueKey());
+                return mapToEpicTimeline(e, planned, teamNames);
+            }).toList();
+
+            RiceAssessmentDto rice = riceMap.get(p.getIssueKey());
+
+            return new ProjectTimelineDto(
+                    p.getIssueKey(),
+                    p.getSummary(),
+                    p.getStatus(),
+                    progressPct,
+                    rice != null ? rice.normalizedScore() : null,
+                    epicDtos
+            );
+        }).toList();
+    }
+
+    private EpicTimelineDto mapToEpicTimeline(JiraIssueEntity epic, PlannedEpic planned, Map<Long, String> teamNames) {
+        String teamName = epic.getTeamId() != null ? teamNames.getOrDefault(epic.getTeamId(), null) : null;
+
+        if (planned == null) {
+            return new EpicTimelineDto(
+                    epic.getIssueKey(), epic.getSummary(), epic.getStatus(), teamName,
+                    null, null, null, false, null, null, null, null
+            );
+        }
+
+        Map<String, EpicTimelineDto.PhaseAggregationInfo> phaseAgg = null;
+        if (planned.phaseAggregation() != null) {
+            phaseAgg = new LinkedHashMap<>();
+            for (var entry : planned.phaseAggregation().entrySet()) {
+                var v = entry.getValue();
+                phaseAgg.put(entry.getKey(), new EpicTimelineDto.PhaseAggregationInfo(
+                        v.hours(), v.startDate(), v.endDate()
+                ));
+            }
+        }
+
+        Map<String, EpicTimelineDto.PhaseProgressInfo> roleProgress = null;
+        if (planned.roleProgress() != null) {
+            roleProgress = new LinkedHashMap<>();
+            for (var entry : planned.roleProgress().entrySet()) {
+                var v = entry.getValue();
+                roleProgress.put(entry.getKey(), new EpicTimelineDto.PhaseProgressInfo(
+                        v.estimateSeconds(), v.loggedSeconds(), v.completed()
+                ));
+            }
+        }
+
+        Map<String, BigDecimal> roughEstimates = planned.roughEstimates();
+
+        return new EpicTimelineDto(
+                epic.getIssueKey(),
+                planned.summary(),
+                planned.status(),
+                teamName,
+                planned.startDate(),
+                planned.endDate(),
+                planned.progressPercent(),
+                planned.isRoughEstimate(),
+                roughEstimates,
+                phaseAgg,
+                roleProgress,
+                planned.flagged()
         );
     }
 

@@ -6,10 +6,11 @@ import java.util.Set;
  * Application roles for RBAC.
  */
 public enum AppRole {
-    ADMIN,      // Full access, user management, settings
-    TEAM_LEAD,  // Manage own team, change priorities
-    MEMBER,     // View, participate in Poker, own metrics
-    VIEWER;     // Read-only (PM/Product)
+    ADMIN,           // Full access, user management, settings
+    PROJECT_MANAGER, // Manage projects, RICE, view board/timeline
+    TEAM_LEAD,       // Manage own team, change priorities
+    MEMBER,          // View, participate in Poker, own metrics
+    VIEWER;          // Read-only (PM/Product)
 
     /**
      * Get permissions associated with this role.
@@ -23,6 +24,11 @@ public enum AppRole {
                     "poker:participate",
                     "sync:trigger",
                     "admin:access"
+            );
+            case PROJECT_MANAGER -> Set.of(
+                    "projects:manage",
+                    "board:view",
+                    "poker:participate"
             );
             case TEAM_LEAD -> Set.of(
                     "teams:manage:own",

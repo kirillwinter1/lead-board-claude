@@ -1,0 +1,4 @@
+-- Add PROJECT_MANAGER role
+ALTER TABLE users DROP CONSTRAINT chk_app_role;
+ALTER TABLE users ADD CONSTRAINT chk_app_role
+    CHECK (app_role IN ('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD', 'MEMBER', 'VIEWER'));
