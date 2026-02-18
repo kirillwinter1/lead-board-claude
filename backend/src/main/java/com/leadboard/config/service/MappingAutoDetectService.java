@@ -4,8 +4,12 @@ import com.leadboard.config.JiraProperties;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
+import com.leadboard.sync.JiraIssueRepository;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,7 @@ public class MappingAutoDetectService {
     private final LinkTypeMappingRepository linkTypeRepo;
     private final WorkflowConfigService workflowConfigService;
     private final JiraProperties jiraProperties;
+    private final JiraIssueRepository jiraIssueRepo;
 
     public MappingAutoDetectService(
             JiraMetadataService jiraMetadataService,
@@ -39,7 +44,8 @@ public class MappingAutoDetectService {
             StatusMappingRepository statusMappingRepo,
             LinkTypeMappingRepository linkTypeRepo,
             WorkflowConfigService workflowConfigService,
-            JiraProperties jiraProperties
+            JiraProperties jiraProperties,
+            JiraIssueRepository jiraIssueRepo
     ) {
         this.jiraMetadataService = jiraMetadataService;
         this.configRepo = configRepo;
@@ -49,6 +55,15 @@ public class MappingAutoDetectService {
         this.linkTypeRepo = linkTypeRepo;
         this.workflowConfigService = workflowConfigService;
         this.jiraProperties = jiraProperties;
+        this.jiraIssueRepo = jiraIssueRepo;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void onStartup() {
+        int count = backfillMissingTypes();
+        if (count > 0) {
+            log.info("Backfilled {} missing issue type(s) from existing issues", count);
+        }
     }
 
     /**
@@ -154,17 +169,36 @@ public class MappingAutoDetectService {
         int statusCount = 0;
         Set<String> processedStatuses = new HashSet<>();
 
+        // Build lookup by ID: issueTypeId → BoardCategory (reliable matching)
+        Map<String, BoardCategory> typeIdToCategory = new HashMap<>();
+        for (Map<String, Object> it : issueTypes) {
+            String name = (String) it.get("name");
+            Object id = it.get("id");
+            if (name == null || id == null) continue;
+            boolean isSub = Boolean.TRUE.equals(it.get("subtask"));
+            typeIdToCategory.put(id.toString(), detectBoardCategory(name, isSub));
+        }
+
         for (Map<String, Object> typeStatuses : statusesByType) {
             String issueTypeName = (String) typeStatuses.get("issueType");
+            Object issueTypeId = typeStatuses.get("issueTypeId");
             List<Map<String, Object>> statuses = (List<Map<String, Object>>) typeStatuses.get("statuses");
-            if (statuses == null || issueTypeName == null) continue;
+            if (statuses == null) continue;
 
-            // Determine board category for this issue type
-            boolean isSubtask = subtaskToRole.containsKey(issueTypeName)
-                    || issueTypes.stream().anyMatch(it ->
-                    issueTypeName.equals(it.get("name")) && Boolean.TRUE.equals(it.get("subtask")));
-            BoardCategory boardCat = detectBoardCategory(issueTypeName, isSubtask);
-            if (boardCat == BoardCategory.IGNORE) continue;
+            // Match by ID first (reliable), fallback to name heuristic
+            BoardCategory boardCat = null;
+            if (issueTypeId != null) {
+                boardCat = typeIdToCategory.get(issueTypeId.toString());
+            }
+            if (boardCat == null && issueTypeName != null) {
+                boolean isSubtask = subtaskToRole.containsKey(issueTypeName)
+                        || issueTypes.stream().anyMatch(it ->
+                        issueTypeName.equals(it.get("name")) && Boolean.TRUE.equals(it.get("subtask")));
+                boardCat = detectBoardCategory(issueTypeName, isSubtask);
+            }
+            log.info("Auto-detect statuses: issueType='{}' (id={}) → category={}, statusCount={}",
+                    issueTypeName, issueTypeId, boardCat, statuses.size());
+            if (boardCat == null || boardCat == BoardCategory.IGNORE) continue;
 
             int statusSortOrder = 0;
             Map<String, StatusMappingEntity> savedMappings = new LinkedHashMap<>();
@@ -234,6 +268,141 @@ public class MappingAutoDetectService {
         return new AutoDetectResult(typeCount, roleCount, statusCount, linkCount, warnings);
     }
 
+    // ==================== Incremental type registration ====================
+
+    /**
+     * Registers an unknown issue type with NULL board_category.
+     * Thread-safe, idempotent — skips if already registered.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registerUnknownTypeIfNeeded(String jiraTypeName) {
+        if (jiraTypeName == null) return;
+        Long configId = getOrCreateDefaultConfigId();
+
+        // Skip if already registered in DB
+        if (issueTypeRepo.findByConfigIdAndJiraTypeName(configId, jiraTypeName).isPresent()) return;
+
+        IssueTypeMappingEntity mapping = new IssueTypeMappingEntity();
+        mapping.setConfigId(configId);
+        mapping.setJiraTypeName(jiraTypeName);
+        mapping.setBoardCategory(null); // Awaiting user configuration
+        issueTypeRepo.save(mapping);
+        log.info("Registered unknown issue type '{}' — awaiting configuration in Workflow Settings", jiraTypeName);
+    }
+
+    /**
+     * Backfills issue_type_mappings from existing jira_issues.
+     * Finds issue types present in jira_issues but missing from issue_type_mappings,
+     * and registers them with NULL board_category.
+     * Called on startup to catch types that were previously handled by fallback heuristics.
+     */
+    @Transactional
+    public int backfillMissingTypes() {
+        Long configId = getDefaultConfigId();
+        if (configId == null) return 0;
+
+        List<String> existingTypes = jiraIssueRepo.findDistinctIssueTypes();
+        Set<String> mappedTypes = new HashSet<>();
+        for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(configId)) {
+            mappedTypes.add(m.getJiraTypeName());
+        }
+
+        int count = 0;
+        for (String typeName : existingTypes) {
+            if (!mappedTypes.contains(typeName)) {
+                IssueTypeMappingEntity mapping = new IssueTypeMappingEntity();
+                mapping.setConfigId(configId);
+                mapping.setJiraTypeName(typeName);
+                mapping.setBoardCategory(null);
+                issueTypeRepo.save(mapping);
+                log.info("Backfilled missing issue type '{}' from existing issues", typeName);
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            workflowConfigService.clearCache();
+        }
+        return count;
+    }
+
+    /**
+     * Detects and saves status mappings for a specific issue type + board category.
+     * Fetches statuses from Jira metadata and auto-maps them.
+     * Returns the number of new status mappings created.
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public int detectStatusesForIssueType(String jiraTypeName, BoardCategory boardCategory) {
+        Long configId = getOrCreateDefaultConfigId();
+        List<Map<String, Object>> allStatuses = jiraMetadataService.getStatuses();
+
+        // Find statuses for this issue type
+        List<Map<String, Object>> typeStatuses = findStatusesForType(allStatuses, jiraTypeName);
+
+        // Get existing status names for this category to avoid duplicates
+        Set<String> existingKeys = new HashSet<>();
+        for (StatusMappingEntity existing : statusMappingRepo.findByConfigIdAndIssueCategory(configId, boardCategory)) {
+            existingKeys.add(existing.getJiraStatusName());
+        }
+
+        // Get max sort order for this category
+        int sortOrder = statusMappingRepo.findByConfigIdAndIssueCategory(configId, boardCategory).stream()
+                .mapToInt(StatusMappingEntity::getSortOrder)
+                .max()
+                .orElse(0) + 10;
+
+        // Get role codes from DB
+        Set<String> roles = new LinkedHashSet<>();
+        for (var role : roleRepo.findByConfigIdOrderBySortOrderAsc(configId)) {
+            roles.add(role.getCode());
+        }
+
+        int count = 0;
+        for (Map<String, Object> status : typeStatuses) {
+            String statusName = (String) status.get("name");
+            if (statusName == null || existingKeys.contains(statusName)) continue;
+
+            String statusCategoryKey = (String) status.get("statusCategory");
+            StatusCategory mapped = mapJiraStatusCategory(statusCategoryKey, statusName, boardCategory);
+            String roleCode = detectRoleFromStatusName(statusName, roles);
+            int scoreWeight = computeScoreWeight(mapped, statusName);
+
+            StatusMappingEntity sm = new StatusMappingEntity();
+            sm.setConfigId(configId);
+            sm.setJiraStatusName(statusName);
+            sm.setIssueCategory(boardCategory);
+            sm.setStatusCategory(mapped);
+            sm.setWorkflowRoleCode(roleCode);
+            sm.setSortOrder(sortOrder);
+            sm.setScoreWeight(scoreWeight);
+            sm.setColor(computeDefaultColor(mapped));
+            statusMappingRepo.save(sm);
+            existingKeys.add(statusName);
+            count++;
+            sortOrder += 10;
+        }
+
+        if (count > 0) {
+            workflowConfigService.clearCache();
+            log.info("Detected {} new status mappings for type '{}' (category={})", count, jiraTypeName, boardCategory);
+        }
+
+        return count;
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> findStatusesForType(List<Map<String, Object>> allStatuses, String jiraTypeName) {
+        for (Map<String, Object> typeStatuses : allStatuses) {
+            String issueTypeName = (String) typeStatuses.get("issueType");
+            if (jiraTypeName.equals(issueTypeName)) {
+                List<Map<String, Object>> statuses = (List<Map<String, Object>>) typeStatuses.get("statuses");
+                return statuses != null ? statuses : List.of();
+            }
+        }
+        return List.of();
+    }
+
     // ==================== Heuristics ====================
 
     BoardCategory detectBoardCategory(String typeName, boolean isSubtask) {
@@ -251,7 +420,7 @@ public class MappingAutoDetectService {
         return BoardCategory.IGNORE;
     }
 
-    String detectRoleFromSubtaskName(String subtaskName) {
+    public String detectRoleFromSubtaskName(String subtaskName) {
         String lower = subtaskName.toLowerCase();
         if (lower.contains("аналити") || lower.contains("analyt") || lower.contains("requirement")
                 || lower.contains("требовани") || lower.contains("analysis")) {

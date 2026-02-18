@@ -18,7 +18,7 @@ public class IssueTypeMappingEntity {
     private String jiraTypeName;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "board_category", nullable = false, length = 20)
+    @Column(name = "board_category", nullable = true, length = 20)
     private BoardCategory boardCategory;
 
     @Column(name = "workflow_role_code", length = 50)

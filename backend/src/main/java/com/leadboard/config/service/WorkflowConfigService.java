@@ -120,6 +120,7 @@ public class WorkflowConfigService {
             Set<String> storyNames = new HashSet<>();
             Set<String> subtaskNames = new HashSet<>();
             for (IssueTypeMappingEntity m : typeMappings) {
+                if (m.getBoardCategory() == null) continue; // Skip unmapped types
                 typeToCategory.put(m.getJiraTypeName().toLowerCase(), m.getBoardCategory());
                 if (m.getWorkflowRoleCode() != null) {
                     typeToRoleCode.put(m.getJiraTypeName().toLowerCase(), m.getWorkflowRoleCode());
@@ -194,25 +195,8 @@ public class WorkflowConfigService {
     // ==================== Issue Type Categorization ====================
 
     public BoardCategory categorizeIssueType(String jiraTypeName) {
-        if (jiraTypeName == null) return BoardCategory.IGNORE;
-        BoardCategory cat = typeToCategory.get(jiraTypeName.toLowerCase());
-        if (cat != null) return cat;
-
-        // Fallback: substring matching
-        String lower = jiraTypeName.toLowerCase();
-        if (lower.contains("project") || lower.contains("проект")) return BoardCategory.PROJECT;
-        if (lower.contains("epic") || lower.contains("эпик")) return BoardCategory.EPIC;
-        if (lower.contains("sub-task") || lower.contains("подзадача") ||
-            lower.contains("аналитик") || lower.contains("разработк") || lower.contains("тестирован")) {
-            return BoardCategory.SUBTASK;
-        }
-        if (lower.contains("story") || lower.contains("bug") || lower.contains("task") ||
-            lower.contains("история") || lower.contains("баг") || lower.contains("задача")) {
-            return BoardCategory.STORY;
-        }
-
-        log.warn("Unknown issue type '{}', defaulting to IGNORE", jiraTypeName);
-        return BoardCategory.IGNORE;
+        if (jiraTypeName == null) return null;
+        return typeToCategory.get(jiraTypeName.toLowerCase());
     }
 
     public boolean isProject(String jiraTypeName) {
@@ -252,14 +236,7 @@ public class WorkflowConfigService {
     public String getSubtaskRole(String jiraTypeName) {
         if (jiraTypeName == null) return getDefaultRoleCode();
         String role = typeToRoleCode.get(jiraTypeName.toLowerCase());
-        if (role != null) return role;
-
-        // Fallback: substring matching
-        String lower = jiraTypeName.toLowerCase();
-        if (lower.contains("аналитик") || lower.contains("analyt") || lower.contains("analysis")) return "SA";
-        if (lower.contains("тестир") || lower.contains("test") || lower.contains("qa")) return "QA";
-
-        return getDefaultRoleCode();
+        return role != null ? role : getDefaultRoleCode();
     }
 
     public String getDefaultRoleCode() {
@@ -284,6 +261,7 @@ public class WorkflowConfigService {
         if (status == null) return StatusCategory.NEW;
 
         BoardCategory cat = categorizeIssueType(issueType);
+        if (cat == null) return StatusCategory.NEW; // Unmapped type
         return categorizeByBoardCategory(status, cat);
     }
 
@@ -508,15 +486,17 @@ public class WorkflowConfigService {
     // ==================== Sync helpers ====================
 
     public String computeBoardCategory(String issueType, boolean isSubtask) {
-        if (isSubtask) {
-            BoardCategory cat = categorizeIssueType(issueType);
-            return (cat == BoardCategory.SUBTASK) ? "SUBTASK" : categorizeIssueType(issueType).name();
+        BoardCategory cat = categorizeIssueType(issueType);
+        if (cat == null) return null; // Unmapped type
+        if (isSubtask && cat != BoardCategory.SUBTASK) {
+            return BoardCategory.SUBTASK.name();
         }
-        return categorizeIssueType(issueType).name();
+        return cat.name();
     }
 
     public String computeWorkflowRole(String issueType) {
-        if (isSubtask(issueType)) {
+        BoardCategory cat = categorizeIssueType(issueType);
+        if (cat == BoardCategory.SUBTASK) {
             return getSubtaskRole(issueType);
         }
         return null;

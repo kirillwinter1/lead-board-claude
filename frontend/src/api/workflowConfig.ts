@@ -12,7 +12,7 @@ export interface WorkflowRoleDto {
 export interface IssueTypeMappingDto {
   id: number | null
   jiraTypeName: string
-  boardCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE'
+  boardCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE' | null
   workflowRoleCode: string | null
 }
 
@@ -125,4 +125,10 @@ export const workflowConfigApi = {
 
   fetchJiraLinkTypes: () =>
     axios.get<JiraLinkTypeMetadata[]>('/api/admin/jira-metadata/link-types').then(r => r.data),
+
+  detectStatusesForType: (typeName: string, boardCategory: string) =>
+    axios.post<{ typeName: string; boardCategory: string; statusesDetected: number }>(
+      `/api/admin/workflow-config/issue-types/${encodeURIComponent(typeName)}/detect-statuses`,
+      { boardCategory }
+    ).then(r => r.data),
 }

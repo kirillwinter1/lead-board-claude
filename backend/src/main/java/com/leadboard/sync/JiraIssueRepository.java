@@ -151,6 +151,14 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
            nativeQuery = true)
     int inheritTeamFromParent();
 
+    // ==================== Type & Status discovery ====================
+
+    @Query("SELECT DISTINCT e.issueType FROM JiraIssueEntity e WHERE e.issueType IS NOT NULL ORDER BY e.issueType")
+    List<String> findDistinctIssueTypes();
+
+    @Query("SELECT DISTINCT e.status FROM JiraIssueEntity e WHERE e.boardCategory = :boardCategory AND e.status IS NOT NULL ORDER BY e.status")
+    List<String> findDistinctStatusesByBoardCategory(@Param("boardCategory") String boardCategory);
+
     // ==================== Workflow Graph queries ====================
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.status = :status AND e.boardCategory = :boardCategory ORDER BY e.id ASC")

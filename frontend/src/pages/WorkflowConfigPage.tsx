@@ -19,6 +19,7 @@ import './WorkflowConfigPage.css'
 type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
 
 const BOARD_CATEGORIES = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
+const BOARD_CATEGORIES_WITH_UNMAPPED = ['', 'PROJECT', 'EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
 const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const
 const LINK_CATEGORIES = ['BLOCKS', 'RELATED', 'IGNORE'] as const
 
@@ -261,7 +262,7 @@ function suggestStatuses(
     if (id) issueTypeIdMap.set(id, t.boardCategory)
   })
 
-  const issueCategories: IssueTypeMappingDto['boardCategory'][] = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK']
+  const issueCategories = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK'] as const
 
   for (const group of jiraStatuses) {
     const boardCat = issueTypeIdMap.get(group.issueTypeId)
@@ -582,16 +583,41 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     }])
   }
 
+  const [detectingType, setDetectingType] = useState<string | null>(null)
+
   const updateIssueType = (index: number, field: keyof IssueTypeMappingDto, value: any) => {
+    const item = issueTypes[index]
+    const wasUnmapped = item.boardCategory === null
+
     const updated = issueTypes.map((t, i) => {
       if (i !== index) return t
-      const next = { ...t, [field]: value }
+      const next = { ...t, [field]: value === '' ? null : value }
       if (field === 'boardCategory' && value !== 'SUBTASK') {
         next.workflowRoleCode = null
       }
       return next
     })
     setIssueTypes(updated)
+
+    // Auto-detect statuses when mapping a previously unmapped type
+    if (field === 'boardCategory' && wasUnmapped && value && value !== '' && value !== 'IGNORE') {
+      handleDetectStatuses(item.jiraTypeName, value as string)
+    }
+  }
+
+  const handleDetectStatuses = async (typeName: string, boardCategory: string) => {
+    try {
+      setDetectingType(typeName)
+      const result = await workflowConfigApi.detectStatusesForType(typeName, boardCategory)
+      showSaveSuccess(`Mapped "${typeName}" → ${boardCategory}, detected ${result.statusesDetected} statuses`)
+      // Reload config to get updated data
+      await loadConfig()
+      refreshWorkflowContext()
+    } catch (err: any) {
+      setError(err.response?.data?.error || `Failed to detect statuses for ${typeName}`)
+    } finally {
+      setDetectingType(null)
+    }
   }
 
   const deleteIssueType = (index: number) => {
@@ -832,9 +858,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return renderWizard()
   }
 
-  const tabs: { key: TabKey; label: string; count: number }[] = [
+  const unmappedCount = issueTypes.filter(t => t.boardCategory === null).length
+
+  const tabs: { key: TabKey; label: string; count: number; badge?: string }[] = [
     { key: 'roles', label: 'Roles', count: roles.length },
-    { key: 'issueTypes', label: 'Issue Types', count: issueTypes.length },
+    { key: 'issueTypes', label: 'Issue Types', count: issueTypes.length, badge: unmappedCount > 0 ? `${unmappedCount} new` : undefined },
     { key: 'statuses', label: 'Statuses', count: statuses.length },
     { key: 'linkTypes', label: 'Link Types', count: linkTypes.length },
   ]
@@ -888,6 +916,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label}<span className="tab-count">({tab.count})</span>
+            {tab.badge && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: '#fff', background: '#E2B203', borderRadius: 8, padding: '1px 7px' }}>{tab.badge}</span>}
           </button>
         ))}
       </div>
@@ -1017,7 +1046,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
           <td>
             <select
               className="workflow-select"
-              value={it.boardCategory}
+              value={it.boardCategory || ''}
               onChange={e => updateWizardIssueType(idx, 'boardCategory', e.target.value)}
             >
               {BOARD_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -1450,8 +1479,23 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   }
 
   function renderIssueTypesTab() {
+    // Sort: unmapped (null category) first, then by name
+    const sortedIssueTypes = [...issueTypes].map((it, originalIdx) => ({ it, originalIdx }))
+    sortedIssueTypes.sort((a, b) => {
+      const aUnmapped = a.it.boardCategory === null ? 0 : 1
+      const bUnmapped = b.it.boardCategory === null ? 0 : 1
+      if (aUnmapped !== bUnmapped) return aUnmapped - bUnmapped
+      return a.it.jiraTypeName.localeCompare(b.it.jiraTypeName)
+    })
+
     return (
       <>
+        {unmappedCount > 0 && (
+          <div style={{ marginBottom: 16, padding: '10px 16px', background: '#FFF7E6', border: '1px solid #FFE58F', borderRadius: 6, fontSize: 13 }}>
+            <strong>{unmappedCount} unmapped issue type{unmappedCount > 1 ? 's' : ''}</strong> discovered during sync.
+            Select a Board Category to configure — statuses will be auto-detected from Jira.
+          </div>
+        )}
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
             <thead>
@@ -1463,50 +1507,63 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
               </tr>
             </thead>
             <tbody>
-              {issueTypes.map((it, idx) => (
-                <tr key={it.id ?? `new-${idx}`}>
-                  <td>
-                    <input
-                      className="workflow-input"
-                      value={it.jiraTypeName}
-                      onChange={e => updateIssueType(idx, 'jiraTypeName', e.target.value)}
-                      placeholder="e.g. Story"
-                    />
-                  </td>
-                  <td>
-                    <select
-                      className="workflow-select"
-                      value={it.boardCategory}
-                      onChange={e => updateIssueType(idx, 'boardCategory', e.target.value)}
-                    >
-                      {BOARD_CATEGORIES.map(c => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    {it.boardCategory === 'SUBTASK' ? (
+              {sortedIssueTypes.map(({ it, originalIdx }) => {
+                const isUnmapped = it.boardCategory === null
+                const isDetecting = detectingType === it.jiraTypeName
+                return (
+                  <tr key={it.id ?? `new-${originalIdx}`} style={isUnmapped ? { backgroundColor: '#FFFBE6' } : undefined}>
+                    <td>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          className="workflow-input"
+                          value={it.jiraTypeName}
+                          onChange={e => updateIssueType(originalIdx, 'jiraTypeName', e.target.value)}
+                          placeholder="e.g. Story"
+                        />
+                        {isUnmapped && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: '#E2B203', borderRadius: 8, padding: '1px 7px', whiteSpace: 'nowrap' }}>NEW</span>
+                        )}
+                        {isDetecting && (
+                          <span style={{ fontSize: 12, color: '#6B778C', whiteSpace: 'nowrap' }}>detecting...</span>
+                        )}
+                      </span>
+                    </td>
+                    <td>
                       <select
                         className="workflow-select"
-                        value={it.workflowRoleCode || ''}
-                        onChange={e => updateIssueType(idx, 'workflowRoleCode', e.target.value || null)}
+                        value={it.boardCategory ?? ''}
+                        onChange={e => updateIssueType(originalIdx, 'boardCategory', e.target.value)}
+                        disabled={isDetecting}
                       >
-                        <option value="">-- none --</option>
-                        {roles.map(r => (
-                          <option key={r.code} value={r.code}>{r.displayName || r.code}</option>
+                        {(isUnmapped ? BOARD_CATEGORIES_WITH_UNMAPPED : BOARD_CATEGORIES).map(c => (
+                          <option key={c} value={c}>{c === '' ? '-- unmapped --' : c}</option>
                         ))}
                       </select>
-                    ) : (
-                      <span style={{ color: '#6B778C', fontSize: 13 }}>N/A</span>
-                    )}
-                  </td>
-                  <td>
-                    <button className="btn-danger-text" onClick={() => deleteIssueType(idx)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td>
+                      {it.boardCategory === 'SUBTASK' ? (
+                        <select
+                          className="workflow-select"
+                          value={it.workflowRoleCode || ''}
+                          onChange={e => updateIssueType(originalIdx, 'workflowRoleCode', e.target.value || null)}
+                        >
+                          <option value="">-- none --</option>
+                          {roles.map(r => (
+                            <option key={r.code} value={r.code}>{r.displayName || r.code}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span style={{ color: '#6B778C', fontSize: 13 }}>N/A</span>
+                      )}
+                    </td>
+                    <td>
+                      <button className="btn-danger-text" onClick={() => deleteIssueType(originalIdx)}>
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })}
               {issueTypes.length === 0 && (
                 <tr><td colSpan={4} style={{ textAlign: 'center', color: '#6B778C' }}>No issue types configured</td></tr>
               )}

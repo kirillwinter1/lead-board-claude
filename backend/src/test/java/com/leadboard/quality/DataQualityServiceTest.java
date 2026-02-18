@@ -1,14 +1,12 @@
 package com.leadboard.quality;
 
-import com.leadboard.config.JiraProperties;
-import com.leadboard.config.repository.*;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.rice.RiceAssessmentRepository;
+import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -23,6 +21,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -37,27 +36,47 @@ class DataQualityServiceTest {
     private TeamMemberRepository memberRepository;
 
     @Mock
-    private ProjectConfigurationRepository configRepo;
-    @Mock
-    private WorkflowRoleRepository roleRepo;
-    @Mock
-    private IssueTypeMappingRepository issueTypeRepo;
-    @Mock
-    private StatusMappingRepository statusMappingRepo;
-    @Mock
-    private LinkTypeMappingRepository linkTypeRepo;
+    private WorkflowConfigService workflowConfigService;
+
     @Mock
     private RiceAssessmentRepository riceAssessmentRepository;
 
-    private WorkflowConfigService workflowConfigService;
     private DataQualityService dataQualityService;
 
     @BeforeEach
     void setUp() {
-        // Real WorkflowConfigService with empty caches - fallback substring matching works
-        workflowConfigService = new WorkflowConfigService(
-                configRepo, roleRepo, issueTypeRepo, statusMappingRepo, linkTypeRepo, new ObjectMapper(), new JiraProperties()
-        );
+        // Mock WorkflowConfigService — no fallback heuristics since F38
+        // isDone: only "Done" status is done
+        lenient().when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        lenient().when(workflowConfigService.isDone(eq("Done"), anyString())).thenReturn(true);
+
+        // isInProgress: "In Progress", "Development", "Developing", "In Review"
+        lenient().when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
+        lenient().when(workflowConfigService.isInProgress(eq("In Progress"), anyString())).thenReturn(true);
+        lenient().when(workflowConfigService.isInProgress(eq("Development"), anyString())).thenReturn(true);
+        lenient().when(workflowConfigService.isInProgress(eq("Developing"), anyString())).thenReturn(true);
+        lenient().when(workflowConfigService.isInProgress(eq("In Review"), anyString())).thenReturn(true);
+
+        // isEpicInProgress: "In Progress", "Developing"
+        lenient().when(workflowConfigService.isEpicInProgress(anyString())).thenReturn(false);
+        lenient().when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
+        lenient().when(workflowConfigService.isEpicInProgress("Developing")).thenReturn(true);
+
+        // isTimeLoggingAllowed: "In Progress", "Developing"
+        lenient().when(workflowConfigService.isTimeLoggingAllowed(anyString())).thenReturn(false);
+        lenient().when(workflowConfigService.isTimeLoggingAllowed("In Progress")).thenReturn(true);
+        lenient().when(workflowConfigService.isTimeLoggingAllowed("Developing")).thenReturn(true);
+
+        // categorizeEpic
+        lenient().when(workflowConfigService.categorizeEpic(anyString())).thenReturn(StatusCategory.NEW);
+        lenient().when(workflowConfigService.categorizeEpic("In Progress")).thenReturn(StatusCategory.IN_PROGRESS);
+        lenient().when(workflowConfigService.categorizeEpic("Developing")).thenReturn(StatusCategory.IN_PROGRESS);
+        lenient().when(workflowConfigService.categorizeEpic("Done")).thenReturn(StatusCategory.DONE);
+        lenient().when(workflowConfigService.categorizeEpic("Open")).thenReturn(StatusCategory.NEW);
+        lenient().when(workflowConfigService.categorizeEpic("Backlog")).thenReturn(StatusCategory.NEW);
+        lenient().when(workflowConfigService.categorizeEpic("Requirements")).thenReturn(StatusCategory.REQUIREMENTS);
+        lenient().when(workflowConfigService.categorizeEpic("Planned")).thenReturn(StatusCategory.PLANNED);
+
         dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService, riceAssessmentRepository);
     }
 

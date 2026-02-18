@@ -33,6 +33,7 @@ class MappingAutoDetectServiceTest {
     @Mock private LinkTypeMappingRepository linkTypeRepo;
     @Mock private WorkflowConfigService workflowConfigService;
     @Mock private JiraProperties jiraProperties;
+    @Mock private com.leadboard.sync.JiraIssueRepository jiraIssueRepo;
 
     private MappingAutoDetectService service;
 
@@ -40,7 +41,8 @@ class MappingAutoDetectServiceTest {
     void setUp() {
         service = new MappingAutoDetectService(
                 jiraMetadataService, configRepo, roleRepo, issueTypeRepo,
-                statusMappingRepo, linkTypeRepo, workflowConfigService, jiraProperties
+                statusMappingRepo, linkTypeRepo, workflowConfigService, jiraProperties,
+                jiraIssueRepo
         );
 
         // JiraProperties returns null project key by default (no env configured)

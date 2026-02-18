@@ -362,6 +362,14 @@ public class SyncService {
         String issueTypeName = jiraIssue.getFields().getIssuetype().getName();
         boolean isSubtaskFlag = jiraIssue.getFields().getIssuetype().isSubtask();
         entity.setBoardCategory(workflowConfigService.computeBoardCategory(issueTypeName, isSubtaskFlag));
+        // Register unknown type if not yet mapped
+        if (entity.getBoardCategory() == null) {
+            try {
+                autoDetectService.registerUnknownTypeIfNeeded(issueTypeName);
+            } catch (Exception e) {
+                log.warn("Failed to register unknown type '{}': {}", issueTypeName, e.getMessage());
+            }
+        }
         entity.setWorkflowRole(workflowConfigService.computeWorkflowRole(issueTypeName));
 
         if (jiraIssue.getFields().getParent() != null) {

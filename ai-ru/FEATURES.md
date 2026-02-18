@@ -36,6 +36,8 @@
 | F34 | Project Key → Config Binding | 2026-02-16 | [features/F34](features/F34_PROJECT_KEY_CONFIG.md) |
 | F35 | Projects (Sync + UI + Progress + RICE + Alignment) | 2026-02-16 | [features/F35](features/F35_PROJECTS.md) |
 | F36 | RICE Scoring | 2026-02-17 | [features/F36](features/F36_RICE_SCORING.md) |
+| F37 | Team Colors | 2026-02-17 | [features/F37](features/F37_TEAM_COLORS.md) |
+| F38 | Incremental Workflow Configuration | 2026-02-18 | [features/F38](features/F38_INCREMENTAL_WORKFLOW_CONFIG.md) |
 
 ## Бэклог (BF)
 
@@ -88,6 +90,24 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-18: F38 Incremental Workflow Configuration
+- Инкрементальное управление типами задач: неизвестные типы регистрируются с NULL board_category при синке
+- V39 миграция: board_category в issue_type_mappings стала nullable
+- Убраны fallback-эвристики из WorkflowConfigService.categorizeIssueType() — только явный маппинг из БД
+- MappingAutoDetectService: registerUnknownTypeIfNeeded(), detectStatusesForIssueType()
+- Новый endpoint: POST /api/admin/workflow-config/issue-types/{typeName}/detect-statuses
+- WorkflowConfigPage: unmapped типы с бейджем NEW, авто-фетч статусов при выборе категории
+- Задачи с NULL board_category сохраняются, но не показываются на доске
+
+### 2026-02-17: F37 Team Colors
+- Accent-цвет для каждой команды: палитра 12 Atlassian-like цветов
+- V38 миграция: `color VARCHAR(7)` в таблице `teams`
+- Backend: auto-assign при создании/sync, lazy fill для существующих, hex validation
+- Board: TeamBadge (цветной бейдж с left-border), цветные точки в фильтре команд
+- TeamsPage: inline color picker (кликабельный кружок → палитра 6×2), picker в модалке
+- TeamMembersPage: цветная рамка на аватарах участников
+- BoardNode: поле `teamColor` передаётся на фронтенд через Board API
 
 ### 2026-02-17: F36 RICE Scoring (BF4)
 - Шаблонный движок RICE (Business + Technical) с настраиваемыми подкритериями

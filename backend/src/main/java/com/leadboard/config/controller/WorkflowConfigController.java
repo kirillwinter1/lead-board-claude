@@ -1,6 +1,7 @@
 package com.leadboard.config.controller;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.dto.*;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
@@ -285,6 +286,50 @@ public class WorkflowConfigController {
         log.info("Updated {} link type mappings", linkTypes.size());
 
         return ResponseEntity.ok(mapLinkTypes(linkTypeRepo.findByConfigId(configId)));
+    }
+
+    // ==================== Detect statuses for a single issue type ====================
+
+    @PostMapping("/issue-types/{typeName}/detect-statuses")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> detectStatusesForType(
+            @PathVariable String typeName,
+            @RequestBody Map<String, String> body) {
+
+        String categoryStr = body.get("boardCategory");
+        if (categoryStr == null || categoryStr.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "boardCategory is required"));
+        }
+
+        BoardCategory category;
+        try {
+            category = BoardCategory.valueOf(categoryStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid boardCategory: " + categoryStr));
+        }
+
+        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+        IssueTypeMappingEntity mapping = issueTypeRepo
+                .findByConfigIdAndJiraTypeName(config.getId(), typeName)
+                .orElseThrow(() -> new IllegalArgumentException("Issue type not found: " + typeName));
+
+        mapping.setBoardCategory(category);
+        if (category == BoardCategory.SUBTASK) {
+            mapping.setWorkflowRoleCode(autoDetectService.detectRoleFromSubtaskName(typeName));
+        } else {
+            mapping.setWorkflowRoleCode(null);
+        }
+        issueTypeRepo.save(mapping);
+
+        // Detect statuses for this type
+        int statusCount = autoDetectService.detectStatusesForIssueType(typeName, category);
+        workflowConfigService.clearCache();
+
+        return ResponseEntity.ok(Map.of(
+                "typeName", typeName,
+                "boardCategory", category.name(),
+                "statusesDetected", statusCount
+        ));
     }
 
     // ==================== Validation ====================

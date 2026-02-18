@@ -85,8 +85,18 @@ public abstract class ComponentTestBase {
 
     protected void seedWorkflowConfig() {
         var existingConfig = projectConfigRepo.findByIsDefaultTrue();
-        if (existingConfig.isEmpty()) return;
-        Long configId = existingConfig.get().getId();
+        Long configId;
+        if (existingConfig.isEmpty()) {
+            // Create default config for tests (Flyway is disabled, so no migration data)
+            ProjectConfigurationEntity config = new ProjectConfigurationEntity();
+            config.setName("Test Config");
+            config.setProjectKey("TEST");
+            config.setDefault(true);
+            config = projectConfigRepo.save(config);
+            configId = config.getId();
+        } else {
+            configId = existingConfig.get().getId();
+        }
         if (!workflowRoleRepo.findByConfigIdOrderBySortOrderAsc(configId).isEmpty()) return;
 
         // Roles

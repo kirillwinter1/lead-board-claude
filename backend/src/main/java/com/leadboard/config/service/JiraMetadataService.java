@@ -180,6 +180,41 @@ public class JiraMetadataService {
         }
     }
 
+    /**
+     * Gets statuses for a specific issue type using the statuses search API.
+     * Used as fallback when /project/{key}/statuses doesn't return a particular type.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getStatusesForIssueType(String issueTypeId) {
+        try {
+            String projectKey = jiraProperties.getProjectKey();
+            // Use /rest/api/3/statuses/search with issueTypeId and projectId filters
+            Map<String, Object> response = callJiraApi(
+                    "/rest/api/3/statuses/search?issueTypeId=" + issueTypeId + "&projectId=" + projectKey + "&maxResults=200");
+
+            List<Map<String, Object>> values = (List<Map<String, Object>>) response.get("values");
+            if (values == null) return List.of();
+
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Map<String, Object> status : values) {
+                Map<String, Object> s = new LinkedHashMap<>();
+                s.put("id", status.get("id"));
+                s.put("name", status.get("name"));
+                Map<String, Object> cat = (Map<String, Object>) status.get("statusCategory");
+                if (cat != null) {
+                    s.put("statusCategory", cat.get("key"));
+                }
+                result.add(s);
+            }
+
+            log.info("Fetched {} statuses for issueTypeId={} via statuses/search", result.size(), issueTypeId);
+            return result;
+        } catch (Exception e) {
+            log.warn("Failed to fetch statuses for issueTypeId={}: {}", issueTypeId, e.getMessage());
+            return List.of();
+        }
+    }
+
     // ==================== Private helpers ====================
 
     @SuppressWarnings("unchecked")
