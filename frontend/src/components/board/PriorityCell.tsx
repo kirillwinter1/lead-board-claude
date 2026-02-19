@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { getRecommendationIcon } from './helpers'
 import { getScoreBreakdown } from '../../api/board'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { PriorityCellProps, ScoreBreakdown } from './types'
 
 export function PriorityCell({ node, recommendedPosition, actualPosition }: PriorityCellProps) {
@@ -11,6 +12,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
   const cellRef = useRef<HTMLDivElement>(null)
 
+  const { isBug } = useWorkflowConfig()
   const score = node.autoScore || 0
 
   // Color based on score
@@ -21,7 +23,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
 
   // Icons
   const icons: string[] = []
-  if (node.issueType?.toLowerCase().includes('bug') || node.issueType?.toLowerCase().includes('баг')) {
+  if (isBug(node.issueType)) {
     icons.push('🐞')
   }
   if (node.blockedBy && node.blockedBy.length > 0) {

@@ -29,17 +29,20 @@ public class DataQualityService {
     private final TeamMemberRepository memberRepository;
     private final WorkflowConfigService workflowConfigService;
     private final RiceAssessmentRepository riceAssessmentRepository;
+    private final BugSlaService bugSlaService;
 
     public DataQualityService(
             JiraIssueRepository issueRepository,
             TeamMemberRepository memberRepository,
             WorkflowConfigService workflowConfigService,
-            RiceAssessmentRepository riceAssessmentRepository
+            RiceAssessmentRepository riceAssessmentRepository,
+            BugSlaService bugSlaService
     ) {
         this.issueRepository = issueRepository;
         this.memberRepository = memberRepository;
         this.workflowConfigService = workflowConfigService;
         this.riceAssessmentRepository = riceAssessmentRepository;
+        this.bugSlaService = bugSlaService;
     }
 
     /**
@@ -274,6 +277,56 @@ public class DataQualityService {
                     }
                 }
             }
+        }
+
+        // STORY_FULLY_LOGGED_NOT_DONE - All time logged on subtasks but story not Done
+        if (!workflowConfigService.isDone(story.getStatus(), story.getIssueType()) && !subtasks.isEmpty()) {
+            long totalEstimate = subtasks.stream()
+                    .mapToLong(st -> st.getOriginalEstimateSeconds() != null ? st.getOriginalEstimateSeconds() : 0)
+                    .sum();
+            long totalLogged = subtasks.stream()
+                    .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
+                    .sum();
+            if (totalEstimate > 0 && totalLogged >= totalEstimate) {
+                violations.add(DataQualityViolation.of(DataQualityRule.STORY_FULLY_LOGGED_NOT_DONE));
+            }
+        }
+
+        return violations;
+    }
+
+    /**
+     * Checks all data quality rules for a Bug.
+     * Includes all Story checks plus BUG-specific SLA and staleness checks.
+     */
+    public List<DataQualityViolation> checkBug(
+            JiraIssueEntity bug,
+            JiraIssueEntity epic,
+            List<JiraIssueEntity> subtasks
+    ) {
+        // Start with all Story checks (bugs share the same hierarchy rules)
+        List<DataQualityViolation> violations = new ArrayList<>(checkStory(bug, epic, subtasks));
+
+        // BUG_SLA_BREACH - Bug exceeded SLA threshold
+        if (!workflowConfigService.isDone(bug.getStatus(), bug.getIssueType())) {
+            if (bugSlaService.checkSlaBreach(bug)) {
+                long resolutionHours = bugSlaService.getResolutionTimeHours(bug);
+                int slaLimit = bugSlaService.getSlaForPriority(bug.getPriority()).orElse(0);
+                violations.add(DataQualityViolation.of(
+                        DataQualityRule.BUG_SLA_BREACH,
+                        resolutionHours,
+                        slaLimit
+                ));
+            }
+        }
+
+        // BUG_STALE - Bug has no updates for more than 14 days
+        if (bugSlaService.checkStale(bug)) {
+            long daysSinceUpdate = bugSlaService.getDaysSinceUpdate(bug);
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.BUG_STALE,
+                    daysSinceUpdate
+            ));
         }
 
         return violations;

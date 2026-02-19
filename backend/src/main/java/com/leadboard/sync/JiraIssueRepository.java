@@ -166,10 +166,15 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("status") String status,
             @Param("boardCategory") String boardCategory);
 
+    // ==================== Priority discovery ====================
+
+    @Query("SELECT DISTINCT e.priority FROM JiraIssueEntity e WHERE e.priority IS NOT NULL ORDER BY e.priority")
+    List<String> findDistinctPriorities();
+
     // ==================== Status Issue Counts ====================
 
     @Query("SELECT e.status, e.boardCategory, COUNT(e) FROM JiraIssueEntity e " +
-           "WHERE e.boardCategory IN ('EPIC','STORY','SUBTASK') " +
+           "WHERE e.boardCategory IN ('EPIC','STORY','BUG','SUBTASK') " +
            "GROUP BY e.status, e.boardCategory")
     List<Object[]> countByStatusAndBoardCategory();
 

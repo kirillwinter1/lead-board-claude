@@ -34,6 +34,9 @@ class StoryAutoScoreServiceTest {
     void setUp() {
         // WorkflowConfigService returns 0 by default for getStoryStatusSortOrder,
         // so the fallback matchesStatus will be used in tests
+        lenient().when(workflowConfigService.isBug("Bug")).thenReturn(true);
+        lenient().when(workflowConfigService.isBug("Баг")).thenReturn(true);
+        lenient().when(workflowConfigService.isBug("Дефект")).thenReturn(true);
         service = new StoryAutoScoreService(issueRepository, workflowConfigService);
     }
 

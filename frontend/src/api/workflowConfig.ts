@@ -12,14 +12,14 @@ export interface WorkflowRoleDto {
 export interface IssueTypeMappingDto {
   id: number | null
   jiraTypeName: string
-  boardCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE' | null
+  boardCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'BUG' | 'SUBTASK' | 'IGNORE' | null
   workflowRoleCode: string | null
 }
 
 export interface StatusMappingDto {
   id: number | null
   jiraStatusName: string
-  issueCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'SUBTASK' | 'IGNORE'
+  issueCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'BUG' | 'SUBTASK' | 'IGNORE'
   statusCategory: 'NEW' | 'REQUIREMENTS' | 'PLANNED' | 'IN_PROGRESS' | 'DONE'
   workflowRoleCode: string | null
   sortOrder: number

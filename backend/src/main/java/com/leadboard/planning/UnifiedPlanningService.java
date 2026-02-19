@@ -719,7 +719,7 @@ public class UnifiedPlanningService {
 
         // Filter to stories only (not subtasks) - uses dynamic config
         List<JiraIssueEntity> stories = children.stream()
-                .filter(c -> workflowConfigService.isStory(c.getIssueType()))
+                .filter(c -> workflowConfigService.isStoryOrBug(c.getIssueType()))
                 .toList();
 
         if (stories.isEmpty()) {

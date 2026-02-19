@@ -41,6 +41,9 @@ class DataQualityServiceTest {
     @Mock
     private RiceAssessmentRepository riceAssessmentRepository;
 
+    @Mock
+    private BugSlaService bugSlaService;
+
     private DataQualityService dataQualityService;
 
     @BeforeEach
@@ -77,7 +80,7 @@ class DataQualityServiceTest {
         lenient().when(workflowConfigService.categorizeEpic("Requirements")).thenReturn(StatusCategory.REQUIREMENTS);
         lenient().when(workflowConfigService.categorizeEpic("Planned")).thenReturn(StatusCategory.PLANNED);
 
-        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService, riceAssessmentRepository);
+        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService, riceAssessmentRepository, bugSlaService);
     }
 
     // ==================== Helper Methods ====================
@@ -294,6 +297,7 @@ class DataQualityServiceTest {
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TIME_LOGGED_WRONG_EPIC_STATUS));
         }
+
     }
 
     // ==================== Story Rules Tests ====================
@@ -341,6 +345,51 @@ class DataQualityServiceTest {
             List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
 
             assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TIME_LOGGED_NOT_IN_SUBTASK));
+        }
+
+        @Test
+        void storyFullyLoggedNotDone_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+
+            JiraIssueEntity subtask = createSubtask("TEST-3", "Done", "TEST-2");
+            subtask.setOriginalEstimateSeconds(28800L); // 8h
+            subtask.setTimeSpentSeconds(28800L); // 8h — fully logged
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask));
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_FULLY_LOGGED_NOT_DONE));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.STORY_FULLY_LOGGED_NOT_DONE)
+                    .allMatch(v -> v.severity() == DataQualitySeverity.WARNING));
+        }
+
+        @Test
+        void storyDone_shouldNotReturnFullyLoggedWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Done", "TEST-1");
+
+            JiraIssueEntity subtask = createSubtask("TEST-3", "Done", "TEST-2");
+            subtask.setOriginalEstimateSeconds(28800L);
+            subtask.setTimeSpentSeconds(28800L);
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask));
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_FULLY_LOGGED_NOT_DONE));
+        }
+
+        @Test
+        void storyPartiallyLogged_shouldNotReturnFullyLoggedWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(28800L); // 8h
+            subtask.setTimeSpentSeconds(14400L); // 4h — only half
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask));
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_FULLY_LOGGED_NOT_DONE));
         }
     }
 

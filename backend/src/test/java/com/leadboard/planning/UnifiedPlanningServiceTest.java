@@ -87,6 +87,7 @@ class UnifiedPlanningServiceTest {
         // WorkflowConfigService defaults
         when(workflowConfigService.getRoleCodesInPipelineOrder()).thenReturn(List.of("SA", "DEV", "QA"));
         when(workflowConfigService.isStory("Story")).thenReturn(true);
+        when(workflowConfigService.isStoryOrBug("Story")).thenReturn(true);
         when(workflowConfigService.getSubtaskRole("Analysis")).thenReturn("SA");
         when(workflowConfigService.getSubtaskRole("Development")).thenReturn("DEV");
         when(workflowConfigService.getSubtaskRole("Testing")).thenReturn("QA");

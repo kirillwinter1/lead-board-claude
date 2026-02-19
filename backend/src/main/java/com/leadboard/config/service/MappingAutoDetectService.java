@@ -411,9 +411,11 @@ public class MappingAutoDetectService {
         String lower = typeName.toLowerCase();
         if (lower.contains("project") || lower.contains("проект")) return BoardCategory.PROJECT;
         if (lower.contains("epic") || lower.contains("эпик")) return BoardCategory.EPIC;
-        if (lower.contains("story") || lower.contains("bug") || lower.contains("task")
-                || lower.contains("история") || lower.contains("задача") || lower.contains("баг")
-                || lower.contains("дефект") || lower.contains("улучшение") || lower.contains("improvement")) {
+        // BUG detection must come before STORY to avoid matching "bug" as story
+        if (lower.contains("bug") || lower.contains("баг") || lower.contains("дефект")) return BoardCategory.BUG;
+        if (lower.contains("story") || lower.contains("task")
+                || lower.contains("история") || lower.contains("задача")
+                || lower.contains("улучшение") || lower.contains("improvement")) {
             return BoardCategory.STORY;
         }
         // Unknown non-subtask types → IGNORE

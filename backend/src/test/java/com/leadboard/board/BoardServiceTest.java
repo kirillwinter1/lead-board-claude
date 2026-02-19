@@ -88,8 +88,15 @@ class BoardServiceTest {
         when(workflowConfigService.isEpic("Разработка")).thenReturn(false);
         when(workflowConfigService.isEpic("Тестирование")).thenReturn(false);
         when(workflowConfigService.isStory("История")).thenReturn(true);
-        when(workflowConfigService.isStory("Баг")).thenReturn(true);
+        when(workflowConfigService.isStory("Баг")).thenReturn(false);
+        when(workflowConfigService.isBug("Баг")).thenReturn(true);
         when(workflowConfigService.isStory("Эпик")).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug("История")).thenReturn(true);
+        when(workflowConfigService.isStoryOrBug("Баг")).thenReturn(true);
+        when(workflowConfigService.isStoryOrBug("Эпик")).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug("Аналитика")).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug("Разработка")).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug("Тестирование")).thenReturn(false);
         when(workflowConfigService.getSubtaskRole("Аналитика")).thenReturn("SA");
         when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
         when(workflowConfigService.getSubtaskRole("Тестирование")).thenReturn("QA");

@@ -10,6 +10,7 @@ import { PlanningPokerPage } from './pages/PlanningPokerPage'
 import { PokerRoomPage } from './pages/PokerRoomPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { WorkflowConfigPage } from './pages/WorkflowConfigPage'
+import { BugSlaSettingsPage } from './pages/BugSlaSettingsPage'
 import { MemberProfilePage } from './pages/MemberProfilePage'
 import { TeamCompetencyPage } from './pages/TeamCompetencyPage'
 import { ProjectsPage } from './pages/ProjectsPage'
@@ -40,6 +41,7 @@ function App() {
           <Route path="teams/:teamId/competency" element={<TeamCompetencyPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="workflow" element={<WorkflowConfigPage />} />
+          <Route path="bug-sla" element={<BugSlaSettingsPage />} />
         </Route>
       </Routes>
       </WorkflowConfigProvider>

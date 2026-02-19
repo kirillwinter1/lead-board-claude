@@ -80,7 +80,7 @@ public class BoardService {
                     .collect(Collectors.toList());
 
             List<JiraIssueEntity> stories = allIssues.stream()
-                    .filter(e -> workflowConfigService.isStory(e.getIssueType()))
+                    .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
                     .collect(Collectors.toList());
 
             List<JiraIssueEntity> subtasks = allIssues.stream()
@@ -288,7 +288,7 @@ public class BoardService {
             node.setFlagged(entity.getFlagged());
             node.setAutoScore(entity.getAutoScore());
             node.setManualOrder(entity.getManualOrder());
-        } else if (workflowConfigService.isStory(entity.getIssueType())) {
+        } else if (workflowConfigService.isStoryOrBug(entity.getIssueType())) {
             node.setAutoScore(entity.getAutoScore());
             node.setManualOrder(entity.getManualOrder());
             node.setFlagged(entity.getFlagged());

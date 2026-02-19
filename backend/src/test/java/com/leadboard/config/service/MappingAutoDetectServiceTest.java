@@ -118,13 +118,20 @@ class MappingAutoDetectServiceTest {
         }
 
         @Test
-        @DisplayName("should detect STORY for story/bug/task types")
+        @DisplayName("should detect STORY for story/task types")
         void shouldDetectStory() {
             assertEquals(BoardCategory.STORY, service.detectBoardCategory("Story", false));
-            assertEquals(BoardCategory.STORY, service.detectBoardCategory("Bug", false));
             assertEquals(BoardCategory.STORY, service.detectBoardCategory("Task", false));
             assertEquals(BoardCategory.STORY, service.detectBoardCategory("История", false));
             assertEquals(BoardCategory.STORY, service.detectBoardCategory("Задача", false));
+        }
+
+        @Test
+        @DisplayName("should detect BUG for bug types")
+        void shouldDetectBug() {
+            assertEquals(BoardCategory.BUG, service.detectBoardCategory("Bug", false));
+            assertEquals(BoardCategory.BUG, service.detectBoardCategory("Баг", false));
+            assertEquals(BoardCategory.BUG, service.detectBoardCategory("Дефект", false));
         }
 
         @Test

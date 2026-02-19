@@ -11,9 +11,9 @@ import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
-  const { getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, isStoryOrBug } = useWorkflowConfig()
   const isEpicRow = isEpic(node.issueType) && level === 0
-  const isStoryRow = (node.issueType === 'Story' || node.issueType === 'История' || node.issueType === 'Bug' || node.issueType === 'Баг') && level === 1
+  const isStoryRow = isStoryOrBug(node.issueType) && level === 1
 
   const justDroppedEffects = isJustDropped ? 'just-dropped' : ''
 

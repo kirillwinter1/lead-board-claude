@@ -66,6 +66,9 @@ const ruleLabels: Record<string, string> = {
   STORY_BLOCKED_NO_PROGRESS: 'Блокировка без прогресса >30 дней',
   SUBTASK_DONE_NO_TIME_LOGGED: 'Подзадача закрыта без списания времени',
   SUBTASK_TIME_LOGGED_BUT_TODO: 'Списано время, но подзадача в TODO',
+  BUG_SLA_BREACH: 'Баг превысил SLA',
+  BUG_STALE: 'Баг без обновлений >14 дней',
+  STORY_FULLY_LOGGED_NOT_DONE: 'Всё время списано, но эпик не закрыт',
 }
 
 function getRuleLabel(rule: string): string {

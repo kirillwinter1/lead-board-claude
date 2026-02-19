@@ -13,6 +13,8 @@ interface WorkflowConfigHelpers extends WorkflowConfig {
   isProject: (type: string | null | undefined) => boolean
   isEpic: (type: string | null | undefined) => boolean
   isStory: (type: string | null | undefined) => boolean
+  isBug: (type: string | null | undefined) => boolean
+  isStoryOrBug: (type: string | null | undefined) => boolean
   isSubtask: (type: string | null | undefined) => boolean
   getRoleColor: (code: string) => string
   getRoleDisplayName: (code: string) => string
@@ -73,6 +75,15 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       if (!type) return false
       return config.issueTypeCategories[type] === 'STORY'
     },
+    isBug: (type) => {
+      if (!type) return false
+      return config.issueTypeCategories[type] === 'BUG'
+    },
+    isStoryOrBug: (type) => {
+      if (!type) return false
+      const cat = config.issueTypeCategories[type]
+      return cat === 'STORY' || cat === 'BUG'
+    },
     isSubtask: (type) => {
       if (!type) return false
       return config.issueTypeCategories[type] === 'SUBTASK'
@@ -112,6 +123,8 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       isProject: () => false,
       isEpic: () => false,
       isStory: () => false,
+      isBug: () => false,
+      isStoryOrBug: () => false,
       isSubtask: () => false,
       getRoleColor: (code) => DEFAULT_ROLE_COLORS[code] || '#666',
       getRoleDisplayName: (code) => code,

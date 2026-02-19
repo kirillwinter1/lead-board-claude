@@ -62,7 +62,7 @@ public class PokerController {
         List<JiraIssueEntity> stories = issueRepository.findByParentKey(epicKey);
 
         List<EpicStoryResponse> response = stories.stream()
-                .filter(s -> workflowConfigService.isStory(s.getIssueType()))
+                .filter(s -> workflowConfigService.isStoryOrBug(s.getIssueType()))
                 .map(story -> {
                     // Load subtasks for this story
                     List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());

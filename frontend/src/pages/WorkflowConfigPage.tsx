@@ -18,8 +18,8 @@ import './WorkflowConfigPage.css'
 
 type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
 
-const BOARD_CATEGORIES = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
-const BOARD_CATEGORIES_WITH_UNMAPPED = ['', 'PROJECT', 'EPIC', 'STORY', 'SUBTASK', 'IGNORE'] as const
+const BOARD_CATEGORIES = ['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK', 'IGNORE'] as const
+const BOARD_CATEGORIES_WITH_UNMAPPED = ['', 'PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK', 'IGNORE'] as const
 const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const
 const LINK_CATEGORIES = ['BLOCKS', 'RELATED', 'IGNORE'] as const
 
@@ -169,7 +169,9 @@ function suggestIssueTypes(jiraTypes: JiraIssueTypeMetadata[]): IssueTypeMapping
       boardCategory = 'PROJECT'
     } else if (lower.includes('epic') || lower.includes('эпик')) {
       boardCategory = 'EPIC'
-    } else if (lower === 'story' || lower === 'bug' || lower === 'task' || lower === 'история' || lower === 'баг' || lower === 'задача' || lower.includes('story') || lower.includes('bug') || lower.includes('task')) {
+    } else if (lower.includes('bug') || lower.includes('баг') || lower.includes('дефект')) {
+      boardCategory = 'BUG'
+    } else if (lower === 'story' || lower === 'task' || lower === 'история' || lower === 'задача' || lower.includes('story') || lower.includes('task')) {
       boardCategory = 'STORY'
     }
 
@@ -628,7 +630,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const addStatus = () => {
     const maxOrder = statuses.reduce((max, s) => Math.max(max, s.sortOrder), 0)
     setStatuses([...statuses, {
-      id: null, jiraStatusName: '', issueCategory: statusFilter === 'EPIC' || statusFilter === 'STORY' || statusFilter === 'SUBTASK' ? statusFilter as any : 'STORY',
+      id: null, jiraStatusName: '', issueCategory: statusFilter === 'EPIC' || statusFilter === 'STORY' || statusFilter === 'BUG' || statusFilter === 'SUBTASK' ? statusFilter as any : 'STORY',
       statusCategory: 'NEW', workflowRoleCode: null,
       sortOrder: maxOrder + 1, scoreWeight: 0,
       color: STATUS_CATEGORY_DEFAULT_COLORS['NEW'],
@@ -1203,7 +1205,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
           <strong>Score Weight</strong> — вес для расчёта % завершения.
         </div>
         <div className="status-filter">
-          {['PROJECT', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
+          {['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK'].map(f => (
             <button
               key={f}
               className={`status-filter-btn ${wizardStatusFilter === f ? 'active' : ''}`}
@@ -1371,6 +1373,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
             <div className="wizard-review-detail">
               EPIC: {wizardStatuses.filter(s => s.issueCategory === 'EPIC').length},
               STORY: {wizardStatuses.filter(s => s.issueCategory === 'STORY').length},
+              BUG: {wizardStatuses.filter(s => s.issueCategory === 'BUG').length},
               SUBTASK: {wizardStatuses.filter(s => s.issueCategory === 'SUBTASK').length}
             </div>
           </div>
@@ -1651,7 +1654,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="status-filter">
-          {['PROJECT', 'EPIC', 'STORY', 'SUBTASK'].map(f => (
+          {['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK'].map(f => (
             <button
               key={f}
               className={`status-filter-btn ${statusFilter === f ? 'active' : ''}`}

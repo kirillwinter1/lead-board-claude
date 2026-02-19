@@ -15,12 +15,14 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { playDropSound } from './helpers'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { BoardRow } from './BoardRow'
 import { SortableEpicRow } from './SortableEpicRow'
 import { SortableStoryRow } from './SortableStoryRow'
 import type { BoardNode, BoardTableProps } from './types'
 
 export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, storyPlanningMap, canReorder, onReorder, onStoryReorder }: BoardTableProps) {
+  const { isStoryOrBug } = useWorkflowConfig()
   // Load expanded keys from localStorage
   const loadExpandedKeys = (): Set<string> => {
     try {
@@ -180,10 +182,7 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
 
   // Calculate recommended positions for stories within each epic
   const getStoryRecommendations = useCallback((children: BoardNode[]): Map<string, number> => {
-    const stories = children.filter(c =>
-      c.issueType === 'Story' || c.issueType === 'История' ||
-      c.issueType === 'Bug' || c.issueType === 'Баг'
-    )
+    const stories = children.filter(c => isStoryOrBug(c.issueType))
     const sorted = [...stories]
       .filter(s => s.autoScore !== null)
       .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
@@ -199,14 +198,8 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
   const renderChildren = (children: BoardNode[], parentKey: string, level: number, isExpanded: boolean): JSX.Element => {
     const storyRecommendations = level === 1 ? getStoryRecommendations(children) : new Map<string, number>()
 
-    const stories = children.filter(c =>
-      c.issueType === 'Story' || c.issueType === 'История' ||
-      c.issueType === 'Bug' || c.issueType === 'Баг'
-    )
-    const subtasks = children.filter(c =>
-      c.issueType !== 'Story' && c.issueType !== 'История' &&
-      c.issueType !== 'Bug' && c.issueType !== 'Баг'
-    )
+    const stories = children.filter(c => isStoryOrBug(c.issueType))
+    const subtasks = children.filter(c => !isStoryOrBug(c.issueType))
 
     return (
       <div className={`children-wrapper ${isExpanded ? 'expanded' : ''}`}>

@@ -45,6 +45,7 @@ public class WorkflowConfigService {
     private volatile Set<String> projectTypeNames = Set.of();
     private volatile Set<String> epicTypeNames = Set.of();
     private volatile Set<String> storyTypeNames = Set.of();
+    private volatile Set<String> bugTypeNames = Set.of();
     private volatile Set<String> subtaskTypeNames = Set.of();
     private volatile String projectKey;
     private volatile String epicLinkType;
@@ -118,6 +119,7 @@ public class WorkflowConfigService {
             Set<String> projectNames = new HashSet<>();
             Set<String> epicNames = new HashSet<>();
             Set<String> storyNames = new HashSet<>();
+            Set<String> bugNames = new HashSet<>();
             Set<String> subtaskNames = new HashSet<>();
             for (IssueTypeMappingEntity m : typeMappings) {
                 if (m.getBoardCategory() == null) continue; // Skip unmapped types
@@ -129,6 +131,7 @@ public class WorkflowConfigService {
                     case PROJECT -> projectNames.add(m.getJiraTypeName());
                     case EPIC -> epicNames.add(m.getJiraTypeName());
                     case STORY -> storyNames.add(m.getJiraTypeName());
+                    case BUG -> bugNames.add(m.getJiraTypeName());
                     case SUBTASK -> subtaskNames.add(m.getJiraTypeName());
                     default -> {}
                 }
@@ -136,6 +139,7 @@ public class WorkflowConfigService {
             projectTypeNames = Set.copyOf(projectNames);
             epicTypeNames = Set.copyOf(epicNames);
             storyTypeNames = Set.copyOf(storyNames);
+            bugTypeNames = Set.copyOf(bugNames);
             subtaskTypeNames = Set.copyOf(subtaskNames);
 
             // Load epic link config
@@ -211,8 +215,21 @@ public class WorkflowConfigService {
         return categorizeIssueType(jiraTypeName) == BoardCategory.STORY;
     }
 
+    public boolean isBug(String jiraTypeName) {
+        return categorizeIssueType(jiraTypeName) == BoardCategory.BUG;
+    }
+
     public boolean isSubtask(String jiraTypeName) {
         return categorizeIssueType(jiraTypeName) == BoardCategory.SUBTASK;
+    }
+
+    public boolean isStoryOrBug(String jiraTypeName) {
+        BoardCategory cat = categorizeIssueType(jiraTypeName);
+        return cat == BoardCategory.STORY || cat == BoardCategory.BUG;
+    }
+
+    public List<String> getBugTypeNames() {
+        return List.copyOf(bugTypeNames);
     }
 
     public List<String> getProjectTypeNames() {
@@ -293,6 +310,19 @@ public class WorkflowConfigService {
             }
         }
 
+        // BUG fallback: try STORY mappings if no BUG-specific mapping exists
+        if (boardCat == BoardCategory.BUG) {
+            String storyKey = buildStatusKey("STORY", status);
+            StatusCategory storyCat = statusLookup.get(storyKey);
+            if (storyCat != null) return storyCat;
+            for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+                if (entry.getKey().startsWith("STORY:") &&
+                    entry.getKey().substring(6).equalsIgnoreCase(status)) {
+                    return entry.getValue();
+                }
+            }
+        }
+
         // Fallback: substring matching
         String s = status.toLowerCase();
         if (s.contains("done") || s.contains("closed") || s.contains("resolved") ||
@@ -355,8 +385,9 @@ public class WorkflowConfigService {
         if (issueType != null) {
             String typeLower = issueType.toLowerCase();
             if (typeLower.contains("аналитик") || typeLower.contains("analyt")) return "SA";
-            if (typeLower.contains("тестир") || typeLower.contains("test") || typeLower.contains("qa") ||
-                typeLower.contains("bug") || typeLower.contains("баг") || typeLower.contains("дефект")) return "QA";
+            if (typeLower.contains("тестир") || typeLower.contains("test") || typeLower.contains("qa")) return "QA";
+            // Bugs default to QA phase
+            if (isBug(issueType)) return "QA";
         }
 
         return getDefaultRoleCode();

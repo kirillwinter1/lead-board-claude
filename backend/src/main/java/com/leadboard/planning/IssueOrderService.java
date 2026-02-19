@@ -93,7 +93,7 @@ public class IssueOrderService {
         JiraIssueEntity story = issueRepository.findByIssueKey(storyKey)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found: " + storyKey));
 
-        if (!workflowConfigService.isStory(story.getIssueType())) {
+        if (!workflowConfigService.isStoryOrBug(story.getIssueType())) {
             throw new IllegalArgumentException("Issue is not a story/bug: " + storyKey);
         }
 
@@ -150,7 +150,7 @@ public class IssueOrderService {
             issue.setManualOrder(maxOrder + 1);
             issueRepository.save(issue);
             log.debug("Assigned order {} to new epic {}", issue.getManualOrder(), issue.getIssueKey());
-        } else if (workflowConfigService.isStory(issue.getIssueType()) && issue.getParentKey() != null) {
+        } else if (workflowConfigService.isStoryOrBug(issue.getIssueType()) && issue.getParentKey() != null) {
             int maxOrder = issueRepository.findMaxStoryOrderForParent(issue.getParentKey());
             issue.setManualOrder(maxOrder + 1);
             issueRepository.save(issue);
@@ -192,7 +192,7 @@ public class IssueOrderService {
 
         int index = 1;
         for (JiraIssueEntity child : children) {
-            if (!workflowConfigService.isStory(child.getIssueType())) continue;
+            if (!workflowConfigService.isStoryOrBug(child.getIssueType())) continue;
             if (!java.util.Objects.equals(child.getManualOrder(), index)) {
                 child.setManualOrder(index);
                 issueRepository.save(child);
@@ -226,7 +226,7 @@ public class IssueOrderService {
     private void shiftStoriesDown(String parentKey, int fromPosition, int toPosition) {
         List<JiraIssueEntity> stories = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
         for (JiraIssueEntity s : stories) {
-            if (!workflowConfigService.isStory(s.getIssueType())) continue;
+            if (!workflowConfigService.isStoryOrBug(s.getIssueType())) continue;
             Integer order = s.getManualOrder();
             if (order != null && order >= fromPosition && order < toPosition) {
                 s.setManualOrder(order + 1);
@@ -238,7 +238,7 @@ public class IssueOrderService {
     private void shiftStoriesUp(String parentKey, int fromPosition, int toPosition) {
         List<JiraIssueEntity> stories = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
         for (JiraIssueEntity s : stories) {
-            if (!workflowConfigService.isStory(s.getIssueType())) continue;
+            if (!workflowConfigService.isStoryOrBug(s.getIssueType())) continue;
             Integer order = s.getManualOrder();
             if (order != null && order > fromPosition && order <= toPosition) {
                 s.setManualOrder(order - 1);

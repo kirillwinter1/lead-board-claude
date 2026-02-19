@@ -97,10 +97,8 @@ public class StoryAutoScoreService {
             return BigDecimal.ZERO;
         }
 
-        String type = story.getIssueType().toLowerCase();
-
-        // Bug = 100
-        if (type.contains("bug") || type.contains("баг") || type.contains("дефект")) {
+        // Bug = 100 (higher priority than stories)
+        if (workflowConfigService.isBug(story.getIssueType())) {
             return BigDecimal.valueOf(100);
         }
 
@@ -280,6 +278,8 @@ public class StoryAutoScoreService {
         int count = 0;
 
         List<JiraIssueEntity> stories = issueRepository.findByBoardCategory("STORY");
+        List<JiraIssueEntity> bugs = issueRepository.findByBoardCategory("BUG");
+
         for (JiraIssueEntity story : stories) {
             BigDecimal score = calculateAutoScore(story);
             story.setAutoScore(score);
@@ -288,7 +288,15 @@ public class StoryAutoScoreService {
             count++;
         }
 
-        log.info("Recalculated AutoScore for {} stories", count);
+        for (JiraIssueEntity bug : bugs) {
+            BigDecimal score = calculateAutoScore(bug);
+            bug.setAutoScore(score);
+            bug.setAutoScoreCalculatedAt(OffsetDateTime.now());
+            issueRepository.save(bug);
+            count++;
+        }
+
+        log.info("Recalculated AutoScore for {} stories/bugs", count);
         return count;
     }
 
@@ -368,6 +376,6 @@ public class StoryAutoScoreService {
 
     private boolean isStoryType(String issueType) {
         if (issueType == null) return false;
-        return workflowConfigService.isStory(issueType);
+        return workflowConfigService.isStoryOrBug(issueType);
     }
 }

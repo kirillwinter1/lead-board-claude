@@ -4,6 +4,7 @@ public enum BoardCategory {
     PROJECT,
     EPIC,
     STORY,
+    BUG,
     SUBTASK,
     IGNORE
 }

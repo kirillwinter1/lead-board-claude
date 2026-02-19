@@ -141,6 +141,23 @@ public enum DataQualityRule {
     RICE_MISSING_ASSESSMENT(
             DataQualitySeverity.WARNING,
             "RICE assessment is missing (epic is in Planned+ status)"
+    ),
+
+    // Bug SLA rules
+    BUG_SLA_BREACH(
+            DataQualitySeverity.ERROR,
+            "Bug exceeded SLA: %d hours (limit: %d hours)"
+    ),
+
+    BUG_STALE(
+            DataQualitySeverity.WARNING,
+            "Bug has no progress for %d days"
+    ),
+
+    // Story/Bug fully logged but not done
+    STORY_FULLY_LOGGED_NOT_DONE(
+            DataQualitySeverity.WARNING,
+            "All estimated time is logged (100%%) but issue is not Done"
     );
 
     private final DataQualitySeverity severity;

@@ -39,10 +39,16 @@ class IssueOrderServiceTest {
         lenient().when(workflowConfigService.isEpic("Story")).thenReturn(false);
         lenient().when(workflowConfigService.isEpic("Bug")).thenReturn(false);
         lenient().when(workflowConfigService.isStory("Story")).thenReturn(true);
-        lenient().when(workflowConfigService.isStory("Bug")).thenReturn(true);
+        lenient().when(workflowConfigService.isStory("Bug")).thenReturn(false);
+        lenient().when(workflowConfigService.isBug("Bug")).thenReturn(true);
         lenient().when(workflowConfigService.isStory("Epic")).thenReturn(false);
         lenient().when(workflowConfigService.isStory("Sub-task")).thenReturn(false);
-        lenient().when(workflowConfigService.getStoryTypeNames()).thenReturn(List.of("Story", "Bug"));
+        lenient().when(workflowConfigService.isStoryOrBug("Story")).thenReturn(true);
+        lenient().when(workflowConfigService.isStoryOrBug("Bug")).thenReturn(true);
+        lenient().when(workflowConfigService.isStoryOrBug("Epic")).thenReturn(false);
+        lenient().when(workflowConfigService.isStoryOrBug("Sub-task")).thenReturn(false);
+        lenient().when(workflowConfigService.getStoryTypeNames()).thenReturn(List.of("Story"));
+        lenient().when(workflowConfigService.getBugTypeNames()).thenReturn(List.of("Bug"));
     }
 
     // ==================== Epic Reorder Tests ====================

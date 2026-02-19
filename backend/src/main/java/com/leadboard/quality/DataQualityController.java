@@ -65,7 +65,7 @@ public class DataQualityController {
                 .toList();
 
         List<JiraIssueEntity> storiesAndBugs = allIssues.stream()
-                .filter(e -> workflowConfigService.isStory(e.getIssueType()))
+                .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
                 .toList();
 
         List<JiraIssueEntity> subtasks = allIssues.stream()
@@ -99,7 +99,9 @@ public class DataQualityController {
             // Check children of this epic
             for (JiraIssueEntity child : children) {
                 List<JiraIssueEntity> childSubtasks = subtasksByParent.getOrDefault(child.getIssueKey(), List.of());
-                List<DataQualityViolation> childViolations = dataQualityService.checkStory(child, epic, childSubtasks);
+                List<DataQualityViolation> childViolations = workflowConfigService.isBug(child.getIssueType())
+                        ? dataQualityService.checkBug(child, epic, childSubtasks)
+                        : dataQualityService.checkStory(child, epic, childSubtasks);
 
                 if (!childViolations.isEmpty()) {
                     allViolations.add(toIssueViolations(child, baseUrl, childViolations));
