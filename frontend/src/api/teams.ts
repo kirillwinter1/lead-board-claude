@@ -145,6 +145,34 @@ export interface MemberProfileResponse {
   summary: MemberSummary
 }
 
+// ==================== Absences ====================
+
+export type AbsenceType = 'VACATION' | 'SICK_LEAVE' | 'DAY_OFF' | 'OTHER'
+
+export interface Absence {
+  id: number
+  memberId: number
+  absenceType: AbsenceType
+  startDate: string
+  endDate: string
+  comment: string | null
+  createdAt: string
+}
+
+export interface CreateAbsenceRequest {
+  absenceType: AbsenceType
+  startDate: string
+  endDate: string
+  comment?: string
+}
+
+export interface UpdateAbsenceRequest {
+  absenceType?: AbsenceType
+  startDate?: string
+  endDate?: string
+  comment?: string
+}
+
 export const teamsApi = {
   getConfig: () => axios.get<TeamsConfig>('/api/teams/config').then(r => r.data),
 
@@ -186,4 +214,23 @@ export const teamsApi = {
     axios.get<MemberProfileResponse>(`/api/teams/${teamId}/members/${memberId}/profile`, {
       params: { from, to }
     }).then(r => r.data),
+
+  // ==================== Absences ====================
+
+  getTeamAbsences: (teamId: number, from: string, to: string) =>
+    axios.get<Absence[]>(`/api/teams/${teamId}/absences`, {
+      params: { from, to }
+    }).then(r => r.data),
+
+  getUpcomingAbsences: (teamId: number, memberId: number) =>
+    axios.get<Absence[]>(`/api/teams/${teamId}/members/${memberId}/absences/upcoming`).then(r => r.data),
+
+  createAbsence: (teamId: number, memberId: number, data: CreateAbsenceRequest) =>
+    axios.post<Absence>(`/api/teams/${teamId}/members/${memberId}/absences`, data).then(r => r.data),
+
+  updateAbsence: (teamId: number, memberId: number, absenceId: number, data: UpdateAbsenceRequest) =>
+    axios.put<Absence>(`/api/teams/${teamId}/members/${memberId}/absences/${absenceId}`, data).then(r => r.data),
+
+  deleteAbsence: (teamId: number, memberId: number, absenceId: number) =>
+    axios.delete(`/api/teams/${teamId}/members/${memberId}/absences/${absenceId}`),
 }

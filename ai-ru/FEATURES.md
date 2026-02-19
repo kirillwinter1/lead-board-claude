@@ -39,6 +39,8 @@
 | F37 | Team Colors | 2026-02-17 | [features/F37](features/F37_TEAM_COLORS.md) |
 | F38 | Incremental Workflow Configuration | 2026-02-18 | [features/F38](features/F38_INCREMENTAL_WORKFLOW_CONFIG.md) |
 | F39 | Unified Style Refactoring | 2026-02-19 | [features/F39](features/F39_UNIFIED_STYLE_REFACTORING.md) |
+| F40 | Team Competencies | 2026-02-19 | [features/F40](features/F40_TEAM_COMPETENCIES.md) |
+| F41 | Member Absences / Time Off | 2026-02-19 | [features/F41](features/F41_MEMBER_ABSENCES.md) |
 
 ## Бэклог (BF)
 
@@ -49,10 +51,10 @@
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
-| BF11 | Competency Matrix | 🚧 В работе (код не закоммичен) | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
+| BF11 | Competency Matrix | ✅ Done → [F40](features/F40_TEAM_COMPETENCIES.md) | [archive/BF11](archive/BF11_COMPETENCY_MATRIX.md) |
 | BF12 | Sprint Integration | 📋 Planned | [backlog/BF12](backlog/BF12_SPRINT_INTEGRATION.md) |
 | BF13 | Export & Reporting | 💡 Idea | — |
-| BF14 | Time Off / Calendar | 💡 Idea | — |
+| BF14 | Time Off / Calendar | ✅ Done → [F41](features/F41_MEMBER_ABSENCES.md) | — |
 | BF15 | Release Management | 💡 Idea | — |
 | BF16 | Cross-team Roadmap | 💡 Idea | — |
 | BF17 | Public API & Webhooks | 💡 Idea | — |

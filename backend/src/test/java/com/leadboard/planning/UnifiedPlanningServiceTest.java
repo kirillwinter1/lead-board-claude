@@ -44,6 +44,8 @@ class UnifiedPlanningServiceTest {
     private StoryDependencyService dependencyService;
     @Mock
     private CompetencyScoreCalculator competencyCalculator;
+    @Mock
+    private AbsenceService absenceService;
 
     private UnifiedPlanningService service;
 
@@ -58,7 +60,8 @@ class UnifiedPlanningServiceTest {
                 calendarService,
                 workflowConfigService,
                 dependencyService,
-                competencyCalculator
+                competencyCalculator,
+                absenceService
         );
 
         // Default config

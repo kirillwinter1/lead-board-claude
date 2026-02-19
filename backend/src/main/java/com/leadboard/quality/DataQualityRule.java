@@ -119,11 +119,6 @@ public enum DataQualityRule {
             "Story has been blocked for more than 30 days without progress on blocking issue: %s"
     ),
 
-    SUBTASK_ACTIVE_STORY_NOT_INPROGRESS(
-            DataQualitySeverity.WARNING,
-            "Subtask is in active status but parent story is not in progress"
-    ),
-
     // Subtask done without time logged
     SUBTASK_DONE_NO_TIME_LOGGED(
             DataQualitySeverity.WARNING,

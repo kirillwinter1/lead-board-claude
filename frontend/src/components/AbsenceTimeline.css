@@ -1,0 +1,277 @@
+.absence-timeline {
+  position: relative;
+  margin-top: 12px;
+}
+
+.absence-timeline-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.absence-timeline-range {
+  font-size: 13px;
+  color: #6b778c;
+  margin-left: 8px;
+}
+
+.absence-timeline-grid {
+  display: flex;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Left panel */
+.absence-timeline-left {
+  flex-shrink: 0;
+  border-right: 1px solid #dfe1e6;
+  background: #fafbfc;
+}
+
+.absence-timeline-left-header {
+  display: flex;
+  align-items: flex-end;
+  padding: 0 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #dfe1e6;
+}
+
+.absence-timeline-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-bottom: 1px solid #f4f5f7;
+}
+
+.absence-member-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.absence-member-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #ddd;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.absence-member-avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid #ddd;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.absence-member-name {
+  font-size: 13px;
+  color: #172b4d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.absence-add-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid #dfe1e6;
+  background: #fff;
+  color: #6b778c;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+
+.absence-add-btn:hover {
+  background: #f4f5f7;
+  color: #0052cc;
+  border-color: #0052cc;
+}
+
+/* Right panel */
+.absence-timeline-right {
+  flex: 1;
+  overflow-x: auto;
+}
+
+.absence-timeline-header {
+  border-bottom: 1px solid #dfe1e6;
+  display: flex;
+  flex-direction: column;
+}
+
+.absence-timeline-months {
+  position: relative;
+  height: 20px;
+}
+
+.absence-month-label {
+  position: absolute;
+  top: 0;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.absence-timeline-days {
+  display: flex;
+  height: 28px;
+}
+
+.absence-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #6b778c;
+  flex-shrink: 0;
+}
+
+.absence-day-header.weekend {
+  color: #b3bac5;
+  background: #f9fafb;
+}
+
+.absence-day-header.today {
+  color: #0052cc;
+  font-weight: 700;
+}
+
+/* Timeline rows */
+.absence-timeline-row {
+  position: relative;
+  border-bottom: 1px solid #f4f5f7;
+}
+
+.absence-day-bg {
+  position: absolute;
+  top: 0;
+}
+
+.absence-day-bg.weekend {
+  background: #f9fafb;
+}
+
+/* Absence bars */
+.absence-bar {
+  position: absolute;
+  top: 8px;
+  height: 24px;
+  border-radius: 4px;
+  opacity: 0.85;
+  transition: opacity 0.15s;
+}
+
+.absence-bar:hover {
+  opacity: 1;
+}
+
+.absence-bar.clickable {
+  cursor: pointer;
+}
+
+/* Today line */
+.absence-today-line {
+  position: absolute;
+  width: 2px;
+  background: #de350b;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* Tooltip */
+.absence-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  background: #172b4d;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  z-index: 1000;
+  pointer-events: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.absence-tooltip-type {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.absence-tooltip-dates {
+  color: #b3bac5;
+  font-size: 11px;
+}
+
+.absence-tooltip-comment {
+  margin-top: 4px;
+  color: #c1c7d0;
+  font-size: 11px;
+  max-width: 200px;
+  white-space: normal;
+}
+
+/* Legend */
+.absence-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 4px 0;
+}
+
+.absence-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #6b778c;
+}
+
+.absence-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* Loading overlay */
+.absence-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 13px;
+  color: #6b778c;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px 16px;
+  border-radius: 4px;
+}

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest, PlanningConfig } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { Modal } from '../components/Modal'
+import { AbsenceTimeline } from '../components/AbsenceTimeline'
 import './TeamsPage.css'
 
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
@@ -38,6 +39,9 @@ export function TeamMembersPage() {
   const [planningConfig, setPlanningConfig] = useState<PlanningConfig>(DEFAULT_PLANNING_CONFIG)
   const [showPlanningConfig, setShowPlanningConfig] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
+
+  // Absences section state
+  const [showAbsences, setShowAbsences] = useState(false)
 
   const fetchData = () => {
     if (!teamId) return
@@ -545,6 +549,28 @@ export function TeamMembersPage() {
                 {savingConfig ? 'Сохранение...' : 'Сохранить настройки'}
               </button>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Absences Section */}
+      <div className="planning-config-section">
+        <div
+          className="planning-config-header"
+          onClick={() => setShowAbsences(!showAbsences)}
+        >
+          <span className={`chevron ${showAbsences ? 'expanded' : ''}`}>›</span>
+          <h3>Отпуска и отсутствия</h3>
+        </div>
+
+        {showAbsences && teamId && (
+          <div className="planning-config-content">
+            <AbsenceTimeline
+              teamId={parseInt(teamId)}
+              members={members}
+              teamColor={team?.color}
+              canManage={true}
+            />
           </div>
         )}
       </div>

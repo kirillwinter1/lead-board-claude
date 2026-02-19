@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Tracks assignee availability across days.
@@ -48,6 +49,17 @@ public class AssigneeSchedule {
 
     public BigDecimal getTotalAssignedHours() {
         return totalAssignedHours;
+    }
+
+    /**
+     * Blocks all absence dates by filling usedHours to effectiveHoursPerDay.
+     * After blocking, getAvailableHours() returns 0 for these dates.
+     */
+    public void blockAbsenceDates(Set<LocalDate> absenceDates) {
+        if (absenceDates == null) return;
+        for (LocalDate date : absenceDates) {
+            usedHours.put(date, effectiveHoursPerDay);
+        }
     }
 
     /**

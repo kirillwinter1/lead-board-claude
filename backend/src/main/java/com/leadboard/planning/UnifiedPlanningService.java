@@ -7,6 +7,7 @@ import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.planning.dto.UnifiedPlanningResult.*;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.team.AbsenceService;
 import com.leadboard.team.Grade;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
@@ -53,6 +54,7 @@ public class UnifiedPlanningService {
     private final WorkflowConfigService workflowConfigService;
     private final StoryDependencyService dependencyService;
     private final CompetencyScoreCalculator competencyCalculator;
+    private final AbsenceService absenceService;
 
     public UnifiedPlanningService(
             JiraIssueRepository issueRepository,
@@ -61,7 +63,8 @@ public class UnifiedPlanningService {
             WorkCalendarService calendarService,
             WorkflowConfigService workflowConfigService,
             StoryDependencyService dependencyService,
-            CompetencyScoreCalculator competencyCalculator
+            CompetencyScoreCalculator competencyCalculator,
+            AbsenceService absenceService
     ) {
         this.issueRepository = issueRepository;
         this.teamService = teamService;
@@ -70,6 +73,7 @@ public class UnifiedPlanningService {
         this.workflowConfigService = workflowConfigService;
         this.dependencyService = dependencyService;
         this.competencyCalculator = competencyCalculator;
+        this.absenceService = absenceService;
     }
 
     /**
@@ -88,6 +92,16 @@ public class UnifiedPlanningService {
         // 2. Load team members and build assignee schedules
         List<TeamMemberEntity> members = memberRepository.findByTeamIdAndActiveTrue(teamId);
         Map<String, AssigneeSchedule> assigneeSchedules = buildAssigneeSchedules(members, gradeCoeffs);
+
+        // 2a. Block absence dates in schedules
+        LocalDate now = LocalDate.now();
+        Map<String, Set<LocalDate>> absenceDates = absenceService.getTeamAbsenceDates(teamId, now, now.plusYears(1));
+        for (Map.Entry<String, AssigneeSchedule> entry : assigneeSchedules.entrySet()) {
+            Set<LocalDate> dates = absenceDates.get(entry.getKey());
+            if (dates != null && !dates.isEmpty()) {
+                entry.getValue().blockAbsenceDates(dates);
+            }
+        }
 
         // 2b. Pre-load competencies for all team members
         Map<String, Map<String, Integer>> competencyMap = competencyCalculator.loadForMembers(members);

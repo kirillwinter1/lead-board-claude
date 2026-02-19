@@ -2,12 +2,26 @@ import { Link, useParams } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { CompetencyRating } from '../components/competency/CompetencyRating'
-import { teamsApi, MemberProfileResponse, WeeklyTrend } from '../api/teams'
+import { teamsApi, MemberProfileResponse, WeeklyTrend, Absence, AbsenceType } from '../api/teams'
 import { competencyApi, CompetencyLevel } from '../api/competency'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 
 // ======================== HELPERS ========================
+
+const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
+  VACATION: 'Отпуск',
+  SICK_LEAVE: 'Больничный',
+  DAY_OFF: 'Отгул',
+  OTHER: 'Другое',
+}
+
+const ABSENCE_COLORS: Record<AbsenceType, string> = {
+  VACATION: '#4C9AFF',
+  SICK_LEAVE: '#FF5630',
+  DAY_OFF: '#FF991F',
+  OTHER: '#97A0AF',
+}
 
 function getDsrClass(dsr: number): string {
   if (dsr <= 1.0) return 'good'
@@ -142,6 +156,7 @@ export function MemberProfilePage() {
 
   const [competencies, setCompetencies] = useState<CompetencyLevel[]>([])
   const [availableComponents, setAvailableComponents] = useState<string[]>([])
+  const [upcomingAbsences, setUpcomingAbsences] = useState<Absence[]>([])
 
   const loadProfile = useCallback(async () => {
     if (!teamId || !memberId) return
@@ -162,10 +177,11 @@ export function MemberProfilePage() {
   }, [loadProfile])
 
   useEffect(() => {
-    if (!memberId) return
+    if (!memberId || !teamId) return
     competencyApi.getMember(Number(memberId)).then(setCompetencies).catch(() => {})
     competencyApi.getComponents().then(setAvailableComponents).catch(() => {})
-  }, [memberId])
+    teamsApi.getUpcomingAbsences(Number(teamId), Number(memberId)).then(setUpcomingAbsences).catch(() => {})
+  }, [memberId, teamId])
 
   const handleCompetencyChange = async (componentName: string, level: number) => {
     if (!memberId) return
@@ -308,6 +324,48 @@ export function MemberProfilePage() {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Upcoming Absences */}
+      {upcomingAbsences.length > 0 && (
+        <div className="profile-section" style={{ marginBottom: 16 }}>
+          <div className="profile-section-header">
+            <h3>Предстоящие отсутствия</h3>
+            <span className="section-badge">{upcomingAbsences.length}</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 0' }}>
+            {upcomingAbsences.map(a => (
+              <div key={a.id} style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                borderRadius: 6,
+                background: ABSENCE_COLORS[a.absenceType] + '15',
+                border: `1px solid ${ABSENCE_COLORS[a.absenceType]}30`,
+                fontSize: 13,
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: 8,
+                  height: 8,
+                  borderRadius: 2,
+                  backgroundColor: ABSENCE_COLORS[a.absenceType],
+                  flexShrink: 0,
+                }} />
+                <span style={{ fontWeight: 600, color: ABSENCE_COLORS[a.absenceType] }}>
+                  {ABSENCE_TYPE_LABELS[a.absenceType]}
+                </span>
+                <span style={{ color: '#6b778c' }}>
+                  {formatDate(a.startDate)} — {formatDate(a.endDate)}
+                </span>
+                {a.comment && (
+                  <span style={{ color: '#97a0af', fontSize: 12 }}>{a.comment}</span>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )}

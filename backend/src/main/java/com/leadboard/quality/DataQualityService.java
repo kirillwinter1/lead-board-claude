@@ -332,16 +332,6 @@ public class DataQualityService {
             }
         }
 
-        // SUBTASK_ACTIVE_STORY_NOT_INPROGRESS - Subtask in active status but Story in TODO
-        if (workflowConfigService.isInProgress(subtask.getStatus(), subtask.getIssueType())) {
-            if (story != null) {
-                boolean storyIsTodo = !workflowConfigService.isInProgress(story.getStatus(), story.getIssueType())
-                        && !workflowConfigService.isDone(story.getStatus(), story.getIssueType());
-                if (storyIsTodo) {
-                    violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_ACTIVE_STORY_NOT_INPROGRESS));
-                }
-            }
-        }
 
         // SUBTASK_DONE_NO_TIME_LOGGED - Subtask is Done but has no time logged
         if (workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType())) {

@@ -2,8 +2,11 @@ package com.leadboard.team;
 
 import com.leadboard.auth.AuthorizationService;
 import com.leadboard.config.JiraProperties;
+import com.leadboard.team.dto.AbsenceDto;
+import com.leadboard.team.dto.CreateAbsenceRequest;
 import com.leadboard.team.dto.MemberProfileResponse;
 import com.leadboard.team.dto.PlanningConfigDto;
+import com.leadboard.team.dto.UpdateAbsenceRequest;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -22,15 +25,17 @@ public class TeamController {
     private final TeamService teamService;
     private final TeamSyncService teamSyncService;
     private final MemberProfileService memberProfileService;
+    private final AbsenceService absenceService;
     private final JiraProperties jiraProperties;
     private final AuthorizationService authorizationService;
 
     public TeamController(TeamService teamService, TeamSyncService teamSyncService,
-                          MemberProfileService memberProfileService,
+                          MemberProfileService memberProfileService, AbsenceService absenceService,
                           JiraProperties jiraProperties, AuthorizationService authorizationService) {
         this.teamService = teamService;
         this.teamSyncService = teamSyncService;
         this.memberProfileService = memberProfileService;
+        this.absenceService = absenceService;
         this.jiraProperties = jiraProperties;
         this.authorizationService = authorizationService;
     }
@@ -156,6 +161,53 @@ public class TeamController {
         return memberProfileService.getMemberProfile(teamId, memberId, from, to);
     }
 
+    // ==================== Absence Endpoints ====================
+
+    @GetMapping("/{teamId}/absences")
+    public List<AbsenceDto> getTeamAbsences(
+            @PathVariable Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return absenceService.getAbsencesForTeam(teamId, from, to);
+    }
+
+    @GetMapping("/{teamId}/members/{memberId}/absences/upcoming")
+    public List<AbsenceDto> getUpcomingAbsences(
+            @PathVariable Long teamId,
+            @PathVariable Long memberId) {
+        return absenceService.getUpcomingAbsences(memberId);
+    }
+
+    @PostMapping("/{teamId}/members/{memberId}/absences")
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
+    public ResponseEntity<AbsenceDto> createAbsence(
+            @PathVariable Long teamId,
+            @PathVariable Long memberId,
+            @Valid @RequestBody CreateAbsenceRequest request) {
+        AbsenceDto dto = absenceService.createAbsence(teamId, memberId, request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+    }
+
+    @PutMapping("/{teamId}/members/{memberId}/absences/{absenceId}")
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
+    public AbsenceDto updateAbsence(
+            @PathVariable Long teamId,
+            @PathVariable Long memberId,
+            @PathVariable Long absenceId,
+            @Valid @RequestBody UpdateAbsenceRequest request) {
+        return absenceService.updateAbsence(teamId, memberId, absenceId, request);
+    }
+
+    @DeleteMapping("/{teamId}/members/{memberId}/absences/{absenceId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("@authorizationService.canManageTeam(#teamId)")
+    public void deleteAbsence(
+            @PathVariable Long teamId,
+            @PathVariable Long memberId,
+            @PathVariable Long absenceId) {
+        absenceService.deleteAbsence(teamId, memberId, absenceId);
+    }
+
     // ==================== Exception Handlers ====================
 
     @ExceptionHandler(TeamService.TeamNotFoundException.class)
@@ -184,6 +236,24 @@ public class TeamController {
 
     @ExceptionHandler(TeamService.InvalidPlanningConfigException.class)
     public ResponseEntity<Map<String, String>> handleInvalidPlanningConfig(TeamService.InvalidPlanningConfigException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(AbsenceService.AbsenceNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleAbsenceNotFound(AbsenceService.AbsenceNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(AbsenceService.AbsenceOverlapException.class)
+    public ResponseEntity<Map<String, String>> handleAbsenceOverlap(AbsenceService.AbsenceOverlapException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(AbsenceService.InvalidAbsenceDatesException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidAbsenceDates(AbsenceService.InvalidAbsenceDatesException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", e.getMessage()));
     }

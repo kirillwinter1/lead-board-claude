@@ -64,7 +64,6 @@ const ruleLabels: Record<string, string> = {
   STORY_BLOCKED_BY_MISSING: 'Блокировщик не найден',
   STORY_CIRCULAR_DEPENDENCY: 'Циклическая зависимость',
   STORY_BLOCKED_NO_PROGRESS: 'Блокировка без прогресса >30 дней',
-  SUBTASK_ACTIVE_STORY_NOT_INPROGRESS: 'Подзадача активна, стори не в работе',
   SUBTASK_DONE_NO_TIME_LOGGED: 'Подзадача закрыта без списания времени',
   SUBTASK_TIME_LOGGED_BUT_TODO: 'Списано время, но подзадача в TODO',
 }
