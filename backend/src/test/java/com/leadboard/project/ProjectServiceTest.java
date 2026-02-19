@@ -123,7 +123,7 @@ class ProjectServiceTest {
 
         assertEquals("PROJ-1", result.issueKey());
         assertEquals(0, result.completedEpicCount());
-        assertEquals(0, result.progressPercent());
+        assertEquals(50, result.progressPercent()); // 36000 logged / 72000 estimate = 50%
         assertEquals(LocalDate.of(2026, 4, 30), result.expectedDone());
 
         assertEquals(1, result.epics().size());

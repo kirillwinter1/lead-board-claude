@@ -354,6 +354,7 @@ public class SyncService {
         entity.setIssueId(jiraIssue.getId());
         entity.setProjectKey(projectKey);
         entity.setSummary(jiraIssue.getFields().getSummary());
+        entity.setDescription(extractDescriptionText(jiraIssue.getFields().getDescription()));
         entity.setStatus(jiraIssue.getFields().getStatus().getName());
         entity.setIssueType(jiraIssue.getFields().getIssuetype().getName());
         entity.setSubtask(jiraIssue.getFields().getIssuetype().isSubtask());
@@ -399,9 +400,11 @@ public class SyncService {
         if (jiraIssue.getFields().getAssignee() != null) {
             entity.setAssigneeAccountId(jiraIssue.getFields().getAssignee().getAccountId());
             entity.setAssigneeDisplayName(jiraIssue.getFields().getAssignee().getDisplayName());
+            entity.setAssigneeAvatarUrl(jiraIssue.getFields().getAssignee().getAvatarUrl48());
         } else {
             entity.setAssigneeAccountId(null);
             entity.setAssigneeDisplayName(null);
+            entity.setAssigneeAvatarUrl(null);
         }
 
         // Extract components
@@ -542,6 +545,35 @@ public class SyncService {
             log.warn("Failed to parse datetime: {}", dateTimeStr);
             return null;
         }
+    }
+
+    /**
+     * Extract plain text from Jira API v3 ADF (Atlassian Document Format) description.
+     * ADF is a JSON object with nested content nodes. This recursively extracts text.
+     */
+    @SuppressWarnings("unchecked")
+    private String extractDescriptionText(Object description) {
+        if (description == null) return null;
+        if (description instanceof String s) return s.isBlank() ? null : s;
+        if (description instanceof Map<?, ?> map) {
+            StringBuilder sb = new StringBuilder();
+            Object content = map.get("content");
+            if (content instanceof List<?> list) {
+                for (Object item : list) {
+                    String text = extractDescriptionText(item);
+                    if (text != null && !text.isEmpty()) {
+                        if (sb.length() > 0) sb.append("\n");
+                        sb.append(text);
+                    }
+                }
+            }
+            Object textVal = map.get("text");
+            if (textVal instanceof String s && !s.isEmpty()) {
+                sb.append(s);
+            }
+            return sb.length() > 0 ? sb.toString() : null;
+        }
+        return null;
     }
 
     private String extractTeamFieldValue(JiraIssue jiraIssue) {

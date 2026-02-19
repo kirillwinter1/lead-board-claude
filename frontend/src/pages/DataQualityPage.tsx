@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { getIssueIcon } from '../components/board/helpers'
 import './DataQualityPage.css'
 
 interface ViolationDto {
@@ -135,7 +136,7 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
         </td>
         <td className="cell-type">
           <span className="issue-type-cell">
-            {iconUrl && <img src={iconUrl} alt={issue.issueType} className="issue-type-icon" />}
+            <img src={getIssueIcon(issue.issueType, iconUrl)} alt={issue.issueType} className="issue-type-icon" />
             {issue.issueType}
           </span>
         </td>

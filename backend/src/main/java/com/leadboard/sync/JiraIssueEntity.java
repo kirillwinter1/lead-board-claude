@@ -31,6 +31,9 @@ public class JiraIssueEntity {
     @Column(name = "summary", nullable = false, length = 500)
     private String summary;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "status", nullable = false, length = 100)
     private String status;
 
@@ -99,6 +102,9 @@ public class JiraIssueEntity {
 
     @Column(name = "assignee_display_name", length = 255)
     private String assigneeDisplayName;
+
+    @Column(name = "assignee_avatar_url", length = 500)
+    private String assigneeAvatarUrl;
 
     @Column(name = "started_at")
     private OffsetDateTime startedAt;
@@ -178,6 +184,9 @@ public class JiraIssueEntity {
     public String getSummary() { return summary; }
     public void setSummary(String summary) { this.summary = summary; }
 
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 
@@ -252,6 +261,9 @@ public class JiraIssueEntity {
 
     public String getAssigneeDisplayName() { return assigneeDisplayName; }
     public void setAssigneeDisplayName(String assigneeDisplayName) { this.assigneeDisplayName = assigneeDisplayName; }
+
+    public String getAssigneeAvatarUrl() { return assigneeAvatarUrl; }
+    public void setAssigneeAvatarUrl(String assigneeAvatarUrl) { this.assigneeAvatarUrl = assigneeAvatarUrl; }
 
     public OffsetDateTime getStartedAt() { return startedAt; }
     public void setStartedAt(OffsetDateTime startedAt) { this.startedAt = startedAt; }

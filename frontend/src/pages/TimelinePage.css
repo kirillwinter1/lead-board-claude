@@ -134,19 +134,6 @@
   background: #de350b;
 }
 
-/* Phase legend for story view - Atlassian Design System (400-500 level) */
-.legend-phase-sa::before {
-  background: #669DF1;
-}
-
-.legend-phase-dev::before {
-  background: #B55FEB;
-}
-
-.legend-phase-qa::before {
-  background: #6CC3E0;
-}
-
 .legend-blocked::before {
   background: white;
   border: 2px solid #ef4444;

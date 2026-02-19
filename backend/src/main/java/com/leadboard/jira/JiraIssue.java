@@ -50,6 +50,7 @@ public class JiraIssue {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class JiraFields {
         private String summary;
+        private Object description;
         private JiraStatus status;
         private JiraIssueType issuetype;
         private JiraParent parent;
@@ -85,6 +86,14 @@ public class JiraIssue {
 
         public void setSummary(String summary) {
             this.summary = summary;
+        }
+
+        public Object getDescription() {
+            return description;
+        }
+
+        public void setDescription(Object description) {
+            this.description = description;
         }
 
         public JiraStatus getStatus() {
@@ -445,6 +454,7 @@ public class JiraIssue {
         private String accountId;
         private String displayName;
         private String emailAddress;
+        private Map<String, String> avatarUrls;
 
         public String getAccountId() {
             return accountId;
@@ -468,6 +478,19 @@ public class JiraIssue {
 
         public void setEmailAddress(String emailAddress) {
             this.emailAddress = emailAddress;
+        }
+
+        public Map<String, String> getAvatarUrls() {
+            return avatarUrls;
+        }
+
+        public void setAvatarUrls(Map<String, String> avatarUrls) {
+            this.avatarUrls = avatarUrls;
+        }
+
+        public String getAvatarUrl48() {
+            if (avatarUrls == null) return null;
+            return avatarUrls.get("48x48");
         }
     }
 

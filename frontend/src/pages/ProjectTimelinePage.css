@@ -1,37 +1,43 @@
 .pt-controls {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
-  background: #f4f5f7;
-  border-bottom: 1px solid #dfe1e6;
+  align-items: flex-end;
+  gap: 24px;
+  padding: 16px 20px;
+  margin: 0 16px 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dfe1e6;
   flex-wrap: wrap;
 }
 
 .pt-controls .filter-group {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .pt-controls .filter-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #6b778c;
-  font-weight: 500;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .pt-controls .filter-input {
-  padding: 4px 8px;
+  padding: 6px 10px;
   border: 1px solid #dfe1e6;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
   background: white;
+  height: 38px;
+  box-sizing: border-box;
 }
 
 .pt-legend {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   margin-left: auto;
   font-size: 12px;
   color: #6b778c;
@@ -44,7 +50,7 @@
 }
 
 .pt-legend-today {
-  border-left: 2px solid #FF5630;
+  border-left: 2px solid #0052cc;
   padding-left: 6px;
 }
 
@@ -56,18 +62,17 @@
 /* Gantt container */
 .pt-gantt {
   display: flex;
-  flex: 1;
   overflow: hidden;
   border-top: 1px solid #dfe1e6;
 }
 
 /* Labels panel (left) */
 .pt-labels {
-  width: 300px;
-  min-width: 300px;
-  border-right: 2px solid #dfe1e6;
-  overflow-y: auto;
-  background: #fff;
+  width: 380px;
+  min-width: 380px;
+  border-right: 1px solid #dfe1e6;
+  overflow-y: hidden;
+  background: #fafbfc;
   flex-shrink: 0;
 }
 
@@ -215,7 +220,7 @@
 .pt-chart {
   flex: 1;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: hidden;
   position: relative;
 }
 
@@ -228,6 +233,7 @@
 
 .pt-header-group {
   display: flex;
+  height: 24px;
   border-bottom: 1px solid #ebecf0;
 }
 
@@ -235,25 +241,68 @@
   text-align: center;
   font-size: 11px;
   font-weight: 600;
-  color: #6b778c;
-  padding: 4px 0;
-  border-right: 1px solid #ebecf0;
-  background: #fafbfc;
+  color: #172b4d;
+  padding: 4px 8px;
+  border-right: 1px solid #dfe1e6;
+  background: #f4f5f7;
   text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pt-header-group-cell:last-child {
+  border-right: none;
+}
+
+/* Week header row (for day zoom) */
+.pt-header-week {
+  display: flex;
+  height: 20px;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.pt-header-week-cell {
+  padding: 2px 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #6b778c;
+  text-align: center;
+  border-right: 1px solid #ebecf0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pt-header-week-cell:last-child {
+  border-right: none;
 }
 
 .pt-header-unit {
   display: flex;
+  height: 36px;
   border-bottom: 1px solid #dfe1e6;
 }
 
 .pt-header-cell {
-  text-align: center;
-  font-size: 11px;
+  padding: 8px 4px;
+  font-size: 10px;
+  font-weight: 600;
   color: #6b778c;
-  padding: 4px 0;
-  border-right: 1px solid #f0f1f3;
-  background: #fff;
+  text-align: left;
+  border-right: 1px solid #ebecf0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pt-header-cell:last-child {
+  border-right: none;
+}
+
+.pt-header-cell-weekend {
+  background: #fafbfc;
+  color: #c1c7d0;
 }
 
 /* Chart body */
@@ -333,9 +382,25 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #FF5630;
-  z-index: 2;
+  background: #0052cc;
+  opacity: 0.5;
+  z-index: 5;
   pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.pt-today-line:hover {
+  opacity: 1;
+}
+
+/* Weekend column background */
+.pt-weekend-column {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #fafbfc;
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Project summary bar */
@@ -377,4 +442,41 @@
 
 .pt-error {
   color: #de350b;
+}
+
+/* ========== ANIMATIONS ========== */
+
+@keyframes slideInRow {
+  0% {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.pt-epic-row.pt-row-animate {
+  animation: slideInRow 0.6s ease-out both;
+}
+
+.pt-project-row.pt-row-animate {
+  animation: slideInRow 0.4s ease-out both;
+}
+
+/* Epic bar hover */
+.pt-epic-bar {
+  transition: filter 0.15s ease, box-shadow 0.15s ease;
+  cursor: default;
+}
+
+.pt-epic-bar:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Tooltip smooth appear */
+.pt-tooltip {
+  transition: opacity 0.15s ease;
 }

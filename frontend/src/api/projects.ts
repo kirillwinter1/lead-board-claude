@@ -2,12 +2,17 @@ import axios from 'axios'
 
 export interface ProjectDto {
   issueKey: string
+  issueType: string
   summary: string
+  description: string | null
   status: string
   assigneeDisplayName: string | null
+  assigneeAvatarUrl: string | null
   childEpicCount: number
   completedEpicCount: number
   progressPercent: number
+  totalEstimateSeconds: number | null
+  totalLoggedSeconds: number | null
   expectedDone: string | null
   riceScore: number | null
   riceNormalizedScore: number | null
@@ -15,9 +20,11 @@ export interface ProjectDto {
 
 export interface ChildEpicDto {
   issueKey: string
+  issueType: string
   summary: string
   status: string
   teamName: string | null
+  teamColor: string | null
   estimateSeconds: number | null
   loggedSeconds: number | null
   progressPercent: number | null
@@ -29,10 +36,14 @@ export interface ChildEpicDto {
 export interface ProjectDetailDto {
   issueKey: string
   summary: string
+  description: string | null
   status: string
   assigneeDisplayName: string | null
+  assigneeAvatarUrl: string | null
   completedEpicCount: number
   progressPercent: number
+  totalEstimateSeconds: number | null
+  totalLoggedSeconds: number | null
   expectedDone: string | null
   riceScore: number | null
   riceNormalizedScore: number | null
@@ -64,7 +75,9 @@ export interface EpicTimelineDto {
   epicKey: string
   summary: string
   status: string
+  issueType: string | null
   teamName: string | null
+  teamColor: string | null
   startDate: string | null
   endDate: string | null
   progressPercent: number | null
@@ -79,8 +92,10 @@ export interface ProjectTimelineDto {
   issueKey: string
   summary: string
   status: string
+  issueType: string | null
   progressPercent: number
   riceNormalizedScore: number | null
+  assigneeDisplayName: string | null
   epics: EpicTimelineDto[]
 }
 

@@ -55,21 +55,28 @@ public class ProjectService {
             List<JiraIssueEntity> epics = findChildEpics(p);
             int epicCount = epics.size();
             int completedCount = countCompletedEpics(epics);
-            int progressPct = epicCount > 0 ? (completedCount * 100) / epicCount : 0;
 
             Map<String, PlannedEpic> planningMap = buildEpicPlanningMap(epics);
             LocalDate expectedDone = computeExpectedDone(epics, planningMap);
+            long[] timeTotals = computeTimeTotals(epics, planningMap);
+
+            int progressPct = computeProgressPercent(timeTotals, completedCount, epicCount);
 
             RiceAssessmentDto rice = riceMap.get(p.getIssueKey());
 
             return new ProjectDto(
                     p.getIssueKey(),
+                    p.getIssueType(),
                     p.getSummary(),
+                    p.getDescription(),
                     p.getStatus(),
                     p.getAssigneeDisplayName(),
+                    p.getAssigneeAvatarUrl(),
                     epicCount,
                     completedCount,
                     progressPct,
+                    timeTotals[0] > 0 ? timeTotals[0] : null,
+                    timeTotals[1] > 0 ? timeTotals[1] : null,
                     expectedDone,
                     rice != null ? rice.riceScore() : null,
                     rice != null ? rice.normalizedScore() : null
@@ -83,10 +90,12 @@ public class ProjectService {
 
         List<JiraIssueEntity> epics = findChildEpics(project);
         Map<Long, String> teamNames = loadTeamNames();
+        Map<Long, String> teamColors = loadTeamColors();
         Map<String, PlannedEpic> planningMap = buildEpicPlanningMap(epics);
 
         int completedCount = countCompletedEpics(epics);
-        int progressPct = epics.size() > 0 ? (completedCount * 100) / epics.size() : 0;
+        long[] timeTotals = computeTimeTotals(epics, planningMap);
+        int progressPct = computeProgressPercent(timeTotals, completedCount, epics.size());
         LocalDate expectedDone = computeExpectedDone(epics, planningMap);
         LocalDate averageExpectedDone = computeAverageExpectedDone(epics, planningMap);
 
@@ -114,9 +123,11 @@ public class ProjectService {
 
             return new ChildEpicDto(
                     e.getIssueKey(),
+                    e.getIssueType(),
                     e.getSummary(),
                     e.getStatus(),
                     e.getTeamId() != null ? teamNames.getOrDefault(e.getTeamId(), null) : null,
+                    e.getTeamId() != null ? teamColors.getOrDefault(e.getTeamId(), null) : null,
                     estimateSeconds,
                     loggedSeconds,
                     epicProgressPct,
@@ -131,10 +142,14 @@ public class ProjectService {
         return new ProjectDetailDto(
                 project.getIssueKey(),
                 project.getSummary(),
+                project.getDescription(),
                 project.getStatus(),
                 project.getAssigneeDisplayName(),
+                project.getAssigneeAvatarUrl(),
                 completedCount,
                 progressPct,
+                timeTotals[0] > 0 ? timeTotals[0] : null,
+                timeTotals[1] > 0 ? timeTotals[1] : null,
                 expectedDone,
                 rice != null ? rice.riceScore() : null,
                 rice != null ? rice.normalizedScore() : null,
@@ -151,18 +166,20 @@ public class ProjectService {
                 : riceAssessmentService.getAssessments(projectKeys);
 
         Map<Long, String> teamNames = loadTeamNames();
+        Map<Long, String> teamColors = loadTeamColors();
 
         return projects.stream().map(p -> {
             List<JiraIssueEntity> epics = findChildEpics(p);
             int epicCount = epics.size();
             int completedCount = countCompletedEpics(epics);
-            int progressPct = epicCount > 0 ? (completedCount * 100) / epicCount : 0;
 
             Map<String, PlannedEpic> planningMap = buildEpicPlanningMap(epics);
+            long[] timeTotals = computeTimeTotals(epics, planningMap);
+            int progressPct = computeProgressPercent(timeTotals, completedCount, epicCount);
 
             List<EpicTimelineDto> epicDtos = epics.stream().map(e -> {
                 PlannedEpic planned = planningMap.get(e.getIssueKey());
-                return mapToEpicTimeline(e, planned, teamNames);
+                return mapToEpicTimeline(e, planned, teamNames, teamColors);
             }).toList();
 
             RiceAssessmentDto rice = riceMap.get(p.getIssueKey());
@@ -171,19 +188,22 @@ public class ProjectService {
                     p.getIssueKey(),
                     p.getSummary(),
                     p.getStatus(),
+                    p.getIssueType(),
                     progressPct,
                     rice != null ? rice.normalizedScore() : null,
+                    p.getAssigneeDisplayName(),
                     epicDtos
             );
         }).toList();
     }
 
-    private EpicTimelineDto mapToEpicTimeline(JiraIssueEntity epic, PlannedEpic planned, Map<Long, String> teamNames) {
+    private EpicTimelineDto mapToEpicTimeline(JiraIssueEntity epic, PlannedEpic planned, Map<Long, String> teamNames, Map<Long, String> teamColors) {
         String teamName = epic.getTeamId() != null ? teamNames.getOrDefault(epic.getTeamId(), null) : null;
+        String teamColor = epic.getTeamId() != null ? teamColors.getOrDefault(epic.getTeamId(), null) : null;
 
         if (planned == null) {
             return new EpicTimelineDto(
-                    epic.getIssueKey(), epic.getSummary(), epic.getStatus(), teamName,
+                    epic.getIssueKey(), epic.getSummary(), epic.getStatus(), epic.getIssueType(), teamName, teamColor,
                     null, null, null, false, null, null, null, null
             );
         }
@@ -216,7 +236,9 @@ public class ProjectService {
                 epic.getIssueKey(),
                 planned.summary(),
                 planned.status(),
+                epic.getIssueType(),
                 teamName,
+                teamColor,
                 planned.startDate(),
                 planned.endDate(),
                 planned.progressPercent(),
@@ -252,6 +274,33 @@ public class ProjectService {
         }
 
         return result;
+    }
+
+    /**
+     * Compute aggregate time totals [estimateSeconds, loggedSeconds] across all epics from planning data.
+     */
+    private long[] computeTimeTotals(List<JiraIssueEntity> epics, Map<String, PlannedEpic> planningMap) {
+        long totalEstimate = 0;
+        long totalLogged = 0;
+        for (JiraIssueEntity epic : epics) {
+            PlannedEpic planned = planningMap.get(epic.getIssueKey());
+            if (planned != null) {
+                if (planned.totalEstimateSeconds() != null) totalEstimate += planned.totalEstimateSeconds();
+                if (planned.totalLoggedSeconds() != null) totalLogged += planned.totalLoggedSeconds();
+            }
+        }
+        return new long[]{totalEstimate, totalLogged};
+    }
+
+    /**
+     * Compute progress percent: time-based (logged/estimate) when time data available,
+     * fallback to epic-based (completed/total).
+     */
+    private int computeProgressPercent(long[] timeTotals, int completedCount, int epicCount) {
+        if (timeTotals[0] > 0) {
+            return (int) Math.min(100, (timeTotals[1] * 100) / timeTotals[0]);
+        }
+        return epicCount > 0 ? (completedCount * 100) / epicCount : 0;
     }
 
     /**
@@ -350,5 +399,11 @@ public class ProjectService {
     private Map<Long, String> loadTeamNames() {
         return teamRepository.findByActiveTrue().stream()
                 .collect(Collectors.toMap(TeamEntity::getId, TeamEntity::getName));
+    }
+
+    private Map<Long, String> loadTeamColors() {
+        return teamRepository.findByActiveTrue().stream()
+                .filter(t -> t.getColor() != null)
+                .collect(Collectors.toMap(TeamEntity::getId, TeamEntity::getColor));
     }
 }

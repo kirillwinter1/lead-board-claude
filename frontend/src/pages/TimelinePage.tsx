@@ -4,14 +4,13 @@ import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetroEpic } from '../api/forecast'
 import { getConfig } from '../api/config'
+import { getStatusStyles, StatusStyle } from '../api/board'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { useStatusStyles } from '../components/board/StatusStylesContext'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './TimelinePage.css'
 
-// Fallback issue type icons (used when Jira icon URL is not available)
-import storyIcon from '../icons/story.png'
-import bugIcon from '../icons/bug.png'
-import epicIcon from '../icons/epic.png'
-import subtaskIcon from '../icons/subtask.png'
+import { getIssueIcon } from '../components/board/helpers'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type TimelineMode = 'forecast' | 'retrospective'
@@ -297,17 +296,6 @@ function lightenColor(hex: string, factor: number): string {
   return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
 }
 
-// Get issue type icon (Jira URL preferred, local fallback)
-function getIssueTypeIcon(issueType: string | null, jiraIconUrl?: string | null): string {
-  if (jiraIconUrl) return jiraIconUrl
-  if (!issueType) return storyIcon
-  const type = issueType.toLowerCase()
-  if (type.includes('bug')) return bugIcon
-  if (type.includes('epic')) return epicIcon
-  if (type.includes('sub') || type.includes('подзадача')) return subtaskIcon
-  return storyIcon
-}
-
 // Format seconds to hours
 function formatHours(seconds: number | null): string {
   if (seconds === null || seconds === 0) return '0ч'
@@ -361,27 +349,25 @@ function calculateRowHeight(epic: PlannedEpic): number {
   return Math.max(MIN_ROW_HEIGHT, numLanes * (BAR_HEIGHT + LANE_GAP) + 8)
 }
 
-// --- Status badge colors (Atlassian Design System) ---
-const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
-  'new': { bg: '#dfe1e6', text: '#42526e' },
-  'backlog': { bg: '#dfe1e6', text: '#42526e' },
-  'to do': { bg: '#dfe1e6', text: '#42526e' },
-  'planned': { bg: '#deebff', text: '#0747a6' },
-  'developing': { bg: '#e3fcef', text: '#006644' },
-  'in progress': { bg: '#e3fcef', text: '#006644' },
-  'e2e testing': { bg: '#eae6ff', text: '#403294' },
-  'done': { bg: '#dfe1e6', text: '#42526e' },
-  'новый': { bg: '#dfe1e6', text: '#42526e' },
-  'бэклог': { bg: '#dfe1e6', text: '#42526e' },
-  'запланировано': { bg: '#deebff', text: '#0747a6' },
-  'в разработке': { bg: '#e3fcef', text: '#006644' },
-  'e2e тестирование': { bg: '#eae6ff', text: '#403294' },
-  'готово': { bg: '#dfe1e6', text: '#42526e' },
+// --- Status color helper (uses StatusStylesContext data) ---
+function getContrastColor(hex: string): string {
+  const c = hex.replace('#', '')
+  const r = parseInt(c.substring(0, 2), 16)
+  const g = parseInt(c.substring(2, 4), 16)
+  const b = parseInt(c.substring(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.6 ? '#172b4d' : '#ffffff'
 }
 
-function getStatusColor(status: string | null): { bg: string; text: string } {
-  if (!status) return { bg: '#dfe1e6', text: '#42526e' }
-  return STATUS_COLORS[status.toLowerCase()] || { bg: '#dfe1e6', text: '#42526e' }
+function getStatusColor(
+  status: string | null,
+  styles: Record<string, StatusStyle>
+): { bg: string; text: string } {
+  const fallback = { bg: '#dfe1e6', text: '#42526e' }
+  if (!status) return fallback
+  const style = styles[status]
+  if (style?.color) return { bg: style.color, text: getContrastColor(style.color) }
+  return fallback
 }
 
 // --- Epic Label Component with Tooltip ---
@@ -394,7 +380,8 @@ interface EpicLabelProps {
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
-  const epicIconUrl = getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик') || epicIcon
+  const statusStyles = useStatusStyles()
+  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик'))
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -405,7 +392,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
     setShowTooltip(true)
   }
 
-  const statusColor = getStatusColor(epic.status)
+  const statusColor = getStatusColor(epic.status, statusStyles)
   const progress = epic.progressPercent ?? 0
   const dueDateDelta = epicForecast?.dueDateDeltaDays ?? null
 
@@ -736,6 +723,7 @@ interface StoryBarsProps {
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const statusStyles = useStatusStyles()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -799,7 +787,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <img
-                src={getIssueTypeIcon(hoveredStory.issueType, getIssueTypeIconUrl(hoveredStory.issueType))}
+                src={getIssueIcon(hoveredStory.issueType || 'Story', getIssueTypeIconUrl(hoveredStory.issueType))}
                 alt={hoveredStory.issueType || 'Story'}
                 style={{ width: '16px', height: '16px' }}
               />
@@ -823,8 +811,8 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
                 fontSize: '11px',
                 padding: '2px 8px',
                 borderRadius: '4px',
-                background: getStatusColor(hoveredStory.status).bg,
-                color: getStatusColor(hoveredStory.status).text,
+                background: getStatusColor(hoveredStory.status, statusStyles).bg,
+                color: getStatusColor(hoveredStory.status, statusStyles).text,
                 fontWeight: 500
               }}
             >
@@ -1045,7 +1033,7 @@ interface RoughEstimateBarsProps {
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
-  const epicIconUrl = getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик') || epicIcon
+  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик'))
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1281,6 +1269,7 @@ export function TimelinePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [teams, setTeams] = useState<Team[]>([])
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
 
   // Sync teamId with URL
   const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
@@ -1314,6 +1303,8 @@ export function TimelinePage() {
     getConfig()
       .then(config => setJiraBaseUrl(config.jiraBaseUrl))
       .catch(err => console.error('Failed to load config:', err))
+
+    getStatusStyles().then(setStatusStyles).catch(() => {})
 
     teamsApi.getAll()
       .then(data => {
@@ -1507,6 +1498,7 @@ export function TimelinePage() {
   }, [dateRange])
 
   return (
+    <StatusStylesProvider value={statusStyles}>
     <main className="main-content">
       <div className="page-header">
         <h2>Timeline</h2>
@@ -1738,5 +1730,6 @@ export function TimelinePage() {
         </div>
       )}
     </main>
+    </StatusStylesProvider>
   )
 }
