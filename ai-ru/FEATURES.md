@@ -38,20 +38,16 @@
 | F36 | RICE Scoring | 2026-02-17 | [features/F36](features/F36_RICE_SCORING.md) |
 | F37 | Team Colors | 2026-02-17 | [features/F37](features/F37_TEAM_COLORS.md) |
 | F38 | Incremental Workflow Configuration | 2026-02-18 | [features/F38](features/F38_INCREMENTAL_WORKFLOW_CONFIG.md) |
+| F39 | Unified Style Refactoring | 2026-02-19 | [features/F39](features/F39_UNIFIED_STYLE_REFACTORING.md) |
 
 ## Бэклог (BF)
 
 | # | Название | Статус | Спецификация |
 |---|----------|--------|-------------|
-| BF1 | Manual Order + Recommendations | ✅ Done | [backlog/BF1](backlog/BF1_MANUAL_ORDER.md) |
 | BF2 | Pipeline WIP + Stories | 📋 Planned | [backlog/BF2](backlog/BF2_PIPELINE_WIP_STORIES.md) |
 | BF3 | Employee Performance Dashboard | 📋 Planned | — |
-| BF4 | RICE Scoring & AutoScore | ✅ Done → [F36](features/F36_RICE_SCORING.md) | [backlog/BF4](backlog/BF4_RICE_SCORING.md) |
-| BF5 | Projects (Project-Level Management) | ✅ Done → [F35](features/F35_PROJECTS.md) | [backlog/BF5](backlog/BF5_PROJECTS.md) |
 | BF6 | AI Digest | 📋 Planned | [backlog/BF6](backlog/BF6_AI_DIGEST.md) |
 | BF7 | Notifications | 📋 Planned | [backlog/BF7](backlog/BF7_NOTIFICATIONS.md) |
-| BF8 | AI Simulation | ✅ Done → [F28](features/F28_SIMULATION.md) | — |
-| BF9 | Universal Workflow Configuration | ✅ Done → [F29](features/F29_WORKFLOW_CONFIGURATION.md) | [backlog/BF9](backlog/BF9_WORKFLOW_CONFIGURATION.md) |
 | BF10 | Eisenhower Matrix (Backlog Triage) | 📋 Planned | [backlog/BF10](backlog/BF10_EISENHOWER_MATRIX.md) |
 | BF11 | Competency Matrix | 🚧 В работе (код не закоммичен) | [backlog/BF11](backlog/BF11_COMPETENCY_MATRIX.md) |
 | BF12 | Sprint Integration | 📋 Planned | [backlog/BF12](backlog/BF12_SPRINT_INTEGRATION.md) |
@@ -90,6 +86,15 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-19: F39 Unified Style Refactoring
+- Убраны hardcoded STATUS_COLORS из ProjectTimelinePage и TimelinePage → StatusStylesContext
+- Иконки типов задач унифицированы: getIssueIcon() из helpers.ts везде (Jira → fallback local)
+- Team colors добавлены в ProjectsPage (TeamBadge), ProjectTimelinePage (бары + лейблы)
+- Убраны hardcoded phase legend CSS из TimelinePage.css → динамические через getRoleColor()
+- Backend: teamColor в ChildEpicDto и EpicTimelineDto, description и assigneeAvatarUrl в JiraIssue
+- V40 миграция: description в jira_issues, V41: assignee_avatar_url
+- Версия 0.39.0
 
 ### 2026-02-18: F38 Incremental Workflow Configuration
 - Инкрементальное управление типами задач: неизвестные типы регистрируются с NULL board_category при синке

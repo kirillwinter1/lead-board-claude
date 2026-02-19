@@ -124,6 +124,21 @@ lead-board-claude/
 - Обновлять документацию в ai-ru/
 - Коммитить документацию вместе с кодом
 
+## Design System (обязательные правила)
+
+**Эти правила действуют для ВСЕХ фич без исключений.**
+
+### Визуальные данные — только из конфигурации
+1. **Иконки типов задач** — `getIssueIcon(type, getIssueTypeIconUrl(type))`. ЗАПРЕЩЕНО импортировать локальные иконки напрямую.
+2. **Цвета статусов** — из `StatusStylesContext` / `StatusBadge`. ЗАПРЕЩЕНЫ hardcoded палитры `STATUS_COLORS`.
+3. **Цвета команд** — `TeamBadge` или `team.color`. Никогда не показывать team name без цвета.
+4. **Цвета фаз (ролей)** — `getRoleColor(code)` из `WorkflowConfigContext`. ЗАПРЕЩЕНЫ hardcoded цвета SA/DEV/QA.
+
+### Переиспользование компонентов — не дублировать код
+5. **Готовые компоненты**: `StatusBadge`, `TeamBadge`, `RiceScoreBadge`, `Modal`, `MultiSelectDropdown` — использовать как есть. Не создавать аналоги.
+6. **Готовые хелперы**: `getIssueIcon()`, `getStatusStyles()`, `getIssueTypeIconUrl()`, `getRoleColor()` — не писать свои версии, расширять существующие.
+7. **Перед созданием нового компонента** — проверить `components/`. Если есть похожий — расширить, а не создавать новый.
+
 ## Решённые проблемы
 
 - **Jira API 410 Gone:** `/rest/api/3/search` → `/rest/api/3/search/jql`
