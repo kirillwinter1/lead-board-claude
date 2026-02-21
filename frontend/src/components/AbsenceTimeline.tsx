@@ -1,14 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { teamsApi, Absence, TeamMember, CreateAbsenceRequest } from '../api/teams'
-import { AbsenceModal, ABSENCE_TYPE_LABELS } from './AbsenceModal'
+import { AbsenceModal, ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from './AbsenceModal'
 import './AbsenceTimeline.css'
-
-const ABSENCE_COLORS: Record<string, string> = {
-  VACATION: '#4C9AFF',
-  SICK_LEAVE: '#FF5630',
-  DAY_OFF: '#FF991F',
-  OTHER: '#97A0AF',
-}
 
 const DAY_WIDTH = 32
 const ROW_HEIGHT = 40
@@ -70,7 +63,10 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
     setLoading(true)
     teamsApi.getTeamAbsences(teamId, toDateStr(startDate), toDateStr(endDate))
       .then(setAbsences)
-      .catch(() => {})
+      .catch(err => {
+        console.error('Failed to load absences:', err)
+        setAbsences([])
+      })
       .finally(() => setLoading(false))
   }, [teamId, startDate, endDate])
 
@@ -281,8 +277,8 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
 
                   {/* Absence bars */}
                   {memberAbsences.map(a => {
-                    const aStart = new Date(a.startDate + 'T00:00:00')
-                    const aEnd = new Date(a.endDate + 'T00:00:00')
+                    const aStart = new Date(a.startDate + 'T00:00:00Z')
+                    const aEnd = new Date(a.endDate + 'T00:00:00Z')
                     const barStart = Math.max(0, daysBetween(startDate, aStart))
                     const barEnd = Math.min(DAYS_VISIBLE - 1, daysBetween(startDate, aEnd))
                     if (barEnd < 0 || barStart >= DAYS_VISIBLE) return null
@@ -332,7 +328,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
             {ABSENCE_TYPE_LABELS[tooltip.absence.absenceType]}
           </div>
           <div className="absence-tooltip-dates">
-            {formatDateShort(new Date(tooltip.absence.startDate + 'T00:00:00'))} — {formatDateShort(new Date(tooltip.absence.endDate + 'T00:00:00'))}
+            {formatDateShort(new Date(tooltip.absence.startDate + 'T00:00:00Z'))} — {formatDateShort(new Date(tooltip.absence.endDate + 'T00:00:00Z'))}
           </div>
           {tooltip.absence.comment && (
             <div className="absence-tooltip-comment">{tooltip.absence.comment}</div>

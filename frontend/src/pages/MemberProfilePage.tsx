@@ -4,24 +4,11 @@ import { MetricCard } from '../components/metrics/MetricCard'
 import { CompetencyRating } from '../components/competency/CompetencyRating'
 import { teamsApi, MemberProfileResponse, WeeklyTrend, Absence, AbsenceType } from '../api/teams'
 import { competencyApi, CompetencyLevel } from '../api/competency'
+import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 
 // ======================== HELPERS ========================
-
-const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
-  VACATION: 'Отпуск',
-  SICK_LEAVE: 'Больничный',
-  DAY_OFF: 'Отгул',
-  OTHER: 'Другое',
-}
-
-const ABSENCE_COLORS: Record<AbsenceType, string> = {
-  VACATION: '#4C9AFF',
-  SICK_LEAVE: '#FF5630',
-  DAY_OFF: '#FF991F',
-  OTHER: '#97A0AF',
-}
 
 function getDsrClass(dsr: number): string {
   if (dsr <= 1.0) return 'good'

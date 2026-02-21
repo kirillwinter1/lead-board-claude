@@ -340,6 +340,19 @@ public class MappingAutoDetectService {
         // Find statuses for this issue type
         List<Map<String, Object>> typeStatuses = findStatusesForType(allStatuses, jiraTypeName);
 
+        // Fallback: if /project/{key}/statuses doesn't include this type, use /statuses/search API
+        if (typeStatuses.isEmpty()) {
+            log.info("No statuses found for '{}' via project statuses API, trying statuses/search fallback", jiraTypeName);
+            List<Map<String, Object>> issueTypes = jiraMetadataService.getIssueTypes();
+            for (Map<String, Object> it : issueTypes) {
+                if (jiraTypeName.equals(it.get("name"))) {
+                    String issueTypeId = String.valueOf(it.get("id"));
+                    typeStatuses = jiraMetadataService.getStatusesForIssueType(issueTypeId);
+                    break;
+                }
+            }
+        }
+
         // Get existing status names for this category to avoid duplicates
         Set<String> existingKeys = new HashSet<>();
         for (StatusMappingEntity existing : statusMappingRepo.findByConfigIdAndIssueCategory(configId, boardCategory)) {

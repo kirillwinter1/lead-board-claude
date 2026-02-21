@@ -1,0 +1,165 @@
+.bug-metrics-page {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.bug-metrics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.bug-metrics-header h2 {
+  margin: 0;
+  font-size: 20px;
+  color: #172b4d;
+}
+
+.team-filter-select {
+  padding: 6px 12px;
+  border: 1px solid #dfe1e6;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #172b4d;
+  background: white;
+  cursor: pointer;
+  min-width: 160px;
+}
+
+.team-filter-select:focus {
+  outline: none;
+  border-color: #4c9aff;
+}
+
+.bug-metrics-section {
+  margin-top: 24px;
+}
+
+.bug-metrics-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #172b4d;
+}
+
+.bug-metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bug-metrics-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f4f5f7;
+  border-bottom: 1px solid #dfe1e6;
+}
+
+.bug-metrics-table td {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #172b4d;
+  border-bottom: 1px solid #ebecf0;
+  vertical-align: middle;
+}
+
+.bug-metrics-table tr:last-child td {
+  border-bottom: none;
+}
+
+.bug-metrics-table tr:hover td {
+  background: #f4f5f7;
+}
+
+.priority-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.bug-key-link {
+  color: #0052cc;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.bug-key-link:hover {
+  text-decoration: underline;
+}
+
+.bug-summary-cell {
+  max-width: 400px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compliance-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.compliance-badge.good {
+  background: #e3fcef;
+  color: #006644;
+}
+
+.compliance-badge.warn {
+  background: #fffae6;
+  color: #ff8b00;
+}
+
+.compliance-badge.bad {
+  background: #ffebe6;
+  color: #de350b;
+}
+
+.sla-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sla-badge.ok {
+  background: #e3fcef;
+  color: #006644;
+}
+
+.sla-badge.breach {
+  background: #ffebe6;
+  color: #de350b;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #6b778c;
+}
+
+.error-message {
+  text-align: center;
+  padding: 40px;
+  color: #de350b;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 48px;
+  color: #6b778c;
+  font-size: 14px;
+}

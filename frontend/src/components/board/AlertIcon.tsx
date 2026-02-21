@@ -71,7 +71,7 @@ export function AlertIcon({ node }: { node: BoardNode }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <span className={`alert-icon alert-${severityClass}`}>
+      <span className={`alert-icon alert-${severityClass}`} role="img" aria-label={`${count} data quality alerts`}>
         {count}
       </span>
 

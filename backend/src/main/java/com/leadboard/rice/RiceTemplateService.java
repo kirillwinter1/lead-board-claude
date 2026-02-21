@@ -35,7 +35,7 @@ public class RiceTemplateService {
     }
 
     public RiceTemplateDto getTemplateByCode(String code) {
-        RiceTemplateEntity template = templateRepository.findByCode(code)
+        RiceTemplateEntity template = templateRepository.findByCodeIgnoreCase(code)
                 .orElseThrow(() -> new IllegalArgumentException("Template not found: " + code));
         return toDto(template);
     }
@@ -122,8 +122,8 @@ public class RiceTemplateService {
             }
         }
 
-        double rawMin = (reachMin * impactMin * confidenceMin) / effortMax;
-        double rawMax = (reachMax * impactMax * confidenceMax) / effortMin;
+        double rawMin = Math.round(((reachMin * impactMin * confidenceMin) / effortMax) * 100.0) / 100.0;
+        double rawMax = Math.round(((reachMax * impactMax * confidenceMax) / effortMin) * 100.0) / 100.0;
 
         return new RiceScoreRange(rawMin, rawMax);
     }

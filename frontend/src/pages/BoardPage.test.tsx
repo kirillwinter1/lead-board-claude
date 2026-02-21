@@ -17,6 +17,7 @@ vi.mock('../api/forecast', () => ({
 
 vi.mock('../api/board', () => ({
   getScoreBreakdown: vi.fn(),
+  getStatusStyles: vi.fn().mockResolvedValue({}),
 }))
 
 // Mock axios

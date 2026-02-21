@@ -42,6 +42,7 @@
 | F40 | Team Competencies | 2026-02-19 | [features/F40](features/F40_TEAM_COMPETENCIES.md) |
 | F41 | Member Absences / Time Off | 2026-02-19 | [features/F41](features/F41_MEMBER_ABSENCES.md) |
 | F42 | Bug Management | 2026-02-19 | [features/F42](features/F42_BUG_MANAGEMENT.md) |
+| F43 | Bug Metrics Dashboard | 2026-02-19 | [features/F43](features/F43_BUG_METRICS.md) |
 
 ## Бэклог (BF)
 

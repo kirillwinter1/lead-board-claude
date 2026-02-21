@@ -211,8 +211,9 @@ export function TeamMetricsPage() {
   const [teams, setTeams] = useState<Team[]>([])
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
 
-  // Sync teamId with URL
-  const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
+  // Sync teamId with URL (validate to avoid NaN)
+  const rawTeamId = searchParams.get('teamId')
+  const selectedTeamId = rawTeamId ? (isNaN(Number(rawTeamId)) ? null : Number(rawTeamId)) : null
   const setSelectedTeamId = (id: number | null) => {
     if (id) {
       setSearchParams({ teamId: String(id) })
@@ -271,7 +272,9 @@ export function TeamMetricsPage() {
   useEffect(() => {
     if (!selectedTeamId) return
 
+    const controller = new AbortController()
     setMetricsLoading(true)
+    setError(null)
 
     // Load metrics, forecast accuracy, and DSR in parallel
     Promise.all([
@@ -285,18 +288,22 @@ export function TeamMetricsPage() {
       getDsr(selectedTeamId, dateRange.from, dateRange.to)
     ])
       .then(([metricsData, accuracyData, dsrData]) => {
+        if (controller.signal.aborted) return
         setMetrics(metricsData)
         setForecastAccuracy(accuracyData)
         setDsr(dsrData)
         setMetricsLoading(false)
       })
       .catch(err => {
-        console.error('Failed to load metrics:', err)
+        if (controller.signal.aborted) return
+        setError('Failed to load metrics: ' + (err instanceof Error ? err.message : 'Unknown error'))
         setMetrics(null)
         setForecastAccuracy(null)
         setDsr(null)
         setMetricsLoading(false)
       })
+
+    return () => controller.abort()
   }, [selectedTeamId, dateRange.from, dateRange.to, issueType])
 
   return (

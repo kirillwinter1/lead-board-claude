@@ -43,6 +43,8 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
           {(isEpicRow || isStoryRow) && canReorder && dragHandleProps && (
             <span
               className="drag-handle"
+              role="button"
+              aria-label={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
               title={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
               style={{ cursor: 'grab', touchAction: 'none' }}
               {...dragHandleProps}

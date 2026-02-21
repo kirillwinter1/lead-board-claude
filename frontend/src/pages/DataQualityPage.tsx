@@ -192,8 +192,12 @@ export function DataQualityPage() {
         : '/api/data-quality'
       const response = await axios.get<DataQualityResponse>(url)
       setData(response.data)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data quality report')
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setError(`Failed to load data quality report: ${err.response?.status} ${err.response?.statusText || err.message}`)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to load data quality report')
+      }
     } finally {
       setLoading(false)
     }

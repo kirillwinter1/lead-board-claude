@@ -9,8 +9,10 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
   const [showTooltip, setShowTooltip] = useState(false)
   const [breakdown, setBreakdown] = useState<ScoreBreakdown | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
   const cellRef = useRef<HTMLDivElement>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   const { isBug } = useWorkflowConfig()
   const score = node.autoScore || 0
@@ -79,14 +81,24 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
     }
 
     if (!breakdown && !loading) {
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
       setLoading(true)
+      setLoadError(false)
       try {
         const data = await getScoreBreakdown(node.issueKey)
-        setBreakdown(data)
+        if (!controller.signal.aborted) {
+          setBreakdown(data)
+        }
       } catch (err) {
-        console.error('Failed to load score breakdown:', err)
+        if (!controller.signal.aborted) {
+          setLoadError(true)
+        }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+        }
       }
     }
   }
@@ -112,7 +124,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
       className="priority-cell"
       style={{ color }}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseLeave={() => { setShowTooltip(false); abortRef.current?.abort() }}
     >
       <span className="priority-score" style={{ fontWeight: 600 }}>
         {score.toFixed(0)}
@@ -157,6 +169,10 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
 
           {loading && (
             <div className="priority-tooltip-loading">Загрузка...</div>
+          )}
+
+          {loadError && (
+            <div className="priority-tooltip-loading" style={{ color: '#de350b' }}>Ошибка загрузки</div>
           )}
 
           {breakdown && breakdown.breakdown && (

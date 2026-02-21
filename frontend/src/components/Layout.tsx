@@ -108,6 +108,12 @@ export function Layout() {
               <NavLink to={`/board/data-quality${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Data Quality
               </NavLink>
+              <NavLink to={`/board/bug-metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Bugs
+              </NavLink>
+              <NavLink to={`/board/bug-sla${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Bug SLA
+              </NavLink>
               <NavLink to={`/board/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Poker
               </NavLink>

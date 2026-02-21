@@ -252,7 +252,7 @@ function suggestStatuses(
 ): StatusMappingDto[] {
   const result: StatusMappingDto[] = []
   const seen = new Set<string>()
-  const categoryCounter: Record<string, number> = { PROJECT: 0, EPIC: 0, STORY: 0, SUBTASK: 0 }
+  const categoryCounter: Record<string, number> = { PROJECT: 0, EPIC: 0, STORY: 0, BUG: 0, SUBTASK: 0 }
 
   // Build mapping: issueTypeId → boardCategory (using jiraIssueTypes to bridge name→id)
   const nameToId = new Map<string, string>()
@@ -264,7 +264,7 @@ function suggestStatuses(
     if (id) issueTypeIdMap.set(id, t.boardCategory)
   })
 
-  const issueCategories = ['PROJECT', 'EPIC', 'STORY', 'SUBTASK'] as const
+  const issueCategories = ['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK'] as const
 
   for (const group of jiraStatuses) {
     const boardCat = issueTypeIdMap.get(group.issueTypeId)
@@ -276,6 +276,7 @@ function suggestStatuses(
         if (issueCat === 'PROJECT' && boardCat !== 'PROJECT') continue
         if (issueCat === 'EPIC' && boardCat !== 'EPIC') continue
         if (issueCat === 'STORY' && boardCat !== 'STORY') continue
+        if (issueCat === 'BUG' && boardCat !== 'BUG') continue
 
         const key = `${st.name}|${issueCat}`
         if (seen.has(key)) continue
@@ -327,9 +328,10 @@ function suggestStatuses(
     }
   }
 
-  // Fallback: if EPIC or STORY have 0 statuses, copy from the first non-empty category
+  // Fallback: if EPIC, STORY or BUG have 0 statuses, copy from the first non-empty category
   const epicStatuses = result.filter(s => s.issueCategory === 'EPIC')
   const storyStatuses = result.filter(s => s.issueCategory === 'STORY')
+  const bugStatuses = result.filter(s => s.issueCategory === 'BUG')
   const allUniqueStatuses = [...new Map(result.map(s => [s.jiraStatusName, s])).values()]
 
   if (epicStatuses.length === 0 && allUniqueStatuses.length > 0) {
@@ -382,9 +384,31 @@ function suggestStatuses(
     }
   }
 
+  // BUG fallback: copy from STORY statuses (bugs use same workflow as stories)
+  if (bugStatuses.length === 0) {
+    const storySource = result.filter(s => s.issueCategory === 'STORY')
+    for (const src of storySource) {
+      const key = `${src.jiraStatusName}|BUG`
+      if (seen.has(key)) continue
+      seen.add(key)
+
+      categoryCounter['BUG'] = (categoryCounter['BUG'] || 0) + 10
+      result.push({
+        id: null,
+        jiraStatusName: src.jiraStatusName,
+        issueCategory: 'BUG',
+        statusCategory: src.statusCategory,
+        workflowRoleCode: src.workflowRoleCode,
+        sortOrder: categoryCounter['BUG'],
+        scoreWeight: 0,
+        color: src.color || STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory] || '#DFE1E6',
+      })
+    }
+  }
+
   // Recalculate scoreWeight by position for all categories
   let final = result
-  for (const cat of ['PROJECT', 'EPIC', 'STORY', 'SUBTASK']) {
+  for (const cat of ['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK']) {
     final = recalcScoreWeights(final, cat)
   }
   return final
@@ -1668,6 +1692,25 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         {filteredStatuses.length === 0 ? (
           <div style={{ textAlign: 'center', color: '#6B778C', padding: '48px 0' }}>
             No statuses for {statusFilter}
+            {(() => {
+              const typesForCategory = issueTypes.filter(t => t.boardCategory === statusFilter)
+              if (typesForCategory.length === 0) return null
+              return (
+                <div style={{ marginTop: 16 }}>
+                  <button
+                    className="btn btn-primary"
+                    disabled={detectingType !== null}
+                    onClick={async () => {
+                      for (const t of typesForCategory) {
+                        await handleDetectStatuses(t.jiraTypeName, statusFilter)
+                      }
+                    }}
+                  >
+                    {detectingType ? 'Detecting...' : `Detect from Jira (${typesForCategory.map(t => t.jiraTypeName).join(', ')})`}
+                  </button>
+                </div>
+              )
+            })()}
           </div>
         ) : (
           <div className="pipeline-container">

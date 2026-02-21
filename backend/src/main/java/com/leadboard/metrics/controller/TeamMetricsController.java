@@ -16,6 +16,12 @@ import java.util.List;
 @RequestMapping("/api/metrics")
 public class TeamMetricsController {
 
+    private void validateDateRange(LocalDate from, LocalDate to) {
+        if (from.isAfter(to)) {
+            throw new IllegalArgumentException("'from' date must not be after 'to' date");
+        }
+    }
+
     private final TeamMetricsService metricsService;
     private final ForecastAccuracyService forecastAccuracyService;
     private final DsrService dsrService;
@@ -44,6 +50,7 @@ public class TeamMetricsController {
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey,
             @RequestParam(required = false) String assigneeAccountId) {
+        validateDateRange(from, to);
         return metricsService.calculateThroughput(teamId, from, to, issueType, epicKey, assigneeAccountId);
     }
 
@@ -55,6 +62,7 @@ public class TeamMetricsController {
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey,
             @RequestParam(required = false) String assigneeAccountId) {
+        validateDateRange(from, to);
         return metricsService.calculateLeadTime(teamId, from, to, issueType, epicKey, assigneeAccountId);
     }
 
@@ -66,6 +74,7 @@ public class TeamMetricsController {
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey,
             @RequestParam(required = false) String assigneeAccountId) {
+        validateDateRange(from, to);
         return metricsService.calculateCycleTime(teamId, from, to, issueType, epicKey, assigneeAccountId);
     }
 
@@ -74,6 +83,7 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
         return metricsService.calculateTimeInStatuses(teamId, from, to);
     }
 
@@ -82,6 +92,7 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
         return metricsService.calculateByAssignee(teamId, from, to);
     }
 
@@ -92,6 +103,7 @@ public class TeamMetricsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey) {
+        validateDateRange(from, to);
         return metricsService.getSummary(teamId, from, to, issueType, epicKey);
     }
 
@@ -103,6 +115,7 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
         return forecastAccuracyService.calculateAccuracy(teamId, from, to);
     }
 
@@ -116,6 +129,7 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
         return dsrService.calculateDsr(teamId, from, to);
     }
 
@@ -127,6 +141,7 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
         return velocityService.calculateVelocity(teamId, from, to);
     }
 

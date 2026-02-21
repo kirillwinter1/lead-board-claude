@@ -181,7 +181,7 @@ public enum DataQualityRule {
      */
     public String formatMessage(Object... args) {
         if (args == null || args.length == 0) {
-            return messageTemplate;
+            return messageTemplate.replace("%%", "%");
         }
         return String.format(messageTemplate, args);
     }

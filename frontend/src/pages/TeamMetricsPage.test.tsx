@@ -17,11 +17,15 @@ vi.mock('../api/metrics', () => ({
   getMetricsSummary: vi.fn(),
   getForecastAccuracy: vi.fn(),
   getDsr: vi.fn(),
+  getVelocity: vi.fn(),
+  getEpicBurndown: vi.fn(),
+  getEpicsForBurndown: vi.fn(),
 }))
 
 vi.mock('../api/forecast', () => ({
   getWipHistory: vi.fn(),
   createWipSnapshot: vi.fn(),
+  getRoleLoad: vi.fn().mockResolvedValue({ roles: [], alerts: [] }),
 }))
 
 vi.mock('../api/config', () => ({
@@ -62,6 +66,18 @@ vi.mock('../components/metrics/AssigneeTable', () => ({
 
 vi.mock('../components/metrics/ForecastAccuracyChart', () => ({
   ForecastAccuracyChart: () => <div data-testid="forecast-accuracy-chart">ForecastAccuracyChart</div>,
+}))
+
+vi.mock('../components/metrics/VelocityChart', () => ({
+  VelocityChart: () => <div data-testid="velocity-chart">VelocityChart</div>,
+}))
+
+vi.mock('../components/metrics/EpicBurndownChart', () => ({
+  EpicBurndownChart: () => <div data-testid="epic-burndown-chart">EpicBurndownChart</div>,
+}))
+
+vi.mock('../components/metrics/RoleLoadBlock', () => ({
+  RoleLoadBlock: () => <div data-testid="role-load-block">RoleLoadBlock</div>,
 }))
 
 const mockTeams = [
@@ -310,7 +326,7 @@ describe('TeamMetricsPage', () => {
       })
     })
 
-    it('should show message when no metrics data', async () => {
+    it('should show error message when metrics API fails', async () => {
       vi.mocked(metricsApi.getMetricsSummary).mockRejectedValue(new Error('No data'))
       vi.mocked(metricsApi.getDsr).mockRejectedValue(new Error('No data'))
       vi.mocked(metricsApi.getForecastAccuracy).mockRejectedValue(new Error('No data'))
@@ -318,7 +334,7 @@ describe('TeamMetricsPage', () => {
       renderTeamMetricsPage()
 
       await waitFor(() => {
-        expect(screen.getByText('No metrics data available for this period')).toBeInTheDocument()
+        expect(screen.getByText('Failed to load metrics: No data')).toBeInTheDocument()
       })
     })
   })

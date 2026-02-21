@@ -58,8 +58,9 @@ export function BugSlaSettingsPage() {
       setConfigs(sortConfigs(configsRes.data))
       setAvailablePriorities(prioritiesRes.data)
       setError(null)
-    } catch {
-      setError('Failed to load SLA configuration')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Failed to load SLA configuration: ${msg}`)
     } finally {
       setLoading(false)
     }
@@ -85,8 +86,9 @@ export function BugSlaSettingsPage() {
       setEditingPriority(null)
       setEditValue('')
       await fetchData()
-    } catch {
-      setError('Failed to update SLA')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Failed to update SLA: ${msg}`)
     } finally {
       setSaving(false)
     }
@@ -103,8 +105,9 @@ export function BugSlaSettingsPage() {
       setNewPriority('')
       setNewHours('168')
       await fetchData()
-    } catch {
-      setError('Failed to add SLA')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Failed to add SLA: ${msg}`)
     } finally {
       setSaving(false)
     }
@@ -116,8 +119,9 @@ export function BugSlaSettingsPage() {
     try {
       await axios.delete(`/api/bug-sla/${encodeURIComponent(priority)}`)
       await fetchData()
-    } catch {
-      setError('Failed to delete SLA')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Failed to delete SLA: ${msg}`)
     }
   }
 

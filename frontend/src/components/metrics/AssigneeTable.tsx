@@ -63,8 +63,8 @@ export function AssigneeTable({ data }: AssigneeTableProps) {
             <tr key={a.accountId}>
               <td>{a.displayName}</td>
               <td className="metrics-table-number">{a.issuesClosed}</td>
-              <td className="metrics-table-number">{a.avgLeadTimeDays.toFixed(1)} days</td>
-              <td className="metrics-table-number">{a.avgCycleTimeDays.toFixed(1)} days</td>
+              <td className="metrics-table-number">{(a.avgLeadTimeDays ?? 0).toFixed(1)} days</td>
+              <td className="metrics-table-number">{(a.avgCycleTimeDays ?? 0).toFixed(1)} days</td>
               <td className="metrics-table-number">
                 {a.personalDsr !== null ? (
                   <span style={{ color: getDsrColor(a.personalDsr) }}>

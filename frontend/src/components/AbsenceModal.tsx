@@ -9,6 +9,13 @@ const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
   OTHER: 'Другое',
 }
 
+const ABSENCE_COLORS: Record<AbsenceType, string> = {
+  VACATION: '#4C9AFF',
+  SICK_LEAVE: '#FF5630',
+  DAY_OFF: '#FF991F',
+  OTHER: '#97A0AF',
+}
+
 const ABSENCE_TYPES: AbsenceType[] = ['VACATION', 'SICK_LEAVE', 'DAY_OFF', 'OTHER']
 
 interface AbsenceModalProps {
@@ -46,13 +53,18 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!startDate || !endDate) return
+    if (startDate > endDate) {
+      setError('Дата начала не может быть позже даты окончания')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
       await onSave({ absenceType, startDate, endDate, comment: comment || undefined })
       onClose()
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Failed to save')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
+      setError(axiosErr.response?.data?.error || axiosErr.message || 'Failed to save')
     } finally {
       setSaving(false)
     }
@@ -65,8 +77,9 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
     try {
       await onDelete()
       onClose()
-    } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Failed to delete')
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
+      setError(axiosErr.response?.data?.error || axiosErr.message || 'Failed to delete')
     } finally {
       setSaving(false)
     }
@@ -149,4 +162,4 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
   )
 }
 
-export { ABSENCE_TYPE_LABELS }
+export { ABSENCE_TYPE_LABELS, ABSENCE_COLORS }

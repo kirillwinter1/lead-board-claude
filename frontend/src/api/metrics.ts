@@ -289,3 +289,43 @@ export async function getEpicsForBurndown(teamId: number): Promise<EpicInfo[]> {
   const response = await axios.get(`/api/metrics/epics-for-burndown?teamId=${teamId}`)
   return response.data
 }
+
+// ==================== Bug Metrics ====================
+
+export interface PriorityMetrics {
+  priority: string
+  openCount: number
+  resolvedCount: number
+  avgResolutionHours: number
+  slaLimitHours: number | null
+  slaCompliancePercent: number
+}
+
+export interface OpenBugDto {
+  issueKey: string
+  summary: string
+  priority: string
+  status: string
+  ageDays: number
+  ageHours: number
+  slaBreach: boolean
+  jiraUrl: string
+}
+
+export interface BugMetricsResponse {
+  openBugs: number
+  resolvedBugs: number
+  staleBugs: number
+  avgResolutionHours: number
+  slaCompliancePercent: number
+  byPriority: PriorityMetrics[]
+  openBugList: OpenBugDto[]
+}
+
+export async function fetchBugMetrics(teamId?: number): Promise<BugMetricsResponse> {
+  const params = new URLSearchParams()
+  if (teamId) params.append('teamId', String(teamId))
+  const query = params.toString() ? `?${params}` : ''
+  const response = await axios.get(`/api/metrics/bugs${query}`)
+  return response.data
+}

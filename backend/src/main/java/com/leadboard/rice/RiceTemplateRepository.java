@@ -10,4 +10,6 @@ public interface RiceTemplateRepository extends JpaRepository<RiceTemplateEntity
     List<RiceTemplateEntity> findByActiveTrue();
 
     Optional<RiceTemplateEntity> findByCode(String code);
+
+    Optional<RiceTemplateEntity> findByCodeIgnoreCase(String code);
 }
