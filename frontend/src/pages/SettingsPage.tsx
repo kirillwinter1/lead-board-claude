@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
+import { BugSlaSettingsPage } from './BugSlaSettingsPage'
 import './SettingsPage.css'
 
 interface User {
@@ -178,13 +179,7 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-section">
-        <h2 className="settings-section-title">Bug SLA</h2>
-        <p className="settings-section-description">
-          Configure maximum resolution time by priority for bugs. Bugs exceeding SLA will trigger a Data Quality error.
-        </p>
-        <Link to="/board/bug-sla" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
-          Open Bug SLA Settings
-        </Link>
+        <BugSlaSettingsPage />
       </section>
 
       <section className="settings-section">
