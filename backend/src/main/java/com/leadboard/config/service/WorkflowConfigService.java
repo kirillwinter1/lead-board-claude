@@ -4,6 +4,7 @@ import com.leadboard.config.JiraProperties;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
+import com.leadboard.tenant.TenantContext;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
@@ -28,7 +29,10 @@ public class WorkflowConfigService {
     private final ObjectMapper objectMapper;
     private final JiraProperties jiraProperties;
 
-    // Cached lookups
+    // Per-tenant cache: tenantId → loaded flag. -1L = no tenant (public/legacy).
+    private final ConcurrentHashMap<Long, Boolean> loadedTenants = new ConcurrentHashMap<>();
+
+    // Cached lookups (for current tenant — reloaded when tenant changes)
     private volatile Long defaultConfigId;
     private final ConcurrentHashMap<String, BoardCategory> typeToCategory = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> typeToRoleCode = new ConcurrentHashMap<>();
@@ -50,6 +54,9 @@ public class WorkflowConfigService {
     private volatile String projectKey;
     private volatile String epicLinkType;
     private volatile String epicLinkName;
+
+    // Track which tenant is currently loaded
+    private volatile Long currentlyLoadedTenantId = null;
 
     public WorkflowConfigService(
             ProjectConfigurationRepository configRepo,
@@ -74,7 +81,29 @@ public class WorkflowConfigService {
     }
 
     public void clearCache() {
+        Long tenantId = TenantContext.getCurrentTenantId();
+        if (tenantId != null) {
+            loadedTenants.remove(tenantId);
+        }
         loadConfiguration();
+    }
+
+    /**
+     * Ensure configuration is loaded for the current tenant.
+     * Call this before any cache read in a multi-tenant context.
+     */
+    public void ensureLoaded() {
+        Long tenantId = TenantContext.getCurrentTenantId();
+        if (tenantId == null) {
+            // No tenant context — use default (already loaded at startup)
+            return;
+        }
+        if (!tenantId.equals(currentlyLoadedTenantId)) {
+            // Different tenant — reload
+            loadConfiguration();
+            currentlyLoadedTenantId = tenantId;
+            loadedTenants.put(tenantId, true);
+        }
     }
 
     private void loadConfiguration() {
@@ -199,6 +228,7 @@ public class WorkflowConfigService {
     // ==================== Issue Type Categorization ====================
 
     public BoardCategory categorizeIssueType(String jiraTypeName) {
+        ensureLoaded();
         if (jiraTypeName == null) return null;
         return typeToCategory.get(jiraTypeName.toLowerCase());
     }
@@ -265,6 +295,7 @@ public class WorkflowConfigService {
     }
 
     public List<WorkflowRoleEntity> getRolesInPipelineOrder() {
+        ensureLoaded();
         return cachedRoles;
     }
 
@@ -275,6 +306,7 @@ public class WorkflowConfigService {
     // ==================== Status Categorization ====================
 
     public StatusCategory categorize(String status, String issueType) {
+        ensureLoaded();
         if (status == null) return StatusCategory.NEW;
 
         BoardCategory cat = categorizeIssueType(issueType);
@@ -560,10 +592,12 @@ public class WorkflowConfigService {
     // ==================== Helpers ====================
 
     public Long getDefaultConfigId() {
+        ensureLoaded();
         return defaultConfigId;
     }
 
     public String getProjectKey() {
+        ensureLoaded();
         return projectKey;
     }
 

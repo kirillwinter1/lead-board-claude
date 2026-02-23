@@ -16,6 +16,7 @@ import { TeamCompetencyPage } from './pages/TeamCompetencyPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { ProjectTimelinePage } from './pages/ProjectTimelinePage'
 import { LandingPage } from './pages/landing/LandingPage'
+import RegistrationPage from './pages/RegistrationPage'
 import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
 import './App.css'
 
@@ -26,6 +27,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/landing" element={<LandingPage />} />
+        <Route path="/register" element={<RegistrationPage />} />
         <Route path="/board" element={<Layout />}>
           <Route index element={<BoardPage />} />
           <Route path="timeline" element={<TimelinePage />} />

@@ -2,6 +2,7 @@ package com.leadboard.auth;
 
 import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
+import com.leadboard.tenant.TenantService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -38,11 +39,14 @@ class OAuthServiceTest {
     @Mock
     private SessionRepository sessionRepository;
 
+    @Mock
+    private TenantService tenantService;
+
     private OAuthService oAuthService;
 
     @BeforeEach
     void setUp() {
-        oAuthService = new OAuthService(oauthProperties, appProperties, userRepository, tokenRepository, sessionRepository);
+        oAuthService = new OAuthService(oauthProperties, appProperties, userRepository, tokenRepository, sessionRepository, tenantService);
 
         // Setup default properties
         when(oauthProperties.getAuthorizationUri()).thenReturn("https://auth.atlassian.com/authorize");

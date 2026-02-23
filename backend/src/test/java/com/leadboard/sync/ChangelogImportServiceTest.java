@@ -4,6 +4,7 @@ import com.leadboard.jira.JiraChangelogResponse;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.metrics.service.StatusChangelogService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -18,6 +19,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@DisplayName("ChangelogImportService")
 class ChangelogImportServiceTest {
 
     @Mock
@@ -37,6 +39,7 @@ class ChangelogImportServiceTest {
     }
 
     @Test
+    @DisplayName("should import status changes from Jira changelog")
     void importChangelogForIssue_importsStatusChanges() {
         // Given
         var histories = createHistories(
@@ -64,6 +67,7 @@ class ChangelogImportServiceTest {
     }
 
     @Test
+    @DisplayName("should return false when no changelog found")
     void importChangelogForIssue_returnsFalseWhenNoChangelog() {
         // Given
         when(jiraClient.fetchIssueChangelog("TEST-2")).thenReturn(List.of());
@@ -77,6 +81,7 @@ class ChangelogImportServiceTest {
     }
 
     @Test
+    @DisplayName("should fix started_at from real Jira changelog")
     void importChangelogForIssue_fixesStartedAt() {
         // Given
         OffsetDateTime realStartedAt = OffsetDateTime.parse("2024-01-15T14:30:00.000+00:00");
@@ -107,6 +112,7 @@ class ChangelogImportServiceTest {
     }
 
     @Test
+    @DisplayName("should fix done_at from real Jira changelog")
     void importChangelogForIssue_fixesDoneAt() {
         // Given
         OffsetDateTime realDoneAt = OffsetDateTime.parse("2024-01-20T09:00:00.000+00:00");
@@ -137,6 +143,7 @@ class ChangelogImportServiceTest {
     }
 
     @Test
+    @DisplayName("should fix started_at for multiple issues in batch")
     void fixStartedAtFromChangelog_fixesMultipleIssues() {
         // Given
         OffsetDateTime realDate1 = OffsetDateTime.parse("2024-01-10T10:00:00.000+00:00");
@@ -168,6 +175,7 @@ class ChangelogImportServiceTest {
     }
 
     @Test
+    @DisplayName("should fix done_at for multiple issues in batch")
     void fixDoneAtFromChangelog_fixesMultipleIssues() {
         // Given
         OffsetDateTime realDone = OffsetDateTime.parse("2024-01-25T16:00:00.000+00:00");

@@ -56,16 +56,19 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
 
   // Tooltip state
   const [tooltip, setTooltip] = useState<{ x: number; y: number; absence: Absence } | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   const endDate = useMemo(() => addDays(startDate, DAYS_VISIBLE - 1), [startDate])
 
   const fetchAbsences = useCallback(() => {
     setLoading(true)
+    setFetchError(null)
     teamsApi.getTeamAbsences(teamId, toDateStr(startDate), toDateStr(endDate))
       .then(setAbsences)
       .catch(err => {
         console.error('Failed to load absences:', err)
         setAbsences([])
+        setFetchError('Не удалось загрузить отсутствия')
       })
       .finally(() => setLoading(false))
   }, [teamId, startDate, endDate])
@@ -86,7 +89,8 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
     const d = new Date()
     d.setHours(0, 0, 0, 0)
     return d
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate])
 
   const todayOffset = useMemo(() => {
     const diff = daysBetween(startDate, today)
@@ -171,9 +175,9 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
     <div className="absence-timeline">
       {/* Navigation */}
       <div className="absence-timeline-nav">
-        <button className="btn btn-small btn-secondary" onClick={() => navigate(-1)}>&larr;</button>
-        <button className="btn btn-small btn-secondary" onClick={goToday}>Сегодня</button>
-        <button className="btn btn-small btn-secondary" onClick={() => navigate(1)}>&rarr;</button>
+        <button className="btn btn-small btn-secondary" onClick={() => navigate(-1)} aria-label="Предыдущая неделя">&larr;</button>
+        <button className="btn btn-small btn-secondary" onClick={goToday} aria-label="Перейти к сегодня">Сегодня</button>
+        <button className="btn btn-small btn-secondary" onClick={() => navigate(1)} aria-label="Следующая неделя">&rarr;</button>
         <span className="absence-timeline-range">
           {formatDateShort(startDate)} — {formatDateShort(endDate)}
         </span>
@@ -285,10 +289,14 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
                     const left = barStart * DAY_WIDTH + 2
                     const width = (barEnd - barStart + 1) * DAY_WIDTH - 4
 
+                    const memberName = members.find(mm => mm.id === a.memberId)?.displayName || ''
+
                     return (
                       <div
                         key={a.id}
                         className={`absence-bar ${canManage ? 'clickable' : ''}`}
+                        role="button"
+                        aria-label={`${ABSENCE_TYPE_LABELS[a.absenceType as keyof typeof ABSENCE_TYPE_LABELS] || a.absenceType}: ${memberName}`}
                         style={{
                           left,
                           width,
@@ -297,7 +305,9 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
                         onClick={() => handleClickAbsence(a)}
                         onMouseEnter={e => {
                           const rect = e.currentTarget.getBoundingClientRect()
-                          setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 8, absence: a })
+                          const x = Math.max(100, Math.min(rect.left + rect.width / 2, window.innerWidth - 100))
+                          const y = Math.max(40, rect.top - 8)
+                          setTooltip({ x, y, absence: a })
                         }}
                         onMouseLeave={() => setTooltip(null)}
                       />
@@ -356,6 +366,11 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
       />
 
       {loading && <div className="absence-loading">Загрузка...</div>}
+      {fetchError && (
+        <div style={{ marginTop: 8, padding: '8px 12px', background: '#ffebe6', color: '#de350b', borderRadius: 4, fontSize: 13 }}>
+          {fetchError}
+        </div>
+      )}
     </div>
   )
 }

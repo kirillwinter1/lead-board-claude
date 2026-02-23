@@ -43,6 +43,7 @@
 | F41 | Member Absences / Time Off | 2026-02-19 | [features/F41](features/F41_MEMBER_ABSENCES.md) |
 | F42 | Bug Management | 2026-02-19 | [features/F42](features/F42_BUG_MANAGEMENT.md) |
 | F43 | Bug Metrics Dashboard | 2026-02-19 | [features/F43](features/F43_BUG_METRICS.md) |
+| F44 | Multi-Tenancy & SaaS Packaging | 2026-02-23 | [features/F44](features/F44_MULTITENANCY.md) |
 
 ## Бэклог (BF)
 
@@ -61,9 +62,9 @@
 | BF16 | Cross-team Roadmap | 💡 Idea | — |
 | BF17 | Public API & Webhooks | 💡 Idea | — |
 | BF18 | Billing & Subscriptions (Free/PRO/MAX) | 💡 Idea | — |
-| BF19 | Multi-tenancy & SaaS Packaging | 💡 Idea | — |
+| BF19 | Multi-tenancy & SaaS Packaging | ✅ Done → [F44](features/F44_MULTITENANCY.md) | [LAUNCH_PLAN.md#L1](LAUNCH_PLAN.md#l1-мультитенантность) |
 | BF20 | Planning Poker v2 | 💡 Idea | — |
-| BF21 | Smart Hints & Onboarding | 💡 Idea | — |
+| BF21 | Smart Hints & Onboarding | 📋 Planned | [LAUNCH_PLAN.md#L14](LAUNCH_PLAN.md#l14-подсказки--документация-для-пользователей) |
 | BF22 | UI Redesign (Sidebar Navigation) | 💡 Idea | — |
 | BF23 | Sprint Retrospective (Easy Retro) | 📋 Planned | [backlog/BF23](backlog/BF23_SPRINT_RETROSPECTIVE.md) |
 | BF24 | Quarterly Planning / OKR | 💡 Idea | — |
@@ -79,6 +80,7 @@
 - [JIRA_WORKFLOWS.md](JIRA_WORKFLOWS.md) — Jira workflows (Epic, Story, Subtask)
 - [API_PLANNING.md](API_PLANNING.md) — API документация
 - [TECH_DEBT.md](TECH_DEBT.md) — технический долг
+- [LAUNCH_PLAN.md](LAUNCH_PLAN.md) — план подготовки к запуску (15 задач)
 
 ## Диаграмма зависимостей (реализованные)
 
@@ -90,6 +92,22 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-02-23: F44 Multi-Tenancy & SaaS Packaging (BF19)
+- Schema-per-tenant мультитенантность: каждая компания в отдельной PostgreSQL-схеме
+- V44 миграция: `tenants`, `tenant_users` в public schema, `tenant_id` в `user_sessions`
+- T1/T2 tenant migrations: все 27 бизнес-таблиц + `tenant_jira_config`
+- Hibernate multi-tenancy (SCHEMA): `SET search_path TO {tenant_schema}, public`
+- TenantContext (ThreadLocal) + TenantFilter (subdomain/header → tenant)
+- Auth: per-tenant роли через `tenant_users`, tenant-aware OAuth flow
+- Self-service регистрация: `POST /api/public/tenants/register` с валидацией slug
+- JiraClient: team field из TenantJiraConfig с fallback на JiraProperties
+- TenantSyncScheduler: итерация активных тенантов, sync per project key
+- WorkflowConfigService: per-tenant cache с lazy reload при смене tenant
+- Frontend: `getTenantSlug()`, axios interceptor для X-Tenant-Slug, RegistrationPage
+- TenantMigrationService: Flyway per tenant schema (T-prefix, `db/tenant/`)
+- 11 новых тестов (TenantServiceTest 8, TenantContextTest 3)
+- Версия 0.44.0
 
 ### 2026-02-19: F39 Unified Style Refactoring
 - Убраны hardcoded STATUS_COLORS из ProjectTimelinePage и TimelinePage → StatusStylesContext

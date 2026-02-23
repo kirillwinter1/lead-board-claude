@@ -15,18 +15,22 @@ import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import com.leadboard.team.TeamSyncService;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +60,7 @@ public class SyncService {
     private final MappingAutoDetectService autoDetectService;
     private final ChangelogImportService changelogImportService;
     private final TeamSyncService teamSyncService;
+    private final SyncService self;
 
     public SyncService(JiraClient jiraClient,
                        JiraProperties jiraProperties,
@@ -70,7 +75,8 @@ public class SyncService {
                        WorkflowConfigService workflowConfigService,
                        MappingAutoDetectService autoDetectService,
                        ChangelogImportService changelogImportService,
-                       TeamSyncService teamSyncService) {
+                       TeamSyncService teamSyncService,
+                       @Lazy SyncService self) {
         this.jiraClient = jiraClient;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
@@ -85,6 +91,27 @@ public class SyncService {
         this.autoDetectService = autoDetectService;
         this.changelogImportService = changelogImportService;
         this.teamSyncService = teamSyncService;
+        this.self = self;
+    }
+
+    /**
+     * BUG-39: Auto-recover stuck sync_in_progress flag on startup.
+     * If sync has been running for more than 30 minutes, reset it.
+     */
+    @PostConstruct
+    public void recoverStuckSync() {
+        syncStateRepository.findAll().forEach(state -> {
+            if (state.isSyncInProgress() && state.getLastSyncStartedAt() != null) {
+                Duration stuck = Duration.between(state.getLastSyncStartedAt(), OffsetDateTime.now());
+                if (stuck.toMinutes() > 30) {
+                    log.warn("Recovering stuck sync for project {} (stuck for {})",
+                            state.getProjectKey(), stuck);
+                    state.setSyncInProgress(false);
+                    state.setLastError("Sync was stuck, auto-recovered on startup");
+                    syncStateRepository.save(state);
+                }
+            }
+        });
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
@@ -103,20 +130,18 @@ public class SyncService {
 
         autoDetectIfNeeded(projectKey);
         log.info("Starting scheduled sync for project: {}", projectKey);
-        syncProject(projectKey);
+        self.syncProject(projectKey);
 
         scheduledSyncCount++;
         if (scheduledSyncCount % RECONCILE_EVERY_N_SYNCS == 0) {
-            reconcileDeletedIssues(projectKey);
+            self.reconcileDeletedIssues(projectKey);
         }
     }
 
-    @Transactional
     public SyncStatus triggerSync() {
         return triggerSync(null);
     }
 
-    @Transactional
     public SyncStatus triggerSync(Integer months) {
         String projectKey = jiraProperties.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
@@ -129,14 +154,24 @@ public class SyncService {
                     state.getLastSyncIssuesCount(), "Sync already in progress");
         }
 
-        new Thread(() -> {
-            autoDetectIfNeeded(projectKey);
-            syncProject(projectKey, months);
-            reconcileDeletedIssues(projectKey);
-        }).start();
+        self.runSyncAsync(projectKey, months);
 
         return new SyncStatus(true, OffsetDateTime.now(), state.getLastSyncCompletedAt(),
                 state.getLastSyncIssuesCount(), null);
+    }
+
+    /**
+     * BUG-41: Run sync asynchronously via @Async instead of raw Thread.
+     */
+    @Async
+    public void runSyncAsync(String projectKey, Integer months) {
+        try {
+            autoDetectIfNeeded(projectKey);
+            syncProject(projectKey, months);
+            reconcileDeletedIssues(projectKey);
+        } catch (Exception e) {
+            log.error("Async sync failed for project: {}", projectKey, e);
+        }
     }
 
     public SyncStatus getSyncStatus() {
@@ -159,12 +194,19 @@ public class SyncService {
         );
     }
 
-    @Transactional
+    /**
+     * Called by TenantSyncScheduler in tenant context.
+     * TenantContext is already set by the caller.
+     */
+    public void syncProjectForTenant(String projectKey) {
+        autoDetectIfNeeded(projectKey);
+        syncProject(projectKey, null);
+    }
+
     public void syncProject(String projectKey) {
         syncProject(projectKey, null);
     }
 
-    @Transactional
     public void syncProject(String projectKey, Integer months) {
         JiraSyncStateEntity state = getOrCreateSyncState(projectKey);
 
@@ -396,6 +438,7 @@ public class SyncService {
 
         entity.setDueDate(parseLocalDate(jiraIssue.getFields().getDuedate()));
         entity.setJiraCreatedAt(parseOffsetDateTime(jiraIssue.getFields().getCreated()));
+        entity.setJiraUpdatedAt(parseOffsetDateTime(jiraIssue.getFields().getUpdated()));
 
         if (jiraIssue.getFields().getAssignee() != null) {
             entity.setAssigneeAccountId(jiraIssue.getFields().getAssignee().getAccountId());
@@ -611,7 +654,6 @@ public class SyncService {
                 });
     }
 
-    @Transactional
     public void reconcileDeletedIssues(String projectKey) {
         try {
             log.info("Starting reconciliation of deleted issues for project: {}", projectKey);
@@ -634,11 +676,25 @@ public class SyncService {
                 nextPageToken = response.getNextPageToken();
             }
 
+            // BUG-40: Sanity check — abort if Jira returned 0 keys (possible API error)
+            if (jiraKeys.isEmpty()) {
+                log.warn("Reconciliation aborted: Jira returned 0 keys (possible API error)");
+                return;
+            }
+
             List<String> dbKeys = issueRepository.findAllIssueKeysByProjectKey(projectKey);
 
             List<String> orphanedKeys = dbKeys.stream()
                     .filter(key -> !jiraKeys.contains(key))
                     .toList();
+
+            // BUG-40: Sanity check — abort if too many orphaned keys (>50% of DB)
+            int dbCount = dbKeys.size();
+            if (dbCount > 0 && orphanedKeys.size() > dbCount / 2) {
+                log.warn("Reconciliation aborted: too many orphaned keys ({} of {}), possible API issue",
+                        orphanedKeys.size(), dbCount);
+                return;
+            }
 
             if (!orphanedKeys.isEmpty()) {
                 log.info("Found {} deleted issues to remove: {}", orphanedKeys.size(), orphanedKeys);
@@ -667,11 +723,21 @@ public class SyncService {
             jql = String.format("project = %s", projectKey);
         }
 
-        int total = jiraClient.countByJql(jql);
-        return Map.of(
-                "total", total,
-                "months", months != null ? months : 0
-        );
+        // BUG-46: Wrap in try-catch to avoid 500 on Jira API errors
+        try {
+            int total = jiraClient.countByJql(jql);
+            return Map.of(
+                    "total", total,
+                    "months", months != null ? months : 0
+            );
+        } catch (Exception e) {
+            log.error("Failed to count issues in Jira: {}", e.getMessage());
+            Map<String, Object> result = new HashMap<>();
+            result.put("total", 0);
+            result.put("months", months != null ? months : 0);
+            result.put("error", e.getMessage());
+            return result;
+        }
     }
 
     public record SyncStatus(

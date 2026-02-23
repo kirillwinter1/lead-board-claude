@@ -288,7 +288,7 @@ describe('PlanningPokerPage', () => {
 
       await waitFor(() => {
         expect(pokerApi.createSession).toHaveBeenCalledWith(1, 'EPIC-3')
-        expect(mockNavigate).toHaveBeenCalledWith('/poker/room/NEW123')
+        expect(mockNavigate).toHaveBeenCalledWith('/board/poker/room/NEW123')
       })
     })
   })
@@ -335,7 +335,7 @@ describe('PlanningPokerPage', () => {
       const submitButton = modalActions.querySelector('button.btn-primary')!
       fireEvent.click(submitButton)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/poker/room/ABC123')
+      expect(mockNavigate).toHaveBeenCalledWith('/board/poker/room/ABC123')
     })
 
     it('should convert room code to uppercase', async () => {
@@ -388,7 +388,7 @@ describe('PlanningPokerPage', () => {
         fireEvent.click(screen.getByText('Войти'))
       })
 
-      expect(mockNavigate).toHaveBeenCalledWith('/poker/room/ABC123')
+      expect(mockNavigate).toHaveBeenCalledWith('/board/poker/room/ABC123')
     })
   })
 

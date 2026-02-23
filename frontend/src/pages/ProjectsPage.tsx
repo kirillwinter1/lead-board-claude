@@ -79,7 +79,7 @@ function JiraLink({ issueKey, jiraBaseUrl }: { issueKey: string; jiraBaseUrl: st
   }
   return (
     <a
-      href={`${jiraBaseUrl}${issueKey}`}
+      href={`${jiraBaseUrl}/browse/${issueKey}`}
       target="_blank"
       rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}

@@ -14,12 +14,16 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 public class ChangelogImportService {
 
     private static final Logger log = LoggerFactory.getLogger(ChangelogImportService.class);
     private static final long RATE_LIMIT_MS = 100;
+
+    // BUG-44: Concurrency guard to prevent multiple simultaneous imports
+    private final AtomicBoolean importInProgress = new AtomicBoolean(false);
 
     private final JiraClient jiraClient;
     private final JiraIssueRepository issueRepository;
@@ -35,12 +39,13 @@ public class ChangelogImportService {
 
     /**
      * Count issues that would be processed by changelog import.
+     * BUG-42: Uses jiraUpdatedAt instead of updatedAt for filtering.
      */
     public Map<String, Object> countIssuesForImport(String projectKey, Integer months) {
         long count;
         if (months != null && months > 0) {
             OffsetDateTime since = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(months);
-            count = issueRepository.countByProjectKeyAndUpdatedAtAfter(projectKey, since);
+            count = issueRepository.countByProjectKeyAndJiraUpdatedAtAfter(projectKey, since);
         } else {
             count = issueRepository.countByProjectKey(projectKey);
         }
@@ -55,14 +60,21 @@ public class ChangelogImportService {
     /**
      * Batch import changelogs for ALL issues in the project.
      * Runs async — called from admin endpoint or after first sync.
+     * BUG-44: Concurrency guard prevents multiple simultaneous imports.
      */
     @Async
     public void importAllChangelogsAsync(String projectKey, Integer months) {
+        if (!importInProgress.compareAndSet(false, true)) {
+            log.warn("Changelog import already in progress, skipping");
+            return;
+        }
         try {
             ImportResult result = importAllChangelogs(projectKey, months);
             log.info("Async changelog import completed for {}: {}", projectKey, result);
         } catch (Exception e) {
             log.error("Async changelog import failed for {}", projectKey, e);
+        } finally {
+            importInProgress.set(false);
         }
     }
 
@@ -107,7 +119,7 @@ public class ChangelogImportService {
         List<JiraIssueEntity> allIssues;
         if (months != null && months > 0) {
             OffsetDateTime since = OffsetDateTime.now(ZoneOffset.UTC).minusMonths(months);
-            allIssues = issueRepository.findByProjectKeyAndUpdatedAtAfter(projectKey, since);
+            allIssues = issueRepository.findByProjectKeyAndJiraUpdatedAtAfter(projectKey, since);
             log.info("Starting changelog import for {} issues updated in last {} months in project {}",
                     allIssues.size(), months, projectKey);
         } else {

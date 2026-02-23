@@ -48,6 +48,19 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             @Param("projectKey") String projectKey,
             @Param("since") OffsetDateTime since);
 
+    // BUG-42: Use jiraUpdatedAt (Jira's own updated timestamp) instead of local updatedAt
+    @Query("SELECT COUNT(e) FROM JiraIssueEntity e WHERE e.projectKey = :projectKey " +
+           "AND e.jiraUpdatedAt >= :since")
+    long countByProjectKeyAndJiraUpdatedAtAfter(
+            @Param("projectKey") String projectKey,
+            @Param("since") OffsetDateTime since);
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.projectKey = :projectKey " +
+           "AND e.jiraUpdatedAt >= :since")
+    List<JiraIssueEntity> findByProjectKeyAndJiraUpdatedAtAfter(
+            @Param("projectKey") String projectKey,
+            @Param("since") OffsetDateTime since);
+
     @Query("SELECT COUNT(e) FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")
     long countByProjectKey(@Param("projectKey") String projectKey);
 

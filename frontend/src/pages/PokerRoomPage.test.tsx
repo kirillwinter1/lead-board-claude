@@ -5,6 +5,18 @@ import { PokerRoomPage } from './PokerRoomPage'
 import * as pokerApi from '../api/poker'
 import * as configApi from '../api/config'
 
+const mockAxiosGet = vi.fn()
+
+vi.mock('axios', () => ({
+  default: {
+    get: (...args: any[]) => mockAxiosGet(...args),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    put: vi.fn().mockResolvedValue({ data: {} }),
+    delete: vi.fn().mockResolvedValue({ data: {} }),
+    isAxiosError: () => false,
+  },
+}))
+
 vi.mock('../api/poker', () => ({
   getSessionByRoomCode: vi.fn(),
   getEpicStories: vi.fn(),
@@ -13,6 +25,23 @@ vi.mock('../api/poker', () => ({
 
 vi.mock('../api/config', () => ({
   getConfig: vi.fn(),
+}))
+
+const stableGetRoleCodes = () => ['SA', 'DEV', 'QA']
+const stableGetRoleColor = () => '#666'
+const stableGetRoleDisplayName = (code: string) => code
+const stableGetIssueTypeIconUrl = () => ''
+
+vi.mock('../contexts/WorkflowConfigContext', () => ({
+  useWorkflowConfig: () => ({
+    getRoleCodes: stableGetRoleCodes,
+    getRoleColor: stableGetRoleColor,
+    getRoleDisplayName: stableGetRoleDisplayName,
+    getIssueTypeIconUrl: stableGetIssueTypeIconUrl,
+    issueTypeIcons: {},
+    config: { roles: [], issueTypes: [], statuses: [] },
+    loading: false,
+  }),
 }))
 
 vi.mock('../hooks/usePokerWebSocket', () => ({
@@ -25,6 +54,29 @@ vi.mock('../hooks/usePokerWebSocket', () => ({
     sendStartSession: vi.fn(),
   })),
 }))
+
+vi.mock('../api/teams', () => ({
+  teamsApi: {
+    getMembers: vi.fn().mockResolvedValue([
+      { id: 1, jiraAccountId: 'user-123', displayName: 'Test User', role: 'DEV', avatarUrl: null },
+    ]),
+  },
+}))
+
+const mockAuthResponse = {
+  data: {
+    authenticated: true,
+    user: {
+      id: 1,
+      accountId: 'user-123',
+      displayName: 'Test User',
+      email: 'test@example.com',
+      avatarUrl: null,
+      role: 'ADMIN',
+      permissions: [],
+    },
+  },
+}
 
 const mockSession = {
   id: 1,
@@ -41,13 +93,9 @@ const mockSession = {
       id: 1,
       storyKey: 'STORY-1',
       title: 'First Story',
-      needsSa: true,
-      needsDev: true,
-      needsQa: true,
+      needsRoles: ['SA', 'DEV', 'QA'],
       status: 'VOTING' as const,
-      finalSaHours: null,
-      finalDevHours: null,
-      finalQaHours: null,
+      finalEstimates: {},
       orderIndex: 0,
       votes: [],
     },
@@ -70,6 +118,7 @@ describe('PokerRoomPage', () => {
     vi.clearAllMocks()
     vi.mocked(pokerApi.getSessionByRoomCode).mockResolvedValue(mockSession as any)
     vi.mocked(configApi.getConfig).mockResolvedValue({ jiraBaseUrl: 'https://jira.example.com/browse/' })
+    mockAxiosGet.mockResolvedValue(mockAuthResponse)
   })
 
   describe('Rendering', () => {
@@ -77,7 +126,7 @@ describe('PokerRoomPage', () => {
       renderPokerRoomPage()
 
       await waitFor(() => {
-        expect(screen.getByText('ABC123')).toBeInTheDocument()
+        expect(screen.getAllByText('ABC123').length).toBeGreaterThan(0)
       })
     })
 
@@ -94,7 +143,7 @@ describe('PokerRoomPage', () => {
 
       // Wait for session to load and display room code and epic key
       await waitFor(() => {
-        expect(screen.getByText('ABC123')).toBeInTheDocument()
+        expect(screen.getAllByText('ABC123').length).toBeGreaterThan(0)
         expect(screen.getByText('EPIC-1')).toBeInTheDocument()
       })
     })
@@ -127,7 +176,7 @@ describe('PokerRoomPage', () => {
       renderPokerRoomPage()
 
       await waitFor(() => {
-        expect(screen.getByText(/Failed to load session/i)).toBeInTheDocument()
+        expect(screen.getByText(/не удалось загрузить/i)).toBeInTheDocument()
       })
     })
   })

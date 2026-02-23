@@ -2,15 +2,22 @@ package com.leadboard.jira;
 
 import com.leadboard.auth.OAuthService;
 import com.leadboard.config.JiraProperties;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantJiraConfigEntity;
+import com.leadboard.tenant.TenantJiraConfigRepository;
+import io.netty.channel.ChannelOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.netty.http.client.HttpClient;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
@@ -27,17 +34,27 @@ public class JiraClient {
     private final WebClient webClient;
     private final JiraProperties jiraProperties;
     private final OAuthService oauthService;
+    private final TenantJiraConfigRepository tenantJiraConfigRepository;
 
-    public JiraClient(JiraProperties jiraProperties, OAuthService oauthService, WebClient.Builder webClientBuilder) {
+    public JiraClient(JiraProperties jiraProperties, OAuthService oauthService,
+                      TenantJiraConfigRepository tenantJiraConfigRepository,
+                      WebClient.Builder webClientBuilder) {
         this.jiraProperties = jiraProperties;
         this.oauthService = oauthService;
+        this.tenantJiraConfigRepository = tenantJiraConfigRepository;
 
         // Increase buffer size for large Jira responses
         ExchangeStrategies strategies = ExchangeStrategies.builder()
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
                 .build();
 
+        // BUG-48: Configure connection and response timeouts
+        HttpClient httpClient = HttpClient.create()
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
+                .responseTimeout(Duration.ofSeconds(30));
+
         this.webClient = webClientBuilder
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .exchangeStrategies(strategies)
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
@@ -79,12 +96,29 @@ public class JiraClient {
     }
 
     private String buildFieldsList() {
-        String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,assignee,flagged,customfield_10021,issuelinks,components";
-        String teamFieldId = jiraProperties.getTeamFieldId();
+        String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,updated,assignee,flagged,customfield_10021,issuelinks,components";
+        String teamFieldId = getEffectiveTeamFieldId();
         if (teamFieldId != null && !teamFieldId.isEmpty()) {
             return baseFields + "," + teamFieldId;
         }
         return baseFields;
+    }
+
+    /**
+     * Get team field ID: from tenant config if available, else from JiraProperties.
+     */
+    private String getEffectiveTeamFieldId() {
+        if (TenantContext.hasTenant()) {
+            try {
+                return tenantJiraConfigRepository.findActive()
+                        .map(TenantJiraConfigEntity::getTeamFieldId)
+                        .orElse(jiraProperties.getTeamFieldId());
+            } catch (Exception e) {
+                // Fallback if tenant schema doesn't have the table yet
+                return jiraProperties.getTeamFieldId();
+            }
+        }
+        return jiraProperties.getTeamFieldId();
     }
 
     private JiraSearchResponse searchWithOAuth(String jql, int maxResults, String nextPageToken, String accessToken, String cloudId, String fields) {

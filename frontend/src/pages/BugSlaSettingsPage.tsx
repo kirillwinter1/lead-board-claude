@@ -59,8 +59,12 @@ export function BugSlaSettingsPage() {
       setAvailablePriorities(prioritiesRes.data)
       setError(null)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      setError(`Failed to load SLA configuration: ${msg}`)
+      if (axios.isAxiosError(err) && err.response) {
+        setError(`Failed to load SLA configuration: ${err.response.status} ${err.response.statusText}`)
+      } else {
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Failed to load SLA configuration: ${msg}`)
+      }
     } finally {
       setLoading(false)
     }
@@ -87,8 +91,12 @@ export function BugSlaSettingsPage() {
       setEditValue('')
       await fetchData()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      setError(`Failed to update SLA: ${msg}`)
+      if (axios.isAxiosError(err) && err.response) {
+        setError(`Failed to update SLA for "${priority}": ${err.response.status} ${err.response.statusText}`)
+      } else {
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Failed to update SLA: ${msg}`)
+      }
     } finally {
       setSaving(false)
     }
@@ -106,8 +114,12 @@ export function BugSlaSettingsPage() {
       setNewHours('168')
       await fetchData()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      setError(`Failed to add SLA: ${msg}`)
+      if (axios.isAxiosError(err) && err.response) {
+        setError(`Failed to add SLA for "${newPriority}": ${err.response.status} ${err.response.statusText}`)
+      } else {
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Failed to add SLA: ${msg}`)
+      }
     } finally {
       setSaving(false)
     }
@@ -120,8 +132,12 @@ export function BugSlaSettingsPage() {
       await axios.delete(`/api/bug-sla/${encodeURIComponent(priority)}`)
       await fetchData()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Unknown error'
-      setError(`Failed to delete SLA: ${msg}`)
+      if (axios.isAxiosError(err) && err.response) {
+        setError(`Failed to delete SLA for "${priority}": ${err.response.status} ${err.response.statusText}`)
+      } else {
+        const msg = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Failed to delete SLA: ${msg}`)
+      }
     }
   }
 

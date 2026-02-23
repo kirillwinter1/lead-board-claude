@@ -25,13 +25,13 @@
 | 13 | **Setup Wizard** | F33 | ❌ Не проверен | — | — |
 | 14 | **Auth / OAuth** | F4, F27 | ❌ Не проверен | — | — |
 | 15 | **Sync** | F2, F3, F9, F34 | ✅ Проверен | 2 Critical, 2 High, 4 Medium, 2 Low | [reports/2026-02-21_SYNC.md](reports/2026-02-21_SYNC.md) |
-| 16 | **AutoScore / Planning** | F13, F19, F20, F21 | ❌ Не проверен | — | — |
+| 16 | **AutoScore / Planning** | F13, F19, F20, F21 | ✅ Проверен | 1 High, 4 Medium, 4 Low | [reports/2026-02-23_AUTOSCORE_PLANNING.md](reports/2026-02-23_AUTOSCORE_PLANNING.md) |
 | 17 | **Team Members** | F5, F6, F37, F41 | ✅ Проверен (F41) | 3 High, 6 Medium, 3 Low | [reports/2026-02-19_F41_ABSENCES.md](reports/2026-02-19_F41_ABSENCES.md) |
 | 18 | **Member Absences** | F41 | ✅ Проверен | 3 High, 6 Medium, 3 Low | [reports/2026-02-19_F41_ABSENCES.md](reports/2026-02-19_F41_ABSENCES.md) |
 
 | 19 | **Bug SLA Settings** | F42 | ✅ Проверен (встроен в Settings) | 0 багов | [reports/2026-02-23_BUG_SLA_TO_SETTINGS.md](reports/2026-02-23_BUG_SLA_TO_SETTINGS.md) |
 
-**Прогресс: 12 / 19 экранов проверено (63%)**
+**Прогресс: 13 / 19 экранов проверено (68%)**
 
 ---
 
@@ -40,10 +40,10 @@
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
 | Critical | 0 | 3 | 3 |
-| High | 2 | 11 | 13 |
-| Medium | 7 | 16 | 23 |
-| Low | 3 | 7 | 10 |
-| **Итого** | **12** | **37** | **49** |
+| High | 3 | 11 | 14 |
+| Medium | 11 | 16 | 27 |
+| Low | 7 | 7 | 14 |
+| **Итого** | **21** | **37** | **58** |
 
 ---
 
@@ -160,7 +160,7 @@
 |-----------|-------|--------|
 | P0 | **Board** | Основной экран, частично проверен (визуал), нужны глубокие тесты |
 | ~~P0~~ | ~~**Sync**~~ | ✅ Проверен (2 Critical, 2 High, 4 Medium, 2 Low) |
-| P1 | **AutoScore / Planning** | Ядро бизнес-логики, сложные расчёты |
+| ~~P1~~ | ~~**AutoScore / Planning**~~ | ✅ Проверен (1 High, 4 Medium, 4 Low) |
 | P1 | **Workflow Config** | Центральный конфиг, влияет на всё |
 | P2 | **Data Quality** | 17+ правил, влияет на доверие к данным |
 | P2 | **Timeline** | Визуализация планирования |

@@ -125,6 +125,10 @@ public class RiceTemplateService {
         double rawMin = Math.round(((reachMin * impactMin * confidenceMin) / effortMax) * 100.0) / 100.0;
         double rawMax = Math.round(((reachMax * impactMax * confidenceMax) / effortMin) * 100.0) / 100.0;
 
+        // Fix floating point artifacts (e.g. 0.30000000000000004 → 0.3)
+        rawMin = Math.round(rawMin * 100.0) / 100.0;
+        rawMax = Math.round(rawMax * 100.0) / 100.0;
+
         return new RiceScoreRange(rawMin, rawMax);
     }
 

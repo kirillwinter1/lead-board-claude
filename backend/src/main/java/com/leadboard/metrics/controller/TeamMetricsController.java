@@ -7,10 +7,12 @@ import com.leadboard.metrics.service.TeamMetricsService;
 import com.leadboard.metrics.service.VelocityService;
 import com.leadboard.metrics.service.EpicBurndownService;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/metrics")
@@ -20,6 +22,11 @@ public class TeamMetricsController {
         if (from.isAfter(to)) {
             throw new IllegalArgumentException("'from' date must not be after 'to' date");
         }
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleIllegalArgument(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
     }
 
     private final TeamMetricsService metricsService;
@@ -149,8 +156,12 @@ public class TeamMetricsController {
      * Get epic burndown chart data.
      */
     @GetMapping("/epic-burndown")
-    public EpicBurndownResponse getEpicBurndown(@RequestParam String epicKey) {
-        return burndownService.calculateBurndown(epicKey);
+    public ResponseEntity<?> getEpicBurndown(@RequestParam String epicKey) {
+        try {
+            return ResponseEntity.ok(burndownService.calculateBurndown(epicKey));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     /**

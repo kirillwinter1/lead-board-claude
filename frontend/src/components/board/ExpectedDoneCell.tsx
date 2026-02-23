@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { ExpectedDoneCellProps } from './types'
@@ -9,7 +10,7 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
     minSpaceNeeded: 200,
   })
 
-  if (!forecast) {
+  if (!forecast || !forecast.expectedDone) {
     return <span className="expected-done-empty">--</span>
   }
 
@@ -67,7 +68,7 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
         </span>
       )}
 
-      {showTooltip && tooltipPos && (
+      {showTooltip && tooltipPos && createPortal(
         <div
           className="forecast-tooltip"
           style={{
@@ -102,7 +103,8 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
               Due date: {formatDate(dueDate)}
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

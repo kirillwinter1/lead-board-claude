@@ -26,6 +26,8 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        tenant_identifier_resolver: com.leadboard.tenant.TenantSchemaResolver
+        multi_tenancy: SCHEMA
   flyway:
     enabled: true
     locations: classpath:db/migration

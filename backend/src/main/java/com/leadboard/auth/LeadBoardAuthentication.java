@@ -16,14 +16,22 @@ public class LeadBoardAuthentication implements Authentication {
     private final UserEntity user;
     private final Set<GrantedAuthority> authorities;
     private boolean authenticated = true;
+    private final Long tenantId;
+    private final AppRole tenantRole;
 
     public LeadBoardAuthentication(UserEntity user) {
+        this(user, null, user.getAppRole());
+    }
+
+    public LeadBoardAuthentication(UserEntity user, Long tenantId, AppRole tenantRole) {
         this.user = user;
-        this.authorities = user.getAppRole().getPermissions().stream()
+        this.tenantId = tenantId;
+        this.tenantRole = tenantRole != null ? tenantRole : user.getAppRole();
+        this.authorities = this.tenantRole.getPermissions().stream()
                 .map(SimpleGrantedAuthority::new)
                 .collect(Collectors.toSet());
         // Add role as authority
-        this.authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getAppRole().name()));
+        this.authorities.add(new SimpleGrantedAuthority("ROLE_" + this.tenantRole.name()));
     }
 
     @Override
@@ -78,6 +86,14 @@ public class LeadBoardAuthentication implements Authentication {
     }
 
     public boolean hasPermission(String permission) {
-        return user.getAppRole().hasPermission(permission);
+        return tenantRole.hasPermission(permission);
+    }
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public AppRole getTenantRole() {
+        return tenantRole;
     }
 }

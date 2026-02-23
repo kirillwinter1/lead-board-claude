@@ -4,6 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantService;
+import com.leadboard.tenant.TenantUserEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -32,30 +36,37 @@ public class OAuthService {
     private final UserRepository userRepository;
     private final OAuthTokenRepository tokenRepository;
     private final SessionRepository sessionRepository;
+    private final TenantService tenantService;
     private final WebClient webClient;
 
     // Support concurrent OAuth flows (multiple users logging in simultaneously)
-    private final ConcurrentHashMap<String, Instant> pendingStates = new ConcurrentHashMap<>();
+    // State → (expiry, tenantId) for tenant-aware OAuth
+    private final ConcurrentHashMap<String, OAuthState> pendingStates = new ConcurrentHashMap<>();
 
     public OAuthService(AtlassianOAuthProperties oauthProperties,
                         AppProperties appProperties,
                         UserRepository userRepository,
                         OAuthTokenRepository tokenRepository,
-                        SessionRepository sessionRepository) {
+                        SessionRepository sessionRepository,
+                        TenantService tenantService) {
         this.oauthProperties = oauthProperties;
         this.appProperties = appProperties;
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.sessionRepository = sessionRepository;
+        this.tenantService = tenantService;
         this.webClient = WebClient.builder().build();
     }
 
+    private record OAuthState(Instant expiry, Long tenantId) {}
+
     public String getAuthorizationUrl() {
         String state = UUID.randomUUID().toString();
-        pendingStates.put(state, Instant.now().plusSeconds(600)); // 10 min TTL
+        Long tenantId = TenantContext.getCurrentTenantId();
+        pendingStates.put(state, new OAuthState(Instant.now().plusSeconds(600), tenantId));
 
         // Cleanup expired states
-        pendingStates.entrySet().removeIf(e -> e.getValue().isBefore(Instant.now()));
+        pendingStates.entrySet().removeIf(e -> e.getValue().expiry().isBefore(Instant.now()));
 
         return UriComponentsBuilder.fromUriString(oauthProperties.getAuthorizationUri())
                 .queryParam("audience", "api.atlassian.com")
@@ -72,11 +83,12 @@ public class OAuthService {
     @Transactional
     public CallbackResult handleCallback(String code, String state) {
         // Verify and consume state
-        Instant expiry = pendingStates.remove(state);
-        if (expiry == null || expiry.isBefore(Instant.now())) {
+        OAuthState oauthState = pendingStates.remove(state);
+        if (oauthState == null || oauthState.expiry().isBefore(Instant.now())) {
             log.warn("Invalid or expired OAuth state: {}", state);
             return new CallbackResult(false, "Invalid state parameter", null);
         }
+        Long tenantId = oauthState.tenantId();
 
         try {
             // Exchange code for tokens
@@ -132,14 +144,33 @@ public class OAuthService {
 
             tokenRepository.save(token);
 
-            // Create session
+            // Create tenant_users association if tenant context exists
+            if (tenantId != null) {
+                Optional<TenantEntity> tenantOpt = tenantService.findById(tenantId);
+                if (tenantOpt.isPresent()) {
+                    TenantEntity tenant = tenantOpt.get();
+                    // First user in this tenant gets ADMIN
+                    List<TenantUserEntity> existingTenantUsers = tenantService.findUserTenants(user.getId());
+                    boolean isFirstTenantUser = existingTenantUsers.stream()
+                            .noneMatch(tu -> tu.getTenant().getId().equals(tenantId));
+                    if (isFirstTenantUser) {
+                        // Check if this tenant has any users at all
+                        boolean tenantHasUsers = tenantService.findTenantUser(tenantId, user.getId()).isPresent();
+                        AppRole tenantRole = tenantHasUsers ? AppRole.MEMBER : AppRole.ADMIN;
+                        tenantService.addUserToTenant(tenant, user, tenantRole);
+                    }
+                }
+            }
+
+            // Create session with tenant_id
             SessionEntity session = new SessionEntity();
             session.setId(UUID.randomUUID().toString());
             session.setUser(user);
+            session.setTenantId(tenantId);
             session.setExpiresAt(OffsetDateTime.now().plusDays(appProperties.getSession().getMaxAgeDays()));
             sessionRepository.save(session);
 
-            log.info("OAuth successful for user: {} ({})", user.getDisplayName(), user.getEmail());
+            log.info("OAuth successful for user: {} ({}) tenant: {}", user.getDisplayName(), user.getEmail(), tenantId);
 
             return new CallbackResult(true, null, session.getId());
 
@@ -302,14 +333,16 @@ public class OAuthService {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth instanceof LeadBoardAuthentication leadAuth) {
             UserEntity user = leadAuth.getUser();
+            AppRole effectiveRole = leadAuth.getTenantRole();
             return new AuthStatus(true, new AuthenticatedUser(
                     user.getId(),
                     user.getAtlassianAccountId(),
                     user.getDisplayName(),
                     user.getEmail(),
                     user.getAvatarUrl(),
-                    user.getAppRole().name(),
-                    user.getAppRole().getPermissions()
+                    effectiveRole.name(),
+                    effectiveRole.getPermissions(),
+                    leadAuth.getTenantId()
             ));
         }
         return new AuthStatus(false, null);
@@ -378,7 +411,8 @@ public class OAuthService {
             String email,
             String avatarUrl,
             String role,
-            java.util.Set<String> permissions
+            java.util.Set<String> permissions,
+            Long tenantId
     ) {}
 
     public record AuthStatus(boolean authenticated, AuthenticatedUser user) {}

@@ -103,7 +103,8 @@ class SyncServiceTest {
                 workflowConfigService,
                 autoDetectService,
                 changelogImportService,
-                teamSyncService
+                teamSyncService,
+                null // self (not needed for unit tests, @Async not invoked via proxy)
         );
 
         // Common setup

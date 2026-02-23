@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
 import type { BoardNode } from './types'
 
@@ -59,9 +60,11 @@ export function AlertIcon({ node }: { node: BoardNode }) {
     STORY_BLOCKED_NO_PROGRESS: 'Блокировка без прогресса >30 дней',
     SUBTASK_DONE_NO_TIME_LOGGED: 'Подзадача закрыта без списания времени',
     SUBTASK_TIME_LOGGED_BUT_TODO: 'Списано время, но подзадача в TODO',
+    SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED: 'Списано время, но эпик приостановлен',
+    RICE_MISSING_ASSESSMENT: 'Нет RICE-оценки',
     BUG_SLA_BREACH: 'Баг превысил SLA',
     BUG_STALE: 'Баг без обновлений >14 дней',
-    STORY_FULLY_LOGGED_NOT_DONE: 'Всё время списано, но эпик не закрыт',
+    STORY_FULLY_LOGGED_NOT_DONE: 'Всё время списано, но задача не закрыта',
   }
 
   return (
@@ -75,7 +78,7 @@ export function AlertIcon({ node }: { node: BoardNode }) {
         {count}
       </span>
 
-      {showTooltip && tooltipPos && (
+      {showTooltip && tooltipPos && createPortal(
         <div
           className="alert-tooltip"
           style={{
@@ -101,7 +104,8 @@ export function AlertIcon({ node }: { node: BoardNode }) {
               </div>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

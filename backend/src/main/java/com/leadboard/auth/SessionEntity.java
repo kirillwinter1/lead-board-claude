@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "user_sessions")
+@Table(name = "user_sessions", schema = "public")
 public class SessionEntity {
 
     @Id
@@ -14,6 +14,9 @@ public class SessionEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private UserEntity user;
+
+    @Column(name = "tenant_id")
+    private Long tenantId;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -58,5 +61,13 @@ public class SessionEntity {
 
     public void setExpiresAt(OffsetDateTime expiresAt) {
         this.expiresAt = expiresAt;
+    }
+
+    public Long getTenantId() {
+        return tenantId;
+    }
+
+    public void setTenantId(Long tenantId) {
+        this.tenantId = tenantId;
     }
 }

@@ -203,8 +203,19 @@ public class UnifiedPlanningService {
         int storiesActive = 0;
 
         for (JiraIssueEntity story : stories) {
-            // Skip done stories
+            // Done stories: skip planning but accumulate progress
             if (workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
+                StoryProgressData doneProgress = extractProgressData(story);
+                if (doneProgress.totalEstimate() > 0) {
+                    epicTotalEstimate += doneProgress.totalEstimate();
+                    epicTotalLogged += doneProgress.totalLogged();
+                }
+                Map<String, PhaseProgressInfo> rp = doneProgress.roleProgress();
+                if (rp != null) {
+                    for (Map.Entry<String, PhaseProgressInfo> e : rp.entrySet()) {
+                        accumulateRoleProgress(e.getValue(), e.getKey(), roleEstimate, roleLogged, roleExists, roleDone);
+                    }
+                }
                 continue;
             }
 

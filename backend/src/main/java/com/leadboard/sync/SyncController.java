@@ -30,15 +30,23 @@ public class SyncController {
 
     @GetMapping("/issue-count")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Map<String, Object>> getIssueCount(
+    public ResponseEntity<?> getIssueCount(
             @RequestParam(required = false) Integer months) {
+        // BUG-45: Validate months parameter
+        if (months != null && months < 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "months must be >= 0"));
+        }
         return ResponseEntity.ok(syncService.countIssuesInJira(months));
     }
 
     @PostMapping("/trigger")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<SyncService.SyncStatus> triggerSync(
+    public ResponseEntity<?> triggerSync(
             @RequestParam(required = false) Integer months) {
+        // BUG-45: Validate months parameter
+        if (months != null && months < 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "months must be >= 0"));
+        }
         return ResponseEntity.ok(syncService.triggerSync(months));
     }
 

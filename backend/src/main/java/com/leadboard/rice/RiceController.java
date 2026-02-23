@@ -78,7 +78,7 @@ public class RiceController {
     @GetMapping("/assessments/{issueKey}")
     public ResponseEntity<RiceAssessmentDto> getAssessment(@PathVariable String issueKey) {
         RiceAssessmentDto dto = assessmentService.getAssessment(issueKey);
-        return dto != null ? ResponseEntity.ok(dto) : ResponseEntity.notFound().build();
+        return ResponseEntity.ok(dto);
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")

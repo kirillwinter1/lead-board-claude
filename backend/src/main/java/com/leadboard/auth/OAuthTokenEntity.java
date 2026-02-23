@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "oauth_tokens")
+@Table(name = "oauth_tokens", schema = "public")
 public class OAuthTokenEntity {
 
     @Id

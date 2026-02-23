@@ -1,6 +1,7 @@
 package com.leadboard.config;
 
 import com.leadboard.auth.LeadBoardAuthenticationFilter;
+import com.leadboard.tenant.TenantFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -19,9 +20,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final LeadBoardAuthenticationFilter authenticationFilter;
+    private final TenantFilter tenantFilter;
 
-    public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter) {
+    public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter, TenantFilter tenantFilter) {
         this.authenticationFilter = authenticationFilter;
+        this.tenantFilter = tenantFilter;
     }
 
     @Bean
@@ -33,13 +36,17 @@ public class SecurityConfig {
             // Disable session management - we use OAuth tokens
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 
-            // Add our custom auth filter before the default one
-            .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            // Add tenant filter first, then auth filter
+            .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(authenticationFilter, TenantFilter.class)
 
             // Configure authorization
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints - OAuth flow
                 .requestMatchers("/oauth/atlassian/**").permitAll()
+
+                // Public tenant registration
+                .requestMatchers("/api/public/**").permitAll()
 
                 // Health check
                 .requestMatchers("/api/health").permitAll()

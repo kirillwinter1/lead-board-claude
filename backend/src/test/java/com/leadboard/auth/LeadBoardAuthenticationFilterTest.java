@@ -1,6 +1,7 @@
 package com.leadboard.auth;
 
 import com.leadboard.config.AppProperties;
+import com.leadboard.tenant.TenantUserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,9 @@ class LeadBoardAuthenticationFilterTest {
     private SessionRepository sessionRepository;
 
     @Mock
+    private TenantUserRepository tenantUserRepository;
+
+    @Mock
     private FilterChain filterChain;
 
     private LeadBoardAuthenticationFilter filter;
@@ -35,7 +39,7 @@ class LeadBoardAuthenticationFilterTest {
     @BeforeEach
     void setUp() {
         AppProperties appProperties = new AppProperties();
-        filter = new LeadBoardAuthenticationFilter(sessionRepository, appProperties);
+        filter = new LeadBoardAuthenticationFilter(sessionRepository, tenantUserRepository, appProperties);
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
         SecurityContextHolder.clearContext();
