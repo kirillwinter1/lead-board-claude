@@ -613,7 +613,7 @@ export function TeamMembersPage() {
                 value={formData.role}
                 onChange={e => setFormData({ ...formData, role: e.target.value })}
               >
-                {(roles.length > 0 ? roles : ['SA', 'DEV', 'QA']).map(role => (
+                {roles.map(role => (
                   <option key={role} value={role}>{getRoleDisplayName(role)}</option>
                 ))}
               </select>

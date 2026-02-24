@@ -99,7 +99,7 @@ class RetrospectiveTimelineServiceTest {
             JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
             epic.setBoardCategory("EPIC");
 
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story));
             when(issueRepository.findByIssueKey("PROJ-100"))
                     .thenReturn(Optional.of(epic));
@@ -162,7 +162,7 @@ class RetrospectiveTimelineServiceTest {
             JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
             epic.setBoardCategory("EPIC");
 
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story));
             when(issueRepository.findByIssueKey("PROJ-100"))
                     .thenReturn(Optional.of(epic));
@@ -202,7 +202,7 @@ class RetrospectiveTimelineServiceTest {
             JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
             epic.setBoardCategory("EPIC");
 
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story));
             when(issueRepository.findByIssueKey("PROJ-100"))
                     .thenReturn(Optional.of(epic));
@@ -243,7 +243,7 @@ class RetrospectiveTimelineServiceTest {
             JiraIssueEntity epic = createStory("PROJ-100", "Done", null);
             epic.setBoardCategory("EPIC");
 
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story));
             when(issueRepository.findByIssueKey("PROJ-100"))
                     .thenReturn(Optional.of(epic));
@@ -273,7 +273,7 @@ class RetrospectiveTimelineServiceTest {
         void shouldClosePhaseOnBacklogReturn() {
             JiraIssueEntity story = createStory("PROJ-5", "To Do", "PROJ-100");
             // Story returned to backlog — should be filtered out (it's in NEW status)
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story));
 
             RetrospectiveResult result = service.calculateRetrospective(1L);
@@ -289,7 +289,7 @@ class RetrospectiveTimelineServiceTest {
         void shouldSkipStoriesWithNoTransitions() {
             JiraIssueEntity story = createStory("PROJ-6", "In Development", "PROJ-100");
 
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story));
             when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-6")))
                     .thenReturn(List.of());
@@ -316,7 +316,7 @@ class RetrospectiveTimelineServiceTest {
             epic2.setBoardCategory("EPIC");
             epic2.setSummary("Epic 200");
 
-            when(issueRepository.findByBoardCategoryAndTeamId("STORY", 1L))
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
                     .thenReturn(List.of(story1, story2, story3));
             when(issueRepository.findByIssueKey("PROJ-100")).thenReturn(Optional.of(epic1));
             when(issueRepository.findByIssueKey("PROJ-200")).thenReturn(Optional.of(epic2));

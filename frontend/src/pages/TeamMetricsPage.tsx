@@ -4,6 +4,7 @@ import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
 import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getDsr, DsrResponse } from '../api/metrics'
 import { getConfig } from '../api/config'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './TeamMetricsPage.css'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { DsrGauge } from '../components/metrics/DsrGauge'
@@ -208,6 +209,7 @@ export function WipHistoryChart({ teamId }: WipHistoryChartProps) {
 
 export function TeamMetricsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { issueTypeCategories } = useWorkflowConfig()
   const [teams, setTeams] = useState<Team[]>([])
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
 
@@ -240,6 +242,22 @@ export function TeamMetricsPage() {
       to: to.toISOString().split('T')[0]
     }
   }, [period])
+
+  // Build issue type options from workflow config
+  const issueTypeOptions = useMemo(() => {
+    const categoryLabels: Record<string, string> = {
+      EPIC: 'Epics', STORY: 'Stories', SUBTASK: 'Sub-tasks', BUG: 'Bugs'
+    }
+    const seen = new Set<string>()
+    const options: { value: string; label: string }[] = []
+    for (const [typeName, category] of Object.entries(issueTypeCategories)) {
+      if (!seen.has(typeName) && categoryLabels[category]) {
+        seen.add(typeName)
+        options.push({ value: typeName, label: `${typeName} (${categoryLabels[category]})` })
+      }
+    }
+    return options
+  }, [issueTypeCategories])
 
   // Load config for Jira URL
   useEffect(() => {
@@ -348,9 +366,9 @@ export function TeamMetricsPage() {
             onChange={e => setIssueType(e.target.value)}
           >
             <option value="">All</option>
-            <option value="Epic">Epics</option>
-            <option value="Story">Stories</option>
-            <option value="Sub-task">Sub-tasks</option>
+            {issueTypeOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
           </select>
         </div>
       </div>

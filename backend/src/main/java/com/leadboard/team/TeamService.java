@@ -2,6 +2,7 @@ package com.leadboard.team;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.team.dto.PlanningConfigDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,13 +24,16 @@ public class TeamService {
     private final TeamMemberRepository memberRepository;
     private final ObjectMapper objectMapper;
     private final com.leadboard.sync.JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
     public TeamService(TeamRepository teamRepository, TeamMemberRepository memberRepository,
-                       ObjectMapper objectMapper, com.leadboard.sync.JiraIssueRepository issueRepository) {
+                       ObjectMapper objectMapper, com.leadboard.sync.JiraIssueRepository issueRepository,
+                       WorkflowConfigService workflowConfigService) {
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
         this.objectMapper = objectMapper;
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     // ==================== Team Operations ====================
@@ -125,7 +129,7 @@ public class TeamService {
         member.setTeam(team);
         member.setJiraAccountId(request.jiraAccountId());
         member.setDisplayName(request.displayName());
-        member.setRole(request.role() != null ? request.role() : "DEV");
+        member.setRole(request.role() != null ? request.role() : workflowConfigService.getDefaultRoleCode());
         member.setGrade(request.grade() != null ? request.grade() : Grade.MIDDLE);
         if (request.hoursPerDay() != null) {
             member.setHoursPerDay(request.hoursPerDay());
@@ -183,15 +187,28 @@ public class TeamService {
 
         String configJson = team.getPlanningConfig();
         if (configJson == null || configJson.isBlank()) {
-            return PlanningConfigDto.defaults();
+            return dynamicDefaults();
         }
 
         try {
             return objectMapper.readValue(configJson, PlanningConfigDto.class);
         } catch (JsonProcessingException e) {
             // If parsing fails, return defaults
+            return dynamicDefaults();
+        }
+    }
+
+    private PlanningConfigDto dynamicDefaults() {
+        java.util.List<String> roleCodes = workflowConfigService.getRoleCodesInPipelineOrder();
+        if (roleCodes.isEmpty()) {
             return PlanningConfigDto.defaults();
         }
+        return new PlanningConfigDto(
+                PlanningConfigDto.GradeCoefficients.defaults(),
+                new BigDecimal("0.2"),
+                PlanningConfigDto.WipLimits.defaults(roleCodes),
+                PlanningConfigDto.StoryDuration.defaults(roleCodes)
+        );
     }
 
     public PlanningConfigDto updatePlanningConfig(Long teamId, PlanningConfigDto config) {

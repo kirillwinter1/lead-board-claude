@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.rice.RiceAssessmentService;
 import com.leadboard.rice.dto.RiceAssessmentDto;
@@ -72,15 +73,6 @@ public class AutoScoreCalculator {
     private static final BigDecimal MAX_ALIGNMENT_BOOST = new BigDecimal("10");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
-    // Баллы за статус в Epic Workflow (чем дальше по workflow — тем выше)
-    private static final int STATUS_SCORE_ACCEPTANCE = 30;    // Почти готово
-    private static final int STATUS_SCORE_E2E_TESTING = 30;   // Почти готово
-    private static final int STATUS_SCORE_DEVELOPING = 25;    // Активная разработка
-    private static final int STATUS_SCORE_PLANNED = 15;       // Готов к старту
-    private static final int STATUS_SCORE_ROUGH_ESTIMATE = 10; // Оценивается
-    private static final int STATUS_SCORE_REQUIREMENTS = 5;   // Пишутся БТ
-    private static final int STATUS_SCORE_NEW = -5;           // Не начат
-
     /**
      * Рассчитывает AutoScore для эпика.
      *
@@ -119,7 +111,7 @@ public class AutoScoreCalculator {
     /**
      * Статус: баллы зависят от позиции в Epic Workflow.
      * Чем дальше по workflow — тем выше приоритет (закончить начатое).
-     * Uses WorkflowConfigService for DB-driven score weights with substring fallback.
+     * Uses WorkflowConfigService for DB-driven score weights with category-based fallback.
      */
     private BigDecimal calculateStatusScore(JiraIssueEntity epic) {
         String status = epic.getStatus();
@@ -127,45 +119,8 @@ public class AutoScoreCalculator {
             return BigDecimal.ZERO;
         }
 
-        // Try WorkflowConfigService first (DB-driven)
-        int weight = workflowConfigService.getStatusScoreWeight(status);
-        if (weight != 0) {
-            return BigDecimal.valueOf(weight);
-        }
-
-        // Fallback: substring matching for unmapped statuses
-        String statusLower = status.toLowerCase();
-
-        if (statusLower.contains("acceptance") || statusLower.contains("приёмка") || statusLower.contains("приемка")) {
-            return BigDecimal.valueOf(STATUS_SCORE_ACCEPTANCE);
-        }
-        if (statusLower.contains("e2e") || statusLower.contains("end-to-end")) {
-            return BigDecimal.valueOf(STATUS_SCORE_E2E_TESTING);
-        }
-        if (statusLower.contains("developing") || statusLower.contains("development") ||
-            statusLower.contains("in progress") || statusLower.contains("в работе") ||
-            statusLower.contains("в разработке")) {
-            return BigDecimal.valueOf(STATUS_SCORE_DEVELOPING);
-        }
-        if (statusLower.contains("запланировано") || statusLower.contains("planned") ||
-            statusLower.contains("ready")) {
-            return BigDecimal.valueOf(STATUS_SCORE_PLANNED);
-        }
-        if (statusLower.contains("rough estimate") || statusLower.contains("estimation") ||
-            statusLower.contains("оценка") || statusLower.contains("estimate")) {
-            return BigDecimal.valueOf(STATUS_SCORE_ROUGH_ESTIMATE);
-        }
-        if (statusLower.contains("requirements") || statusLower.contains("требования") ||
-            statusLower.contains("analysis") || statusLower.contains("аналитика")) {
-            return BigDecimal.valueOf(STATUS_SCORE_REQUIREMENTS);
-        }
-        if (statusLower.contains("новое") || statusLower.contains("new") ||
-            statusLower.contains("backlog") || statusLower.contains("to do") ||
-            statusLower.contains("open")) {
-            return BigDecimal.valueOf(STATUS_SCORE_NEW);
-        }
-
-        return BigDecimal.ZERO;
+        int weight = workflowConfigService.getStatusScoreWeightWithFallback(status, BoardCategory.EPIC);
+        return BigDecimal.valueOf(weight);
     }
 
     /**

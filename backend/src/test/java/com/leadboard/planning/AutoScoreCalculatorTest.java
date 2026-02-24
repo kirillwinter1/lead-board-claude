@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.rice.RiceAssessmentService;
 import com.leadboard.rice.dto.RiceAssessmentDto;
@@ -30,17 +31,17 @@ class AutoScoreCalculatorTest {
 
     @BeforeEach
     void setUp() {
-        // WorkflowConfigService returns 0 by default for getStatusScoreWeight,
-        // so the fallback substring matching will be used in tests
         calculator = new AutoScoreCalculator(issueRepository, workflowConfigService, riceAssessmentService);
     }
 
     // ==================== Status Factor Tests (Updated 2026-01-26) ====================
+    // Now tests mock getStatusScoreWeightWithFallback (config-driven, no substring matching)
 
     @Test
     void statusDevelopingGivesHighScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Developing");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Developing", BoardCategory.EPIC)).thenReturn(25);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -51,6 +52,7 @@ class AutoScoreCalculatorTest {
     void statusInProgressGivesHighScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("In Progress");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("In Progress", BoardCategory.EPIC)).thenReturn(25);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -61,6 +63,7 @@ class AutoScoreCalculatorTest {
     void statusInProgressRussianGivesHighScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("В работе");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("В работе", BoardCategory.EPIC)).thenReturn(25);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -71,6 +74,7 @@ class AutoScoreCalculatorTest {
     void statusAcceptanceGivesMaxScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Acceptance");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Acceptance", BoardCategory.EPIC)).thenReturn(30);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -81,6 +85,7 @@ class AutoScoreCalculatorTest {
     void statusE2ETestingGivesMaxScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("E2E Testing");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("E2E Testing", BoardCategory.EPIC)).thenReturn(30);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -91,6 +96,7 @@ class AutoScoreCalculatorTest {
     void statusPlannedGivesMediumScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Запланировано");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Запланировано", BoardCategory.EPIC)).thenReturn(15);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -101,6 +107,7 @@ class AutoScoreCalculatorTest {
     void statusRoughEstimateGivesLowScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Rough Estimate");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Rough Estimate", BoardCategory.EPIC)).thenReturn(10);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -111,16 +118,18 @@ class AutoScoreCalculatorTest {
     void statusRequirementsGivesLowScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Requirements");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Requirements", BoardCategory.EPIC)).thenReturn(8);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
-        assertEquals(new BigDecimal("5"), factors.get("status"));
+        assertEquals(new BigDecimal("8"), factors.get("status"));
     }
 
     @Test
     void statusNewGivesNegativeScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Новое");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Новое", BoardCategory.EPIC)).thenReturn(-5);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -131,6 +140,7 @@ class AutoScoreCalculatorTest {
     void statusBacklogGivesNegativeScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Backlog");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Backlog", BoardCategory.EPIC)).thenReturn(-5);
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -141,6 +151,7 @@ class AutoScoreCalculatorTest {
     void statusDoneGivesZeroScore() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Done");
+        // Default mock returns 0
 
         Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
 
@@ -498,11 +509,13 @@ class AutoScoreCalculatorTest {
         flagged.setStatus("Developing");
         flagged.setPriority("Highest");
         flagged.setFlagged(true);
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Developing", BoardCategory.EPIC)).thenReturn(25);
 
         JiraIssueEntity unflagged = createBasicEpic();
         unflagged.setStatus("Новое");
         unflagged.setPriority("Low");
         unflagged.setFlagged(false);
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Новое", BoardCategory.EPIC)).thenReturn(-5);
 
         BigDecimal flaggedScore = calculator.calculate(flagged);
         BigDecimal unflaggedScore = calculator.calculate(unflagged);
@@ -518,6 +531,7 @@ class AutoScoreCalculatorTest {
         JiraIssueEntity epic = createBasicEpic();
         epic.setStatus("Developing");    // +25
         epic.setPriority("High");        // +15
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Developing", BoardCategory.EPIC)).thenReturn(25);
 
         BigDecimal score = calculator.calculate(epic);
 
@@ -531,11 +545,13 @@ class AutoScoreCalculatorTest {
         highPriority.setStatus("Developing");
         highPriority.setPriority("Highest");
         highPriority.setDueDate(LocalDate.now().plusDays(7));
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Developing", BoardCategory.EPIC)).thenReturn(25);
 
         JiraIssueEntity lowPriority = createBasicEpic();
         lowPriority.setStatus("Новое"); // -5 for status
         lowPriority.setPriority("Low");
         lowPriority.setDueDate(LocalDate.now().plusDays(60));
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Новое", BoardCategory.EPIC)).thenReturn(-5);
 
         BigDecimal highScore = calculator.calculate(highPriority);
         BigDecimal lowScore = calculator.calculate(lowPriority);
@@ -585,9 +601,11 @@ class AutoScoreCalculatorTest {
     void developingEpicScoresHigherThanNewEpic() {
         JiraIssueEntity developing = createBasicEpic();
         developing.setStatus("Developing");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Developing", BoardCategory.EPIC)).thenReturn(25);
 
         JiraIssueEntity newEpic = createBasicEpic();
         newEpic.setStatus("Новое");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Новое", BoardCategory.EPIC)).thenReturn(-5);
 
         BigDecimal developingScore = calculator.calculate(developing);
         BigDecimal newScore = calculator.calculate(newEpic);

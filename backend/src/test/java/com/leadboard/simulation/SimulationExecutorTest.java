@@ -4,6 +4,7 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraTransition;
 import com.leadboard.simulation.dto.SimulationAction;
+import com.leadboard.status.StatusCategory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -60,6 +61,9 @@ class SimulationExecutorTest {
                 new JiraTransition.TransitionTarget("5", "Done", null));
         when(jiraClient.getTransitionsBasicAuth("PROJ-11"))
                 .thenReturn(List.of(transition));
+        // categorize returns IN_PROGRESS for the target, but only DONE transitions available
+        when(workflowConfigService.categorize("In Progress", "Sub-task")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfigService.categorize("Done", "Sub-task")).thenReturn(StatusCategory.DONE);
 
         SimulationAction action = SimulationAction.transition(
                 "PROJ-11", "Sub-task", "Dev One", "New", "In Progress", "Starting work");

@@ -1448,3 +1448,33 @@
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
+/* ========== HYBRID TIMELINE ========== */
+
+/* Forecast phase bars — striped pattern */
+.phase-bar-forecast {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--phase-color),
+    var(--phase-color) 3px,
+    transparent 3px,
+    transparent 6px
+  ) !important;
+}
+
+/* Legend: retro (solid) */
+.legend-retro::before {
+  background: #0065FF;
+}
+
+/* Legend: forecast (striped) */
+.legend-forecast-striped::before {
+  background: repeating-linear-gradient(
+    -45deg,
+    #0065FF,
+    #0065FF 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  opacity: 0.7;
+}
+

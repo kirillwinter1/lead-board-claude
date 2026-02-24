@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -111,36 +112,11 @@ public class StoryAutoScoreService {
             return BigDecimal.ZERO;
         }
 
-        String status = story.getStatus();
+        BoardCategory boardCat = workflowConfigService.categorizeIssueType(story.getIssueType());
+        if (boardCat == null) boardCat = BoardCategory.STORY;
 
-        // Use WorkflowConfigService DB-driven score_weight
-        int scoreWeight = workflowConfigService.getStoryStatusScoreWeight(status);
-        if (scoreWeight > 0) {
-            return BigDecimal.valueOf(scoreWeight);
-        }
-
-        // Fallback: hardcoded matching for unmapped statuses
-        if (matchesStatus(status, "New", "Новое", "Новый")) return BigDecimal.ZERO;
-        if (matchesStatus(status, "Ready", "Готово (к работе)", "Готов")) return BigDecimal.valueOf(10);
-        if (matchesStatus(status, "Analysis", "Анализ")) return BigDecimal.valueOf(20);
-        if (matchesStatus(status, "Analysis Review", "Ревью анализа")) return BigDecimal.valueOf(30);
-        if (matchesStatus(status, "Waiting Dev", "Ожидает разработки")) return BigDecimal.valueOf(40);
-        if (matchesStatus(status, "Development", "Разработка")) return BigDecimal.valueOf(50);
-        if (matchesStatus(status, "Dev Review", "Ревью разработки")) return BigDecimal.valueOf(60);
-        if (matchesStatus(status, "Waiting QA", "Ожидает тестирования")) return BigDecimal.valueOf(70);
-        if (matchesStatus(status, "Testing", "Тестирование")) return BigDecimal.valueOf(80);
-        if (matchesStatus(status, "Test Review", "Ревью тестирования")) return BigDecimal.valueOf(90);
-        if (matchesStatus(status, "Ready to Release", "Готов к релизу")) return BigDecimal.valueOf(100);
-        if (matchesStatus(status, "Done", "Готово")) return BigDecimal.ZERO;
-
-        // Fallback: check using WorkflowConfigService
-        if (workflowConfigService.isDone(status, story.getIssueType())) {
-            return BigDecimal.ZERO;
-        } else if (workflowConfigService.isInProgress(status, story.getIssueType())) {
-            return BigDecimal.valueOf(50);
-        }
-
-        return BigDecimal.ZERO;
+        int weight = workflowConfigService.getStatusScoreWeightWithFallback(story.getStatus(), boardCat);
+        return BigDecimal.valueOf(weight);
     }
 
     private BigDecimal calculateProgressWeight(JiraIssueEntity story) {
@@ -254,17 +230,6 @@ public class StoryAutoScoreService {
         }
 
         return BigDecimal.ZERO;
-    }
-
-    private boolean matchesStatus(String status, String... patterns) {
-        if (status == null) return false;
-        String statusLower = status.toLowerCase();
-        for (String pattern : patterns) {
-            if (statusLower.equals(pattern.toLowerCase())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // ==================== Batch Recalculation Methods ====================

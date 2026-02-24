@@ -1,6 +1,7 @@
 package com.leadboard.simulation;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
@@ -57,6 +58,14 @@ class SimulationPlannerTest {
 
         // Default deviation: return base hours
         when(deviation.applyDailyDeviation(anyDouble())).thenAnswer(inv -> inv.getArgument(0));
+
+        // Default: status name resolution for simulation
+        when(workflowConfigService.getFirstStatusNameForCategory(eq(StatusCategory.DONE), any(BoardCategory.class))).thenReturn("Done");
+        when(workflowConfigService.getFirstStatusNameForCategory(eq(StatusCategory.IN_PROGRESS), any(BoardCategory.class))).thenReturn("In Progress");
+        when(workflowConfigService.getFirstStatusNameForCategory(eq(StatusCategory.DONE), isNull())).thenReturn("Done");
+        when(workflowConfigService.getFirstStatusNameForCategory(eq(StatusCategory.IN_PROGRESS), isNull())).thenReturn("In Progress");
+        when(workflowConfigService.categorize("Done", "Разработка")).thenReturn(StatusCategory.DONE);
+        when(workflowConfigService.getEpicTypeNames()).thenReturn(List.of("Epic"));
     }
 
     @Test

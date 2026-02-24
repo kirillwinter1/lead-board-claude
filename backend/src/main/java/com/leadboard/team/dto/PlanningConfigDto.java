@@ -2,6 +2,7 @@ package com.leadboard.team.dto;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,11 +54,18 @@ public record PlanningConfigDto(
             Map<String, Integer> roleLimits  // Рекомендуемые лимиты по ролям (ключ = код роли)
     ) {
         public static WipLimits defaults() {
+            return defaults(List.of("SA", "DEV", "QA"));
+        }
+
+        public static WipLimits defaults(List<String> roleCodes) {
             Map<String, Integer> roles = new LinkedHashMap<>();
-            roles.put("SA", 2);
-            roles.put("DEV", 3);
-            roles.put("QA", 2);
-            return new WipLimits(6, roles);
+            int total = 0;
+            for (String code : roleCodes) {
+                int limit = "DEV".equals(code) ? 3 : 2;
+                roles.put(code, limit);
+                total += limit;
+            }
+            return new WipLimits(total, roles);
         }
     }
 
@@ -70,10 +78,14 @@ public record PlanningConfigDto(
             Map<String, BigDecimal> roleDurations  // Длительность по ролям (ключ = код роли)
     ) {
         public static StoryDuration defaults() {
+            return defaults(List.of("SA", "DEV", "QA"));
+        }
+
+        public static StoryDuration defaults(List<String> roleCodes) {
             Map<String, BigDecimal> roles = new LinkedHashMap<>();
-            roles.put("SA", new BigDecimal("2"));
-            roles.put("DEV", new BigDecimal("2"));
-            roles.put("QA", new BigDecimal("2"));
+            for (String code : roleCodes) {
+                roles.put(code, new BigDecimal("2"));
+            }
             return new StoryDuration(roles);
         }
     }

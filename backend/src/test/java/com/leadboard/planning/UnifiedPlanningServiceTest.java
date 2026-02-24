@@ -379,6 +379,57 @@ class UnifiedPlanningServiceTest {
         assertNull(plannedStory.phases().get("SA").assigneeAccountId());
     }
 
+    @Test
+    void testDoneStoriesIncludedInPlannedStories() {
+        // Given: Epic with 1 done story and 1 active story
+        JiraIssueEntity epic = createEpic("EPIC-1", "Test Epic", new BigDecimal("80"));
+        JiraIssueEntity doneStory = createStory("STORY-1", "Done Story", "EPIC-1", new BigDecimal("60"));
+        doneStory.setStatus("Done");
+        JiraIssueEntity activeStory = createStory("STORY-2", "Active Story", "EPIC-1", new BigDecimal("50"));
+        JiraIssueEntity devSubtask = createSubtask("SUB-1", "DEV Task", "STORY-2", "Development", 8 * 3600L, 0L);
+
+        // Done story has completed subtasks
+        JiraIssueEntity doneSubtask = createSubtask("SUB-2", "Done DEV", "STORY-1", "Development", 16 * 3600L, 16 * 3600L);
+        doneSubtask.setStatus("Done");
+
+        when(workflowConfigService.isDone("Done", "Story")).thenReturn(true);
+        when(workflowConfigService.isDone("Done", "Development")).thenReturn(true);
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
+                .thenReturn(List.of(epic));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(doneStory, activeStory));
+        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(doneSubtask));
+        when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(devSubtask));
+
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
+        ));
+
+        when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        UnifiedPlanningResult result = service.calculatePlan(TEAM_ID);
+
+        // Then
+        PlannedEpic plannedEpic = result.epics().get(0);
+        assertEquals(2, plannedEpic.stories().size(), "Both done and active stories should be in result");
+
+        // Done story should have null dates (placeholder for retro merge)
+        PlannedStory doneResult = plannedEpic.stories().stream()
+                .filter(s -> s.storyKey().equals("STORY-1")).findFirst().orElseThrow();
+        assertNull(doneResult.startDate(), "Done story should have null startDate (retro fills it)");
+        assertNull(doneResult.endDate(), "Done story should have null endDate (retro fills it)");
+        assertEquals("Done", doneResult.status());
+
+        // Active story should have dates
+        PlannedStory activeResult = plannedEpic.stories().stream()
+                .filter(s -> s.storyKey().equals("STORY-2")).findFirst().orElseThrow();
+        assertNotNull(activeResult.startDate());
+        assertNotNull(activeResult.endDate());
+
+        // Epic progress should include done story's estimate
+        assertTrue(plannedEpic.totalEstimateSeconds() > 0, "Epic should accumulate done story estimates");
+    }
+
     // Helper methods
 
     private JiraIssueEntity createEpic(String key, String summary, BigDecimal autoScore) {

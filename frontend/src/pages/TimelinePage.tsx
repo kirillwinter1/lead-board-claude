@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetroEpic } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult } from '../api/forecast'
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
@@ -13,7 +13,7 @@ import './TimelinePage.css'
 import { getIssueIcon } from '../components/board/helpers'
 
 type ZoomLevel = 'day' | 'week' | 'month'
-type TimelineMode = 'forecast' | 'retrospective'
+type PhaseSource = 'retro' | 'forecast' | 'hybrid'
 
 // Width per unit in pixels for each zoom level
 const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
@@ -72,10 +72,9 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
   let minDate: Date = today
   let maxDate: Date = addDays(today, 30)
 
-  // Use unified plan dates if available
+  // Use unified plan dates if available (hybrid data includes both retro and forecast)
   if (unifiedPlan) {
     for (const epic of unifiedPlan.epics) {
-      // For rough estimate epics, use epic dates directly
       if (epic.isRoughEstimate) {
         if (epic.startDate) {
           const d = new Date(epic.startDate)
@@ -86,7 +85,6 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
           if (d > maxDate) maxDate = d
         }
       } else {
-        // For regular epics, use story dates
         for (const story of epic.stories) {
           if (story.startDate) {
             const d = new Date(story.startDate)
@@ -336,16 +334,15 @@ function calculateRowHeight(epic: PlannedEpic): number {
     return MIN_ROW_HEIGHT
   }
 
-  const activeStories = epic.stories.filter(s => {
-    const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
-    const hasPhases = s.phases && Object.keys(s.phases).length > 0
-    return !isDone && hasPhases && s.startDate && s.endDate
+  // Show all stories that have dates (including done stories with retro dates)
+  const visibleStories = epic.stories.filter(s => {
+    return s.startDate && s.endDate && s.phases && Object.keys(s.phases).length > 0
   })
 
-  if (activeStories.length === 0) return MIN_ROW_HEIGHT
+  if (visibleStories.length === 0) return MIN_ROW_HEIGHT
 
   // Each story on its own lane
-  const numLanes = activeStories.length
+  const numLanes = visibleStories.length
   return Math.max(MIN_ROW_HEIGHT, numLanes * (BAR_HEIGHT + LANE_GAP) + 8)
 }
 
@@ -631,13 +628,19 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const isBlocked = story.blockedBy && story.blockedBy.length > 0
   const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
 
+  // Determine story source for visual styling
+  const storySource: PhaseSource = (story as PlannedStory & { _source?: PhaseSource })._source || 'forecast'
+
   const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.65)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
 
   const renderPhaseSegment = (
     phase: UnifiedPhaseSchedule | null,
     phaseType: string
   ) => {
-    if (!phase || !phase.startDate || !phase.endDate || phase.hours <= 0) return null
+    if (!phase || !phase.startDate || !phase.endDate) return null
 
     const phaseStart = new Date(phase.startDate)
     const phaseEnd = new Date(phase.endDate)
@@ -646,16 +649,60 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
     const phaseLeftPercent = Math.max(0, (phaseStartOffset / duration) * 100)
     const phaseWidthPercent = Math.min(100 - phaseLeftPercent, (phaseDuration / duration) * 100)
 
+    const color = getPhaseColor(phaseType)
+
+    // Determine if this phase is retro (past), forecast (future), or hybrid (crosses today)
+    const isForecast = storySource === 'forecast' || (storySource === 'hybrid' && phaseStart >= today)
+    const isHybrid = storySource === 'hybrid' && phaseStart < today && phaseEnd >= today
+
+    if (isHybrid) {
+      // Split into solid (past) + striped (future) segments
+      const pastDays = daysBetween(phaseStart, today)
+      const totalPhaseDays = phaseDuration
+      const pastPercent = (pastDays / totalPhaseDays) * phaseWidthPercent
+      const futurePercent = phaseWidthPercent - pastPercent
+
+      return (
+        <div key={phaseType}>
+          {/* Solid part (retro/actual) */}
+          <div
+            style={{
+              position: 'absolute',
+              left: `${phaseLeftPercent}%`,
+              width: `${pastPercent}%`,
+              height: '100%',
+              backgroundColor: color,
+              opacity: phase.noCapacity ? 0.4 : 1
+            }}
+          />
+          {/* Striped part (forecast) */}
+          <div
+            className="phase-bar-forecast"
+            style={{
+              position: 'absolute',
+              left: `${phaseLeftPercent + pastPercent}%`,
+              width: `${futurePercent}%`,
+              height: '100%',
+              '--phase-color': color,
+              opacity: phase.noCapacity ? 0.4 : 0.7
+            } as React.CSSProperties}
+          />
+        </div>
+      )
+    }
+
     return (
       <div
         key={phaseType}
+        className={isForecast ? 'phase-bar-forecast' : undefined}
         style={{
           position: 'absolute',
           left: `${phaseLeftPercent}%`,
           width: `${phaseWidthPercent}%`,
           height: '100%',
-          backgroundColor: getPhaseColor(phaseType),
-          opacity: phase.noCapacity ? 0.4 : 1
+          ...(isForecast
+            ? { '--phase-color': color, opacity: phase.noCapacity ? 0.4 : 0.7 } as React.CSSProperties
+            : { backgroundColor: color, opacity: phase.noCapacity ? 0.4 : 1 })
         }}
       />
     )
@@ -727,15 +774,14 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
-  // Filter active stories with phases
+  // Show all stories that have dates and phases (including done stories with retro data)
   const activeStories = stories.filter(s => {
-    const isDone = s.status?.toLowerCase().includes('готов') || s.status?.toLowerCase().includes('done')
     const hasPhases = s.phases && Object.keys(s.phases).length > 0
-    return !isDone && hasPhases && s.startDate && s.endDate
+    return hasPhases && s.startDate && s.endDate
   })
 
   if (activeStories.length === 0) {
-    return <div className="story-empty-text">Нет активных сторей</div>
+    return <div className="story-empty-text">Нет сторей с данными</div>
   }
 
   const storyLanes = allocateStoryLanes(activeStories)
@@ -1143,62 +1189,148 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
   )
 }
 
-// --- Retrospective Adapter ---
-// Converts RetroEpic[] to PlannedEpic[] so existing Gantt rendering works unchanged
-function retroToPlannedEpics(retroEpics: RetroEpic[]): PlannedEpic[] {
+// --- Hybrid Merge ---
+// Merges forecast (unified plan) data with retrospective data.
+// Past phases use retro dates (solid bars), future phases use forecast dates (striped bars).
+function mergeHybridEpics(
+  planEpics: PlannedEpic[],
+  retroResult: RetrospectiveResult | null
+): PlannedEpic[] {
+  if (!retroResult || retroResult.epics.length === 0) {
+    // No retro data — mark all stories as forecast source
+    return planEpics.map(epic => ({
+      ...epic,
+      stories: epic.stories.map(s => {
+        const tagged = { ...s, _source: 'forecast' as PhaseSource }
+        return tagged
+      })
+    }))
+  }
+
   const today = new Date().toISOString().split('T')[0]
-  return retroEpics.map(epic => {
-    const stories: PlannedStory[] = epic.stories.map(story => {
-      const phases: Record<string, UnifiedPhaseSchedule> = {}
-      for (const [role, phase] of Object.entries(story.phases)) {
-        phases[role] = {
-          assigneeAccountId: null,
-          assigneeDisplayName: null,
-          startDate: phase.startDate,
-          endDate: phase.endDate ?? (phase.active ? today : null),
-          hours: phase.durationDays * 8,
-          noCapacity: false,
+
+  // Build retro lookup: epicKey -> { storyKey -> RetroStory }
+  const retroEpicMap = new Map<string, Map<string, { storyKey: string; startDate: string | null; endDate: string | null; phases: Record<string, { startDate: string | null; endDate: string | null; durationDays: number; active: boolean }>; completed: boolean }>>()
+  for (const retroEpic of retroResult.epics) {
+    const storyMap = new Map<string, typeof retroEpic.stories[0]>()
+    for (const story of retroEpic.stories) {
+      storyMap.set(story.storyKey, story)
+    }
+    retroEpicMap.set(retroEpic.epicKey, storyMap)
+  }
+
+  return planEpics.map(epic => {
+    const retroStories = retroEpicMap.get(epic.epicKey)
+
+    const mergedStories: PlannedStory[] = epic.stories.map(story => {
+      const retroStory = retroStories?.get(story.storyKey)
+
+      if (!retroStory) {
+        // No retro data — pure forecast
+        return { ...story, _source: 'forecast' as PhaseSource }
+      }
+
+      // Has retro data — merge phases
+      const mergedPhases: Record<string, UnifiedPhaseSchedule> = {}
+      let source: PhaseSource = 'retro'
+
+      // Collect all role codes from both sources
+      const allRoles = new Set<string>([
+        ...Object.keys(retroStory.phases || {}),
+        ...Object.keys(story.phases || {})
+      ])
+
+      for (const role of allRoles) {
+        const retroPhase = retroStory.phases?.[role]
+        const forecastPhase = story.phases?.[role]
+
+        if (retroPhase && retroPhase.startDate) {
+          // Retro phase exists
+          const retroEnd = retroPhase.endDate ?? (retroPhase.active ? today : retroPhase.startDate)
+
+          if (forecastPhase && forecastPhase.startDate && forecastPhase.endDate) {
+            // Both retro and forecast exist — take retro start, forecast end if still in progress
+            if (retroPhase.active) {
+              // Phase still active — hybrid: retro start + forecast end
+              source = 'hybrid'
+              mergedPhases[role] = {
+                assigneeAccountId: forecastPhase.assigneeAccountId,
+                assigneeDisplayName: forecastPhase.assigneeDisplayName,
+                startDate: retroPhase.startDate,
+                endDate: forecastPhase.endDate,
+                hours: forecastPhase.hours,
+                noCapacity: forecastPhase.noCapacity
+              }
+            } else {
+              // Phase completed — use retro data entirely
+              mergedPhases[role] = {
+                assigneeAccountId: forecastPhase.assigneeAccountId,
+                assigneeDisplayName: forecastPhase.assigneeDisplayName,
+                startDate: retroPhase.startDate,
+                endDate: retroEnd,
+                hours: retroPhase.durationDays * 8,
+                noCapacity: false
+              }
+            }
+          } else {
+            // Only retro — completed phase
+            mergedPhases[role] = {
+              assigneeAccountId: null,
+              assigneeDisplayName: null,
+              startDate: retroPhase.startDate,
+              endDate: retroEnd,
+              hours: retroPhase.durationDays * 8,
+              noCapacity: false
+            }
+          }
+        } else if (forecastPhase && forecastPhase.startDate && forecastPhase.endDate) {
+          // Only forecast — future phase
+          source = source === 'retro' ? 'hybrid' : source
+          mergedPhases[role] = forecastPhase
         }
       }
+
+      // Determine merged story dates
+      const phaseStarts = Object.values(mergedPhases)
+        .map(p => p.startDate).filter(Boolean) as string[]
+      const phaseEnds = Object.values(mergedPhases)
+        .map(p => p.endDate).filter(Boolean) as string[]
+
+      const mergedStart = phaseStarts.length > 0 ? phaseStarts.sort()[0] : story.startDate
+      const mergedEnd = phaseEnds.length > 0 ? phaseEnds.sort().reverse()[0] : story.endDate
+
+      // If story is fully done with no forecast phases, source is 'retro'
+      if (retroStory.completed && !Object.keys(story.phases || {}).length) {
+        source = 'retro'
+      }
+
       return {
-        storyKey: story.storyKey,
-        summary: story.summary,
-        autoScore: null,
-        status: story.status,
-        startDate: story.startDate,
-        endDate: story.endDate ?? (story.completed ? story.startDate : today),
-        phases,
-        blockedBy: [],
-        warnings: [],
-        issueType: null,
-        priority: null,
-        flagged: null,
-        totalEstimateSeconds: null,
-        totalLoggedSeconds: null,
-        progressPercent: story.progressPercent,
-        roleProgress: null,
+        ...story,
+        startDate: mergedStart,
+        endDate: mergedEnd,
+        phases: mergedPhases,
+        _source: source
       }
     })
 
+    // Recalculate epic dates from merged stories
+    const storyStarts = mergedStories
+      .map(s => s.startDate).filter(Boolean) as string[]
+    const storyEnds = mergedStories
+      .map(s => s.endDate).filter(Boolean) as string[]
+
+    const epicStart = storyStarts.length > 0
+      ? storyStarts.sort()[0]
+      : epic.startDate
+    const epicEnd = storyEnds.length > 0
+      ? storyEnds.sort().reverse()[0]
+      : epic.endDate
+
     return {
-      epicKey: epic.epicKey,
-      summary: epic.summary,
-      autoScore: 0,
-      startDate: epic.startDate,
-      endDate: epic.endDate ?? today,
-      stories,
-      phaseAggregation: {},
-      status: epic.status,
-      dueDate: null,
-      totalEstimateSeconds: null,
-      totalLoggedSeconds: null,
-      progressPercent: epic.progressPercent,
-      roleProgress: null,
-      storiesTotal: epic.stories.length,
-      storiesActive: epic.stories.filter(s => !s.completed).length,
-      isRoughEstimate: false,
-      roughEstimates: null,
-      flagged: null,
+      ...epic,
+      startDate: epicStart,
+      endDate: epicEnd,
+      stories: mergedStories
     }
   })
 }
@@ -1282,7 +1414,6 @@ export function TimelinePage() {
   }
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
-  const [mode, setMode] = useState<TimelineMode>('forecast')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
@@ -1355,29 +1486,8 @@ export function TimelinePage() {
       }, 2000) // 2 seconds should cover all staggered animations
     }
 
-    if (mode === 'retrospective') {
-      // Load retrospective data
-      getRetrospective(selectedTeamId)
-        .then(data => {
-          // Convert to unified plan format for rendering
-          const retroEpics = retroToPlannedEpics(data.epics)
-          setUnifiedPlan({
-            teamId: data.teamId,
-            planningDate: data.calculatedAt,
-            epics: retroEpics,
-            warnings: [],
-            assigneeUtilization: {},
-          })
-          setForecast(null)
-          setLoading(false)
-          triggerAnimation()
-        })
-        .catch(err => {
-          setError('Failed to load retrospective: ' + err.message)
-          setLoading(false)
-        })
-    } else if (selectedHistoricalDate && isHistoricalMode) {
-      // Load from historical snapshot
+    if (selectedHistoricalDate && isHistoricalMode) {
+      // Load from historical snapshot (no retro for historical)
       Promise.all([
         getForecastSnapshot(selectedTeamId, selectedHistoricalDate),
         getUnifiedPlanningSnapshot(selectedTeamId, selectedHistoricalDate)
@@ -1393,14 +1503,20 @@ export function TimelinePage() {
           setLoading(false)
         })
     } else {
-      // Load live data
+      // Load live data: all 3 APIs in parallel (hybrid mode)
       Promise.all([
         getForecast(selectedTeamId),
-        getUnifiedPlanning(selectedTeamId)
+        getUnifiedPlanning(selectedTeamId),
+        getRetrospective(selectedTeamId)
       ])
-        .then(([forecastData, planData]) => {
+        .then(([forecastData, planData, retroData]) => {
           setForecast(forecastData)
-          setUnifiedPlan(planData)
+          // Merge hybrid: retro dates for past, forecast for future
+          const hybridEpics = mergeHybridEpics(planData.epics, retroData)
+          setUnifiedPlan({
+            ...planData,
+            epics: hybridEpics
+          })
           setLoading(false)
           triggerAnimation()
         })
@@ -1415,7 +1531,7 @@ export function TimelinePage() {
         clearTimeout(animationTimeoutRef.current)
       }
     }
-  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode, mode])
+  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode])
 
   // Handle historical date selection
   const handleHistoricalDateChange = (date: string) => {
@@ -1533,25 +1649,6 @@ export function TimelinePage() {
         </div>
 
         <div className="filter-group">
-          <label className="filter-label">Режим</label>
-          <div className="timeline-mode-toggle">
-            <button
-              className={`mode-toggle-btn ${mode === 'forecast' ? 'mode-toggle-active' : ''}`}
-              onClick={() => setMode('forecast')}
-            >
-              Прогноз
-            </button>
-            <button
-              className={`mode-toggle-btn ${mode === 'retrospective' ? 'mode-toggle-active' : ''}`}
-              onClick={() => setMode('retrospective')}
-            >
-              Ретроспектива
-            </button>
-          </div>
-        </div>
-
-        {mode === 'forecast' && (
-        <div className="filter-group">
           <label className="filter-label">
             Дата
             {isHistoricalMode && (
@@ -1572,7 +1669,6 @@ export function TimelinePage() {
             ))}
           </select>
         </div>
-        )}
 
         <div className="timeline-legend">
           {getRoleCodes().map(code => (
@@ -1587,12 +1683,14 @@ export function TimelinePage() {
               {code}
             </span>
           ))}
+          <span className="legend-item legend-retro">Факт</span>
+          <span className="legend-item legend-forecast-striped">Прогноз</span>
           <span className="legend-item legend-today">Сегодня</span>
           <span className="legend-item legend-due">Due Date</span>
         </div>
       </div>
 
-      {isHistoricalMode && mode === 'forecast' && (
+      {isHistoricalMode && (
         <div className="historical-mode-banner">
           📜 Просмотр исторического снэпшота от {new Date(selectedHistoricalDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
           <button
@@ -1601,13 +1699,6 @@ export function TimelinePage() {
           >
             Вернуться к текущим данным
           </button>
-        </div>
-      )}
-
-      {mode === 'retrospective' && (
-        <div className="retrospective-mode-banner">
-          Ретроспективный таймлайн: фактическое прохождение стори через фазы на основе данных Jira.
-          Активные стори отображаются до сегодняшнего дня.
         </div>
       )}
 

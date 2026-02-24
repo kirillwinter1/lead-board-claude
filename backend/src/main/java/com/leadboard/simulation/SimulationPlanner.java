@@ -1,6 +1,7 @@
 package com.leadboard.simulation;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
@@ -151,13 +152,13 @@ public class SimulationPlanner {
                             assigneeId,
                             "Phase " + phaseName + " starting, assigning to " + assigneeName
                     ));
-                    // Transition to "In Progress"
+                    // Transition to In Progress
                     actions.add(SimulationAction.transition(
                             subtask.getIssueKey(),
                             subtask.getIssueType(),
                             assigneeName,
                             subtask.getStatus(),
-                            "In Progress",
+                            getInProgressStatusName(subtask.getIssueType()),
                             "Phase " + phaseName + " active, starting subtask"
                     ));
                     // Also log work in the same day
@@ -191,13 +192,7 @@ public class SimulationPlanner {
         }
 
         // Check if all subtasks are done (or will be done by planned actions)
-        Set<String> willBeDone = new HashSet<>();
-        for (SimulationAction action : actions) {
-            if (action.type() == SimulationAction.ActionType.TRANSITION
-                    && "Done".equals(action.toStatus())) {
-                willBeDone.add(action.issueKey());
-            }
-        }
+        Set<String> willBeDone = collectWillBeDoneKeys(actions);
 
         boolean allDone = subtasks.stream().allMatch(st ->
                 workflowConfigService.isDone(st.getStatus(), st.getIssueType())
@@ -209,7 +204,7 @@ public class SimulationPlanner {
                     story.issueType(),
                     null,
                     story.status(),
-                    "Done",
+                    getDoneStatusName(story.issueType()),
                     "All subtasks completed"
             ));
         }
@@ -233,13 +228,7 @@ public class SimulationPlanner {
         }
 
         // Check if any stories are still active after planned actions
-        Set<String> willBeDone = new HashSet<>();
-        for (SimulationAction action : actions) {
-            if (action.type() == SimulationAction.ActionType.TRANSITION
-                    && "Done".equals(action.toStatus())) {
-                willBeDone.add(action.issueKey());
-            }
-        }
+        Set<String> willBeDone = collectWillBeDoneKeys(actions);
 
         boolean allStoriesDone = epic.stories().stream().allMatch(st ->
                 workflowConfigService.isDone(st.status(), st.issueType())
@@ -251,10 +240,27 @@ public class SimulationPlanner {
                     epicTypeName,
                     null,
                     epic.status(),
-                    "Done",
+                    getDoneStatusName(epicTypeName),
                     "All stories completed"
             ));
         }
+    }
+
+    /**
+     * Collects issue keys that will be transitioned to a DONE status by the planned actions.
+     */
+    private Set<String> collectWillBeDoneKeys(List<SimulationAction> actions) {
+        Set<String> willBeDone = new HashSet<>();
+        for (SimulationAction action : actions) {
+            if (action.type() == SimulationAction.ActionType.TRANSITION) {
+                StatusCategory targetCat = workflowConfigService.categorize(
+                        action.toStatus(), action.issueType());
+                if (targetCat == StatusCategory.DONE) {
+                    willBeDone.add(action.issueKey());
+                }
+            }
+        }
+        return willBeDone;
     }
 
     private void planWorklog(
@@ -288,7 +294,7 @@ public class SimulationPlanner {
                     subtask.getIssueType(),
                     assigneeName,
                     subtask.getStatus(),
-                    "Done",
+                    getDoneStatusName(subtask.getIssueType()),
                     "Remaining estimate is 0, completing subtask"
             ));
         } else {
@@ -312,11 +318,23 @@ public class SimulationPlanner {
                         subtask.getIssueType(),
                         assigneeName,
                         subtask.getStatus(),
-                        "Done",
+                        getDoneStatusName(subtask.getIssueType()),
                         "Work completed after logging"
                 ));
             }
         }
+    }
+
+    private String getDoneStatusName(String issueType) {
+        BoardCategory cat = workflowConfigService.categorizeIssueType(issueType);
+        if (cat == null) cat = BoardCategory.STORY;
+        return workflowConfigService.getFirstStatusNameForCategory(StatusCategory.DONE, cat);
+    }
+
+    private String getInProgressStatusName(String issueType) {
+        BoardCategory cat = workflowConfigService.categorizeIssueType(issueType);
+        if (cat == null) cat = BoardCategory.STORY;
+        return workflowConfigService.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, cat);
     }
 
     private double roundToHalf(double value) {

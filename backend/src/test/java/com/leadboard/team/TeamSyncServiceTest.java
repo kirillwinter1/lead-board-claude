@@ -1,6 +1,7 @@
 package com.leadboard.team;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.AtlassianTeamsClient;
 import com.leadboard.jira.AtlassianTeamsClient.*;
 import com.leadboard.sync.JiraIssueRepository;
@@ -43,6 +44,9 @@ class TeamSyncServiceTest {
     private JiraIssueRepository issueRepository;
 
     @Mock
+    private WorkflowConfigService workflowConfigService;
+
+    @Mock
     private TeamService teamService;
 
     private TeamSyncService teamSyncService;
@@ -50,12 +54,14 @@ class TeamSyncServiceTest {
     @BeforeEach
     void setUp() {
         when(teamService.nextAutoColor()).thenReturn("#0052CC");
+        when(workflowConfigService.getDefaultRoleCode()).thenReturn("DEV");
         teamSyncService = new TeamSyncService(
                 teamsClient,
                 teamRepository,
                 memberRepository,
                 jiraProperties,
                 issueRepository,
+                workflowConfigService,
                 teamService
         );
 

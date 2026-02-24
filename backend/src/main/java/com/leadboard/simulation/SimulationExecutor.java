@@ -117,7 +117,7 @@ public class SimulationExecutor {
         }
 
         // 2. Category-based match
-        StatusCategory targetCategory = resolveTargetCategory(targetStatus);
+        StatusCategory targetCategory = resolveTargetCategory(targetStatus, action.issueType());
         if (targetCategory != null) {
             for (JiraTransition t : transitions) {
                 if (t.to() != null) {
@@ -149,12 +149,9 @@ public class SimulationExecutor {
         return null;
     }
 
-    private StatusCategory resolveTargetCategory(String targetStatus) {
+    private StatusCategory resolveTargetCategory(String targetStatus, String issueType) {
         if (targetStatus == null) return null;
-        String lower = targetStatus.toLowerCase();
-        if (lower.contains("progress") || lower.contains("работ")) return StatusCategory.IN_PROGRESS;
-        if (lower.contains("done") || lower.contains("готов") || lower.contains("closed")) return StatusCategory.DONE;
-        return null;
+        return workflowConfigService.categorize(targetStatus, issueType);
     }
 
     private SimulationAction executeAssign(SimulationAction action) {

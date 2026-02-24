@@ -68,6 +68,8 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     List<JiraIssueEntity> findByBoardCategoryAndTeamId(String boardCategory, Long teamId);
 
+    List<JiraIssueEntity> findByBoardCategoryInAndTeamId(List<String> boardCategories, Long teamId);
+
     List<JiraIssueEntity> findByBoardCategoryAndTeamIdOrderByAutoScoreDesc(String boardCategory, Long teamId);
 
     List<JiraIssueEntity> findByBoardCategoryAndTeamIdAndStatusInOrderByAutoScoreDesc(

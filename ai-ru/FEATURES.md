@@ -44,6 +44,7 @@
 | F42 | Bug Management | 2026-02-19 | [features/F42](features/F42_BUG_MANAGEMENT.md) |
 | F43 | Bug Metrics Dashboard | 2026-02-19 | [features/F43](features/F43_BUG_METRICS.md) |
 | F44 | Multi-Tenancy & SaaS Packaging | 2026-02-23 | [features/F44](features/F44_MULTITENANCY.md) |
+| F45 | Гибридный таймлайн | 2026-02-23 | [features/F45](features/F45_HYBRID_TIMELINE.md) |
 
 ## Бэклог (BF)
 

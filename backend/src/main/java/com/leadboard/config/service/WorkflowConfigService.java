@@ -531,6 +531,101 @@ public class WorkflowConfigService {
         return 0;
     }
 
+    // ==================== Score Weight with Category Fallback ====================
+
+    /**
+     * Returns a default score weight for a StatusCategory + BoardCategory pair.
+     * Used as a fallback when no explicit score_weight is configured in DB.
+     *
+     * EPIC scale: NEW→-5, REQUIREMENTS→8, PLANNED→15, IN_PROGRESS→25, DONE→0
+     * STORY scale: NEW→0, REQUIREMENTS→20, PLANNED→30, IN_PROGRESS→50, DONE→0
+     */
+    public int getDefaultScoreWeightForCategory(StatusCategory statusCategory, BoardCategory boardCategory) {
+        if (statusCategory == null || boardCategory == null) return 0;
+        StatusCategory normalized = statusCategory.normalized();
+
+        if (boardCategory == BoardCategory.EPIC) {
+            return switch (normalized) {
+                case NEW -> -5;
+                case REQUIREMENTS -> 8;
+                case PLANNED -> 15;
+                case IN_PROGRESS -> 25;
+                case DONE -> 0;
+                default -> 0;
+            };
+        }
+
+        // STORY / BUG / SUBTASK scale
+        return switch (normalized) {
+            case NEW -> 0;
+            case REQUIREMENTS -> 20;
+            case PLANNED -> 30;
+            case IN_PROGRESS -> 50;
+            case DONE -> 0;
+            default -> 0;
+        };
+    }
+
+    /**
+     * Returns score weight for a status, combining DB lookup + category-based fallback.
+     * Single method that replaces ALL hardcoded substring-matching fallbacks.
+     *
+     * Lookup chain:
+     * 1. DB-driven score_weight (exact match via existing getStatusScoreWeight / getStoryStatusScoreWeight)
+     * 2. Category-based fallback: categorize the status, then use default weight for that category
+     */
+    public int getStatusScoreWeightWithFallback(String status, BoardCategory boardCat) {
+        if (status == null || boardCat == null) return 0;
+        ensureLoaded();
+
+        // 1. Try existing DB-driven lookup
+        int dbWeight;
+        if (boardCat == BoardCategory.EPIC) {
+            dbWeight = getStatusScoreWeight(status);
+        } else {
+            dbWeight = getStoryStatusScoreWeight(status);
+        }
+        if (dbWeight != 0) return dbWeight;
+
+        // 2. Category-based fallback: categorize the status, then get default weight
+        StatusCategory statusCategory = categorizeByBoardCategory(status, boardCat);
+        return getDefaultScoreWeightForCategory(statusCategory, boardCat);
+    }
+
+    /**
+     * Returns the first status name mapped to a given StatusCategory for a BoardCategory.
+     * Used by SimulationPlanner to get real status names like "Done" or "In Progress" from config.
+     */
+    public String getFirstStatusNameForCategory(StatusCategory target, BoardCategory boardCat) {
+        if (target == null || boardCat == null) return null;
+        ensureLoaded();
+
+        String prefix = boardCat.name() + ":";
+        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+            if (entry.getKey().startsWith(prefix) && entry.getValue() == target) {
+                return entry.getKey().substring(prefix.length());
+            }
+        }
+
+        // BUG fallback: try STORY mappings
+        if (boardCat == BoardCategory.BUG) {
+            String storyPrefix = "STORY:";
+            for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+                if (entry.getKey().startsWith(storyPrefix) && entry.getValue() == target) {
+                    return entry.getKey().substring(storyPrefix.length());
+                }
+            }
+        }
+
+        // Hardcoded last resort for common status names
+        return switch (target) {
+            case DONE -> "Done";
+            case IN_PROGRESS -> "In Progress";
+            case NEW -> "New";
+            default -> null;
+        };
+    }
+
     // ==================== Link Types ====================
 
     public LinkCategory categorizeLinkType(String linkTypeName) {

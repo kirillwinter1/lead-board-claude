@@ -203,7 +203,7 @@ public class UnifiedPlanningService {
         int storiesActive = 0;
 
         for (JiraIssueEntity story : stories) {
-            // Done stories: skip planning but accumulate progress
+            // Done stories: accumulate progress and add placeholder PlannedStory (dates come from retro)
             if (workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
                 StoryProgressData doneProgress = extractProgressData(story);
                 if (doneProgress.totalEstimate() > 0) {
@@ -216,6 +216,25 @@ public class UnifiedPlanningService {
                         accumulateRoleProgress(e.getValue(), e.getKey(), roleEstimate, roleLogged, roleExists, roleDone);
                     }
                 }
+
+                // Add placeholder PlannedStory so frontend can merge with retro data
+                plannedStories.add(new PlannedStory(
+                        story.getIssueKey(),
+                        story.getSummary(),
+                        story.getAutoScore(),
+                        story.getStatus(),
+                        null, null,
+                        Map.of(),
+                        story.getIsBlockedBy() != null ? story.getIsBlockedBy() : List.of(),
+                        List.of(),
+                        story.getIssueType(),
+                        story.getPriority(),
+                        story.getFlagged(),
+                        doneProgress.totalEstimate(),
+                        doneProgress.totalLogged(),
+                        doneProgress.progressPercent(),
+                        doneProgress.roleProgress()
+                ));
                 continue;
             }
 
@@ -244,6 +263,13 @@ public class UnifiedPlanningService {
                 ));
 
                 StoryProgressData progressData = extractProgressData(story);
+
+                // Accumulate progress even for stories without estimates (may have logged time)
+                if (progressData.totalEstimate() > 0 || progressData.totalLogged() > 0) {
+                    epicTotalEstimate += progressData.totalEstimate();
+                    epicTotalLogged += progressData.totalLogged();
+                }
+
                 plannedStories.add(new PlannedStory(
                         story.getIssueKey(),
                         story.getSummary(),

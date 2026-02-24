@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -32,11 +33,14 @@ class StoryAutoScoreServiceTest {
 
     @BeforeEach
     void setUp() {
-        // WorkflowConfigService returns 0 by default for getStoryStatusSortOrder,
-        // so the fallback matchesStatus will be used in tests
         lenient().when(workflowConfigService.isBug("Bug")).thenReturn(true);
         lenient().when(workflowConfigService.isBug("Баг")).thenReturn(true);
         lenient().when(workflowConfigService.isBug("Дефект")).thenReturn(true);
+        // Default categorization: Story → STORY
+        lenient().when(workflowConfigService.categorizeIssueType("Story")).thenReturn(BoardCategory.STORY);
+        lenient().when(workflowConfigService.categorizeIssueType("Bug")).thenReturn(BoardCategory.BUG);
+        lenient().when(workflowConfigService.categorizeIssueType("Баг")).thenReturn(BoardCategory.BUG);
+        lenient().when(workflowConfigService.categorizeIssueType("Дефект")).thenReturn(BoardCategory.BUG);
         service = new StoryAutoScoreService(issueRepository, workflowConfigService);
     }
 
@@ -73,11 +77,13 @@ class StoryAutoScoreServiceTest {
     }
 
     // ==================== Status Factor Tests ====================
+    // Tests mock getStatusScoreWeightWithFallback (config-driven, no hardcoded status matching)
 
     @Test
     void statusNewGivesZeroScore() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("New");
+        // Default mock returns 0
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -88,6 +94,7 @@ class StoryAutoScoreServiceTest {
     void statusTestReviewGives90Score() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Test Review");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Test Review", BoardCategory.STORY)).thenReturn(90);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -98,6 +105,7 @@ class StoryAutoScoreServiceTest {
     void statusDevelopmentGives50Score() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Development");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Development", BoardCategory.STORY)).thenReturn(50);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -108,6 +116,7 @@ class StoryAutoScoreServiceTest {
     void statusReadyToReleaseGivesMaxScore() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Ready to Release");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Ready to Release", BoardCategory.STORY)).thenReturn(100);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -118,6 +127,7 @@ class StoryAutoScoreServiceTest {
     void statusReadyGives10Score() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Ready");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Ready", BoardCategory.STORY)).thenReturn(10);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -128,6 +138,7 @@ class StoryAutoScoreServiceTest {
     void statusAnalysisGives20Score() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Analysis");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Analysis", BoardCategory.STORY)).thenReturn(20);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -138,6 +149,7 @@ class StoryAutoScoreServiceTest {
     void statusWaitingDevGives40Score() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Waiting Dev");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Waiting Dev", BoardCategory.STORY)).thenReturn(40);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -148,6 +160,7 @@ class StoryAutoScoreServiceTest {
     void statusTestingGives80Score() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Testing");
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Testing", BoardCategory.STORY)).thenReturn(80);
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -158,6 +171,7 @@ class StoryAutoScoreServiceTest {
     void statusDoneGivesZeroScore() {
         JiraIssueEntity story = createBasicStory();
         story.setStatus("Done");
+        // Default mock returns 0
 
         Map<String, BigDecimal> breakdown = service.calculateScoreBreakdown(story);
 
@@ -430,6 +444,7 @@ class StoryAutoScoreServiceTest {
         story.setIssueType("Bug"); // +100
         story.setStatus("Development"); // +50
         story.setPriority("Highest"); // +40
+        when(workflowConfigService.getStatusScoreWeightWithFallback("Development", BoardCategory.BUG)).thenReturn(50);
 
         BigDecimal score = service.calculateAutoScore(story);
 

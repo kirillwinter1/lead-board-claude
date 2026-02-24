@@ -41,8 +41,8 @@ public class RetrospectiveTimelineService {
     }
 
     public RetrospectiveResult calculateRetrospective(Long teamId) {
-        // Load STORY-level issues for team
-        List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryAndTeamId("STORY", teamId);
+        // Load STORY and BUG level issues for team
+        List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), teamId);
 
         // Filter out stories that were never started (still in NEW/TODO status)
         List<JiraIssueEntity> startedStories = stories.stream()

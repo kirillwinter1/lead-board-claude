@@ -1,6 +1,7 @@
 package com.leadboard.team;
 
 import com.leadboard.config.JiraProperties;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.AtlassianTeamsClient;
 import com.leadboard.jira.AtlassianTeamsClient.AtlassianTeam;
 import com.leadboard.jira.AtlassianTeamsClient.AtlassianUser;
@@ -29,6 +30,7 @@ public class TeamSyncService {
     private final TeamMemberRepository memberRepository;
     private final JiraProperties jiraProperties;
     private final com.leadboard.sync.JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
     private final TeamService teamService;
 
@@ -42,12 +44,14 @@ public class TeamSyncService {
             TeamMemberRepository memberRepository,
             JiraProperties jiraProperties,
             com.leadboard.sync.JiraIssueRepository issueRepository,
+            WorkflowConfigService workflowConfigService,
             TeamService teamService) {
         this.teamsClient = teamsClient;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
         this.jiraProperties = jiraProperties;
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
         this.teamService = teamService;
     }
 
@@ -228,7 +232,7 @@ public class TeamSyncService {
         TeamMemberEntity member = new TeamMemberEntity();
         member.setTeam(team);
         member.setJiraAccountId(accountId);
-        member.setRole("DEV"); // Default role
+        member.setRole(workflowConfigService.getDefaultRoleCode());
         member.setGrade(Grade.MIDDLE); // Default grade
         member.setHoursPerDay(new BigDecimal("6.0")); // Default hours
         member.setActive(true);
