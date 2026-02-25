@@ -1,30 +1,12 @@
 import { NavLink, Outlet, useSearchParams } from 'react-router-dom'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import logo from '../icons/logo.png'
+import { useAuth } from '../contexts/AuthContext'
 import { SetupWizardPage } from '../pages/SetupWizardPage'
 import './Header.css'
 
 declare const __APP_VERSION__: string
-
-interface AuthUser {
-  id: number
-  accountId: string
-  displayName: string
-  email: string
-  avatarUrl: string | null
-  role: string
-  permissions: string[]
-}
-
-interface AuthStatus {
-  authenticated: boolean
-  user: AuthUser | null
-}
-
-function isAdmin(user: AuthUser | null | undefined): boolean {
-  return user?.role === 'ADMIN'
-}
 
 interface SyncStatus {
   syncInProgress: boolean
@@ -36,30 +18,16 @@ interface SyncStatus {
 
 export function Layout() {
   const [searchParams] = useSearchParams()
-  const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null)
+  const auth = useAuth()
   const [setupRequired, setSetupRequired] = useState<boolean | null>(null)
 
   // Preserve teamId in navigation links
   const teamId = searchParams.get('teamId')
   const queryString = teamId ? `?teamId=${teamId}` : ''
 
-  const fetchAuthStatus = useCallback(() => {
-    axios.get<AuthStatus>('/oauth/atlassian/status')
-      .then(response => {
-        setAuthStatus(response.data)
-      })
-      .catch(() => {
-        setAuthStatus({ authenticated: false, user: null })
-      })
-  }, [])
-
-  useEffect(() => {
-    fetchAuthStatus()
-  }, [fetchAuthStatus])
-
   // Check if initial setup is needed
   useEffect(() => {
-    if (authStatus?.authenticated) {
+    if (auth.authenticated) {
       axios.get<SyncStatus>('/api/sync/status')
         .then(res => {
           setSetupRequired(res.data.lastSyncCompletedAt === null)
@@ -68,27 +36,14 @@ export function Layout() {
           setSetupRequired(false)
         })
     }
-  }, [authStatus?.authenticated])
+  }, [auth.authenticated])
 
   const handleLogin = () => {
     window.location.href = '/oauth/atlassian/authorize'
   }
 
-  const handleLogout = () => {
-    axios.post('/oauth/atlassian/logout')
-      .then(() => {
-        // Clear wizard state on logout (BUG-74)
-        localStorage.removeItem('setupWizardStep')
-        localStorage.removeItem('setupWizardMonths')
-        setAuthStatus({ authenticated: false, user: null })
-      })
-      .catch(err => {
-        console.error('Logout failed:', err)
-      })
-  }
-
-  const showWizard = authStatus?.authenticated && setupRequired === true
-  const showNav = authStatus?.authenticated && !showWizard
+  const showWizard = auth.authenticated && setupRequired === true
+  const showNav = auth.authenticated && !showWizard
 
   return (
     <div className="app">
@@ -114,9 +69,11 @@ export function Layout() {
               <NavLink to={`/bug-metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Bugs
               </NavLink>
-              <NavLink to={`/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-                Poker
-              </NavLink>
+              {auth.hasPermission('poker:participate') && (
+                <NavLink to={`/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                  Poker
+                </NavLink>
+              )}
               <NavLink to={`/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Teams
               </NavLink>
@@ -126,7 +83,7 @@ export function Layout() {
               <NavLink to={`/project-timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Project Timeline
               </NavLink>
-              {isAdmin(authStatus?.user) && (
+              {auth.isAdmin() && (
                 <NavLink to="/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                   Settings
                 </NavLink>
@@ -136,13 +93,13 @@ export function Layout() {
         </div>
         <div className="header-right">
           <div className="auth-status">
-            {authStatus?.authenticated && authStatus.user ? (
+            {auth.authenticated && auth.user ? (
               <div className="user-info">
-                {authStatus.user.avatarUrl && (
-                  <img src={authStatus.user.avatarUrl} alt="" className="user-avatar" />
+                {auth.user.avatarUrl && (
+                  <img src={auth.user.avatarUrl} alt="" className="user-avatar" />
                 )}
-                <span className="user-name">{authStatus.user.displayName}</span>
-                <button className="btn btn-link btn-logout" onClick={handleLogout}>
+                <span className="user-name">{auth.user.displayName}</span>
+                <button className="btn btn-link btn-logout" onClick={auth.logout}>
                   Logout
                 </button>
               </div>
@@ -154,9 +111,9 @@ export function Layout() {
           </div>
         </div>
       </header>
-      {authStatus?.authenticated ? (
+      {auth.authenticated ? (
         showWizard ? (
-          isAdmin(authStatus?.user) ? (
+          auth.isAdmin() ? (
             <SetupWizardPage onComplete={() => setSetupRequired(false)} />
           ) : (
             <div className="setup-waiting">
@@ -167,7 +124,7 @@ export function Layout() {
         ) : setupRequired === false ? (
           <Outlet />
         ) : null
-      ) : authStatus !== null ? (
+      ) : auth.loading ? null : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 56px)', gap: '16px' }}>
           <h2 style={{ margin: 0, color: '#333' }}>Log in to continue</h2>
           <p style={{ margin: 0, color: '#666' }}>You need to authenticate with Atlassian to access the board</p>
@@ -175,7 +132,7 @@ export function Layout() {
             Login with Atlassian
           </button>
         </div>
-      ) : null}
+      )}
       <div style={{ position: 'fixed', bottom: '8px', right: '12px', fontSize: '11px', color: '#aaa', pointerEvents: 'none', zIndex: 1 }}>
         v{__APP_VERSION__}
       </div>

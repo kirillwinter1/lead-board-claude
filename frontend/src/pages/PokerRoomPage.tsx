@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import { getConfig } from '../api/config'
 import { teamsApi, TeamMember } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { useAuth, type AuthUser } from '../contexts/AuthContext'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -21,34 +21,20 @@ import { usePokerWebSocket } from '../hooks/usePokerWebSocket'
 
 const VOTE_OPTIONS = [2, 4, 8, 12, 16, 24, 32, 40, -1] // -1 = "?"
 
-interface AuthUser {
-  id: number
-  accountId: string
-  displayName: string
-  email: string
-  avatarUrl: string | null
-  role: string
-  permissions: string[]
-}
-
-interface AuthStatus {
-  authenticated: boolean
-  user: AuthUser | null
-}
-
 export function PokerRoomPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
   const navigate = useNavigate()
   const { getRoleCodes, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
+  const auth = useAuth()
 
   const [session, setSession] = useState<PokerSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState('')
 
-  // Auth state
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
+  // Auth state from context
+  const authUser: AuthUser | null = auth.user
+  const authLoading = auth.loading
   const [userRole, setUserRole] = useState<string | null>(null)
   const [showRoleSelector, setShowRoleSelector] = useState(false)
   const [isFacilitator, setIsFacilitator] = useState(false)
@@ -76,22 +62,12 @@ export function PokerRoomPage() {
   // Final estimate inputs - dynamic map
   const [finalEstimateInputs, setFinalEstimateInputs] = useState<Record<string, string>>({})
 
-  // Fetch auth status
+  // Show error if not authenticated
   useEffect(() => {
-    axios.get<AuthStatus>('/oauth/atlassian/status')
-      .then(response => {
-        if (response.data.authenticated && response.data.user) {
-          setAuthUser(response.data.user)
-        } else {
-          setError('Необходимо авторизоваться для участия в сессии')
-        }
-        setAuthLoading(false)
-      })
-      .catch(() => {
-        setError('Не удалось проверить авторизацию')
-        setAuthLoading(false)
-      })
-  }, [])
+    if (!auth.loading && !auth.authenticated) {
+      setError('Необходимо авторизоваться для участия в сессии')
+    }
+  }, [auth.loading, auth.authenticated])
 
   // Initialize newStoryNeedsRoles when roles load
   useEffect(() => {

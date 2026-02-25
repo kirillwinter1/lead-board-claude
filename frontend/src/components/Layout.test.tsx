@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import axios from 'axios'
 import { Layout } from './Layout'
+import { AuthProvider } from '../contexts/AuthContext'
 
 vi.mock('axios')
 const mockedAxios = vi.mocked(axios)
@@ -20,7 +21,7 @@ const authenticatedResponse = {
       email: 'john@example.com',
       avatarUrl: 'https://example.com/avatar.jpg',
       role: 'ADMIN',
-      permissions: [],
+      permissions: ['poker:participate'],
     },
   },
 }
@@ -47,7 +48,9 @@ describe('Layout', () => {
   const renderLayout = (route = '/') => {
     return render(
       <MemoryRouter initialEntries={[route]}>
-        <Layout />
+        <AuthProvider>
+          <Layout />
+        </AuthProvider>
       </MemoryRouter>
     )
   }
@@ -99,6 +102,35 @@ describe('Layout', () => {
 
         const timelineLink = screen.getByText('Timeline').closest('a')
         expect(timelineLink).toHaveAttribute('href', '/timeline?teamId=5')
+      })
+    })
+
+    it('should hide Poker tab for VIEWER role', async () => {
+      mockedAxios.get.mockImplementation((url: string) => {
+        if (url.includes('/oauth/atlassian/status')) {
+          return Promise.resolve({
+            data: {
+              authenticated: true,
+              user: {
+                id: 1, accountId: 'acc-123', displayName: 'Viewer',
+                email: 'v@test.com', avatarUrl: null, role: 'VIEWER',
+                permissions: ['board:view'],
+              },
+            },
+          })
+        }
+        if (url.includes('/api/sync/status')) {
+          return Promise.resolve(syncCompletedResponse)
+        }
+        return Promise.resolve({ data: {} })
+      })
+
+      renderLayout()
+
+      await waitFor(() => {
+        expect(screen.getByText('Board')).toBeInTheDocument()
+        expect(screen.queryByText('Poker')).not.toBeInTheDocument()
+        expect(screen.queryByText('Settings')).not.toBeInTheDocument()
       })
     })
   })
@@ -208,7 +240,7 @@ describe('Layout', () => {
                 email: 'jane@example.com',
                 avatarUrl: null,
                 role: 'MEMBER',
-                permissions: [],
+                permissions: ['board:view', 'poker:participate'],
               },
             },
           })

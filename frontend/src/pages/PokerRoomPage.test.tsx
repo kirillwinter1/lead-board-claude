@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { PokerRoomPage } from './PokerRoomPage'
+import { AuthProvider } from '../contexts/AuthContext'
 import * as pokerApi from '../api/poker'
 import * as configApi from '../api/config'
 
@@ -106,9 +107,11 @@ const mockSession = {
 const renderPokerRoomPage = (roomCode = 'ABC123') => {
   return render(
     <MemoryRouter initialEntries={[`/poker/room/${roomCode}`]}>
-      <Routes>
-        <Route path="/poker/room/:roomCode" element={<PokerRoomPage />} />
-      </Routes>
+      <AuthProvider>
+        <Routes>
+          <Route path="/poker/room/:roomCode" element={<PokerRoomPage />} />
+        </Routes>
+      </AuthProvider>
     </MemoryRouter>
   )
 }

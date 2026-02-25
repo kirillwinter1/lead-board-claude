@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { ProtectedRoute } from './components/ProtectedRoute'
 import { BoardPage } from './pages/BoardPage'
 import { TeamsPage } from './pages/TeamsPage'
 import { TeamMembersPage } from './pages/TeamMembersPage'
@@ -18,6 +19,7 @@ import { ProjectTimelinePage } from './pages/ProjectTimelinePage'
 import { LandingPage } from './pages/landing/LandingPage'
 import RegistrationPage from './pages/RegistrationPage'
 import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
+import { AuthProvider } from './contexts/AuthContext'
 import { getTenantSlug } from './utils/tenant'
 import './App.css'
 
@@ -29,6 +31,7 @@ function TenantAwareRoot() {
 function App() {
   return (
     <BrowserRouter>
+      <AuthProvider>
       <WorkflowConfigProvider>
       <Routes>
         <Route path="/landing" element={<LandingPage />} />
@@ -46,12 +49,13 @@ function App() {
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
           <Route path="teams/:teamId/member/:memberId" element={<MemberProfilePage />} />
           <Route path="teams/:teamId/competency" element={<TeamCompetencyPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="workflow" element={<WorkflowConfigPage />} />
+          <Route path="settings" element={<ProtectedRoute roles={['ADMIN']}><SettingsPage /></ProtectedRoute>} />
+          <Route path="workflow" element={<ProtectedRoute roles={['ADMIN']}><WorkflowConfigPage /></ProtectedRoute>} />
           <Route path="bug-metrics" element={<BugMetricsPage />} />
         </Route>
       </Routes>
       </WorkflowConfigProvider>
+      </AuthProvider>
     </BrowserRouter>
   )
 }
