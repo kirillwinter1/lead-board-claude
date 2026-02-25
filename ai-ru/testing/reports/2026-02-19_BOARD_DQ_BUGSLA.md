@@ -58,7 +58,7 @@
 | BUG-10 | BoardPage.test.tsx — 6 тестов сломаны (missing `getStatusStyles` mock) | `BoardPage.test.tsx` | Pre-existing регрессия, мок `../api/board` не включает `getStatusStyles` |
 | BUG-33 | BugSlaSettingsPage — error swallowing в 4 catch-блоках | `BugSlaSettingsPage.tsx:61,88,106,119` | `setError(generic message)` без деталей ошибки |
 | BUG-34 | DataQualityPage — axios error details lost | `DataQualityPage.tsx:195-199` | Network status/response body теряется |
-| BUG-35 | Hardcoded PRIORITY_COLORS в BugSlaSettingsPage | `BugSlaSettingsPage.tsx:13-21` | Нарушает Design System: цвета должны из конфигурации |
+| BUG-35 | Hardcoded PRIORITY_COLORS в BugSlaSettingsPage | `BugSlaSettingsPage.tsx:13-21` | ✅ FIXED (extracted to helpers/priorityColors.ts) |
 | BUG-36 | Нет aria-label на drag handle и alert icon | `BoardRow.tsx:43-50`, `AlertIcon.tsx:74-76` | Accessibility: screen readers не могут идентифицировать элементы |
 
 ### Low

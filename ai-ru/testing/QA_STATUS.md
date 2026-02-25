@@ -57,7 +57,7 @@
 
 | Bug ID | Severity | Описание | Статус |
 |--------|----------|----------|--------|
-| BUG-10 | High | 24 фронтенд-теста сломаны (регрессия F35/F36/F37) | OPEN |
+| BUG-10 | High | 24 фронтенд-теста сломаны (регрессия F35/F36/F37) | ✅ FIXED (all 235 tests pass) |
 | BUG-11 | Medium | RICE by-code endpoint case-sensitive | ✅ FIXED (findByCodeIgnoreCase) |
 | BUG-12 | Medium | Floating point artifact в score-range (0.3000...04) | ✅ FIXED (additional rounding) |
 | BUG-13 | Medium | Нет тестов для TeamService color methods | OPEN |
@@ -76,7 +76,7 @@
 | BUG-1 | Critical | epic-burndown 500 на несуществующем эпике | ✅ FIXED (@ExceptionHandler + try-catch) |
 | BUG-2 | High | Broken Jira URL в ForecastAccuracyChart (нет `/browse/`) | ✅ FIXED (already had /browse/) |
 | BUG-3 | High | Backend compilation error — ProjectService | ✅ FIXED (method exists, compiles) |
-| BUG-4 | High | Frontend тесты — 53/240 падают (missing mock) | OPEN |
+| BUG-4 | High | Frontend тесты — 53/240 падают (missing mock) | ✅ FIXED (all 235 tests pass) |
 | BUG-5 | Medium | Inverted date range (from > to) → 200 вместо 400 | ✅ FIXED (@ExceptionHandler → 400) |
 | BUG-6 | Medium | Race conditions — нет AbortController | ✅ FIXED (already has AbortController) |
 | BUG-7 | Medium | Silent error swallowing в метриках | ✅ FIXED (already has setError) |
@@ -107,7 +107,7 @@
 | BUG-22 | Medium | 0 controller-level тестов для 5 endpoints | OPEN |
 | BUG-23 | Medium | Нет aria-label на интерактивных элементах | ✅ FIXED (aria-labels added) |
 | BUG-24 | Medium | Нет @DisplayName в backend тестах | OPEN |
-| BUG-25 | Medium | Несогласованность формата createdAt (offset vs UTC) | OPEN |
+| BUG-25 | Medium | Несогласованность формата createdAt (offset vs UTC) | ✅ FIXED (spring.jackson.time-zone: UTC) |
 | BUG-26 | Low | TypeScript `any` type в catch handler | ✅ FIXED (already uses err: unknown) |
 | BUG-27 | Low | `today` memo без deps (не обновится в полночь) | ✅ FIXED (startDate dep) |
 | BUG-28 | Low | Tooltip может выйти за viewport | ✅ FIXED (boundary clamping) |
@@ -171,7 +171,7 @@
 | BUG-32 | High | Тихое проглатывание ошибки в PriorityCell tooltip (зависает loading) | ✅ FIXED (already has loadError) |
 | BUG-33 | Medium | BugSlaSettingsPage — error swallowing в 4 catch-блоках | ✅ FIXED (axios status details) |
 | BUG-34 | Medium | DataQualityPage — axios error details lost | ✅ FIXED (already uses isAxiosError) |
-| BUG-35 | Medium | Hardcoded PRIORITY_COLORS в BugSlaSettingsPage | OPEN (standard Jira colors) |
+| BUG-35 | Medium | Hardcoded PRIORITY_COLORS в BugSlaSettingsPage | ✅ FIXED (extracted to helpers/priorityColors.ts) |
 | BUG-36 | Medium | Нет aria-label на drag handle и alert icon | ✅ FIXED (already has aria-labels) |
 | BUG-37 | Low | Hardcoded score colors в PriorityCell | OPEN (low priority) |
 | BUG-38 | Low | Hardcoded severity labels/rule names в AlertIcon | OPEN (localization scope) |

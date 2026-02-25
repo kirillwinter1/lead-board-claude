@@ -4,26 +4,13 @@ import axios from 'axios'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { fetchBugMetrics, BugMetricsResponse } from '../api/metrics'
+import { getPriorityColor } from '../helpers/priorityColors'
 import './BugMetricsPage.css'
 
 interface Team {
   id: number
   name: string
   color: string | null
-}
-
-const PRIORITY_COLORS: Record<string, string> = {
-  Blocker: '#cc0000',
-  Critical: '#de350b',
-  Highest: '#de350b',
-  High: '#ff5630',
-  Medium: '#ffab00',
-  Low: '#36b37e',
-  Lowest: '#97a0af',
-}
-
-function getPriorityColor(priority: string): string {
-  return PRIORITY_COLORS[priority] || '#42526e'
 }
 
 function formatHours(hours: number): string {

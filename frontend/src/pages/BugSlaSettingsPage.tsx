@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { getPriorityColor } from '../helpers/priorityColors'
 
 interface BugSlaConfig {
   id: number
@@ -9,20 +10,6 @@ interface BugSlaConfig {
 
 // Default order for standard Jira priorities (others will be appended at the end)
 const PRIORITY_ORDER = ['Blocker', 'Critical', 'Highest', 'High', 'Medium', 'Low', 'Lowest']
-
-const PRIORITY_COLORS: Record<string, string> = {
-  Blocker: '#cc0000',
-  Critical: '#de350b',
-  Highest: '#de350b',
-  High: '#ff5630',
-  Medium: '#ffab00',
-  Low: '#36b37e',
-  Lowest: '#97a0af',
-}
-
-function getPriorityColor(priority: string): string {
-  return PRIORITY_COLORS[priority] || '#42526e'
-}
 
 function sortConfigs(configs: BugSlaConfig[]): BugSlaConfig[] {
   return [...configs].sort((a, b) => {
