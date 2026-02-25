@@ -16,13 +16,13 @@
 | 4 | **Timeline** | F14, F20, F21, F45 | ✅ Проверен | 0 багов (11 fixed) | [reports/2026-02-25_TIMELINE.md](reports/2026-02-25_TIMELINE.md) |
 | 5 | **Data Quality** | F18, F36, F42 | ✅ Проверен | (входит в Board QA) | [reports/2026-02-19_BOARD_DQ_BUGSLA.md](reports/2026-02-19_BOARD_DQ_BUGSLA.md) |
 | 6 | **Planning Poker** | F23 | ⏸️ Отложен | Известные баги с Jira | — |
-| 7 | **Workflow Config** | F17, F29 | ❌ Не проверен | — | — |
+| 7 | **Workflow Config** | F17, F29, F38 | ✅ Проверен | 2 Critical, 2 High, 7 Medium, 5 Low | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
 | 8 | **Simulation** | F28 | ❌ Не проверен | — | — |
 | 9 | **Projects** | F35 | ✅ Проверен | 1 High (test regression), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 10 | **RICE Scoring** | F36 | ✅ Проверен | 2 Medium (case-sensitive, FP), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 11 | **Project Timeline** | F35 | ✅ Проверен | Визуал ОК | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 12 | **Member Profile** | F30 | ❌ Не проверен | — | — |
-| 13 | **Setup Wizard** | F33 | ❌ Не проверен | — | — |
+| 13 | **Setup Wizard** | F33 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
 | 14 | **Auth / OAuth** | F4, F27 | ❌ Не проверен | — | — |
 | 15 | **Sync** | F2, F3, F9, F34 | ✅ Проверен | 2 Critical, 2 High, 4 Medium, 2 Low | [reports/2026-02-21_SYNC.md](reports/2026-02-21_SYNC.md) |
 | 16 | **AutoScore / Planning** | F13, F19, F20, F21 | ✅ Проверен | 1 High, 4 Medium, 4 Low | [reports/2026-02-23_AUTOSCORE_PLANNING.md](reports/2026-02-23_AUTOSCORE_PLANNING.md) |
@@ -30,8 +30,9 @@
 | 18 | **Member Absences** | F41 | ✅ Проверен | 3 High, 6 Medium, 3 Low | [reports/2026-02-19_F41_ABSENCES.md](reports/2026-02-19_F41_ABSENCES.md) |
 
 | 19 | **Bug SLA Settings** | F42 | ✅ Проверен (встроен в Settings) | 0 багов | [reports/2026-02-23_BUG_SLA_TO_SETTINGS.md](reports/2026-02-23_BUG_SLA_TO_SETTINGS.md) |
+| 20 | **Multi-Tenancy / Registration** | F44 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
 
-**Прогресс: 14 / 19 экранов проверено (74%)**
+**Прогресс: 17 / 20 экранов проверено (85%)**
 
 ---
 
@@ -39,11 +40,11 @@
 
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
-| Critical | 0 | 3 | 3 |
-| High | 3 | 15 | 18 |
-| Medium | 11 | 21 | 32 |
-| Low | 7 | 9 | 16 |
-| **Итого** | **21** | **48** | **69** |
+| Critical | 2 | 3 | 5 |
+| High | 5 | 15 | 20 |
+| Medium | 18 | 21 | 39 |
+| Low | 12 | 9 | 21 |
+| **Итого** | **37** | **48** | **85** |
 
 ---
 
@@ -181,15 +182,40 @@
 
 | Приоритет | Экран | Почему |
 |-----------|-------|--------|
-| P0 | **Board** | Основной экран, частично проверен (визуал), нужны глубокие тесты |
-| ~~P0~~ | ~~**Sync**~~ | ✅ Проверен (2 Critical, 2 High, 4 Medium, 2 Low) |
-| ~~P1~~ | ~~**AutoScore / Planning**~~ | ✅ Проверен (1 High, 4 Medium, 4 Low) |
-| P1 | **Workflow Config** | Центральный конфиг, влияет на всё |
-| P2 | **Data Quality** | 17+ правил, влияет на доверие к данным |
-| ~~P2~~ | ~~**Timeline**~~ | ✅ Проверен (4 High, 5 Medium, 2 Low) |
+| ~~P0~~ | ~~**Sync**~~ | ✅ Проверен |
+| ~~P1~~ | ~~**AutoScore / Planning**~~ | ✅ Проверен |
+| ~~P1~~ | ~~**Workflow Config**~~ | ✅ Проверен (2 Critical, 2 High, 7 Medium, 5 Low) |
+| ~~P2~~ | ~~**Timeline**~~ | ✅ Проверен |
+| ~~P3~~ | ~~**Setup Wizard**~~ | ✅ Проверен (входит в Workflow Config QA) |
+| P2 | **Simulation** | Моделирование сценариев (F28) |
 | P3 | **Member Profile** | Профиль участника |
-| P3 | **Setup Wizard** | Первичная настройка |
 | P3 | **Auth / OAuth** | Безопасность |
+
+### Workflow Config + Setup Wizard + Multi-Tenancy — 2026-02-25
+
+**API endpoints (41):** 32 PASS, 8 BUG, 1 NOTE
+**Visual:** 2 экрана проверены (WorkflowConfigPage, RegistrationPage)
+**Backend tests:** service tests ALL PASS; 44 @WebMvcTest FAIL (pre-existing TenantUserRepository)
+**Frontend tests:** 235/235 PASS (но 0 тестов для проверяемых экранов)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-60 | Critical | Multi-tenant cache race condition в WorkflowConfigService (volatile + ConcurrentHashMap) | OPEN |
+| BUG-61 | Critical | SQL injection risk — schema name конкатенируется в SQL напрямую | OPEN |
+| BUG-62 | High | PUT roles/statuses/issue-types `[]` → 200 OK, удаляет все данные | OPEN |
+| BUG-63 | High | 44 @WebMvcTest controller теста сломаны (TenantUserRepository not mocked) | OPEN |
+| BUG-64 | Medium | check-slug не валидирует reserved words, формат, длину — ложный "available" | OPEN |
+| BUG-65 | Medium | issue-count: months=0 возвращает все задачи, missing param дефолтится в 0 | OPEN |
+| BUG-66 | Medium | PublicConfigController.getIssueTypeCategories() NPE на null boardCategory | OPEN |
+| BUG-67 | Medium | Нет AbortController в WorkflowConfigPage fetch calls | OPEN |
+| BUG-68 | Medium | Silent polling errors в SetupWizardPage (.catch(() => {})) | OPEN |
+| BUG-69 | Medium | Нет debounce на slug check в RegistrationPage | OPEN |
+| BUG-70 | Medium | 0 frontend тестов для WorkflowConfigPage, SetupWizardPage, RegistrationPage | OPEN |
+| BUG-71 | Low | Tab URL parameter не работает (?tab=statuses показывает Roles) | OPEN |
+| BUG-72 | Low | check-slug со спецсимволами → Tomcat HTML 400 вместо JSON | OPEN |
+| BUG-73 | Low | Нет верхней границы months (9999 принимается) | OPEN |
+| BUG-74 | Low | localStorage wizard state переживает logout/смену tenant'а | OPEN |
+| BUG-75 | Low | Нет aria-labels на color picker, tab buttons в WorkflowConfigPage | OPEN |
 
 ---
 
@@ -207,7 +233,8 @@ ai-ru/testing/
     ├── 2026-02-21_SYNC.md             ← QA-отчёт: Sync Module (P0)
     ├── 2026-02-23_AUTOSCORE_PLANNING.md ← QA-отчёт: AutoScore / Planning
     ├── 2026-02-23_BUG_SLA_TO_SETTINGS.md ← QA-отчёт: Bug SLA Settings
-    └── 2026-02-25_TIMELINE.md         ← QA-отчёт: Timeline (F14, F45 Hybrid)
+    ├── 2026-02-25_TIMELINE.md         ← QA-отчёт: Timeline (F14, F45 Hybrid)
+    └── 2026-02-25_WORKFLOW_TENANT_WIZARD.md ← QA-отчёт: Workflow Config + Wizard + Multi-Tenancy
 ```
 
 ## Процесс
