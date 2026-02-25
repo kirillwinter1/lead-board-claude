@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-02-21
+**Последнее обновление:** 2026-02-25
 
 ---
 
@@ -13,7 +13,7 @@
 | 1 | **Board** | F8, F10, F11, F15, F21, F31, F37, F42 | ✅ Проверен | 4 High, 5 Medium, 2 Low | [reports/2026-02-19_BOARD_DQ_BUGSLA.md](reports/2026-02-19_BOARD_DQ_BUGSLA.md) |
 | 2 | **Teams** | F5, F6, F7, F37 | ✅ Проверен (F37) | 1 Medium (color tests missing) | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 3 | **Team Metrics** | F22, F24, F32 | ✅ Проверен | 9 багов (1 Critical, 3 High, 4 Medium, 1 Low) | [reports/2026-02-17_TEAM_METRICS.md](reports/2026-02-17_TEAM_METRICS.md) |
-| 4 | **Timeline** | F14 | ❌ Не проверен | — | — |
+| 4 | **Timeline** | F14, F20, F21, F45 | ✅ Проверен | 0 багов (11 fixed) | [reports/2026-02-25_TIMELINE.md](reports/2026-02-25_TIMELINE.md) |
 | 5 | **Data Quality** | F18, F36, F42 | ✅ Проверен | (входит в Board QA) | [reports/2026-02-19_BOARD_DQ_BUGSLA.md](reports/2026-02-19_BOARD_DQ_BUGSLA.md) |
 | 6 | **Planning Poker** | F23 | ⏸️ Отложен | Известные баги с Jira | — |
 | 7 | **Workflow Config** | F17, F29 | ❌ Не проверен | — | — |
@@ -31,7 +31,7 @@
 
 | 19 | **Bug SLA Settings** | F42 | ✅ Проверен (встроен в Settings) | 0 багов | [reports/2026-02-23_BUG_SLA_TO_SETTINGS.md](reports/2026-02-23_BUG_SLA_TO_SETTINGS.md) |
 
-**Прогресс: 13 / 19 экранов проверено (68%)**
+**Прогресс: 14 / 19 экранов проверено (74%)**
 
 ---
 
@@ -40,10 +40,10 @@
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
 | Critical | 0 | 3 | 3 |
-| High | 3 | 11 | 14 |
-| Medium | 11 | 16 | 27 |
-| Low | 7 | 7 | 14 |
-| **Итого** | **21** | **37** | **58** |
+| High | 3 | 15 | 18 |
+| Medium | 11 | 21 | 32 |
+| Low | 7 | 9 | 16 |
+| **Итого** | **21** | **48** | **69** |
 
 ---
 
@@ -132,6 +132,29 @@
 
 ---
 
+### Timeline (F14, F45 Hybrid) — 2026-02-25
+
+**API endpoints (10):** 8 PASS, 3 BUG (500 на несуществующей команде)
+**Visual:** 1 экран проверен (TimelinePage — Gantt)
+**Backend tests:** 209/222 passed, 13 failed (pre-existing @WebMvcTest TenantUserRepository)
+**Frontend tests:** 13/19 passed, 6 failed (missing getRetrospective mock after F45)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-49 | High | unified/forecast/role-load 500 на несуществующей команде (teamId=9999) | ✅ FIXED (GlobalExceptionHandler → 404) |
+| BUG-50 | High | WIP limits в ForecastResponse = forecasts.size() вместо team config | ✅ FIXED (PlanningConfigDto.wipLimits) |
+| BUG-51 | High | TimelinePage.test.tsx — 6 тестов падают (missing getRetrospective mock F45) | ✅ FIXED (mocks added) |
+| BUG-52 | High | Race condition — нет AbortController при смене команды | ✅ FIXED (AbortController) |
+| BUG-53 | Medium | WIP history принимает отрицательные days (inverted date range) | ✅ FIXED (validation → 400) |
+| BUG-54 | Medium | assigneeDisplayName=null для завершённых сторей в story-forecast | ✅ FIXED (fallback displayName) |
+| BUG-55 | Medium | Historical snapshot mode не загружает retro данные | ✅ FIXED (loads retro + merge) |
+| BUG-56 | Medium | mergeHybridEpics() теряет retro-only эпики | ✅ FIXED (retro-only epics added) |
+| BUG-57 | Medium | Silent error catch при загрузке StatusStyles и Config | ✅ FIXED (console.error) |
+| BUG-58 | Low | Tooltip может выйти за границы экрана | ✅ FIXED (viewport clamping) |
+| BUG-59 | Low | Нет aria-labels на интерактивных элементах Gantt | ✅ FIXED (aria-labels added) |
+
+---
+
 ### Board + Data Quality + Bug SLA — 2026-02-19
 
 **API endpoints (9):** 8 PASS, 1 NOTE (status filter case-sensitive)
@@ -163,7 +186,7 @@
 | ~~P1~~ | ~~**AutoScore / Planning**~~ | ✅ Проверен (1 High, 4 Medium, 4 Low) |
 | P1 | **Workflow Config** | Центральный конфиг, влияет на всё |
 | P2 | **Data Quality** | 17+ правил, влияет на доверие к данным |
-| P2 | **Timeline** | Визуализация планирования |
+| ~~P2~~ | ~~**Timeline**~~ | ✅ Проверен (4 High, 5 Medium, 2 Low) |
 | P3 | **Member Profile** | Профиль участника |
 | P3 | **Setup Wizard** | Первичная настройка |
 | P3 | **Auth / OAuth** | Безопасность |
@@ -181,7 +204,10 @@ ai-ru/testing/
     ├── 2026-02-17_TEAM_METRICS.md     ← QA-отчёт: Team Metrics
     ├── 2026-02-17_F35_F36_F37.md      ← QA-отчёт: Projects + RICE + Team Colors
     ├── 2026-02-19_F41_ABSENCES.md     ← QA-отчёт: F41 Member Absences
-    └── 2026-02-21_SYNC.md             ← QA-отчёт: Sync Module (P0)
+    ├── 2026-02-21_SYNC.md             ← QA-отчёт: Sync Module (P0)
+    ├── 2026-02-23_AUTOSCORE_PLANNING.md ← QA-отчёт: AutoScore / Planning
+    ├── 2026-02-23_BUG_SLA_TO_SETTINGS.md ← QA-отчёт: Bug SLA Settings
+    └── 2026-02-25_TIMELINE.md         ← QA-отчёт: Timeline (F14, F45 Hybrid)
 ```
 
 ## Процесс

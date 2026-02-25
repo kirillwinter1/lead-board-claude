@@ -94,6 +94,10 @@ public class ForecastController {
             @RequestParam Long teamId,
             @RequestParam(defaultValue = "30") int days) {
 
+        if (days <= 0) {
+            throw new IllegalArgumentException("days must be positive, got: " + days);
+        }
+
         List<WipSnapshotEntity> snapshots = wipSnapshotService.getRecentHistory(teamId, days);
 
         LocalDate to = LocalDate.now();

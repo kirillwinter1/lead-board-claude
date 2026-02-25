@@ -200,10 +200,18 @@ public class StoryForecastService {
         BigDecimal remainingHours = calculateRemainingWork(story);
         if (remainingHours.compareTo(BigDecimal.ZERO) <= 0) {
             // Story is complete or has no estimate
+            // Use original Jira assignee display name if available, otherwise use auto-assigned
+            String displayName = story.getAssigneeDisplayName();
+            if (displayName == null && assigneeAccountId != null) {
+                AssigneeScheduleInner schedule = assigneeSchedules.get(assigneeAccountId);
+                if (schedule != null) {
+                    displayName = schedule.displayName();
+                }
+            }
             return new StorySchedule(
                     storyKey,
                     assigneeAccountId,
-                    story.getAssigneeDisplayName(),
+                    displayName,
                     epicStartDate,
                     epicStartDate,
                     BigDecimal.ZERO,

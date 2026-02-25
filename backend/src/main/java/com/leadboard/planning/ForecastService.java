@@ -67,12 +67,17 @@ public class ForecastService {
         PlanningConfigDto config = teamService.getPlanningConfig(teamId);
         Map<String, BigDecimal> roleCapacity = calculateRoleCapacity(teamId, config);
 
-        return convertToForecastResponse(unifiedResult, roleCapacity, statuses);
+        PlanningConfigDto.WipLimits wipLimits = config.wipLimits() != null
+                ? config.wipLimits()
+                : PlanningConfigDto.WipLimits.defaults(workflowConfigService.getRoleCodesInPipelineOrder());
+
+        return convertToForecastResponse(unifiedResult, roleCapacity, wipLimits, statuses);
     }
 
     private ForecastResponse convertToForecastResponse(
             UnifiedPlanningResult unifiedResult,
             Map<String, BigDecimal> roleCapacity,
+            PlanningConfigDto.WipLimits wipLimits,
             List<String> statusFilter
     ) {
         List<EpicForecast> forecasts = new ArrayList<>();
@@ -89,12 +94,17 @@ public class ForecastService {
             forecasts.add(forecast);
         }
 
-        // Build dynamic role WIP status
+        // Build WIP status from team config limits
+        int currentEpics = forecasts.size();
         Map<String, RoleWipStatus> roleWip = new LinkedHashMap<>();
         for (String roleCode : workflowConfigService.getRoleCodesInPipelineOrder()) {
-            roleWip.put(roleCode, RoleWipStatus.of(forecasts.size(), forecasts.size()));
+            int roleLimit = wipLimits.roleLimits() != null && wipLimits.roleLimits().containsKey(roleCode)
+                    ? wipLimits.roleLimits().get(roleCode)
+                    : 2;
+            roleWip.put(roleCode, RoleWipStatus.of(roleLimit, currentEpics));
         }
-        WipStatus wipStatus = WipStatus.of(forecasts.size(), forecasts.size(), roleWip);
+        int teamLimit = wipLimits.team() != null ? wipLimits.team() : currentEpics;
+        WipStatus wipStatus = WipStatus.of(teamLimit, currentEpics, roleWip);
 
         return new ForecastResponse(
                 unifiedResult.planningDate(),

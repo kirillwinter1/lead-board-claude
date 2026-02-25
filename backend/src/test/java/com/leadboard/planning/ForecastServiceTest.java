@@ -466,9 +466,9 @@ class ForecastServiceTest {
             assertNull(response.epics().get(0).queuePosition());
             assertNull(response.epics().get(1).queuePosition());
 
-            // WIP status shows all active
+            // WIP status: current=2 epics, limit from default config (SA=2+DEV=3+QA=2=7)
             assertEquals(2, response.wipStatus().current());
-            assertEquals(2, response.wipStatus().limit());
+            assertEquals(7, response.wipStatus().limit());
             assertFalse(response.wipStatus().exceeded());
         }
     }

@@ -15,6 +15,7 @@ vi.mock('../api/teams', () => ({
 vi.mock('../api/forecast', () => ({
   getForecast: vi.fn(),
   getUnifiedPlanning: vi.fn(),
+  getRetrospective: vi.fn(),
   getAvailableSnapshotDates: vi.fn(),
   getUnifiedPlanningSnapshot: vi.fn(),
   getForecastSnapshot: vi.fn(),
@@ -22,6 +23,23 @@ vi.mock('../api/forecast', () => ({
 
 vi.mock('../api/config', () => ({
   getConfig: vi.fn(),
+}))
+
+vi.mock('../api/board', () => ({
+  getStatusStyles: vi.fn().mockResolvedValue({}),
+}))
+
+vi.mock('../contexts/WorkflowConfigContext', () => ({
+  useWorkflowConfig: () => ({
+    getRoleCodes: () => ['SA', 'DEV', 'QA'],
+    getRoleColor: () => '#669DF1',
+    getRoleDisplayName: (code: string) => code,
+    getIssueTypeIconUrl: () => undefined,
+    issueTypeIcons: {},
+    issueTypeCategories: {},
+    config: { roles: [], issueTypes: [], statuses: [] },
+    loading: false,
+  }),
 }))
 
 // Mock issue type icons
@@ -89,6 +107,7 @@ describe('TimelinePage', () => {
     vi.mocked(teamsApi.getAll).mockResolvedValue(mockTeams)
     vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue(mockUnifiedPlan as any)
     vi.mocked(forecastApi.getForecast).mockResolvedValue(mockForecast as any)
+    vi.mocked(forecastApi.getRetrospective).mockResolvedValue({ teamId: 1, epics: [] })
     vi.mocked(forecastApi.getAvailableSnapshotDates).mockResolvedValue([])
     vi.mocked(configApi.getConfig).mockResolvedValue({ jiraBaseUrl: 'https://jira.example.com/browse/' })
   })

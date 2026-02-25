@@ -32,6 +32,23 @@ vi.mock('../api/config', () => ({
   getConfig: vi.fn(),
 }))
 
+vi.mock('../contexts/WorkflowConfigContext', () => ({
+  useWorkflowConfig: () => ({
+    getRoleCodes: () => ['SA', 'DEV', 'QA'],
+    getRoleColor: () => '#669DF1',
+    getRoleDisplayName: (code: string) => code,
+    getIssueTypeIconUrl: () => undefined,
+    issueTypeIcons: {},
+    issueTypeCategories: {
+      'Epic': 'EPIC',
+      'Story': 'STORY',
+      'Sub-task': 'SUBTASK',
+    },
+    config: { roles: [], issueTypes: [], statuses: [] },
+    loading: false,
+  }),
+}))
+
 // Mock chart components
 vi.mock('../components/metrics/MetricCard', () => ({
   MetricCard: ({ title, value, subtitle }: { title: string; value: string | number; subtitle: string }) => (
@@ -182,8 +199,8 @@ describe('TeamMetricsPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('All')).toBeInTheDocument()
-        expect(screen.getByText('Epics')).toBeInTheDocument()
-        expect(screen.getByText('Stories')).toBeInTheDocument()
+        expect(screen.getByText('Epic (Epics)')).toBeInTheDocument()
+        expect(screen.getByText('Story (Stories)')).toBeInTheDocument()
       })
     })
   })

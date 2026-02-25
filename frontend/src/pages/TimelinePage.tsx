@@ -385,7 +385,15 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
 
   const handleMouseEnter = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect()
-    setTooltipPos({ x: rect.right + 8, y: rect.top })
+    const tooltipWidth = 350
+    const tooltipHeight = 300
+    const x = rect.right + 8 + tooltipWidth > window.innerWidth
+      ? Math.max(8, rect.left - tooltipWidth - 8)
+      : rect.right + 8
+    const y = rect.top + tooltipHeight > window.innerHeight
+      ? Math.max(8, window.innerHeight - tooltipHeight - 8)
+      : rect.top
+    setTooltipPos({ x, y })
     setShowTooltip(true)
   }
 
@@ -716,6 +724,8 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   return (
     <div
       className="story-bar"
+      role="button"
+      aria-label={`Story ${story.storyKey}`}
       style={{
         position: 'absolute',
         left: `${leftPercent}%`,
@@ -1219,7 +1229,9 @@ function mergeHybridEpics(
     retroEpicMap.set(retroEpic.epicKey, storyMap)
   }
 
-  return planEpics.map(epic => {
+  const planEpicKeys = new Set(planEpics.map(e => e.epicKey))
+
+  const mergedPlanEpics = planEpics.map(epic => {
     const retroStories = retroEpicMap.get(epic.epicKey)
 
     const mergedStories: PlannedStory[] = epic.stories.map(story => {
@@ -1333,6 +1345,71 @@ function mergeHybridEpics(
       stories: mergedStories
     }
   })
+
+  // Add retro-only epics (not in plan — removed/moved epics with historical data)
+  const retroOnlyEpics: PlannedEpic[] = []
+  for (const retroEpic of retroResult.epics) {
+    if (planEpicKeys.has(retroEpic.epicKey)) continue
+
+    const retroStories: PlannedStory[] = retroEpic.stories.map(rs => {
+      const phases: Record<string, UnifiedPhaseSchedule> = {}
+      for (const [role, phase] of Object.entries(rs.phases || {})) {
+        if (phase.startDate) {
+          const endDate = phase.endDate ?? (phase.active ? today : phase.startDate)
+          phases[role] = {
+            assigneeAccountId: null,
+            assigneeDisplayName: null,
+            startDate: phase.startDate,
+            endDate,
+            hours: phase.durationDays * 8,
+            noCapacity: false
+          }
+        }
+      }
+      return {
+        storyKey: rs.storyKey,
+        summary: '',
+        autoScore: null,
+        status: rs.completed ? 'Done' : '',
+        startDate: rs.startDate,
+        endDate: rs.endDate,
+        phases,
+        blockedBy: [],
+        warnings: [],
+        issueType: null,
+        priority: null,
+        flagged: null,
+        totalEstimateSeconds: null,
+        totalLoggedSeconds: null,
+        progressPercent: rs.completed ? 100 : null,
+        roleProgress: null,
+        _source: 'retro' as PhaseSource
+      } as PlannedStory
+    })
+
+    retroOnlyEpics.push({
+      epicKey: retroEpic.epicKey,
+      summary: retroEpic.summary,
+      autoScore: 0,
+      startDate: retroEpic.startDate,
+      endDate: retroEpic.endDate,
+      stories: retroStories,
+      phaseAggregation: {},
+      status: retroEpic.status,
+      dueDate: null,
+      totalEstimateSeconds: null,
+      totalLoggedSeconds: null,
+      progressPercent: retroEpic.progressPercent,
+      roleProgress: null,
+      storiesTotal: retroStories.length,
+      storiesActive: 0,
+      isRoughEstimate: false,
+      roughEstimates: null,
+      flagged: null
+    })
+  }
+
+  return [...mergedPlanEpics, ...retroOnlyEpics]
 }
 
 // --- Gantt Row ---
@@ -1435,7 +1512,9 @@ export function TimelinePage() {
       .then(config => setJiraBaseUrl(config.jiraBaseUrl))
       .catch(err => console.error('Failed to load config:', err))
 
-    getStatusStyles().then(setStatusStyles).catch(() => {})
+    getStatusStyles()
+      .then(setStatusStyles)
+      .catch(err => console.error('Failed to load status styles:', err))
 
     teamsApi.getAll()
       .then(data => {
@@ -1469,6 +1548,8 @@ export function TimelinePage() {
   useEffect(() => {
     if (!selectedTeamId) return
 
+    const abortController = new AbortController()
+
     setLoading(true)
     setError(null)
 
@@ -1487,18 +1568,22 @@ export function TimelinePage() {
     }
 
     if (selectedHistoricalDate && isHistoricalMode) {
-      // Load from historical snapshot (no retro for historical)
+      // Load from historical snapshot + retro for hybrid view
       Promise.all([
         getForecastSnapshot(selectedTeamId, selectedHistoricalDate),
-        getUnifiedPlanningSnapshot(selectedTeamId, selectedHistoricalDate)
+        getUnifiedPlanningSnapshot(selectedTeamId, selectedHistoricalDate),
+        getRetrospective(selectedTeamId)
       ])
-        .then(([forecastData, planData]) => {
+        .then(([forecastData, planData, retroData]) => {
+          if (abortController.signal.aborted) return
           setForecast(forecastData)
-          setUnifiedPlan(planData)
+          const hybridEpics = mergeHybridEpics(planData.epics, retroData)
+          setUnifiedPlan({ ...planData, epics: hybridEpics })
           setLoading(false)
           triggerAnimation()
         })
         .catch(err => {
+          if (abortController.signal.aborted) return
           setError('Failed to load historical snapshot: ' + err.message)
           setLoading(false)
         })
@@ -1510,6 +1595,7 @@ export function TimelinePage() {
         getRetrospective(selectedTeamId)
       ])
         .then(([forecastData, planData, retroData]) => {
+          if (abortController.signal.aborted) return
           setForecast(forecastData)
           // Merge hybrid: retro dates for past, forecast for future
           const hybridEpics = mergeHybridEpics(planData.epics, retroData)
@@ -1521,12 +1607,14 @@ export function TimelinePage() {
           triggerAnimation()
         })
         .catch(err => {
+          if (abortController.signal.aborted) return
           setError('Failed to load data: ' + err.message)
           setLoading(false)
         })
     }
 
     return () => {
+      abortController.abort()
       if (animationTimeoutRef.current) {
         clearTimeout(animationTimeoutRef.current)
       }
@@ -1625,6 +1713,7 @@ export function TimelinePage() {
           <label className="filter-label">Команда</label>
           <select
             className="filter-input"
+            aria-label="Выбор команды"
             value={selectedTeamId ?? ''}
             onChange={e => setSelectedTeamId(Number(e.target.value))}
           >
@@ -1639,6 +1728,7 @@ export function TimelinePage() {
           <label className="filter-label">Масштаб</label>
           <select
             className="filter-input"
+            aria-label="Масштаб таймлайна"
             value={zoom}
             onChange={e => setZoom(e.target.value as ZoomLevel)}
           >
@@ -1657,6 +1747,7 @@ export function TimelinePage() {
           </label>
           <select
             className="filter-input"
+            aria-label="Выбор даты снэпшота"
             value={selectedHistoricalDate}
             onChange={e => handleHistoricalDateChange(e.target.value)}
             style={{ minWidth: 140 }}
@@ -1729,7 +1820,7 @@ export function TimelinePage() {
             })}
           </div>
 
-          <div className="gantt-chart" ref={chartRef}>
+          <div className="gantt-chart" ref={chartRef} role="region" aria-label="Gantt-диаграмма таймлайна">
             <div className="gantt-header-container" style={{ width: `${chartWidth}px`, minWidth: `${chartWidth}px` }}>
               {/* Group header row (month/quarter) */}
               <div className="gantt-header-group">
