@@ -86,7 +86,7 @@ public class OAuthService {
         OAuthState oauthState = pendingStates.remove(state);
         if (oauthState == null || oauthState.expiry().isBefore(Instant.now())) {
             log.warn("Invalid or expired OAuth state: {}", state);
-            return new CallbackResult(false, "Invalid state parameter", null);
+            return new CallbackResult(false, "Invalid state parameter", null, null);
         }
         Long tenantId = oauthState.tenantId();
 
@@ -94,13 +94,13 @@ public class OAuthService {
             // Exchange code for tokens
             TokenResponse tokenResponse = exchangeCodeForTokens(code);
             if (tokenResponse == null) {
-                return new CallbackResult(false, "Failed to exchange code for tokens", null);
+                return new CallbackResult(false, "Failed to exchange code for tokens", null, tenantId);
             }
 
             // Get user info
             UserInfo userInfo = getUserInfo(tokenResponse.accessToken);
             if (userInfo == null) {
-                return new CallbackResult(false, "Failed to get user info", null);
+                return new CallbackResult(false, "Failed to get user info", null, tenantId);
             }
 
             // Get cloud ID for the site
@@ -172,11 +172,11 @@ public class OAuthService {
 
             log.info("OAuth successful for user: {} ({}) tenant: {}", user.getDisplayName(), user.getEmail(), tenantId);
 
-            return new CallbackResult(true, null, session.getId());
+            return new CallbackResult(true, null, session.getId(), tenantId);
 
         } catch (Exception e) {
             log.error("OAuth callback failed", e);
-            return new CallbackResult(false, e.getMessage(), null);
+            return new CallbackResult(false, e.getMessage(), null, tenantId);
         }
     }
 
@@ -402,7 +402,7 @@ public class OAuthService {
         public String url;
     }
 
-    public record CallbackResult(boolean success, String error, String sessionId) {}
+    public record CallbackResult(boolean success, String error, String sessionId, Long tenantId) {}
 
     public record AuthenticatedUser(
             Long id,

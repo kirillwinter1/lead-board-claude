@@ -27,6 +27,7 @@ public class AppProperties {
     public static class Session {
         private String cookieName = "LEAD_SESSION";
         private int maxAgeDays = 30;
+        private String cookieDomain;
 
         public String getCookieName() {
             return cookieName;
@@ -42,6 +43,14 @@ public class AppProperties {
 
         public void setMaxAgeDays(int maxAgeDays) {
             this.maxAgeDays = maxAgeDays;
+        }
+
+        public String getCookieDomain() {
+            return cookieDomain;
+        }
+
+        public void setCookieDomain(String cookieDomain) {
+            this.cookieDomain = cookieDomain;
         }
     }
 }
