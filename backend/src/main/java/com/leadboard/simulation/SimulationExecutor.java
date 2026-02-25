@@ -93,6 +93,26 @@ public class SimulationExecutor {
         jiraClient.transitionIssueBasicAuth(action.issueKey(), target.id());
 
         String actualTarget = target.to() != null ? target.to().name() : target.name();
+
+        // Multi-step transition: if we wanted DONE but landed in IN_PROGRESS (forward fallback),
+        // retry from the new status to reach DONE
+        StatusCategory requestedCategory = resolveTargetCategory(action.toStatus(), action.issueType());
+        StatusCategory actualCategory = target.to() != null
+                ? workflowConfigService.categorize(target.to().name(), action.issueType())
+                : null;
+
+        if (requestedCategory == StatusCategory.DONE && actualCategory == StatusCategory.IN_PROGRESS) {
+            List<JiraTransition> transitions2 = jiraClient.getTransitionsBasicAuth(action.issueKey());
+            JiraTransition target2 = findDoneTransition(transitions2, action);
+            if (target2 != null) {
+                jiraClient.transitionIssueBasicAuth(action.issueKey(), target2.id());
+                String finalTarget = target2.to() != null ? target2.to().name() : target2.name();
+                log.info("Simulation: multi-step transition {} '{}' → '{}' → '{}'",
+                        action.issueKey(), action.fromStatus(), actualTarget, finalTarget);
+                return action.withExecuted();
+            }
+        }
+
         log.info("Simulation: transitioned {} from '{}' to '{}' (requested '{}')",
                 action.issueKey(), action.fromStatus(), actualTarget, action.toStatus());
         return action.withExecuted();
@@ -142,6 +162,36 @@ public class SimulationExecutor {
                             return t;
                         }
                     }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Finds a transition that leads to DONE — used for the second step of multi-step transitions.
+     * Only exact name match or DONE category match (no forward fallback to avoid loops).
+     */
+    private JiraTransition findDoneTransition(List<JiraTransition> transitions,
+                                               SimulationAction action) {
+        String targetStatus = action.toStatus();
+
+        // 1. Exact match
+        for (JiraTransition t : transitions) {
+            if (targetStatus.equalsIgnoreCase(t.name())
+                    || (t.to() != null && targetStatus.equalsIgnoreCase(t.to().name()))) {
+                return t;
+            }
+        }
+
+        // 2. Category DONE match only (no forward fallback)
+        for (JiraTransition t : transitions) {
+            if (t.to() != null) {
+                StatusCategory transCategory = workflowConfigService.categorize(
+                        t.to().name(), action.issueType());
+                if (transCategory == StatusCategory.DONE) {
+                    return t;
                 }
             }
         }

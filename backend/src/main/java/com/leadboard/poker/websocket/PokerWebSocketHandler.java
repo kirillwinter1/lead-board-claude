@@ -1,6 +1,8 @@
 package com.leadboard.poker.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.auth.SessionRepository;
+import com.leadboard.config.AppProperties;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
 import com.leadboard.poker.entity.PokerStoryEntity;
@@ -8,6 +10,7 @@ import com.leadboard.poker.service.PokerJiraService;
 import com.leadboard.poker.service.PokerSessionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -16,7 +19,9 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.web.util.UriTemplate;
 
 import java.io.IOException;
+import java.net.HttpCookie;
 import java.net.URI;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,22 +37,42 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
     private final ObjectMapper objectMapper;
     private final PokerSessionService sessionService;
     private final PokerJiraService jiraService;
+    private final SessionRepository authSessionRepository;
+    private final AppProperties appProperties;
 
     // Room code -> list of sessions in that room
     private final Map<String, CopyOnWriteArrayList<WebSocketSession>> roomSessions = new ConcurrentHashMap<>();
     // Session ID -> participant info
     private final Map<String, ParticipantInfo> sessionParticipants = new ConcurrentHashMap<>();
 
-    public PokerWebSocketHandler(ObjectMapper objectMapper, PokerSessionService sessionService, PokerJiraService jiraService) {
+    public PokerWebSocketHandler(ObjectMapper objectMapper, PokerSessionService sessionService,
+                                  PokerJiraService jiraService, SessionRepository authSessionRepository,
+                                  AppProperties appProperties) {
         this.objectMapper = objectMapper;
         this.sessionService = sessionService;
         this.jiraService = jiraService;
+        this.authSessionRepository = authSessionRepository;
+        this.appProperties = appProperties;
     }
 
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         String roomCode = extractRoomCode(session);
         if (roomCode == null) {
+            session.close(CloseStatus.BAD_DATA);
+            return;
+        }
+
+        // Validate authentication via session cookie
+        if (!isAuthenticated(session)) {
+            log.warn("Unauthenticated WebSocket connection attempt for room: {}", roomCode);
+            session.close(CloseStatus.POLICY_VIOLATION);
+            return;
+        }
+
+        // Validate room exists
+        if (sessionService.getSessionByRoomCode(roomCode).isEmpty()) {
+            log.warn("WebSocket connection attempt for non-existent room: {}", roomCode);
             session.close(CloseStatus.BAD_DATA);
             return;
         }
@@ -277,6 +302,31 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
 
     private void sendError(WebSocketSession session, String errorMessage) throws IOException {
         sendMessage(session, PokerMessage.error(errorMessage));
+    }
+
+    private boolean isAuthenticated(WebSocketSession session) {
+        String cookieName = appProperties.getSession().getCookieName();
+        List<String> cookieHeaders = session.getHandshakeHeaders().get(HttpHeaders.COOKIE);
+        if (cookieHeaders == null || cookieHeaders.isEmpty()) {
+            return false;
+        }
+
+        for (String header : cookieHeaders) {
+            // Parse cookie header manually (HttpCookie.parse expects "Set-Cookie:" format)
+            String[] pairs = header.split(";");
+            for (String pair : pairs) {
+                String trimmed = pair.trim();
+                int eq = trimmed.indexOf('=');
+                if (eq > 0) {
+                    String name = trimmed.substring(0, eq).trim();
+                    String value = trimmed.substring(eq + 1).trim();
+                    if (cookieName.equals(name) && !value.isEmpty()) {
+                        return authSessionRepository.findValidSession(value, OffsetDateTime.now()).isPresent();
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private String extractRoomCode(WebSocketSession session) {

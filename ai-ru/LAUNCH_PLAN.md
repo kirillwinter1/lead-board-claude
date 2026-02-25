@@ -10,10 +10,10 @@
 
 | # | Задача | Приоритет | Статус | Зависимости |
 |---|--------|-----------|--------|-------------|
-| L1 | [Мультитенантность](#l1-мультитенантность) | **P0** | 📋 Planned | — |
+| L1 | [Мультитенантность](#l1-мультитенантность) | **P0** | ✅ Done (F44) | — |
 | L2 | [QA: дотестировать оставшиеся экраны](#l2-qa-дотестировать-оставшиеся-экраны) | **P0** | 🚧 В работе (63%) | — |
 | L3 | [Фикс выявленных багов](#l3-фикс-выявленных-багов) | **P0** | 🚧 В работе (12 open) | L2 |
-| L4 | [Security hardening](#l4-security-hardening) | **P0** | 📋 Planned | L1 |
+| L4 | [Security hardening](#l4-security-hardening) | **P0** | ✅ Done (F46) | L1 |
 | L5 | [Sync стабильность](#l5-sync-стабильность) | **P1** | ✅ QA done, bugs fixed | — |
 | L6 | [RBAC — тест от разных ролей](#l6-rbac--тест-от-разных-ролей) | **P1** | 📋 Planned | L1 |
 | L7 | [Setup Wizard — полный флоу](#l7-setup-wizard--полный-флоу) | **P1** | 📋 Planned | L1 |
@@ -101,16 +101,19 @@
 
 ### L4. Security hardening
 
-**Приоритет:** P0 | **Статус:** 📋 Planned
+**Приоритет:** P0 | **Статус:** ✅ Done (F46, v0.46.0)
 
-- [ ] CORS: whitelist доменов (поддомены тенантов)
-- [ ] CSRF: защита для state-changing endpoints
-- [ ] Rate limiting: на API endpoints (особенно sync, auth)
-- [ ] SQL injection: проверить все raw queries
-- [ ] XSS: sanitization user input (Jira data → HTML rendering)
-- [ ] Secrets: убедиться что токены не утекают в логи и API responses
-- [ ] HTTPS: SSL сертификат + redirect HTTP→HTTPS
-- [ ] Headers: Security headers (X-Frame-Options, CSP, HSTS)
+- [x] CORS: whitelist доменов, убраны wildcards, явные headers
+- [x] CSRF: проверено — stateless API + HttpOnly/Secure/SameSite cookie (безопасно)
+- [x] Rate limiting: RateLimitFilter (OAuth 20/min, Sync 5/min, Registration 10/min, API 200/min)
+- [x] SQL injection: проверено — все queries параметризованы через JPA @Param
+- [x] XSS: проверено — React auto-escape, нет dangerouslySetInnerHTML
+- [x] Secrets: проверено — токены не логируются, .env в gitignore
+- [x] HTTPS: SSL на nginx (prod), DB sslmode=require
+- [x] Headers: HSTS, CSP, X-Frame-Options DENY, Referrer-Policy, Permissions-Policy
+- [x] WebSocket auth: валидация сессии при подключении к Poker
+- [x] Tenant isolation: subdomain приоритет, header только для localhost
+- [x] Error sanitization: generic messages клиенту, детали только в логи
 
 ---
 

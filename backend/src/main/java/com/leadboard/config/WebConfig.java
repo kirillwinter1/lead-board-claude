@@ -14,54 +14,44 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${cors.allowed-origins:}")
     private String corsAllowedOrigins;
 
+    private static final List<String> ALLOWED_HEADERS = List.of(
+            "Content-Type", "Authorization", "X-Requested-With",
+            "X-Tenant-Slug", "Accept", "Origin"
+    );
+
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         List<String> origins = new ArrayList<>();
-        List<String> patterns = new ArrayList<>();
 
-        // Localhost для разработки
+        // Localhost for development
         origins.add("http://localhost:5173");
         origins.add("http://localhost:3000");
 
-        // Production origins из env (поддержка wildcards: https://*.onelane.ru)
+        // Production origins from env — explicit origins only, no wildcards
         if (corsAllowedOrigins != null && !corsAllowedOrigins.isBlank()) {
             for (String origin : corsAllowedOrigins.split(",")) {
                 String trimmed = origin.trim();
                 if (!trimmed.isEmpty()) {
-                    if (trimmed.contains("*")) {
-                        patterns.add(trimmed);
-                    } else {
-                        origins.add(trimmed);
-                    }
+                    origins.add(trimmed);
                 }
             }
         }
 
-        configureCors(registry.addMapping("/api/**"), origins, patterns)
+        String[] originsArray = origins.toArray(new String[0]);
+        String[] headersArray = ALLOWED_HEADERS.toArray(new String[0]);
+
+        registry.addMapping("/api/**")
+                .allowedOrigins(originsArray)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true);
+                .allowedHeaders(headersArray)
+                .allowCredentials(true)
+                .maxAge(3600);
 
-        configureCors(registry.addMapping("/oauth/**"), origins, patterns)
+        registry.addMapping("/oauth/**")
+                .allowedOrigins(originsArray)
                 .allowedMethods("GET", "POST", "OPTIONS")
-                .allowedHeaders("*")
-                .allowCredentials(true);
-
-        configureCors(registry.addMapping("/ws/**"), origins, patterns)
-                .allowedMethods("GET", "POST")
-                .allowedHeaders("*")
-                .allowCredentials(true);
-    }
-
-    private org.springframework.web.servlet.config.annotation.CorsRegistration configureCors(
-            org.springframework.web.servlet.config.annotation.CorsRegistration registration,
-            List<String> origins, List<String> patterns) {
-        if (!origins.isEmpty()) {
-            registration.allowedOrigins(origins.toArray(new String[0]));
-        }
-        if (!patterns.isEmpty()) {
-            registration.allowedOriginPatterns(patterns.toArray(new String[0]));
-        }
-        return registration;
+                .allowedHeaders(headersArray)
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 }

@@ -159,4 +159,64 @@ class SimulationExecutorTest {
 
         assertEquals(2, results.size());
     }
+
+    @Test
+    void execute_transition_multiStep_doneViaIntermediate() {
+        // First call: from "В работе" — only "В Ревью" (→ Проверка) available, no direct DONE
+        JiraTransition reviewTransition = new JiraTransition("41", "В Ревью",
+                new JiraTransition.TransitionTarget("10", "Проверка", null));
+        // Second call: from "Проверка" — now "Готово" is available
+        JiraTransition doneTransition = new JiraTransition("51", "Готово",
+                new JiraTransition.TransitionTarget("11", "Готово", null));
+
+        when(jiraClient.getTransitionsBasicAuth("PROJ-11"))
+                .thenReturn(List.of(reviewTransition))   // first call
+                .thenReturn(List.of(doneTransition));     // second call after intermediate
+
+        // "Готово" (requested target) is DONE category
+        when(workflowConfigService.categorize("Готово", "Sub-task")).thenReturn(StatusCategory.DONE);
+        // "Проверка" (intermediate) is IN_PROGRESS category
+        when(workflowConfigService.categorize("Проверка", "Sub-task")).thenReturn(StatusCategory.IN_PROGRESS);
+
+        SimulationAction action = SimulationAction.transition(
+                "PROJ-11", "Sub-task", "Dev One", "В работе", "Готово", "Completing subtask");
+
+        List<SimulationAction> results = executor.execute(List.of(action), SIM_DATE, TEAM_ID);
+
+        assertEquals(1, results.size());
+        assertTrue(results.get(0).executed());
+        // Should have transitioned twice: first to "Проверка", then to "Готово"
+        verify(jiraClient).transitionIssueBasicAuth("PROJ-11", "41");
+        verify(jiraClient).transitionIssueBasicAuth("PROJ-11", "51");
+    }
+
+    @Test
+    void execute_transition_multiStep_noSecondStep() {
+        // Forward fallback fires: wanted DONE, got IN_PROGRESS
+        JiraTransition reviewTransition = new JiraTransition("41", "В Ревью",
+                new JiraTransition.TransitionTarget("10", "Проверка", null));
+
+        // Second call: still no DONE available (stuck in intermediate)
+        JiraTransition backTransition = new JiraTransition("42", "Вернуть",
+                new JiraTransition.TransitionTarget("12", "В работе", null));
+
+        when(jiraClient.getTransitionsBasicAuth("PROJ-11"))
+                .thenReturn(List.of(reviewTransition))
+                .thenReturn(List.of(backTransition));
+
+        when(workflowConfigService.categorize("Готово", "Sub-task")).thenReturn(StatusCategory.DONE);
+        when(workflowConfigService.categorize("Проверка", "Sub-task")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfigService.categorize("В работе", "Sub-task")).thenReturn(StatusCategory.IN_PROGRESS);
+
+        SimulationAction action = SimulationAction.transition(
+                "PROJ-11", "Sub-task", "Dev One", "В работе", "Готово", "Completing subtask");
+
+        List<SimulationAction> results = executor.execute(List.of(action), SIM_DATE, TEAM_ID);
+
+        assertEquals(1, results.size());
+        assertTrue(results.get(0).executed()); // first step still executed
+        // Only one transition actually performed (no DONE found on retry)
+        verify(jiraClient, times(1)).transitionIssueBasicAuth(eq("PROJ-11"), eq("41"));
+        verify(jiraClient, never()).transitionIssueBasicAuth(eq("PROJ-11"), eq("42"));
+    }
 }

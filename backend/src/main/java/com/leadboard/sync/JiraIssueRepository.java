@@ -225,4 +225,17 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     @Query(value = "SELECT DISTINCT unnest(components) FROM jira_issues WHERE team_id = :teamId AND components IS NOT NULL ORDER BY 1",
            nativeQuery = true)
     List<String> findDistinctComponentsByTeamId(@Param("teamId") Long teamId);
+
+    // ==================== Simulation: stuck subtasks ====================
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.subtask = true " +
+           "AND e.status NOT IN :doneStatuses " +
+           "AND e.originalEstimateSeconds > 0 " +
+           "AND e.timeSpentSeconds >= e.originalEstimateSeconds " +
+           "AND (e.remainingEstimateSeconds IS NULL OR e.remainingEstimateSeconds <= 0)")
+    List<JiraIssueEntity> findStuckSubtasks(
+            @Param("teamId") Long teamId,
+            @Param("doneStatuses") List<String> doneStatuses
+    );
 }

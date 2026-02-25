@@ -239,6 +239,68 @@ class SimulationPlannerTest {
                         && "All subtasks completed".equals(a.reason())));
     }
 
+    @Test
+    void planDay_expiredPhase_catchUpStuckSubtask() {
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
+
+        // Phase ended yesterday
+        PhaseSchedule devPhase = new PhaseSchedule(
+                "acc-1", "Dev One", TODAY.minusDays(5), TODAY.minusDays(1), new BigDecimal("40"), false);
+        PlannedStory story = createStory("PROJ-10", "In Progress", devPhase);
+        PlannedEpic epic = createEpic("PROJ-1", List.of(story));
+
+        when(planningService.calculatePlan(TEAM_ID)).thenReturn(
+                new UnifiedPlanningResult(TEAM_ID, OffsetDateTime.now(), List.of(epic), List.of(), Map.of()));
+
+        // Subtask stuck IN_PROGRESS with 0 remaining (work done but not transitioned to Done)
+        JiraIssueEntity subtask = createSubtask("PROJ-11", "Проверка", "Разработка", 28800L, 28800L);
+        subtask.setRemainingEstimateSeconds(0L);
+        when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.categorize("Проверка", "Разработка")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.categorizeIssueType("Разработка")).thenReturn(BoardCategory.STORY);
+
+        List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
+
+        assertTrue(actions.stream().anyMatch(a ->
+                a.type() == SimulationAction.ActionType.TRANSITION
+                        && "PROJ-11".equals(a.issueKey())
+                        && "Done".equals(a.toStatus())
+                        && a.reason().contains("Catch-up")));
+    }
+
+    @Test
+    void planDay_expiredPhase_subtaskWithRemaining_noCatchUp() {
+        TeamMemberEntity member = createMember("acc-1", "Dev One", "DEV");
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(member));
+
+        // Phase ended yesterday
+        PhaseSchedule devPhase = new PhaseSchedule(
+                "acc-1", "Dev One", TODAY.minusDays(5), TODAY.minusDays(1), new BigDecimal("40"), false);
+        PlannedStory story = createStory("PROJ-10", "In Progress", devPhase);
+        PlannedEpic epic = createEpic("PROJ-1", List.of(story));
+
+        when(planningService.calculatePlan(TEAM_ID)).thenReturn(
+                new UnifiedPlanningResult(TEAM_ID, OffsetDateTime.now(), List.of(epic), List.of(), Map.of()));
+
+        // Subtask IN_PROGRESS with remaining work — should NOT be caught up
+        JiraIssueEntity subtask = createSubtask("PROJ-11", "В работе", "Разработка", 28800L, 14400L);
+        subtask.setRemainingEstimateSeconds(14400L); // 4h remaining
+        when(issueRepository.findByParentKey("PROJ-10")).thenReturn(List.of(subtask));
+        when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
+        when(workflowConfigService.categorize("В работе", "Разработка")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+
+        List<SimulationAction> actions = planner.planDay(TEAM_ID, TODAY);
+
+        assertTrue(actions.stream().noneMatch(a ->
+                a.type() == SimulationAction.ActionType.TRANSITION
+                        && "PROJ-11".equals(a.issueKey())
+                        && a.reason() != null && a.reason().contains("Catch-up")));
+    }
+
     // Helper methods
 
     private TeamMemberEntity createMember(String accountId, String name, String role) {

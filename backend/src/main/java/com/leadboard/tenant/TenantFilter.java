@@ -64,13 +64,7 @@ public class TenantFilter extends OncePerRequestFilter {
     }
 
     private String resolveSlug(HttpServletRequest request) {
-        // 1. Check X-Tenant-Slug header (dev/localhost)
-        String headerSlug = request.getHeader(TENANT_HEADER);
-        if (headerSlug != null && !headerSlug.isBlank()) {
-            return headerSlug.trim().toLowerCase();
-        }
-
-        // 2. Check subdomain
+        // 1. Check subdomain FIRST (secure — cannot be spoofed by client)
         String host = request.getServerName();
         if (host != null) {
             String[] parts = host.split("\\.");
@@ -81,6 +75,15 @@ public class TenantFilter extends OncePerRequestFilter {
                 if (!"www".equals(subdomain) && !"api".equals(subdomain)) {
                     return subdomain;
                 }
+            }
+        }
+
+        // 2. Fallback: X-Tenant-Slug header (only for localhost/dev where no subdomain)
+        boolean isLocalhost = host != null && (host.equals("localhost") || host.equals("127.0.0.1"));
+        if (isLocalhost) {
+            String headerSlug = request.getHeader(TENANT_HEADER);
+            if (headerSlug != null && !headerSlug.isBlank()) {
+                return headerSlug.trim().toLowerCase();
             }
         }
 

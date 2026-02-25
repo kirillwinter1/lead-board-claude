@@ -82,6 +82,19 @@ public class SimulationPlanner {
             planEpicTransition(epic, actions);
         }
 
+        // Catch-up: complete stuck subtasks from expired phases (plan-based)
+        for (PlannedEpic epic : plan.epics()) {
+            for (PlannedStory story : epic.stories()) {
+                for (Map.Entry<String, PhaseSchedule> entry : story.phases().entrySet()) {
+                    planCatchUpTransitions(entry.getValue(), entry.getKey(), story, today, actions);
+                }
+            }
+        }
+
+        // Catch-up: complete stuck subtasks found directly in DB
+        // (covers stories already Done that aren't in the plan anymore)
+        planDatabaseCatchUp(teamId, actions);
+
         // Check for story auto-transitions
         for (PlannedEpic epic : plan.epics()) {
             for (PlannedStory story : epic.stories()) {
@@ -170,6 +183,112 @@ public class SimulationPlanner {
                 case DONE -> {
                     // Already done, skip
                 }
+            }
+        }
+    }
+
+    /**
+     * Database-level catch-up: finds subtasks that are stuck (IN_PROGRESS with 0 remaining)
+     * but not covered by the planning result (e.g. their parent story is already Done).
+     */
+    private void planDatabaseCatchUp(Long teamId, List<SimulationAction> actions) {
+        List<String> doneStatuses = workflowConfigService.getStatusNamesByCategory(StatusCategory.DONE);
+        if (doneStatuses.isEmpty()) {
+            return;
+        }
+
+        // Collect keys already planned for transition to avoid duplicates
+        Set<String> alreadyPlanned = new HashSet<>();
+        for (SimulationAction a : actions) {
+            if (a.type() == SimulationAction.ActionType.TRANSITION) {
+                alreadyPlanned.add(a.issueKey());
+            }
+        }
+
+        List<JiraIssueEntity> stuckSubtasks = issueRepository.findStuckSubtasks(teamId, doneStatuses);
+
+        for (JiraIssueEntity subtask : stuckSubtasks) {
+            if (alreadyPlanned.contains(subtask.getIssueKey())) {
+                continue;
+            }
+
+            StatusCategory category = workflowConfigService.categorize(
+                    subtask.getStatus(), subtask.getIssueType());
+            if (category == StatusCategory.DONE) {
+                continue;
+            }
+
+            log.info("DB catch-up: completing stuck subtask {} (status={}, spent={}s, estimate={}s)",
+                    subtask.getIssueKey(), subtask.getStatus(),
+                    subtask.getTimeSpentSeconds(), subtask.getOriginalEstimateSeconds());
+            actions.add(SimulationAction.transition(
+                    subtask.getIssueKey(),
+                    subtask.getIssueType(),
+                    null,
+                    subtask.getStatus(),
+                    getDoneStatusName(subtask.getIssueType()),
+                    "DB catch-up: subtask work complete but not transitioned to Done"
+            ));
+        }
+    }
+
+    /**
+     * Catch-up: if a phase has already ended but some subtasks are still IN_PROGRESS
+     * with remaining <= 0, transition them to Done. This handles subtasks that got stuck
+     * due to multi-step Jira workflows (e.g. "В работе → Проверка → Готово").
+     */
+    private void planCatchUpTransitions(
+            PhaseSchedule phase,
+            String phaseName,
+            PlannedStory story,
+            LocalDate today,
+            List<SimulationAction> actions
+    ) {
+        if (phase == null || phase.endDate() == null) {
+            return;
+        }
+
+        // Only applies to expired phases (today is after endDate)
+        if (!today.isAfter(phase.endDate())) {
+            return;
+        }
+
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.storyKey());
+        List<JiraIssueEntity> phaseSubtasks = subtasks.stream()
+                .filter(st -> phaseName.equals(
+                        workflowConfigService.getSubtaskRole(st.getIssueType())))
+                .toList();
+
+        for (JiraIssueEntity subtask : phaseSubtasks) {
+            StatusCategory category = workflowConfigService.categorize(
+                    subtask.getStatus(), subtask.getIssueType());
+
+            if (category != StatusCategory.IN_PROGRESS) {
+                continue;
+            }
+
+            // Check remaining estimate
+            long remainingSeconds = subtask.getRemainingEstimateSeconds() != null
+                    ? subtask.getRemainingEstimateSeconds() : 0;
+            if (remainingSeconds <= 0) {
+                long est = subtask.getOriginalEstimateSeconds() != null
+                        ? subtask.getOriginalEstimateSeconds() : 0;
+                long spent = subtask.getTimeSpentSeconds() != null
+                        ? subtask.getTimeSpentSeconds() : 0;
+                remainingSeconds = Math.max(0, est - spent);
+            }
+
+            if (remainingSeconds <= 0) {
+                log.info("Catch-up: completing stuck subtask {} (phase {} expired {})",
+                        subtask.getIssueKey(), phaseName, phase.endDate());
+                actions.add(SimulationAction.transition(
+                        subtask.getIssueKey(),
+                        subtask.getIssueType(),
+                        null,
+                        subtask.getStatus(),
+                        getDoneStatusName(subtask.getIssueType()),
+                        "Catch-up: phase " + phaseName + " expired, subtask work complete"
+                ));
             }
         }
     }

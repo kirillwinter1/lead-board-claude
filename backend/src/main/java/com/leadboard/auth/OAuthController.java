@@ -52,7 +52,9 @@ public class OAuthController {
             addSessionCookie(response, result.sessionId());
             response.sendRedirect(redirectUrl + "/?auth=success");
         } else {
-            response.sendRedirect(redirectUrl + "/?auth=error&message=" + result.error());
+            log.warn("OAuth callback failed: {}", result.error());
+            // Don't expose internal error details in URL — use generic error code
+            response.sendRedirect(redirectUrl + "/?auth=error");
         }
     }
 
