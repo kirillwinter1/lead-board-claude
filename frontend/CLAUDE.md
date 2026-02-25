@@ -48,16 +48,27 @@ src/
 
 ## Роутинг (App.tsx)
 
-| Путь | Страница |
-|------|----------|
-| `/` | BoardPage |
-| `/timeline` | TimelinePage |
-| `/metrics` | TeamMetricsPage |
-| `/data-quality` | DataQualityPage |
-| `/teams` | TeamsPage |
-| `/teams/:id` | TeamMembersPage |
-| `/poker` | PlanningPokerPage |
-| `/poker/:id` | PokerRoomPage |
+Все маршруты от корня `/` (без `/board` префикса). Субдомен определяет tenant.
+
+| Путь | Страница | Доступ |
+|------|----------|--------|
+| `/` | BoardPage | Все авторизованные |
+| `/timeline` | TimelinePage | Все авторизованные |
+| `/metrics` | TeamMetricsPage | Все авторизованные |
+| `/data-quality` | DataQualityPage | Все авторизованные |
+| `/bug-metrics` | BugMetricsPage | Все авторизованные |
+| `/poker` | PlanningPokerPage | Все авторизованные |
+| `/poker/room/:roomCode` | PokerRoomPage | Все авторизованные |
+| `/teams` | TeamsPage | Все авторизованные |
+| `/teams/:teamId` | TeamMembersPage | Все авторизованные |
+| `/teams/:teamId/member/:memberId` | MemberProfilePage | Все авторизованные |
+| `/teams/:teamId/competency` | TeamCompetencyPage | Все авторизованные |
+| `/projects` | ProjectsPage | Все авторизованные |
+| `/project-timeline` | ProjectTimelinePage | Все авторизованные |
+| `/settings` | SettingsPage | ADMIN only |
+| `/workflow` | WorkflowConfigPage | ADMIN only |
+| `/landing` | LandingPage | Публичная |
+| `/register` | RegistrationPage | Публичная |
 
 ## Паттерны
 

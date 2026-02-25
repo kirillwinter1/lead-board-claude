@@ -282,7 +282,7 @@ describe('TeamsPage', () => {
 
       await waitFor(() => {
         const teamLink = screen.getByText('Team Alpha').closest('a')
-        expect(teamLink).toHaveAttribute('href', '/board/teams/1')
+        expect(teamLink).toHaveAttribute('href', '/teams/1')
       })
     })
   })

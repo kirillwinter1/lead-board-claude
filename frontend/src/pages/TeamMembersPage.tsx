@@ -261,7 +261,7 @@ export function TeamMembersPage() {
     <main className="main-content">
       <div className="page-header">
         <div className="page-header-left">
-          <Link to="/board/teams" className="back-link">&larr; Back to Teams</Link>
+          <Link to="/teams" className="back-link">&larr; Back to Teams</Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {team.color && (
               <span style={{
@@ -280,7 +280,7 @@ export function TeamMembersPage() {
           )}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <Link to={`/board/teams/${teamId}/competency`} className="btn btn-secondary"
+          <Link to={`/teams/${teamId}/competency`} className="btn btn-secondary"
             style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
             Competency Matrix
           </Link>
@@ -340,7 +340,7 @@ export function TeamMembersPage() {
                           {(member.displayName || '?')[0].toUpperCase()}
                         </span>
                       )}
-                      <Link to={`/board/teams/${teamId}/member/${member.id}`} className="team-name-link">
+                      <Link to={`/teams/${teamId}/member/${member.id}`} className="team-name-link">
                         {member.displayName || <span className="cell-muted">Not set</span>}
                       </Link>
                     </div>

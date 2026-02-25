@@ -428,7 +428,7 @@ export function PokerRoomPage() {
     return (
       <main className="main-content">
         <div className="error">{error}</div>
-        <button className="btn btn-secondary" onClick={() => navigate('/board/poker')}>
+        <button className="btn btn-secondary" onClick={() => navigate('/poker')}>
           Назад к списку
         </button>
       </main>
@@ -473,7 +473,7 @@ export function PokerRoomPage() {
       {/* Header */}
       <div className="poker-header">
         <div className="poker-header-left">
-          <button className="btn btn-secondary" onClick={() => navigate('/board/poker')}>
+          <button className="btn btn-secondary" onClick={() => navigate('/poker')}>
             &#8592; Назад
           </button>
           <h2>

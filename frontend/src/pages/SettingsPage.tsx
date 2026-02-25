@@ -173,7 +173,7 @@ export function SettingsPage() {
         <p className="settings-section-description">
           Configure issue types, statuses, roles and link type mappings.
         </p>
-        <Link to="/board/workflow" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
+        <Link to="/workflow" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
           Open Workflow Configuration
         </Link>
       </section>

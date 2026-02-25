@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { BoardPage } from './pages/BoardPage'
 import { TeamsPage } from './pages/TeamsPage'
@@ -23,7 +23,7 @@ import './App.css'
 
 function TenantAwareRoot() {
   const slug = getTenantSlug()
-  return slug ? <Navigate to="/board" replace /> : <LandingPage />
+  return slug ? <Layout /> : <LandingPage />
 }
 
 function App() {
@@ -31,10 +31,9 @@ function App() {
     <BrowserRouter>
       <WorkflowConfigProvider>
       <Routes>
-        <Route path="/" element={<TenantAwareRoot />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/register" element={<RegistrationPage />} />
-        <Route path="/board" element={<Layout />}>
+        <Route path="/" element={<TenantAwareRoot />}>
           <Route index element={<BoardPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="metrics" element={<TeamMetricsPage />} />

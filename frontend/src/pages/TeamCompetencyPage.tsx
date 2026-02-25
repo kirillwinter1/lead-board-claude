@@ -65,7 +65,7 @@ export function TeamCompetencyPage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/board/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
             <h1>Матрица компетенций</h1>
           </div>
         </div>
@@ -79,7 +79,7 @@ export function TeamCompetencyPage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/board/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
             <h1>Матрица компетенций</h1>
           </div>
         </div>
@@ -94,7 +94,7 @@ export function TeamCompetencyPage() {
     <main className="main-content">
       <div className="page-header">
         <div className="page-header-left">
-          <Link to={`/board/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+          <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
           <h1>Матрица компетенций</h1>
         </div>
       </div>
@@ -166,7 +166,7 @@ export function TeamCompetencyPage() {
                     position: 'sticky', left: 0, background: 'white', zIndex: 1,
                     whiteSpace: 'nowrap',
                   }}>
-                    <Link to={`/board/teams/${teamId}/member/${member.memberId}`}
+                    <Link to={`/teams/${teamId}/member/${member.memberId}`}
                       style={{ color: '#0052cc', textDecoration: 'none' }}>
                       {member.displayName}
                     </Link>

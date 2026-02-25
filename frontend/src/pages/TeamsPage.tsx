@@ -246,7 +246,7 @@ export function TeamsPage() {
                           ))}
                         </div>
                       )}
-                      <Link to={`/board/teams/${team.id}`} className="team-name-link">
+                      <Link to={`/teams/${team.id}`} className="team-name-link">
                         {team.name}
                       </Link>
                     </div>

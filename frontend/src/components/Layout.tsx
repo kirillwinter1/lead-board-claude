@@ -94,40 +94,40 @@ export function Layout() {
     <div className="app">
       <header className="header">
         <div className="header-left">
-          <NavLink to="/board" className="logo-link">
+          <NavLink to="/" className="logo-link">
             <img src={logo} alt="OneLane" className="header-logo" />
           </NavLink>
           {showNav && (
             <nav className="nav-tabs">
-              <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
+              <NavLink to={`/${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
                 Board
               </NavLink>
-              <NavLink to={`/board/timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Timeline
               </NavLink>
-              <NavLink to={`/board/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Metrics
               </NavLink>
-              <NavLink to={`/board/data-quality${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/data-quality${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Data Quality
               </NavLink>
-              <NavLink to={`/board/bug-metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/bug-metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Bugs
               </NavLink>
-              <NavLink to={`/board/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/poker${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Poker
               </NavLink>
-              <NavLink to={`/board/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/teams${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Teams
               </NavLink>
-              <NavLink to={`/board/projects${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/projects${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Projects
               </NavLink>
-              <NavLink to={`/board/project-timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+              <NavLink to={`/project-timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Project Timeline
               </NavLink>
               {isAdmin(authStatus?.user) && (
-                <NavLink to="/board/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                <NavLink to="/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                   Settings
                 </NavLink>
               )}

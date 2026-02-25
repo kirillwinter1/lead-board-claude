@@ -187,7 +187,7 @@ export function MemberProfilePage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/board/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
           </div>
         </div>
         <div style={{ padding: 40, textAlign: 'center', color: '#6b778c' }}>Загрузка профиля...</div>
@@ -200,7 +200,7 @@ export function MemberProfilePage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/board/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
           </div>
         </div>
         <div style={{ padding: 40, textAlign: 'center', color: '#de350b' }}>{error || 'Нет данных'}</div>
@@ -225,7 +225,7 @@ export function MemberProfilePage() {
       {/* Header */}
       <div className="page-header" style={{ marginBottom: 12 }}>
         <div className="page-header-left">
-          <Link to={`/board/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+          <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
         </div>
         <div className="member-profile-period">
           <label>Период:</label>

@@ -44,7 +44,7 @@ describe('Layout', () => {
     })
   })
 
-  const renderLayout = (route = '/board') => {
+  const renderLayout = (route = '/') => {
     return render(
       <MemoryRouter initialEntries={[route]}>
         <Layout />
@@ -91,14 +91,14 @@ describe('Layout', () => {
     })
 
     it('should preserve teamId in navigation links', async () => {
-      renderLayout('/board?teamId=5')
+      renderLayout('/?teamId=5')
 
       await waitFor(() => {
         const boardLink = screen.getByText('Board').closest('a')
-        expect(boardLink).toHaveAttribute('href', '/board?teamId=5')
+        expect(boardLink).toHaveAttribute('href', '/?teamId=5')
 
         const timelineLink = screen.getByText('Timeline').closest('a')
-        expect(timelineLink).toHaveAttribute('href', '/board/timeline?teamId=5')
+        expect(timelineLink).toHaveAttribute('href', '/timeline?teamId=5')
       })
     })
   })
