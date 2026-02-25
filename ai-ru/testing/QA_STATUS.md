@@ -17,13 +17,13 @@
 | 5 | **Data Quality** | F18, F36, F42 | ✅ Проверен | (входит в Board QA) | [reports/2026-02-19_BOARD_DQ_BUGSLA.md](reports/2026-02-19_BOARD_DQ_BUGSLA.md) |
 | 6 | **Planning Poker** | F23 | ⏸️ Отложен | Известные баги с Jira | — |
 | 7 | **Workflow Config** | F17, F29, F38 | ✅ Проверен | 2 Critical, 2 High, 7 Medium, 5 Low | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
-| 8 | **Simulation** | F28 | ❌ Не проверен | — | — |
+| 8 | **Simulation** | F28 | ✅ Проверен | 2 Critical, 4 High, 7 Medium, 5 Low | [reports/2026-02-25_SIMULATION.md](reports/2026-02-25_SIMULATION.md) |
 | 9 | **Projects** | F35 | ✅ Проверен | 1 High (test regression), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 10 | **RICE Scoring** | F36 | ✅ Проверен | 2 Medium (case-sensitive, FP), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 11 | **Project Timeline** | F35 | ✅ Проверен | Визуал ОК | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 12 | **Member Profile** | F30 | ❌ Не проверен | — | — |
 | 13 | **Setup Wizard** | F33 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
-| 14 | **Auth / OAuth** | F4, F27 | ❌ Не проверен | — | — |
+| 14 | **Auth / OAuth / RBAC** | F4, F27, F44 | ✅ Проверен | 2 Critical, 5 High, 5 Medium, 2 Low | [reports/2026-02-25_AUTH_RBAC.md](reports/2026-02-25_AUTH_RBAC.md) |
 | 15 | **Sync** | F2, F3, F9, F34 | ✅ Проверен | 2 Critical, 2 High, 4 Medium, 2 Low | [reports/2026-02-21_SYNC.md](reports/2026-02-21_SYNC.md) |
 | 16 | **AutoScore / Planning** | F13, F19, F20, F21 | ✅ Проверен | 1 High, 4 Medium, 4 Low | [reports/2026-02-23_AUTOSCORE_PLANNING.md](reports/2026-02-23_AUTOSCORE_PLANNING.md) |
 | 17 | **Team Members** | F5, F6, F37, F41 | ✅ Проверен (F41) | 3 High, 6 Medium, 3 Low | [reports/2026-02-19_F41_ABSENCES.md](reports/2026-02-19_F41_ABSENCES.md) |
@@ -31,8 +31,9 @@
 
 | 19 | **Bug SLA Settings** | F42 | ✅ Проверен (встроен в Settings) | 0 багов | [reports/2026-02-23_BUG_SLA_TO_SETTINGS.md](reports/2026-02-23_BUG_SLA_TO_SETTINGS.md) |
 | 20 | **Multi-Tenancy / Registration** | F44 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
+| 21 | **Multi-Tenancy E2E Journey** | F44, F33 | ✅ Проверен | 3 Critical, 2 High, 4 Medium, 2 Low | [reports/2026-02-25_MULTITENANCY_E2E.md](reports/2026-02-25_MULTITENANCY_E2E.md) |
 
-**Прогресс: 17 / 20 экранов проверено (85%)**
+**Прогресс: 20 / 21 экранов проверено (95%)**
 
 ---
 
@@ -40,11 +41,11 @@
 
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
-| Critical | 0 | 5 | 5 |
-| High | 3 | 17 | 20 |
-| Medium | 12 | 27 | 39 |
-| Low | 10 | 11 | 21 |
-| **Итого** | **25** | **60** | **85** |
+| Critical | 4 | 5 | 9 |
+| High | 12 | 17 | 29 |
+| Medium | 24 | 27 | 51 |
+| Low | 17 | 11 | 28 |
+| **Итого** | **57** | **60** | **117** |
 
 ---
 
@@ -187,9 +188,39 @@
 | ~~P1~~ | ~~**Workflow Config**~~ | ✅ Проверен (2 Critical, 2 High, 7 Medium, 5 Low) |
 | ~~P2~~ | ~~**Timeline**~~ | ✅ Проверен |
 | ~~P3~~ | ~~**Setup Wizard**~~ | ✅ Проверен (входит в Workflow Config QA) |
-| P2 | **Simulation** | Моделирование сценариев (F28) |
+| ~~P2~~ | ~~**Simulation**~~ | ✅ Проверен (2 Critical, 4 High, 7 Medium, 5 Low) |
+| ~~P3~~ | ~~**Auth / OAuth / RBAC**~~ | ✅ Проверен (2 Critical, 5 High, 5 Medium, 2 Low) |
 | P3 | **Member Profile** | Профиль участника |
-| P3 | **Auth / OAuth** | Безопасность |
+
+### Simulation (F28) — 2026-02-25
+
+**API endpoints (5):** 23 проверки — 14 PASS, 5 BUG, 4 NOTE
+**Backend tests:** 25 tests ALL PASS (4 test classes)
+**Frontend:** нет (backend-only модуль)
+**Code review:** 13 main files, 4 test files
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-76 | Critical | TOCTOU race condition в concurrent guard (existsByStatus check-then-act) | OPEN |
+| BUG-77 | Critical | SimulationScheduler не устанавливает TenantContext (multi-tenant broken) | OPEN |
+| BUG-78 | High | POST /dry-run и /run: null/missing teamId → 500 вместо 400 (нет валидации) | OPEN |
+| BUG-79 | High | POST /dry-run teamId=9999 → 500 вместо 404 (non-existent team) | OPEN |
+| BUG-80 | High | fromJson() returns null на corrupt JSON → NPE при чтении логов | OPEN |
+| BUG-81 | High | toJson() swallows errors, saves "[]" → simulation data silently lost | OPEN |
+| BUG-82 | Medium | N+1 query: findByParentKey() called per story per phase (~700 queries) | OPEN |
+| BUG-83 | Medium | No duplicate guard: same team+date creates unlimited dry-run logs | OPEN |
+| BUG-84 | Medium | Over-logging: 0.5h rounding minimum inflates Jira time tracking | OPEN |
+| BUG-85 | Medium | getLogs() partial date filter silently ignored (only from without to) | OPEN |
+| BUG-86 | Medium | getLogs() no pagination — returns all logs with full JSONB payloads | OPEN |
+| BUG-87 | Medium | Deviation probability config not validated (sum != 1.0 → biased results) | OPEN |
+| BUG-88 | Medium | Permanent "RUNNING" lock if DB fails during error handling | OPEN |
+| BUG-89 | Low | No warning log when scheduler enabled without teamIds | OPEN |
+| BUG-90 | Low | Fixed 100ms rate limit without adaptive backoff for Jira 429 | OPEN |
+| BUG-91 | Low | Hardcoded "Epic" fallback in getEpicTypeNames() | OPEN |
+| BUG-92 | Low | 0 tests for SimulationController (5 endpoints) and SimulationScheduler | OPEN |
+| BUG-93 | Low | No @DisplayName on any of 25 tests | OPEN |
+
+---
 
 ### Workflow Config + Setup Wizard + Multi-Tenancy — 2026-02-25
 
@@ -217,6 +248,30 @@
 | BUG-74 | Low | localStorage wizard state переживает logout/смену tenant'а | ✅ FIXED (clear on logout) |
 | BUG-75 | Low | Нет aria-labels на color picker, tab buttons в WorkflowConfigPage | OPEN |
 
+### Auth / RBAC — 2026-02-25
+
+**API endpoints (30+):** auth enforcement OK, RBAC gaps found
+**Backend tests:** ALL PASS (но 0 RBAC-specific тестов)
+**Frontend tests:** 235/235 PASS
+**Code review:** 15 files (auth package, SecurityConfig, controllers, frontend Layout)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-94 | Critical | AuthorizationService uses getRole() (global) instead of getTenantRole() — all SpEL checks bypass tenant RBAC | OPEN |
+| BUG-95 | Critical | Cross-tenant session reuse — session from tenant A accepted on tenant B | OPEN |
+| BUG-96 | High | First-tenant-user ADMIN logic broken — every new user gets ADMIN in any tenant | OPEN |
+| BUG-97 | High | 11+ write endpoints lack @PreAuthorize — VIEWER can modify competencies, forecast, planning | OPEN |
+| BUG-98 | High | WebSocket /ws/** has no authentication (permitAll, no handshake interceptor) | OPEN |
+| BUG-99 | High | findLatestToken() returns any user's OAuth token — privilege confusion | OPEN |
+| BUG-100 | High | No session invalidation on role change — old sessions keep old role for 30 days | OPEN |
+| BUG-101 | Medium | First-user ADMIN race condition — count==0 without DB lock | OPEN |
+| BUG-102 | Medium | OAuth state in-memory only — breaks multi-instance, lost on restart | OPEN |
+| BUG-103 | Medium | Tenant registration no rate limiting — public DDL trigger (CREATE SCHEMA + Flyway) | OPEN |
+| BUG-104 | Medium | Frontend RBAC minimal — only Settings tab hidden, write ops visible to VIEWER | OPEN |
+| BUG-105 | Medium | 0 RBAC-specific tests — no test verifies MEMBER/VIEWER rejected from ADMIN endpoints | OPEN |
+| BUG-106 | Low | OAuth tokens stored in plaintext — DB compromise leaks all Jira tokens | OPEN |
+| BUG-107 | Low | Sessions not bound to client fingerprint — stolen cookie works from any location | OPEN |
+
 ---
 
 ## Артефакты
@@ -234,7 +289,9 @@ ai-ru/testing/
     ├── 2026-02-23_AUTOSCORE_PLANNING.md ← QA-отчёт: AutoScore / Planning
     ├── 2026-02-23_BUG_SLA_TO_SETTINGS.md ← QA-отчёт: Bug SLA Settings
     ├── 2026-02-25_TIMELINE.md         ← QA-отчёт: Timeline (F14, F45 Hybrid)
-    └── 2026-02-25_WORKFLOW_TENANT_WIZARD.md ← QA-отчёт: Workflow Config + Wizard + Multi-Tenancy
+    ├── 2026-02-25_WORKFLOW_TENANT_WIZARD.md ← QA-отчёт: Workflow Config + Wizard + Multi-Tenancy
+    ├── 2026-02-25_SIMULATION.md       ← QA-отчёт: Simulation (F28)
+    └── 2026-02-25_AUTH_RBAC.md        ← QA-отчёт: Auth / RBAC
 ```
 
 ## Процесс
