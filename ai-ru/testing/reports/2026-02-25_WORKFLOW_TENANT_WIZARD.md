@@ -17,37 +17,37 @@
 
 | Bug ID | Описание | Файл | Статус |
 |--------|----------|------|--------|
-| BUG-60 | **Multi-tenant cache race condition в WorkflowConfigService.** Глобальный `volatile currentlyLoadedTenantId` + ConcurrentHashMap кэш. Если `ensureLoaded()` вызывается из разных потоков с разными tenant'ами одновременно, конфиг tenant A может попасть в запрос tenant B. `currentlyLoadedTenantId` присваивается ПОСЛЕ `loadConfiguration()` — окно для race condition. **Нужен `Map<Long, CacheSnapshot>` per-tenant.** | `WorkflowConfigService.java:59-106` | OPEN |
-| BUG-61 | **SQL injection risk в tenant schema management.** `"CREATE SCHEMA IF NOT EXISTS " + schemaName` (TenantMigrationService:43) и `"SET search_path TO " + schema + ", public"` (SchemaBasedConnectionProvider:70) — schema name конкатенируется в SQL напрямую. Текущая защита: только через regex валидацию slug в TenantService. Но если schema name bypasses TenantService (e.g., через прямой вызов), возможен SQL injection. **Нужна доп. валидация `^tenant_[a-z0-9_]+$` перед SQL.** | `TenantMigrationService.java:43`, `SchemaBasedConnectionProvider.java:70` | OPEN |
+| BUG-60 | **Multi-tenant cache race condition в WorkflowConfigService.** Глобальный `volatile currentlyLoadedTenantId` + ConcurrentHashMap кэш. Если `ensureLoaded()` вызывается из разных потоков с разными tenant'ами одновременно, конфиг tenant A может попасть в запрос tenant B. `currentlyLoadedTenantId` присваивается ПОСЛЕ `loadConfiguration()` — окно для race condition. | `WorkflowConfigService.java:59-106` | ✅ FIXED (synchronized ensureLoaded/clearCache) |
+| BUG-61 | **SQL injection risk в tenant schema management.** `"CREATE SCHEMA IF NOT EXISTS " + schemaName` (TenantMigrationService:43) и `"SET search_path TO " + schema + ", public"` (SchemaBasedConnectionProvider:70) — schema name конкатенируется в SQL напрямую. | `TenantMigrationService.java:43`, `SchemaBasedConnectionProvider.java:70` | ✅ FIXED (regex validation `^(tenant_[a-z0-9_]+|public)$`) |
 
 ### High (2)
 
 | Bug ID | Описание | Файл | Статус |
 |--------|----------|------|--------|
-| BUG-62 | **PUT roles/statuses/issue-types/link-types принимает пустой массив `[]`, удаляя все данные.** `curl -X PUT -d '[]' /api/admin/workflow-config/roles` → 200 OK, все роли удалены. Ломает pipeline планирования, timeline, всю систему. Нет валидации минимального количества записей. | `WorkflowConfigController.java` (PUT endpoints) | OPEN |
-| BUG-63 | **44 @WebMvcTest controller теста сломаны** после F44 Multi-Tenancy. `NoSuchBeanDefinitionException: TenantUserRepository`. Все контроллерные тесты (Board, Team, Metrics, Forecast, IssueOrder, WorkflowConfig) не запускаются. Регрессия F44. | Все `*ControllerTest.java` файлы | OPEN |
+| BUG-62 | **PUT roles/statuses/issue-types/link-types принимает пустой массив `[]`, удаляя все данные.** | `WorkflowConfigController.java` (PUT endpoints) | ✅ FIXED (empty list → 400 Bad Request) |
+| BUG-63 | **44 @WebMvcTest controller теста сломаны** после F44 Multi-Tenancy. `NoSuchBeanDefinitionException: TenantUserRepository + TenantRepository`. | Все `*ControllerTest.java` файлы | ✅ FIXED (@MockBean added to all 6 test files) |
 
 ### Medium (7)
 
 | Bug ID | Описание | Файл | Статус |
 |--------|----------|------|--------|
-| BUG-64 | **check-slug не валидирует reserved words и формат.** `GET /api/public/tenants/check-slug?slug=admin` → `{"available":true}`. Аналогично для пустого slug, 1 символа, пробелов. `checkSlug()` делает только DB lookup (`findBySlug()`), не вызывая `validateSlug()`. Пользователь видит "Available", но register вернёт 400. | `TenantRegistrationController.java` (checkSlug) | OPEN |
-| BUG-65 | **issue-count: months=0 возвращает все 246 задач.** Ожидание: 0 задач (0 месяцев = ничего) или 400. Факт: возвращает все задачи. Также missing `months` param тихо дефолтится в 0. | `SyncController` (issue-count endpoint) | OPEN |
-| BUG-66 | **NPE в PublicConfigController.getIssueTypeCategories()** при null boardCategory. Строка 61: `m.getBoardCategory().name()` — если тип задачи зарегистрирован через F38 incremental с `boardCategory=NULL`, будет NPE → 500. Латентный баг (сейчас все типы промаппированы). | `PublicConfigController.java:61` | OPEN |
-| BUG-67 | **Нет AbortController в WorkflowConfigPage.** `loadConfig()` и `fetchJiraMetadata()` фетчат без abort. При навигации прочь или быстром рефетче — stale state updates, memory leak. | `WorkflowConfigPage.tsx` (loadConfig, fetchJiraMetadata) | OPEN |
-| BUG-68 | **Silent polling errors в SetupWizardPage.** Polling `.catch(() => {})` тихо проглатывает ошибки. Пользователь видит бесконечный "Syncing..." при сетевых проблемах. Нет таймаута, нет максимального числа попыток. | `SetupWizardPage.tsx` (polling) | OPEN |
-| BUG-69 | **Нет debounce на проверке slug в RegistrationPage.** `checkSlug()` вызывается на каждый keystroke без задержки. Race condition: несколько параллельных запросов, последний ответ может быть не от последнего запроса. | `RegistrationPage.tsx` (checkSlug) | OPEN |
+| BUG-64 | **check-slug не валидирует reserved words и формат.** | `TenantRegistrationController.java` (checkSlug) | ✅ FIXED (isValidSlug() before DB lookup) |
+| BUG-65 | **issue-count: months=0 возвращает все задачи.** | `SyncController` (issue-count endpoint) | ✅ FIXED (months must be > 0, <= 120) |
+| BUG-66 | **NPE в PublicConfigController.getIssueTypeCategories()** при null boardCategory. | `PublicConfigController.java:61` | ✅ FIXED (null check + continue) |
+| BUG-67 | **Нет AbortController в WorkflowConfigPage.** | `WorkflowConfigPage.tsx` (loadConfig) | ✅ FIXED (AbortController + signal) |
+| BUG-68 | **Silent polling errors в SetupWizardPage.** | `SetupWizardPage.tsx` (polling) | ✅ FIXED (error state + max 5 retries) |
+| BUG-69 | **Нет debounce на проверке slug в RegistrationPage.** | `RegistrationPage.tsx` (checkSlug) | ✅ FIXED (300ms debounce + AbortController) |
 | BUG-70 | **0 frontend тестов для 3 критичных страниц.** WorkflowConfigPage (1870 LOC), SetupWizardPage (261 LOC), RegistrationPage (139 LOC) — ни одного теста. | `frontend/src/pages/` | OPEN |
 
 ### Low (5)
 
 | Bug ID | Описание | Файл | Статус |
 |--------|----------|------|--------|
-| BUG-71 | **Tab URL parameter не работает в WorkflowConfigPage.** `?tab=statuses` игнорируется, всегда показывается Roles. Невозможно deep-link на конкретный таб. | `WorkflowConfigPage.tsx` (activeTab state) | OPEN |
-| BUG-72 | **check-slug со спецсимволами возвращает HTML 400** вместо JSON. Tomcat отбрасывает запрос до контроллера. Frontend получает HTML, возможен parse error. | `TenantRegistrationController.java` | OPEN |
-| BUG-73 | **Нет верхней границы months parameter.** `months=9999` принимается (299970 дней). Нет практического вреда, но плохая валидация. | `SyncController` (issue-count) | OPEN |
-| BUG-74 | **localStorage wizard state переживает logout.** Если пользователь разлогинится и войдёт другим аккаунтом (или в другом tenant'е), wizard step/months сохранены. | `SetupWizardPage.tsx` (localStorage) | OPEN |
-| BUG-75 | **Нет aria-labels на WorkflowConfigPage.** Color picker кнопки, tab buttons без `aria-selected`, save/delete кнопки без описания контекста (какую роль удаляем?). | `WorkflowConfigPage.tsx` | OPEN |
+| BUG-71 | **Tab URL parameter не работает в WorkflowConfigPage.** | `WorkflowConfigPage.tsx` (activeTab state) | ✅ FIXED (URL search params) |
+| BUG-72 | **check-slug со спецсимволами возвращает HTML 400** вместо JSON. Tomcat отбрасывает запрос до контроллера. | `TenantRegistrationController.java` | OPEN (Tomcat behavior) |
+| BUG-73 | **Нет верхней границы months parameter.** | `SyncController` (issue-count) | ✅ FIXED (months <= 120) |
+| BUG-74 | **localStorage wizard state переживает logout.** | `SetupWizardPage.tsx` (localStorage) | ✅ FIXED (clear on logout) |
+| BUG-75 | **Нет aria-labels на WorkflowConfigPage.** Color picker кнопки, tab buttons без `aria-selected`. | `WorkflowConfigPage.tsx` | OPEN |
 
 ---
 

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadboard.auth.AuthorizationService;
 import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
+import com.leadboard.tenant.TenantRepository;
+import com.leadboard.tenant.TenantUserRepository;
 import com.leadboard.config.JiraProperties;
 import com.leadboard.planning.AutoScoreService;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,10 @@ class TeamControllerTest {
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
+    @MockBean
+    private TenantUserRepository tenantUserRepository;
+    @MockBean
+    private TenantRepository tenantRepository;
 
     @BeforeEach
     void setUp() {

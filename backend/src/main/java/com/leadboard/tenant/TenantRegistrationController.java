@@ -35,7 +35,12 @@ public class TenantRegistrationController {
 
     @GetMapping("/check-slug")
     public ResponseEntity<?> checkSlug(@RequestParam String slug) {
-        boolean available = !tenantService.findBySlug(slug.toLowerCase().trim()).isPresent();
+        String normalized = slug.toLowerCase().trim();
+        // Validate slug format and reserved words before DB lookup (BUG-64)
+        if (!tenantService.isValidSlug(normalized)) {
+            return ResponseEntity.ok(Map.of("available", false, "reason", "invalid"));
+        }
+        boolean available = !tenantService.findBySlug(normalized).isPresent();
         return ResponseEntity.ok(Map.of("available", available));
     }
 

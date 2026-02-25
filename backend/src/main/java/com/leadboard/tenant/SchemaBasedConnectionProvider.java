@@ -64,6 +64,8 @@ public class SchemaBasedConnectionProvider implements MultiTenantConnectionProvi
     }
 
     private void setSchema(Connection connection, String schema) throws SQLException {
+        // Validate schema name to prevent SQL injection (BUG-61)
+        TenantMigrationService.validateSchemaName(schema);
         // SET search_path TO tenant_acme, public
         // This ensures tenant tables are found first, but public tables are also accessible
         try (var statement = connection.createStatement()) {

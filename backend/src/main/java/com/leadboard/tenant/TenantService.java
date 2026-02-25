@@ -100,6 +100,16 @@ public class TenantService {
         return tenantUserRepository.findByUserId(userId);
     }
 
+    /**
+     * Returns true if slug passes format and reserved-word checks.
+     * Used by check-slug endpoint for pre-validation (BUG-64).
+     */
+    public boolean isValidSlug(String slug) {
+        if (slug == null || slug.isBlank()) return false;
+        if (!SLUG_PATTERN.matcher(slug).matches()) return false;
+        return !RESERVED_SLUGS.contains(slug);
+    }
+
     private void validateSlug(String slug) {
         if (slug == null || slug.isBlank()) {
             throw new IllegalArgumentException("Slug cannot be empty");

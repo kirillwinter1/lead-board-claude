@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
 
 export default function RegistrationPage() {
@@ -7,6 +7,15 @@ export default function RegistrationPage() {
     const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            abortRef.current?.abort();
+        };
+    }, []);
 
     const generateSlug = (companyName: string) => {
         return companyName
@@ -23,17 +32,26 @@ export default function RegistrationPage() {
         const newSlug = generateSlug(value);
         setSlug(newSlug);
         setSlugAvailable(null);
-        if (newSlug.length >= 3) {
-            checkSlug(newSlug);
-        }
+        debouncedCheckSlug(newSlug);
     };
 
+    const debouncedCheckSlug = useCallback((s: string) => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (s.length < 3) return;
+        debounceRef.current = setTimeout(() => checkSlug(s), 300);
+    }, []);
+
     const checkSlug = async (s: string) => {
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         try {
-            const { data } = await axios.get(`/api/public/tenants/check-slug?slug=${s}`);
+            const { data } = await axios.get(`/api/public/tenants/check-slug?slug=${s}`, {
+                signal: controller.signal,
+            });
             setSlugAvailable(data.available);
         } catch {
-            setSlugAvailable(null);
+            if (!controller.signal.aborted) setSlugAvailable(null);
         }
     };
 
@@ -89,9 +107,10 @@ export default function RegistrationPage() {
                             type="text"
                             value={slug}
                             onChange={e => {
-                                setSlug(e.target.value.toLowerCase());
+                                const val = e.target.value.toLowerCase();
+                                setSlug(val);
                                 setSlugAvailable(null);
-                                if (e.target.value.length >= 3) checkSlug(e.target.value.toLowerCase());
+                                debouncedCheckSlug(val);
                             }}
                             placeholder="acme"
                             required

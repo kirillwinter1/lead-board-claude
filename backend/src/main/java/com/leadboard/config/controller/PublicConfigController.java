@@ -58,6 +58,7 @@ public class PublicConfigController {
         List<IssueTypeMappingEntity> mappings = issueTypeRepo.findByConfigId(configId);
         Map<String, String> result = new LinkedHashMap<>();
         for (IssueTypeMappingEntity m : mappings) {
+            if (m.getBoardCategory() == null) continue; // Skip unmapped types (BUG-66)
             result.put(m.getJiraTypeName(), m.getBoardCategory().name());
         }
         return ResponseEntity.ok(result);

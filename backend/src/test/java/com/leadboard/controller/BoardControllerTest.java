@@ -14,6 +14,8 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
+import com.leadboard.tenant.TenantRepository;
+import com.leadboard.tenant.TenantUserRepository;
 
 import java.util.List;
 
@@ -45,6 +47,10 @@ class BoardControllerTest {
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
+    @MockBean
+    private TenantUserRepository tenantUserRepository;
+    @MockBean
+    private TenantRepository tenantRepository;
 
     // ForecastController dependencies (loaded by WebMvcTest)
     @MockBean

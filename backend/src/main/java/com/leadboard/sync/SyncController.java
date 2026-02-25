@@ -32,9 +32,12 @@ public class SyncController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getIssueCount(
             @RequestParam(required = false) Integer months) {
-        // BUG-45: Validate months parameter
-        if (months != null && months < 0) {
-            return ResponseEntity.badRequest().body(Map.of("error", "months must be >= 0"));
+        // BUG-45/BUG-65: Validate months parameter
+        if (months != null && months <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "months must be > 0"));
+        }
+        if (months != null && months > 120) {
+            return ResponseEntity.badRequest().body(Map.of("error", "months must be <= 120"));
         }
         return ResponseEntity.ok(syncService.countIssuesInJira(months));
     }
@@ -43,9 +46,12 @@ public class SyncController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> triggerSync(
             @RequestParam(required = false) Integer months) {
-        // BUG-45: Validate months parameter
-        if (months != null && months < 0) {
-            return ResponseEntity.badRequest().body(Map.of("error", "months must be >= 0"));
+        // BUG-45/BUG-65: Validate months parameter
+        if (months != null && months <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "months must be > 0"));
+        }
+        if (months != null && months > 120) {
+            return ResponseEntity.badRequest().body(Map.of("error", "months must be <= 120"));
         }
         return ResponseEntity.ok(syncService.triggerSync(months));
     }

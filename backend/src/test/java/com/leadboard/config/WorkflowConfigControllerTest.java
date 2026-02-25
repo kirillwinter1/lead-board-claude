@@ -1,6 +1,8 @@
 package com.leadboard.config;
 
 import com.leadboard.auth.SessionRepository;
+import com.leadboard.tenant.TenantRepository;
+import com.leadboard.tenant.TenantUserRepository;
 import com.leadboard.config.controller.WorkflowConfigController;
 import com.leadboard.config.dto.*;
 import com.leadboard.config.entity.*;
@@ -63,6 +65,10 @@ class WorkflowConfigControllerTest {
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
+    @MockBean
+    private TenantUserRepository tenantUserRepository;
+    @MockBean
+    private TenantRepository tenantRepository;
 
     @Test
     void getConfig_returnsFullConfiguration() throws Exception {

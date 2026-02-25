@@ -143,6 +143,9 @@ public class WorkflowConfigController {
     @Transactional
     @PutMapping("/roles")
     public ResponseEntity<List<WorkflowRoleDto>> updateRoles(@RequestBody List<WorkflowRoleDto> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
         ProjectConfigurationEntity config = getOrCreateDefaultConfig();
         Long configId = config.getId();
 
@@ -180,6 +183,9 @@ public class WorkflowConfigController {
     @Transactional
     @PutMapping("/issue-types")
     public ResponseEntity<List<IssueTypeMappingDto>> updateIssueTypes(@RequestBody List<IssueTypeMappingDto> issueTypes) {
+        if (issueTypes == null || issueTypes.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
         ProjectConfigurationEntity config = getOrCreateDefaultConfig();
         Long configId = config.getId();
 
@@ -214,6 +220,9 @@ public class WorkflowConfigController {
     @Transactional
     @PutMapping("/statuses")
     public ResponseEntity<List<StatusMappingDto>> updateStatuses(@RequestBody List<StatusMappingDto> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
         ProjectConfigurationEntity config = getOrCreateDefaultConfig();
         Long configId = config.getId();
 
@@ -268,6 +277,9 @@ public class WorkflowConfigController {
     @Transactional
     @PutMapping("/link-types")
     public ResponseEntity<List<LinkTypeMappingDto>> updateLinkTypes(@RequestBody List<LinkTypeMappingDto> linkTypes) {
+        if (linkTypes == null || linkTypes.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
         ProjectConfigurationEntity config = getOrCreateDefaultConfig();
         Long configId = config.getId();
 

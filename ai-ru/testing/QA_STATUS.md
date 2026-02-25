@@ -40,11 +40,11 @@
 
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
-| Critical | 2 | 3 | 5 |
-| High | 5 | 15 | 20 |
-| Medium | 18 | 21 | 39 |
-| Low | 12 | 9 | 21 |
-| **Итого** | **37** | **48** | **85** |
+| Critical | 0 | 5 | 5 |
+| High | 3 | 17 | 20 |
+| Medium | 12 | 27 | 39 |
+| Low | 10 | 11 | 21 |
+| **Итого** | **25** | **60** | **85** |
 
 ---
 
@@ -200,21 +200,21 @@
 
 | Bug ID | Severity | Описание | Статус |
 |--------|----------|----------|--------|
-| BUG-60 | Critical | Multi-tenant cache race condition в WorkflowConfigService (volatile + ConcurrentHashMap) | OPEN |
-| BUG-61 | Critical | SQL injection risk — schema name конкатенируется в SQL напрямую | OPEN |
-| BUG-62 | High | PUT roles/statuses/issue-types `[]` → 200 OK, удаляет все данные | OPEN |
-| BUG-63 | High | 44 @WebMvcTest controller теста сломаны (TenantUserRepository not mocked) | OPEN |
-| BUG-64 | Medium | check-slug не валидирует reserved words, формат, длину — ложный "available" | OPEN |
-| BUG-65 | Medium | issue-count: months=0 возвращает все задачи, missing param дефолтится в 0 | OPEN |
-| BUG-66 | Medium | PublicConfigController.getIssueTypeCategories() NPE на null boardCategory | OPEN |
-| BUG-67 | Medium | Нет AbortController в WorkflowConfigPage fetch calls | OPEN |
-| BUG-68 | Medium | Silent polling errors в SetupWizardPage (.catch(() => {})) | OPEN |
-| BUG-69 | Medium | Нет debounce на slug check в RegistrationPage | OPEN |
+| BUG-60 | Critical | Multi-tenant cache race condition в WorkflowConfigService (volatile + ConcurrentHashMap) | ✅ FIXED (synchronized ensureLoaded/clearCache) |
+| BUG-61 | Critical | SQL injection risk — schema name конкатенируется в SQL напрямую | ✅ FIXED (regex validation ^tenant_[a-z0-9_]+$) |
+| BUG-62 | High | PUT roles/statuses/issue-types `[]` → 200 OK, удаляет все данные | ✅ FIXED (empty list → 400) |
+| BUG-63 | High | 44 @WebMvcTest controller теста сломаны (TenantUserRepository not mocked) | ✅ FIXED (@MockBean TenantUserRepository + TenantRepository) |
+| BUG-64 | Medium | check-slug не валидирует reserved words, формат, длину — ложный "available" | ✅ FIXED (isValidSlug() before DB lookup) |
+| BUG-65 | Medium | issue-count: months=0 возвращает все задачи, missing param дефолтится в 0 | ✅ FIXED (months must be > 0) |
+| BUG-66 | Medium | PublicConfigController.getIssueTypeCategories() NPE на null boardCategory | ✅ FIXED (null check + skip) |
+| BUG-67 | Medium | Нет AbortController в WorkflowConfigPage fetch calls | ✅ FIXED (AbortController + signal) |
+| BUG-68 | Medium | Silent polling errors в SetupWizardPage (.catch(() => {})) | ✅ FIXED (error state + max 5 retries) |
+| BUG-69 | Medium | Нет debounce на slug check в RegistrationPage | ✅ FIXED (300ms debounce + AbortController) |
 | BUG-70 | Medium | 0 frontend тестов для WorkflowConfigPage, SetupWizardPage, RegistrationPage | OPEN |
-| BUG-71 | Low | Tab URL parameter не работает (?tab=statuses показывает Roles) | OPEN |
-| BUG-72 | Low | check-slug со спецсимволами → Tomcat HTML 400 вместо JSON | OPEN |
-| BUG-73 | Low | Нет верхней границы months (9999 принимается) | OPEN |
-| BUG-74 | Low | localStorage wizard state переживает logout/смену tenant'а | OPEN |
+| BUG-71 | Low | Tab URL parameter не работает (?tab=statuses показывает Roles) | ✅ FIXED (URL search params) |
+| BUG-72 | Low | check-slug со спецсимволами → Tomcat HTML 400 вместо JSON | OPEN (Tomcat behavior) |
+| BUG-73 | Low | Нет верхней границы months (9999 принимается) | ✅ FIXED (months <= 120) |
+| BUG-74 | Low | localStorage wizard state переживает logout/смену tenant'а | ✅ FIXED (clear on logout) |
 | BUG-75 | Low | Нет aria-labels на color picker, tab buttons в WorkflowConfigPage | OPEN |
 
 ---

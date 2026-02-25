@@ -2,6 +2,8 @@ package com.leadboard.planning;
 
 import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
+import com.leadboard.tenant.TenantRepository;
+import com.leadboard.tenant.TenantUserRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +35,10 @@ class IssueOrderControllerTest {
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
+    @MockBean
+    private TenantUserRepository tenantUserRepository;
+    @MockBean
+    private TenantRepository tenantRepository;
 
     // ==================== Epic Order Tests ====================
 

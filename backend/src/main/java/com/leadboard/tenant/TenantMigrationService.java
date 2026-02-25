@@ -11,6 +11,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Manages Flyway migrations for tenant schemas.
@@ -22,6 +23,7 @@ public class TenantMigrationService {
 
     private static final Logger log = LoggerFactory.getLogger(TenantMigrationService.class);
     private static final String TENANT_MIGRATIONS_LOCATION = "classpath:db/tenant";
+    private static final Pattern SAFE_SCHEMA_PATTERN = Pattern.compile("^(tenant_[a-z0-9_]+|public)$");
 
     private final DataSource dataSource;
     private final TenantRepository tenantRepository;
@@ -35,6 +37,7 @@ public class TenantMigrationService {
      * Creates a new PostgreSQL schema and runs all tenant migrations in it.
      */
     public void createTenantSchema(String schemaName) {
+        validateSchemaName(schemaName);
         log.info("Creating tenant schema: {}", schemaName);
 
         // 1. Create the schema
@@ -67,6 +70,12 @@ public class TenantMigrationService {
             } catch (Exception e) {
                 log.error("Failed to migrate tenant schema: {}", tenant.getSchemaName(), e);
             }
+        }
+    }
+
+    static void validateSchemaName(String schemaName) {
+        if (schemaName == null || !SAFE_SCHEMA_PATTERN.matcher(schemaName).matches()) {
+            throw new IllegalArgumentException("Invalid schema name: " + schemaName);
         }
     }
 

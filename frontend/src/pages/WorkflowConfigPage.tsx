@@ -438,7 +438,14 @@ interface WorkflowConfigPageProps {
 export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {}) {
   const { refresh: refreshWorkflowContext } = useWorkflowConfig()
   const [config, setConfig] = useState<WorkflowConfigResponse | null>(null)
-  const [activeTab, setActiveTab] = useState<TabKey>('roles')
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get('tab')
+    if (tab && ['roles', 'issueTypes', 'statuses', 'linkTypes'].includes(tab)) {
+      return tab as TabKey
+    }
+    return 'roles'
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -472,7 +479,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const [wizardStatusFilter, setWizardStatusFilter] = useState<string>('EPIC')
 
   useEffect(() => {
-    loadConfig()
+    const abortController = new AbortController()
+    loadConfig(abortController.signal)
+    return () => abortController.abort()
   }, [])
 
   // Auto-start wizard when config is empty
@@ -483,7 +492,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   }, [loading])
 
 
-  const loadConfig = async () => {
+  const loadConfig = async (signal?: AbortSignal) => {
     try {
       setLoading(true)
       setError(null)
@@ -491,6 +500,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         workflowConfigApi.getConfig(),
         workflowConfigApi.getStatusIssueCounts().catch(() => [] as StatusIssueCountDto[]),
       ])
+      if (signal?.aborted) return
       setConfig(data)
       setRoles(data.roles)
       setIssueTypes(data.issueTypes)
@@ -500,10 +510,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       setEpicLinkType(data.epicLinkType || 'parent')
       setEpicLinkName(data.epicLinkName || '')
     } catch (err) {
+      if (signal?.aborted) return
       setError('Failed to load workflow configuration')
       console.error('Failed to load config:', err)
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }
 

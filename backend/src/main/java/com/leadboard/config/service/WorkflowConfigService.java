@@ -80,7 +80,7 @@ public class WorkflowConfigService {
         loadConfiguration();
     }
 
-    public void clearCache() {
+    public synchronized void clearCache() {
         Long tenantId = TenantContext.getCurrentTenantId();
         if (tenantId != null) {
             loadedTenants.remove(tenantId);
@@ -91,8 +91,10 @@ public class WorkflowConfigService {
     /**
      * Ensure configuration is loaded for the current tenant.
      * Call this before any cache read in a multi-tenant context.
+     * Synchronized to prevent race conditions when multiple threads
+     * switch between tenants concurrently (BUG-60).
      */
-    public void ensureLoaded() {
+    public synchronized void ensureLoaded() {
         Long tenantId = TenantContext.getCurrentTenantId();
         if (tenantId == null) {
             // No tenant context — use default (already loaded at startup)
@@ -624,6 +626,25 @@ public class WorkflowConfigService {
             case NEW -> "New";
             default -> null;
         };
+    }
+
+    /**
+     * Returns all distinct status names mapped to a given StatusCategory across all board categories.
+     */
+    public List<String> getStatusNamesByCategory(StatusCategory target) {
+        if (target == null) return List.of();
+        ensureLoaded();
+
+        Set<String> names = new HashSet<>();
+        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+            if (entry.getValue() == target) {
+                int colonIdx = entry.getKey().indexOf(':');
+                if (colonIdx >= 0) {
+                    names.add(entry.getKey().substring(colonIdx + 1));
+                }
+            }
+        }
+        return new ArrayList<>(names);
     }
 
     // ==================== Link Types ====================

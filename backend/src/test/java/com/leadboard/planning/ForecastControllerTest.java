@@ -2,6 +2,8 @@ package com.leadboard.planning;
 
 import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
+import com.leadboard.tenant.TenantRepository;
+import com.leadboard.tenant.TenantUserRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.config.service.WorkflowConfigService;
@@ -37,6 +39,10 @@ class ForecastControllerTest {
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
+    @MockBean
+    private TenantUserRepository tenantUserRepository;
+    @MockBean
+    private TenantRepository tenantRepository;
 
     @MockBean
     private StoryForecastService storyForecastService;

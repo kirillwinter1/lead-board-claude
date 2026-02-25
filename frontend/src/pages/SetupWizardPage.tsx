@@ -26,9 +26,11 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
 
   const [syncing, setSyncing] = useState(false)
   const [syncDone, setSyncDone] = useState(false)
+  const [syncError, setSyncError] = useState<string | null>(null)
   const [syncIssueCount, setSyncIssueCount] = useState(0)
   const [syncCurrentCount, setSyncCurrentCount] = useState(0)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollFailCount = useRef(0)
 
   // On mount: validate saved step — if DB was reset, issuesCount=0 means sync hasn't happened
   useEffect(() => {
@@ -79,7 +81,9 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
   const handleStartSync = useCallback(() => {
     setSyncing(true)
     setSyncDone(false)
+    setSyncError(null)
     setSyncCurrentCount(0)
+    pollFailCount.current = 0
     setStep(2)
 
     axios.post('/api/sync/trigger', null, {
@@ -89,6 +93,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
         pollRef.current = setInterval(() => {
           axios.get<{ syncInProgress: boolean; issuesCount: number }>('/api/sync/status')
             .then(res => {
+              pollFailCount.current = 0
               setSyncCurrentCount(res.data.issuesCount)
               if (!res.data.syncInProgress) {
                 if (pollRef.current) clearInterval(pollRef.current)
@@ -99,11 +104,20 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
                 setTimeout(() => setStep(3), 1500)
               }
             })
-            .catch(() => {})
+            .catch(() => {
+              pollFailCount.current++
+              if (pollFailCount.current >= 5) {
+                if (pollRef.current) clearInterval(pollRef.current)
+                pollRef.current = null
+                setSyncing(false)
+                setSyncError('Lost connection to server. Please refresh and try again.')
+              }
+            })
         }, 2000)
       })
       .catch(() => {
         setSyncing(false)
+        setSyncError('Failed to start sync. Please try again.')
       })
   }, [months])
 
@@ -218,6 +232,11 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
           {syncDone && (
             <div className="wizard-sync-done">
               Done! {syncIssueCount} issues synced.
+            </div>
+          )}
+          {syncError && (
+            <div className="wizard-issue-count error">
+              {syncError}
             </div>
           )}
         </div>

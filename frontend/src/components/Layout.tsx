@@ -77,6 +77,9 @@ export function Layout() {
   const handleLogout = () => {
     axios.post('/oauth/atlassian/logout')
       .then(() => {
+        // Clear wizard state on logout (BUG-74)
+        localStorage.removeItem('setupWizardStep')
+        localStorage.removeItem('setupWizardMonths')
         setAuthStatus({ authenticated: false, user: null })
       })
       .catch(err => {
