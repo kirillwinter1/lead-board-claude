@@ -6,7 +6,7 @@ import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
 import com.leadboard.tenant.TenantRepository;
 import com.leadboard.tenant.TenantUserRepository;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.planning.AutoScoreService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +52,7 @@ class TeamControllerTest {
     private AbsenceService absenceService;
 
     @MockBean
-    private JiraProperties jiraProperties;
+    private JiraConfigResolver jiraConfigResolver;
 
     @MockBean
     private AutoScoreService autoScoreService;

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Map;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -22,22 +22,22 @@ public class AtlassianTeamsClient {
     private static final Logger log = LoggerFactory.getLogger(AtlassianTeamsClient.class);
 
     private final WebClient webClient;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
 
-    public AtlassianTeamsClient(JiraProperties jiraProperties, WebClient.Builder webClientBuilder) {
-        this.jiraProperties = jiraProperties;
+    public AtlassianTeamsClient(JiraConfigResolver jiraConfigResolver, WebClient.Builder webClientBuilder) {
+        this.jiraConfigResolver = jiraConfigResolver;
         this.webClient = webClientBuilder
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .build();
     }
 
     public TeamsResponse getTeams() {
-        String orgId = jiraProperties.getOrganizationId();
+        String orgId = jiraConfigResolver.getOrganizationId();
         if (orgId == null || orgId.isEmpty()) {
             throw new IllegalStateException("Organization ID is not configured");
         }
 
-        String url = jiraProperties.getBaseUrl() + "/gateway/api/public/teams/v1/org/" + orgId + "/teams";
+        String url = jiraConfigResolver.getBaseUrl() + "/gateway/api/public/teams/v1/org/" + orgId + "/teams";
         log.debug("Fetching teams from: {}", url);
 
         return webClient.get()
@@ -49,12 +49,12 @@ public class AtlassianTeamsClient {
     }
 
     public TeamMembersResponse getTeamMembers(String teamId) {
-        String orgId = jiraProperties.getOrganizationId();
+        String orgId = jiraConfigResolver.getOrganizationId();
         if (orgId == null || orgId.isEmpty()) {
             throw new IllegalStateException("Organization ID is not configured");
         }
 
-        String url = jiraProperties.getBaseUrl() + "/gateway/api/public/teams/v1/org/" + orgId + "/teams/" + teamId + "/members";
+        String url = jiraConfigResolver.getBaseUrl() + "/gateway/api/public/teams/v1/org/" + orgId + "/teams/" + teamId + "/members";
         log.debug("Fetching team members from: {}", url);
 
         return webClient.post()
@@ -66,7 +66,7 @@ public class AtlassianTeamsClient {
     }
 
     public AtlassianUser getUser(String accountId) {
-        String url = jiraProperties.getBaseUrl() + "/rest/api/3/user";
+        String url = jiraConfigResolver.getBaseUrl() + "/rest/api/3/user";
         log.debug("Fetching user info for: {}", accountId);
 
         return webClient.get()
@@ -80,7 +80,7 @@ public class AtlassianTeamsClient {
     }
 
     private String getBasicAuth() {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = jiraConfigResolver.getEmail() + ":" + jiraConfigResolver.getApiToken();
         return Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
     }
 

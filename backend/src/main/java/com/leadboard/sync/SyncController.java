@@ -1,6 +1,6 @@
 package com.leadboard.sync;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -13,14 +13,14 @@ public class SyncController {
 
     private final SyncService syncService;
     private final ChangelogImportService changelogImportService;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
 
     public SyncController(SyncService syncService,
                           ChangelogImportService changelogImportService,
-                          JiraProperties jiraProperties) {
+                          JiraConfigResolver jiraConfigResolver) {
         this.syncService = syncService;
         this.changelogImportService = changelogImportService;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
     }
 
     @GetMapping("/status")
@@ -60,7 +60,7 @@ public class SyncController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> countIssuesForImport(
             @RequestParam(required = false) Integer months) {
-        String projectKey = jiraProperties.getProjectKey();
+        String projectKey = jiraConfigResolver.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Project key not configured"));
         }
@@ -72,7 +72,7 @@ public class SyncController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> importChangelogs(
             @RequestParam(required = false) Integer months) {
-        String projectKey = jiraProperties.getProjectKey();
+        String projectKey = jiraConfigResolver.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Project key not configured"));
         }

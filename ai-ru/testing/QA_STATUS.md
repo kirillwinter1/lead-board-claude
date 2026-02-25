@@ -21,7 +21,7 @@
 | 9 | **Projects** | F35 | ✅ Проверен | 1 High (test regression), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 10 | **RICE Scoring** | F36 | ✅ Проверен | 2 Medium (case-sensitive, FP), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 11 | **Project Timeline** | F35 | ✅ Проверен | Визуал ОК | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
-| 12 | **Member Profile** | F30 | ❌ Не проверен | — | — |
+| 12 | **Member Profile** | F30 | ✅ Проверен | 2 High, 5 Medium, 2 Low | [reports/2026-02-25_MEMBER_PROFILE.md](reports/2026-02-25_MEMBER_PROFILE.md) |
 | 13 | **Setup Wizard** | F33 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
 | 14 | **Auth / OAuth / RBAC** | F4, F27, F44 | ✅ Проверен | 2 Critical, 5 High, 5 Medium, 2 Low | [reports/2026-02-25_AUTH_RBAC.md](reports/2026-02-25_AUTH_RBAC.md) |
 | 15 | **Sync** | F2, F3, F9, F34 | ✅ Проверен | 2 Critical, 2 High, 4 Medium, 2 Low | [reports/2026-02-21_SYNC.md](reports/2026-02-21_SYNC.md) |
@@ -31,9 +31,9 @@
 
 | 19 | **Bug SLA Settings** | F42 | ✅ Проверен (встроен в Settings) | 0 багов | [reports/2026-02-23_BUG_SLA_TO_SETTINGS.md](reports/2026-02-23_BUG_SLA_TO_SETTINGS.md) |
 | 20 | **Multi-Tenancy / Registration** | F44 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
-| 21 | **Multi-Tenancy E2E Journey** | F44, F33 | ✅ Проверен | 3 Critical, 2 High, 4 Medium, 2 Low | [reports/2026-02-25_MULTITENANCY_E2E.md](reports/2026-02-25_MULTITENANCY_E2E.md) |
+| 21 | **Multi-Tenancy E2E Journey** | F44, F33 | ✅ Проверен + Исправлен | 11/11 fixed, 0 OPEN | [reports/2026-02-25_MULTITENANCY_E2E.md](reports/2026-02-25_MULTITENANCY_E2E.md) |
 
-**Прогресс: 20 / 21 экранов проверено (95%)**
+**Прогресс: 21 / 21 экранов проверено (100%)**
 
 ---
 
@@ -41,11 +41,11 @@
 
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
-| Critical | 4 | 5 | 9 |
-| High | 12 | 17 | 29 |
-| Medium | 24 | 27 | 51 |
-| Low | 17 | 11 | 28 |
-| **Итого** | **57** | **60** | **117** |
+| Critical | 2 | 8 | 10 |
+| High | 14 | 19 | 33 |
+| Medium | 29 | 31 | 60 |
+| Low | 19 | 13 | 32 |
+| **Итого** | **64** | **71** | **135** |
 
 ---
 
@@ -190,7 +190,7 @@
 | ~~P3~~ | ~~**Setup Wizard**~~ | ✅ Проверен (входит в Workflow Config QA) |
 | ~~P2~~ | ~~**Simulation**~~ | ✅ Проверен (2 Critical, 4 High, 7 Medium, 5 Low) |
 | ~~P3~~ | ~~**Auth / OAuth / RBAC**~~ | ✅ Проверен (2 Critical, 5 High, 5 Medium, 2 Low) |
-| P3 | **Member Profile** | Профиль участника |
+| ~~P3~~ | ~~**Member Profile**~~ | ✅ Проверен (2 High, 5 Medium, 2 Low) |
 
 ### Simulation (F28) — 2026-02-25
 
@@ -248,6 +248,31 @@
 | BUG-74 | Low | localStorage wizard state переживает logout/смену tenant'а | ✅ FIXED (clear on logout) |
 | BUG-75 | Low | Нет aria-labels на color picker, tab buttons в WorkflowConfigPage | OPEN |
 
+### Multi-Tenancy E2E Customer Journey — 2026-02-25
+
+**Scope:** Полный клиентский путь — регистрация → OAuth → Setup Wizard → Board
+**API tests:** 47 проверок — 40 PASS, 7 BUG → **10 FIXED**
+**Visual:** 6 экранов (Registration desktop+mobile, Landing, Wizard Step 1, Landing+fixes, Registration+fixes)
+**E2E:** 11/11 багов исправлены. JiraConfigResolver заменил JiraProperties во всех 22+ файлах.
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-108 | Critical | Sync @Async thread loses TenantContext — TenantAwareAsyncConfig с TaskDecorator | ✅ FIXED |
+| BUG-96* | Critical | Every new user gets ADMIN — tenantHasUsers() проверяет ВСЕ users | ✅ FIXED |
+| BUG-94* | Critical | No tenant membership check — deny access без записи в tenant_users | ✅ FIXED |
+| BUG-109 | High | Sync API uses global Jira config, not per-tenant — JiraConfigResolver + TenantJiraConfigController + T3 migration | ✅ FIXED |
+| BUG-110 | High | Registration response exposes internal schemaName — removed | ✅ FIXED |
+| BUG-111 | Medium | Branding: "Lead Board" → "OneLane" | ✅ FIXED |
+| BUG-112 | Medium | Unknown slug → 404 on non-public routes | ✅ FIXED |
+| BUG-113 | Medium | Landing → Registration: "Try Free" + "Попробовать бесплатно" | ✅ FIXED |
+| BUG-114 | Medium | Dev mode redirect: localStorage + /board | ✅ FIXED |
+| BUG-115 | Low | "Set to 0" hint: added "Recommended: 3–12 months" | ✅ FIXED |
+| BUG-116 | Low | `err: any` → `err: unknown` with type assertion | ✅ FIXED |
+
+*BUG-94, BUG-96 — подтверждены из Auth/RBAC QA, верифицированы E2E-тестированием.
+
+---
+
 ### Auth / RBAC — 2026-02-25
 
 **API endpoints (30+):** auth enforcement OK, RBAC gaps found
@@ -272,6 +297,25 @@
 | BUG-106 | Low | OAuth tokens stored in plaintext — DB compromise leaks all Jira tokens | OPEN |
 | BUG-107 | Low | Sessions not bound to client fingerprint — stolen cookie works from any location | OPEN |
 
+### Member Profile (F30) — 2026-02-25
+
+**API endpoint (1):** 14 проверок — 12 PASS, 1 BUG, 1 NOTE
+**Backend tests:** 9 tests ALL PASS (MemberProfileServiceTest)
+**Frontend tests:** 236/236 PASS (но 0 для MemberProfilePage)
+**Visual:** Ограничено (tenant/data mismatch)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-108 | High | Inverted date range (from > to) returns 200 empty instead of 400 | OPEN |
+| BUG-109 | High | Silent error swallowing in 4 catch blocks (competency, absences, competency save) | OPEN |
+| BUG-110 | Medium | No AbortController for profile fetch — race condition on period change | OPEN |
+| BUG-111 | Medium | DSR=0.0 for completed tasks with 0 spent hours — skews avgDsr | OPEN |
+| BUG-112 | Medium | Hardcoded status-badge CSS instead of StatusBadge + StatusStylesContext | OPEN |
+| BUG-113 | Medium | No @PreAuthorize on profile endpoint — VIEWER can see all DSR metrics | OPEN |
+| BUG-114 | Medium | 0 frontend tests for MemberProfilePage (527 LOC) | OPEN |
+| BUG-115 | Low | TypeScript `catch (e: any)` instead of `unknown` | OPEN |
+| BUG-116 | Low | N+1 query in resolveEpicInfo (findByIssueKey per parent/grandparent) | OPEN |
+
 ---
 
 ## Артефакты
@@ -291,7 +335,9 @@ ai-ru/testing/
     ├── 2026-02-25_TIMELINE.md         ← QA-отчёт: Timeline (F14, F45 Hybrid)
     ├── 2026-02-25_WORKFLOW_TENANT_WIZARD.md ← QA-отчёт: Workflow Config + Wizard + Multi-Tenancy
     ├── 2026-02-25_SIMULATION.md       ← QA-отчёт: Simulation (F28)
-    └── 2026-02-25_AUTH_RBAC.md        ← QA-отчёт: Auth / RBAC
+    ├── 2026-02-25_AUTH_RBAC.md        ← QA-отчёт: Auth / RBAC
+    ├── 2026-02-25_MULTITENANCY_E2E.md ← QA-отчёт: Multi-Tenancy E2E Customer Journey
+    └── 2026-02-25_MEMBER_PROFILE.md   ← QA-отчёт: Member Profile (F30)
 ```
 
 ## Процесс

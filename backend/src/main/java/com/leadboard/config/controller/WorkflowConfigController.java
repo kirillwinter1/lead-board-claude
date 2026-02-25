@@ -1,6 +1,6 @@
 package com.leadboard.config.controller;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.dto.*;
 import com.leadboard.config.entity.*;
@@ -40,7 +40,7 @@ public class WorkflowConfigController {
     private final MappingAutoDetectService autoDetectService;
     private final ObjectMapper objectMapper;
     private final JiraIssueRepository jiraIssueRepository;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
 
     public WorkflowConfigController(
             ProjectConfigurationRepository configRepo,
@@ -53,7 +53,7 @@ public class WorkflowConfigController {
             MappingAutoDetectService autoDetectService,
             ObjectMapper objectMapper,
             JiraIssueRepository jiraIssueRepository,
-            JiraProperties jiraProperties
+            JiraConfigResolver jiraConfigResolver
     ) {
         this.configRepo = configRepo;
         this.roleRepo = roleRepo;
@@ -65,7 +65,7 @@ public class WorkflowConfigController {
         this.autoDetectService = autoDetectService;
         this.objectMapper = objectMapper;
         this.jiraIssueRepository = jiraIssueRepository;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
     }
 
     // ==================== Full Config ====================
@@ -383,7 +383,7 @@ public class WorkflowConfigController {
     // ==================== Helpers ====================
 
     private ProjectConfigurationEntity getDefaultConfig() {
-        String envProjectKey = jiraProperties.getProjectKey();
+        String envProjectKey = jiraConfigResolver.getProjectKey();
         if (envProjectKey != null && !envProjectKey.isBlank()) {
             var byKey = configRepo.findByProjectKey(envProjectKey);
             if (byKey.isPresent()) return byKey.get();
@@ -392,7 +392,7 @@ public class WorkflowConfigController {
     }
 
     private ProjectConfigurationEntity getOrCreateDefaultConfig() {
-        String envProjectKey = jiraProperties.getProjectKey();
+        String envProjectKey = jiraConfigResolver.getProjectKey();
         if (envProjectKey != null && !envProjectKey.isBlank()) {
             var byKey = configRepo.findByProjectKey(envProjectKey);
             if (byKey.isPresent()) return byKey.get();

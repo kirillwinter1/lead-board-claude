@@ -1,6 +1,6 @@
 package com.leadboard.config.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
@@ -38,7 +38,7 @@ class IncrementalWorkflowConfigTest {
     @Mock private StatusMappingRepository statusMappingRepo;
     @Mock private LinkTypeMappingRepository linkTypeRepo;
     @Mock private WorkflowConfigService workflowConfigService;
-    @Mock private JiraProperties jiraProperties;
+    @Mock private JiraConfigResolver jiraConfigResolver;
     @Mock private com.leadboard.sync.JiraIssueRepository jiraIssueRepo;
 
     private MappingAutoDetectService service;
@@ -47,11 +47,11 @@ class IncrementalWorkflowConfigTest {
     void setUp() {
         service = new MappingAutoDetectService(
                 jiraMetadataService, configRepo, roleRepo, issueTypeRepo,
-                statusMappingRepo, linkTypeRepo, workflowConfigService, jiraProperties,
+                statusMappingRepo, linkTypeRepo, workflowConfigService, jiraConfigResolver,
                 jiraIssueRepo
         );
 
-        when(jiraProperties.getProjectKey()).thenReturn(null);
+        when(jiraConfigResolver.getProjectKey()).thenReturn(null);
 
         ProjectConfigurationEntity config = new ProjectConfigurationEntity();
         config.setId(1L);

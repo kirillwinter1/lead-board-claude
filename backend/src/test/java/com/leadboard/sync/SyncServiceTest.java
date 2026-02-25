@@ -1,6 +1,6 @@
 package com.leadboard.sync;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
@@ -47,7 +47,7 @@ class SyncServiceTest {
     private JiraClient jiraClient;
 
     @Mock
-    private JiraProperties jiraProperties;
+    private JiraConfigResolver jiraConfigResolver;
 
     @Mock
     private JiraIssueRepository issueRepository;
@@ -91,7 +91,7 @@ class SyncServiceTest {
     void setUp() {
         syncService = new SyncService(
                 jiraClient,
-                jiraProperties,
+                jiraConfigResolver,
                 issueRepository,
                 syncStateRepository,
                 teamRepository,
@@ -108,7 +108,7 @@ class SyncServiceTest {
         );
 
         // Common setup
-        when(jiraProperties.getTeamFieldId()).thenReturn(null);
+        when(jiraConfigResolver.getTeamFieldId()).thenReturn(null);
     }
 
     // ==================== Regression Tests ====================
@@ -125,7 +125,7 @@ class SyncServiceTest {
             JiraIssue jiraIssue = createJiraIssue("LB-123", "New Epic", "Новое", "Epic");
             JiraSearchResponse response = createSearchResponse(List.of(jiraIssue), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-123")).thenReturn(Optional.empty()); // NEW issue
@@ -150,7 +150,7 @@ class SyncServiceTest {
 
             JiraIssueEntity existingEntity = createExistingEntity("LB-100", "Новое"); // old status
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-100")).thenReturn(Optional.of(existingEntity));
@@ -180,7 +180,7 @@ class SyncServiceTest {
             JiraIssue jiraIssue = createJiraIssue("LB-999", "Brand New Epic", "Новое", "Epic");
             JiraSearchResponse response = createSearchResponse(List.of(jiraIssue), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-999")).thenReturn(Optional.empty());
@@ -213,8 +213,8 @@ class SyncServiceTest {
             team.setId(5L);
             team.setName("Команда А");
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
-            when(jiraProperties.getTeamFieldId()).thenReturn(teamFieldId);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getTeamFieldId()).thenReturn(teamFieldId);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-100")).thenReturn(Optional.empty());
@@ -252,7 +252,7 @@ class SyncServiceTest {
             existingEntity.setRoughEstimate("DEV", BigDecimal.valueOf(10));
             existingEntity.setRoughEstimate("QA", BigDecimal.valueOf(3));
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-50")).thenReturn(Optional.of(existingEntity));
@@ -283,7 +283,7 @@ class SyncServiceTest {
             existingEntity.setAutoScore(BigDecimal.valueOf(85.5));
             existingEntity.setAutoScoreCalculatedAt(OffsetDateTime.now().minusHours(1));
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-60")).thenReturn(Optional.of(existingEntity));
@@ -310,7 +310,7 @@ class SyncServiceTest {
             JiraIssueEntity existingEntity = createExistingEntity("LB-70", "Новое");
             existingEntity.setSummary("Old Summary");
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(issueRepository.findByIssueKey("LB-70")).thenReturn(Optional.of(existingEntity));
@@ -345,7 +345,7 @@ class SyncServiceTest {
 
             JiraSearchResponse response = createSearchResponse(List.of(), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
 
@@ -370,7 +370,7 @@ class SyncServiceTest {
 
             JiraSearchResponse response = createSearchResponse(List.of(), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
 
@@ -401,7 +401,7 @@ class SyncServiceTest {
             JiraSyncStateEntity syncState = createSyncState(projectKey);
             JiraSearchResponse response = createSearchResponse(List.of(), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(syncStateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -428,7 +428,7 @@ class SyncServiceTest {
             String projectKey = "LB";
             JiraSyncStateEntity syncState = createSyncState(projectKey);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(syncStateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jiraClient.search(anyString(), anyInt(), any())).thenThrow(new RuntimeException("Jira API error"));
@@ -456,7 +456,7 @@ class SyncServiceTest {
             JiraSyncStateEntity syncState = createSyncState(projectKey);
             syncState.setSyncInProgress(true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
 
             // When
@@ -481,7 +481,7 @@ class SyncServiceTest {
             JiraSyncStateEntity syncState = createSyncState(projectKey);
             JiraSearchResponse response = createSearchResponse(List.of(), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(syncStateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -504,7 +504,7 @@ class SyncServiceTest {
         @Test
         @DisplayName("should return total count with months filter")
         void shouldReturnTotalCountWithMonths() {
-            when(jiraProperties.getProjectKey()).thenReturn("LB");
+            when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
             when(jiraClient.countByJql(anyString())).thenReturn(245);
 
             var result = syncService.countIssuesInJira(6);
@@ -520,7 +520,7 @@ class SyncServiceTest {
         @Test
         @DisplayName("should return total count without months filter")
         void shouldReturnTotalCountWithoutMonths() {
-            when(jiraProperties.getProjectKey()).thenReturn("LB");
+            when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
             when(jiraClient.countByJql(anyString())).thenReturn(500);
 
             var result = syncService.countIssuesInJira(null);
@@ -548,7 +548,7 @@ class SyncServiceTest {
             syncState.setLastSyncCompletedAt(null);
             JiraSearchResponse response = createSearchResponse(List.of(), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
             when(syncStateRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -568,7 +568,7 @@ class SyncServiceTest {
             syncState.setLastSyncCompletedAt(OffsetDateTime.now().minusHours(2));
             JiraSearchResponse response = createSearchResponse(List.of(), true);
 
-            when(jiraProperties.getProjectKey()).thenReturn(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
             when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
             when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
 

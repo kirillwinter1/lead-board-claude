@@ -149,15 +149,14 @@ public class OAuthService {
                 Optional<TenantEntity> tenantOpt = tenantService.findById(tenantId);
                 if (tenantOpt.isPresent()) {
                     TenantEntity tenant = tenantOpt.get();
-                    // First user in this tenant gets ADMIN
-                    List<TenantUserEntity> existingTenantUsers = tenantService.findUserTenants(user.getId());
-                    boolean isFirstTenantUser = existingTenantUsers.stream()
-                            .noneMatch(tu -> tu.getTenant().getId().equals(tenantId));
-                    if (isFirstTenantUser) {
-                        // Check if this tenant has any users at all
-                        boolean tenantHasUsers = tenantService.findTenantUser(tenantId, user.getId()).isPresent();
-                        AppRole tenantRole = tenantHasUsers ? AppRole.MEMBER : AppRole.ADMIN;
+                    // BUG-96: Check if this user is already in this tenant
+                    boolean alreadyMember = tenantService.findTenantUser(tenantId, user.getId()).isPresent();
+                    if (!alreadyMember) {
+                        // BUG-96: First user in tenant gets ADMIN, subsequent users get MEMBER
+                        boolean tenantHasAnyUsers = tenantService.tenantHasUsers(tenantId);
+                        AppRole tenantRole = tenantHasAnyUsers ? AppRole.MEMBER : AppRole.ADMIN;
                         tenantService.addUserToTenant(tenant, user, tenantRole);
+                        log.info("Added user {} to tenant {} with role {}", user.getEmail(), tenant.getSlug(), tenantRole);
                     }
                 }
             }

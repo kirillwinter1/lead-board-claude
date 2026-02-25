@@ -1,6 +1,6 @@
 package com.leadboard.config.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
@@ -27,7 +27,7 @@ public class WorkflowConfigService {
     private final StatusMappingRepository statusMappingRepo;
     private final LinkTypeMappingRepository linkTypeRepo;
     private final ObjectMapper objectMapper;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
 
     // Per-tenant cache: tenantId → loaded flag. -1L = no tenant (public/legacy).
     private final ConcurrentHashMap<Long, Boolean> loadedTenants = new ConcurrentHashMap<>();
@@ -65,14 +65,14 @@ public class WorkflowConfigService {
             StatusMappingRepository statusMappingRepo,
             LinkTypeMappingRepository linkTypeRepo,
             ObjectMapper objectMapper,
-            JiraProperties jiraProperties) {
+            JiraConfigResolver jiraConfigResolver) {
         this.configRepo = configRepo;
         this.roleRepo = roleRepo;
         this.issueTypeRepo = issueTypeRepo;
         this.statusMappingRepo = statusMappingRepo;
         this.linkTypeRepo = linkTypeRepo;
         this.objectMapper = objectMapper;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
     }
 
     @PostConstruct
@@ -110,7 +110,7 @@ public class WorkflowConfigService {
 
     private void loadConfiguration() {
         try {
-            String envProjectKey = jiraProperties.getProjectKey();
+            String envProjectKey = jiraConfigResolver.getProjectKey();
             ProjectConfigurationEntity config = null;
 
             // 1. Try to find by project_key from env

@@ -25,7 +25,6 @@ public class TenantRegistrationController {
             return ResponseEntity.ok(Map.of(
                     "tenantId", tenant.getId(),
                     "slug", tenant.getSlug(),
-                    "schemaName", tenant.getSchemaName(),
                     "redirectUrl", "https://" + tenant.getSlug() + ".leadboard.app"
             ));
         } catch (IllegalArgumentException e) {

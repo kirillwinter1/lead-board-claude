@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
+import { setDevTenantSlug } from '../utils/tenant';
 
 export default function RegistrationPage() {
     const [name, setName] = useState('');
@@ -62,12 +63,17 @@ export default function RegistrationPage() {
 
         try {
             const { data } = await axios.post('/api/public/tenants/register', { name, slug });
-            // Redirect to tenant subdomain
-            if (data.redirectUrl) {
+            // Dev mode (localhost): set tenant slug and redirect to /board
+            const host = window.location.hostname;
+            if (host === 'localhost' || host === '127.0.0.1') {
+                setDevTenantSlug(data.slug);
+                window.location.href = '/board';
+            } else if (data.redirectUrl) {
                 window.location.href = data.redirectUrl;
             }
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Registration failed');
+        } catch (err: unknown) {
+            const axiosErr = err as { response?: { data?: { error?: string } } };
+            setError(axiosErr.response?.data?.error || 'Registration failed');
         } finally {
             setLoading(false);
         }
@@ -77,7 +83,7 @@ export default function RegistrationPage() {
         <div style={{ maxWidth: 480, margin: '80px auto', padding: 24 }}>
             <h1 style={{ marginBottom: 8 }}>Create your workspace</h1>
             <p style={{ color: '#666', marginBottom: 32 }}>
-                Get started with Lead Board. Free 14-day trial.
+                Get started with OneLane. Free 14-day trial.
             </p>
 
             <form onSubmit={handleSubmit}>

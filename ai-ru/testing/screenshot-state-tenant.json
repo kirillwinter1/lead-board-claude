@@ -1,0 +1,18 @@
+{
+  "cookies": [{
+    "name": "LEAD_SESSION",
+    "value": "b1f3faa8-91c0-4d6f-bc21-6500943413cf",
+    "domain": "localhost",
+    "path": "/",
+    "httpOnly": false,
+    "secure": false,
+    "sameSite": "Lax"
+  }],
+  "origins": [{
+    "origin": "http://localhost:5173",
+    "localStorage": [
+      { "name": "tenant_slug", "value": "qatest" },
+      { "name": "setupWizardStep", "value": "1" }
+    ]
+  }]
+}

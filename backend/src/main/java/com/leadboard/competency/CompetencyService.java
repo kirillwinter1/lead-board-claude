@@ -1,7 +1,7 @@
 package com.leadboard.competency;
 
 import com.leadboard.competency.dto.*;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
@@ -22,18 +22,18 @@ public class CompetencyService {
     private final MemberCompetencyRepository competencyRepository;
     private final TeamMemberRepository memberRepository;
     private final JiraClient jiraClient;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final JiraIssueRepository issueRepository;
 
     public CompetencyService(MemberCompetencyRepository competencyRepository,
                              TeamMemberRepository memberRepository,
                              JiraClient jiraClient,
-                             JiraProperties jiraProperties,
+                             JiraConfigResolver jiraConfigResolver,
                              JiraIssueRepository issueRepository) {
         this.competencyRepository = competencyRepository;
         this.memberRepository = memberRepository;
         this.jiraClient = jiraClient;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.issueRepository = issueRepository;
     }
 
@@ -146,7 +146,7 @@ public class CompetencyService {
 
     public List<String> getAvailableComponents() {
         try {
-            String projectKey = jiraProperties.getProjectKey();
+            String projectKey = jiraConfigResolver.getProjectKey();
             if (projectKey != null && !projectKey.isEmpty()) {
                 return jiraClient.getProjectComponents(projectKey);
             }

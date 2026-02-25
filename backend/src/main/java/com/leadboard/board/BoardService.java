@@ -1,6 +1,6 @@
 package com.leadboard.board;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.RoughEstimateProperties;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
@@ -28,20 +28,20 @@ public class BoardService {
     private static final long SECONDS_PER_DAY = 8 * 3600; // 8 hours per day
 
     private final JiraIssueRepository issueRepository;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final TeamRepository teamRepository;
     private final RoughEstimateProperties roughEstimateProperties;
     private final DataQualityService dataQualityService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final WorkflowConfigService workflowConfigService;
 
-    public BoardService(JiraIssueRepository issueRepository, JiraProperties jiraProperties,
+    public BoardService(JiraIssueRepository issueRepository, JiraConfigResolver jiraConfigResolver,
                         TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
                         DataQualityService dataQualityService,
                         UnifiedPlanningService unifiedPlanningService,
                         WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.teamRepository = teamRepository;
         this.roughEstimateProperties = roughEstimateProperties;
         this.dataQualityService = dataQualityService;
@@ -50,8 +50,8 @@ public class BoardService {
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size) {
-        String projectKey = jiraProperties.getProjectKey();
-        String baseUrl = jiraProperties.getBaseUrl();
+        String projectKey = jiraConfigResolver.getProjectKey();
+        String baseUrl = jiraConfigResolver.getBaseUrl();
 
         if (projectKey == null || projectKey.isEmpty() || baseUrl == null || baseUrl.isEmpty()) {
             return new BoardResponse(Collections.emptyList(), 0);

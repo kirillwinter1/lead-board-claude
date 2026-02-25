@@ -1,6 +1,6 @@
 package com.leadboard.metrics.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.BugMetricsResponse;
 import com.leadboard.quality.BugSlaService;
@@ -33,14 +33,14 @@ class BugMetricsServiceTest {
     private BugSlaService bugSlaService;
 
     @Mock
-    private JiraProperties jiraProperties;
+    private JiraConfigResolver jiraConfigResolver;
 
     private BugMetricsService bugMetricsService;
 
     @BeforeEach
     void setUp() {
         bugMetricsService = new BugMetricsService(
-                issueRepository, workflowConfigService, bugSlaService, jiraProperties);
+                issueRepository, workflowConfigService, bugSlaService, jiraConfigResolver);
     }
 
     @Test
@@ -72,7 +72,7 @@ class BugMetricsServiceTest {
         when(bugSlaService.checkSlaBreach(openBug)).thenReturn(false);
         when(bugSlaService.getSlaForPriority("High")).thenReturn(Optional.of(72));
         when(bugSlaService.getSlaForPriority("Medium")).thenReturn(Optional.of(120));
-        when(jiraProperties.getBaseUrl()).thenReturn("https://jira.example.com");
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
 
         BugMetricsResponse result = bugMetricsService.getBugMetrics(null);
 
@@ -117,7 +117,7 @@ class BugMetricsServiceTest {
         when(bugSlaService.checkSlaBreach(any())).thenReturn(false);
         when(bugSlaService.getSlaForPriority("High")).thenReturn(Optional.of(72));
         when(bugSlaService.getSlaForPriority("Low")).thenReturn(Optional.of(240));
-        when(jiraProperties.getBaseUrl()).thenReturn("https://jira.example.com");
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
 
         BugMetricsResponse result = bugMetricsService.getBugMetrics(null);
 
@@ -154,7 +154,7 @@ class BugMetricsServiceTest {
         when(bugSlaService.checkStale(freshBug)).thenReturn(false);
         when(bugSlaService.checkSlaBreach(any())).thenReturn(false);
         when(bugSlaService.getSlaForPriority("Medium")).thenReturn(Optional.empty());
-        when(jiraProperties.getBaseUrl()).thenReturn("https://jira.example.com");
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
 
         BugMetricsResponse result = bugMetricsService.getBugMetrics(null);
 
@@ -178,7 +178,7 @@ class BugMetricsServiceTest {
         when(bugSlaService.checkStale(any())).thenReturn(false);
         when(bugSlaService.checkSlaBreach(any())).thenReturn(false);
         when(bugSlaService.getSlaForPriority(any())).thenReturn(Optional.empty());
-        when(jiraProperties.getBaseUrl()).thenReturn("https://jira.example.com");
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
 
         BugMetricsResponse result = bugMetricsService.getBugMetrics(null);
 

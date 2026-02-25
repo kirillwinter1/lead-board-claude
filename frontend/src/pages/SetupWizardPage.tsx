@@ -7,7 +7,7 @@ interface SetupWizardPageProps {
   onComplete: () => void
 }
 
-const STEP_LABELS = ['Period', 'Sync', 'Workflow', 'Done']
+const STEP_LABELS = ['Jira', 'Period', 'Sync', 'Workflow', 'Done']
 const WIZARD_STEP_KEY = 'setupWizardStep'
 const WIZARD_MONTHS_KEY = 'setupWizardMonths'
 
@@ -24,6 +24,16 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
   const [checking, setChecking] = useState(false)
   const [checkError, setCheckError] = useState<string | null>(null)
 
+  // Jira connection (step 1)
+  const [jiraBaseUrl, setJiraBaseUrl] = useState('')
+  const [jiraEmail, setJiraEmail] = useState('')
+  const [jiraApiToken, setJiraApiToken] = useState('')
+  const [projectKey, setProjectKey] = useState('')
+  const [jiraSaving, setJiraSaving] = useState(false)
+  const [jiraTesting, setJiraTesting] = useState(false)
+  const [jiraTestResult, setJiraTestResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [jiraSaveError, setJiraSaveError] = useState<string | null>(null)
+
   const [syncing, setSyncing] = useState(false)
   const [syncDone, setSyncDone] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -34,12 +44,12 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
 
   // On mount: validate saved step — if DB was reset, issuesCount=0 means sync hasn't happened
   useEffect(() => {
-    if (step > 1) {
+    if (step > 2) {
       axios.get<{ issuesCount: number }>('/api/sync/status')
         .then(res => {
           if (res.data.issuesCount === 0) {
-            setStep(1)
-            localStorage.setItem(WIZARD_STEP_KEY, '1')
+            setStep(2)
+            localStorage.setItem(WIZARD_STEP_KEY, '2')
           }
         })
         .catch(() => {})
@@ -61,6 +71,64 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
       if (pollRef.current) clearInterval(pollRef.current)
     }
   }, [])
+
+  // Load existing Jira config on mount
+  useEffect(() => {
+    axios.get<{
+      configured: boolean
+      jiraBaseUrl: string
+      jiraEmail: string
+      hasApiToken: boolean
+      projectKey: string
+    }>('/api/jira-config')
+      .then(res => {
+        const d = res.data
+        if (d.jiraBaseUrl) setJiraBaseUrl(d.jiraBaseUrl)
+        if (d.jiraEmail) setJiraEmail(d.jiraEmail)
+        if (d.projectKey) setProjectKey(d.projectKey)
+        // If already configured, auto-advance past step 1
+        if (d.configured && step === 1) {
+          setStep(2)
+          localStorage.setItem(WIZARD_STEP_KEY, '2')
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleTestConnection = useCallback(() => {
+    setJiraTesting(true)
+    setJiraTestResult(null)
+    axios.post<{ success: boolean; message?: string; error?: string }>('/api/jira-config/test', {
+      jiraBaseUrl, jiraEmail, jiraApiToken, projectKey
+    })
+      .then(res => {
+        setJiraTestResult({
+          success: res.data.success,
+          message: res.data.success ? (res.data.message || 'Connected!') : (res.data.error || 'Failed')
+        })
+      })
+      .catch(err => {
+        setJiraTestResult({ success: false, message: err.response?.data?.error || 'Connection test failed' })
+      })
+      .finally(() => setJiraTesting(false))
+  }, [jiraBaseUrl, jiraEmail, jiraApiToken, projectKey])
+
+  const handleSaveJiraConfig = useCallback(() => {
+    setJiraSaving(true)
+    setJiraSaveError(null)
+    axios.put('/api/jira-config', {
+      jiraBaseUrl, jiraEmail, jiraApiToken, projectKey,
+      syncIntervalSeconds: 300, manualTeamManagement: false
+    })
+      .then(() => {
+        setStep(2)
+        localStorage.setItem(WIZARD_STEP_KEY, '2')
+      })
+      .catch(err => {
+        setJiraSaveError(err.response?.data?.error || 'Failed to save configuration')
+      })
+      .finally(() => setJiraSaving(false))
+  }, [jiraBaseUrl, jiraEmail, jiraApiToken, projectKey])
 
   const handleCheck = useCallback(() => {
     setChecking(true)
@@ -84,7 +152,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
     setSyncError(null)
     setSyncCurrentCount(0)
     pollFailCount.current = 0
-    setStep(2)
+    setStep(3)
 
     axios.post('/api/sync/trigger', null, {
       params: { months: months > 0 ? months : undefined }
@@ -101,7 +169,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
                 setSyncing(false)
                 setSyncDone(true)
                 setSyncIssueCount(res.data.issuesCount)
-                setTimeout(() => setStep(3), 1500)
+                setTimeout(() => setStep(4), 1500)
               }
             })
             .catch(() => {
@@ -150,10 +218,94 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
     </div>
   )
 
-  const renderStep1 = () => (
+  const renderStepJira = () => (
     <div className="wizard-card">
-      <h2>Welcome to OneLane</h2>
-      <p>Let's set up your project. Choose a time period to sync issues from Jira.</p>
+      <h2>Connect to Jira</h2>
+      <p>Enter your Jira Cloud credentials to connect OneLane to your project.</p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+        <div>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>Jira Base URL</label>
+          <input
+            type="url"
+            className="wizard-period-input"
+            style={{ width: '100%' }}
+            value={jiraBaseUrl}
+            onChange={e => setJiraBaseUrl(e.target.value)}
+            placeholder="https://your-domain.atlassian.net"
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>Email</label>
+          <input
+            type="email"
+            className="wizard-period-input"
+            style={{ width: '100%' }}
+            value={jiraEmail}
+            onChange={e => setJiraEmail(e.target.value)}
+            placeholder="your-email@example.com"
+          />
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>API Token</label>
+          <input
+            type="password"
+            className="wizard-period-input"
+            style={{ width: '100%' }}
+            value={jiraApiToken}
+            onChange={e => { setJiraApiToken(e.target.value); setJiraTestResult(null) }}
+            placeholder="Your Jira API token"
+          />
+          <p style={{ fontSize: 11, color: '#97a0af', margin: '4px 0 0' }}>
+            Generate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>id.atlassian.com</a>
+          </p>
+        </div>
+        <div>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 500, fontSize: 13 }}>Project Key</label>
+          <input
+            type="text"
+            className="wizard-period-input"
+            style={{ width: '100%' }}
+            value={projectKey}
+            onChange={e => setProjectKey(e.target.value.toUpperCase())}
+            placeholder="PROJ"
+          />
+        </div>
+      </div>
+
+      {jiraTestResult && (
+        <div className={`wizard-issue-count ${jiraTestResult.success ? '' : 'error'}`}>
+          {jiraTestResult.success ? '\u2705 ' : '\u274c '}{jiraTestResult.message}
+        </div>
+      )}
+
+      {jiraSaveError && (
+        <div className="wizard-issue-count error">{jiraSaveError}</div>
+      )}
+
+      <div className="wizard-actions">
+        <button
+          className="wizard-btn wizard-btn-secondary"
+          onClick={handleTestConnection}
+          disabled={jiraTesting || !jiraBaseUrl || !jiraEmail || !jiraApiToken}
+        >
+          {jiraTesting ? 'Testing...' : 'Test Connection'}
+        </button>
+        <button
+          className="wizard-btn wizard-btn-primary"
+          onClick={handleSaveJiraConfig}
+          disabled={jiraSaving || !jiraBaseUrl || !jiraEmail || !jiraApiToken || !projectKey}
+        >
+          {jiraSaving ? 'Saving...' : 'Save & Continue'}
+        </button>
+      </div>
+    </div>
+  )
+
+  const renderStepPeriod = () => (
+    <div className="wizard-card">
+      <h2>Sync Period</h2>
+      <p>Choose a time period to sync issues from Jira.</p>
 
       <div className="wizard-period-row">
         <label>Sync issues updated in the last</label>
@@ -173,7 +325,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
       </div>
 
       <p style={{ fontSize: 12, color: '#97a0af', margin: '0 0 16px' }}>
-        Set to 0 to sync all issues (may take longer)
+        Recommended: 3–12 months. Set to 0 to sync all issues (may take longer).
       </p>
 
       {issueCount !== null && (
@@ -208,7 +360,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
     </div>
   )
 
-  const renderStep2 = () => {
+  const renderStepSync = () => {
     const target = issueCount || 0
     const progress = target > 0 ? Math.min(95, Math.round((syncCurrentCount / target) * 100)) : 0
     const displayProgress = syncDone ? 100 : progress
@@ -244,13 +396,13 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
     )
   }
 
-  const renderStep3 = () => (
+  const renderStepWorkflow = () => (
     <div className="wizard-workflow-inline">
-      <WorkflowConfigPage onComplete={() => setStep(4)} />
+      <WorkflowConfigPage onComplete={() => setStep(5)} />
     </div>
   )
 
-  const renderStep4 = () => (
+  const renderStepDone = () => (
     <div className="wizard-card">
       <div className="wizard-done-icon">{'\u2705'}</div>
       <h2>Setup Complete!</h2>
@@ -270,10 +422,11 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
   return (
     <div className="setup-wizard">
       {renderStepper()}
-      {step === 1 && renderStep1()}
-      {step === 2 && renderStep2()}
-      {step === 3 && renderStep3()}
-      {step === 4 && renderStep4()}
+      {step === 1 && renderStepJira()}
+      {step === 2 && renderStepPeriod()}
+      {step === 3 && renderStepSync()}
+      {step === 4 && renderStepWorkflow()}
+      {step === 5 && renderStepDone()}
     </div>
   )
 }

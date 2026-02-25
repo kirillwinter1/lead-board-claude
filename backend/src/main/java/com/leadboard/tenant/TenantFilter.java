@@ -52,8 +52,19 @@ public class TenantFilter extends OncePerRequestFilter {
                         return;
                     }
                 } else {
-                    // Unknown slug — continue without tenant context (public routes still work)
-                    log.debug("Unknown tenant slug: '{}'", slug);
+                    // BUG-112: Unknown slug must NOT fall back to public schema.
+                    // Allow public routes (registration, health) to proceed without tenant,
+                    // but block tenant-specific API access.
+                    String path = request.getRequestURI();
+                    boolean isPublicRoute = path.startsWith("/api/public/")
+                            || path.startsWith("/oauth/")
+                            || path.equals("/api/health");
+                    if (!isPublicRoute) {
+                        log.warn("Unknown tenant slug: '{}' — access denied", slug);
+                        response.sendError(HttpServletResponse.SC_NOT_FOUND, "Tenant not found");
+                        return;
+                    }
+                    log.debug("Unknown tenant slug '{}' on public route — allowing", slug);
                 }
             }
 

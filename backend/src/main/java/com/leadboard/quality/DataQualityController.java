@@ -1,6 +1,6 @@
 package com.leadboard.quality;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.quality.dto.DataQualityResponse;
 import com.leadboard.quality.dto.IssueViolations;
@@ -21,18 +21,18 @@ import java.util.stream.Collectors;
 public class DataQualityController {
 
     private final JiraIssueRepository issueRepository;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final DataQualityService dataQualityService;
     private final WorkflowConfigService workflowConfigService;
 
     public DataQualityController(
             JiraIssueRepository issueRepository,
-            JiraProperties jiraProperties,
+            JiraConfigResolver jiraConfigResolver,
             DataQualityService dataQualityService,
             WorkflowConfigService workflowConfigService
     ) {
         this.issueRepository = issueRepository;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.dataQualityService = dataQualityService;
         this.workflowConfigService = workflowConfigService;
     }
@@ -44,8 +44,8 @@ public class DataQualityController {
     public ResponseEntity<DataQualityResponse> getReport(
             @RequestParam(required = false) Long teamId
     ) {
-        String projectKey = jiraProperties.getProjectKey();
-        String baseUrl = jiraProperties.getBaseUrl();
+        String projectKey = jiraConfigResolver.getProjectKey();
+        String baseUrl = jiraConfigResolver.getBaseUrl();
 
         if (projectKey == null || projectKey.isEmpty()) {
             return ResponseEntity.ok(emptyResponse(teamId));

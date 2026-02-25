@@ -29,8 +29,17 @@ public class TenantJiraConfigEntity {
     @Column(name = "team_field_id", length = 100)
     private String teamFieldId;
 
+    @Column(name = "jira_email", length = 255)
+    private String jiraEmail;
+
+    @Column(name = "jira_api_token", length = 500)
+    private String jiraApiToken;
+
     @Column(name = "organization_id", length = 100)
     private String organizationId;
+
+    @Column(name = "manual_team_management", nullable = false)
+    private boolean manualTeamManagement = false;
 
     @Column(name = "sync_interval_seconds", nullable = false)
     private int syncIntervalSeconds = 300;
@@ -83,8 +92,17 @@ public class TenantJiraConfigEntity {
     public String getTeamFieldId() { return teamFieldId; }
     public void setTeamFieldId(String teamFieldId) { this.teamFieldId = teamFieldId; }
 
+    public String getJiraEmail() { return jiraEmail; }
+    public void setJiraEmail(String jiraEmail) { this.jiraEmail = jiraEmail; }
+
+    public String getJiraApiToken() { return jiraApiToken; }
+    public void setJiraApiToken(String jiraApiToken) { this.jiraApiToken = jiraApiToken; }
+
     public String getOrganizationId() { return organizationId; }
     public void setOrganizationId(String organizationId) { this.organizationId = organizationId; }
+
+    public boolean isManualTeamManagement() { return manualTeamManagement; }
+    public void setManualTeamManagement(boolean manualTeamManagement) { this.manualTeamManagement = manualTeamManagement; }
 
     public int getSyncIntervalSeconds() { return syncIntervalSeconds; }
     public void setSyncIntervalSeconds(int syncIntervalSeconds) { this.syncIntervalSeconds = syncIntervalSeconds; }

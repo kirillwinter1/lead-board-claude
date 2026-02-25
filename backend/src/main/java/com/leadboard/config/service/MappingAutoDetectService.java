@@ -1,6 +1,6 @@
 package com.leadboard.config.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
@@ -33,7 +33,7 @@ public class MappingAutoDetectService {
     private final StatusMappingRepository statusMappingRepo;
     private final LinkTypeMappingRepository linkTypeRepo;
     private final WorkflowConfigService workflowConfigService;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final JiraIssueRepository jiraIssueRepo;
 
     public MappingAutoDetectService(
@@ -44,7 +44,7 @@ public class MappingAutoDetectService {
             StatusMappingRepository statusMappingRepo,
             LinkTypeMappingRepository linkTypeRepo,
             WorkflowConfigService workflowConfigService,
-            JiraProperties jiraProperties,
+            JiraConfigResolver jiraConfigResolver,
             JiraIssueRepository jiraIssueRepo
     ) {
         this.jiraMetadataService = jiraMetadataService;
@@ -54,7 +54,7 @@ public class MappingAutoDetectService {
         this.statusMappingRepo = statusMappingRepo;
         this.linkTypeRepo = linkTypeRepo;
         this.workflowConfigService = workflowConfigService;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.jiraIssueRepo = jiraIssueRepo;
     }
 
@@ -563,7 +563,7 @@ public class MappingAutoDetectService {
     }
 
     private Long getDefaultConfigId() {
-        String envProjectKey = jiraProperties.getProjectKey();
+        String envProjectKey = jiraConfigResolver.getProjectKey();
         if (envProjectKey != null && !envProjectKey.isBlank()) {
             var byKey = configRepo.findByProjectKey(envProjectKey);
             if (byKey.isPresent()) return byKey.get().getId();
@@ -572,7 +572,7 @@ public class MappingAutoDetectService {
     }
 
     private Long getOrCreateDefaultConfigId() {
-        String envProjectKey = jiraProperties.getProjectKey();
+        String envProjectKey = jiraConfigResolver.getProjectKey();
 
         // Try by project_key first
         if (envProjectKey != null && !envProjectKey.isBlank()) {

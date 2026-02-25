@@ -27,12 +27,12 @@ public class ConfigurationValidator {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
-        // Jira integration (required for core functionality)
-        validateRequired(jiraProperties.getBaseUrl(), "JIRA_BASE_URL (jira.base-url)", errors);
-        validateRequired(jiraProperties.getEmail(), "JIRA_EMAIL (jira.email)", errors);
-        validateRequired(jiraProperties.getApiToken(), "JIRA_API_TOKEN (jira.api-token)", errors);
-        validateRequired(jiraProperties.getProjectKey(), "JIRA_PROJECT_KEY (jira.project-key)", errors);
-        validateRequired(jiraProperties.getTeamFieldId(), "JIRA_TEAM_FIELD_ID (jira.team-field-id)", errors);
+        // Jira integration (optional in multi-tenant mode — tenants provide their own config)
+        validateRequired(jiraProperties.getBaseUrl(), "JIRA_BASE_URL (jira.base-url)", warnings);
+        validateRequired(jiraProperties.getEmail(), "JIRA_EMAIL (jira.email)", warnings);
+        validateRequired(jiraProperties.getApiToken(), "JIRA_API_TOKEN (jira.api-token)", warnings);
+        validateRequired(jiraProperties.getProjectKey(), "JIRA_PROJECT_KEY (jira.project-key)", warnings);
+        validateRequired(jiraProperties.getTeamFieldId(), "JIRA_TEAM_FIELD_ID (jira.team-field-id)", warnings);
 
         // Atlassian OAuth (required for user authentication)
         validateRequired(oauthProperties.getClientId(), "ATLASSIAN_CLIENT_ID (atlassian.oauth.client-id)", errors);

@@ -3,7 +3,7 @@ package com.leadboard.sync;
 import com.leadboard.config.entity.LinkCategory;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.WorkflowConfigService;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
@@ -47,7 +47,7 @@ public class SyncService {
     private int scheduledSyncCount = 0;
 
     private final JiraClient jiraClient;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final JiraIssueRepository issueRepository;
     private final JiraSyncStateRepository syncStateRepository;
     private final TeamRepository teamRepository;
@@ -63,7 +63,7 @@ public class SyncService {
     private final SyncService self;
 
     public SyncService(JiraClient jiraClient,
-                       JiraProperties jiraProperties,
+                       JiraConfigResolver jiraConfigResolver,
                        JiraIssueRepository issueRepository,
                        JiraSyncStateRepository syncStateRepository,
                        TeamRepository teamRepository,
@@ -78,7 +78,7 @@ public class SyncService {
                        TeamSyncService teamSyncService,
                        @Lazy SyncService self) {
         this.jiraClient = jiraClient;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.issueRepository = issueRepository;
         this.syncStateRepository = syncStateRepository;
         this.teamRepository = teamRepository;
@@ -116,7 +116,7 @@ public class SyncService {
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
     public void scheduledSync() {
-        String projectKey = jiraProperties.getProjectKey();
+        String projectKey = jiraConfigResolver.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return;
         }
@@ -143,7 +143,7 @@ public class SyncService {
     }
 
     public SyncStatus triggerSync(Integer months) {
-        String projectKey = jiraProperties.getProjectKey();
+        String projectKey = jiraConfigResolver.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return new SyncStatus(false, null, null, 0, "Project key not configured");
         }
@@ -175,7 +175,7 @@ public class SyncService {
     }
 
     public SyncStatus getSyncStatus() {
-        String projectKey = jiraProperties.getProjectKey();
+        String projectKey = jiraConfigResolver.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return new SyncStatus(false, null, null, 0, "Project key not configured");
         }
@@ -333,7 +333,7 @@ public class SyncService {
 
             // Trigger team sync if organization ID is configured
             try {
-                String orgId = jiraProperties.getOrganizationId();
+                String orgId = jiraConfigResolver.getOrganizationId();
                 if (orgId != null && !orgId.isEmpty()) {
                     log.info("Triggering team sync after issue sync");
                     teamSyncService.syncTeams();
@@ -620,7 +620,7 @@ public class SyncService {
     }
 
     private String extractTeamFieldValue(JiraIssue jiraIssue) {
-        String teamFieldId = jiraProperties.getTeamFieldId();
+        String teamFieldId = jiraConfigResolver.getTeamFieldId();
         if (teamFieldId == null || teamFieldId.isEmpty()) return null;
 
         Object fieldValue = jiraIssue.getFields().getCustomField(teamFieldId);
@@ -710,7 +710,7 @@ public class SyncService {
     }
 
     public Map<String, Object> countIssuesInJira(Integer months) {
-        String projectKey = jiraProperties.getProjectKey();
+        String projectKey = jiraConfigResolver.getProjectKey();
         if (projectKey == null || projectKey.isEmpty()) {
             return Map.of("total", 0, "months", 0, "error", "Project key not configured");
         }

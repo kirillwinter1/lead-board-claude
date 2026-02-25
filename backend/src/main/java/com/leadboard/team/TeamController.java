@@ -1,7 +1,7 @@
 package com.leadboard.team;
 
 import com.leadboard.auth.AuthorizationService;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.team.dto.AbsenceDto;
 import com.leadboard.team.dto.CreateAbsenceRequest;
 import com.leadboard.team.dto.MemberProfileResponse;
@@ -26,17 +26,17 @@ public class TeamController {
     private final TeamSyncService teamSyncService;
     private final MemberProfileService memberProfileService;
     private final AbsenceService absenceService;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final AuthorizationService authorizationService;
 
     public TeamController(TeamService teamService, TeamSyncService teamSyncService,
                           MemberProfileService memberProfileService, AbsenceService absenceService,
-                          JiraProperties jiraProperties, AuthorizationService authorizationService) {
+                          JiraConfigResolver jiraConfigResolver, AuthorizationService authorizationService) {
         this.teamService = teamService;
         this.teamSyncService = teamSyncService;
         this.memberProfileService = memberProfileService;
         this.absenceService = absenceService;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.authorizationService = authorizationService;
     }
 
@@ -45,8 +45,8 @@ public class TeamController {
     @GetMapping("/config")
     public Map<String, Object> getConfig() {
         return Map.of(
-                "manualTeamManagement", jiraProperties.isManualTeamManagement(),
-                "organizationId", jiraProperties.getOrganizationId() != null ? jiraProperties.getOrganizationId() : ""
+                "manualTeamManagement", jiraConfigResolver.isManualTeamManagement(),
+                "organizationId", jiraConfigResolver.getOrganizationId() != null ? jiraConfigResolver.getOrganizationId() : ""
         );
     }
 

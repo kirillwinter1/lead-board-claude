@@ -37,6 +37,9 @@ export function LandingHeader({ onRequestAudit }: LandingHeaderProps) {
           <a href="#audit" className="landing-nav-link" onClick={(e) => scrollToSection(e, 'audit')}>Аудит и пилот</a>
         </nav>
         <div className="landing-header-actions">
+          <Link to="/register" className="landing-btn landing-btn-secondary">
+            Try Free
+          </Link>
           <button
             onClick={onRequestAudit}
             className="landing-btn landing-btn-primary"

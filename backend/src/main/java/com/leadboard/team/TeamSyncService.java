@@ -1,6 +1,6 @@
 package com.leadboard.team;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.AtlassianTeamsClient;
 import com.leadboard.jira.AtlassianTeamsClient.AtlassianTeam;
@@ -28,7 +28,7 @@ public class TeamSyncService {
     private final AtlassianTeamsClient teamsClient;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final com.leadboard.sync.JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
 
@@ -42,14 +42,14 @@ public class TeamSyncService {
             AtlassianTeamsClient teamsClient,
             TeamRepository teamRepository,
             TeamMemberRepository memberRepository,
-            JiraProperties jiraProperties,
+            JiraConfigResolver jiraConfigResolver,
             com.leadboard.sync.JiraIssueRepository issueRepository,
             WorkflowConfigService workflowConfigService,
             TeamService teamService) {
         this.teamsClient = teamsClient;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
         this.teamService = teamService;
@@ -74,7 +74,7 @@ public class TeamSyncService {
         log.info("Starting team sync from Atlassian");
 
         try {
-            String orgId = jiraProperties.getOrganizationId();
+            String orgId = jiraConfigResolver.getOrganizationId();
             if (orgId == null || orgId.isEmpty()) {
                 throw new IllegalStateException("Organization ID is not configured. Set JIRA_ORGANIZATION_ID in .env");
             }

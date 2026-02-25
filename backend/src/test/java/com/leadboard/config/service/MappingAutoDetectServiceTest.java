@@ -1,6 +1,6 @@
 package com.leadboard.config.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +32,7 @@ class MappingAutoDetectServiceTest {
     @Mock private StatusMappingRepository statusMappingRepo;
     @Mock private LinkTypeMappingRepository linkTypeRepo;
     @Mock private WorkflowConfigService workflowConfigService;
-    @Mock private JiraProperties jiraProperties;
+    @Mock private JiraConfigResolver jiraConfigResolver;
     @Mock private com.leadboard.sync.JiraIssueRepository jiraIssueRepo;
 
     private MappingAutoDetectService service;
@@ -41,12 +41,12 @@ class MappingAutoDetectServiceTest {
     void setUp() {
         service = new MappingAutoDetectService(
                 jiraMetadataService, configRepo, roleRepo, issueTypeRepo,
-                statusMappingRepo, linkTypeRepo, workflowConfigService, jiraProperties,
+                statusMappingRepo, linkTypeRepo, workflowConfigService, jiraConfigResolver,
                 jiraIssueRepo
         );
 
-        // JiraProperties returns null project key by default (no env configured)
-        when(jiraProperties.getProjectKey()).thenReturn(null);
+        // JiraConfigResolver returns null project key by default (no env configured)
+        when(jiraConfigResolver.getProjectKey()).thenReturn(null);
 
         // Default config setup
         ProjectConfigurationEntity config = new ProjectConfigurationEntity();

@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { ExecutionSnapshot } from '../components/ExecutionSnapshot'
 
 interface HeroSectionProps {
@@ -31,9 +32,12 @@ export function HeroSection({ onRequestAudit }: HeroSectionProps) {
             <li>Соответствует требованиям импортозамещения</li>
           </ul>
           <div className="landing-hero-actions landing-hero-actions-left">
+            <Link to="/register" className="landing-btn landing-btn-primary landing-btn-large">
+              Попробовать бесплатно
+            </Link>
             <button
               onClick={onRequestAudit}
-              className="landing-btn landing-btn-primary landing-btn-large"
+              className="landing-btn landing-btn-secondary landing-btn-large"
             >
               Оставить заявку
             </button>

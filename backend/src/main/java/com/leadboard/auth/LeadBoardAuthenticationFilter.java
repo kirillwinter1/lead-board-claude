@@ -13,6 +13,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
@@ -20,10 +23,13 @@ import java.util.Optional;
 
 /**
  * Filter that extracts user from session cookie and sets up SecurityContext.
- * Now tenant-aware: if TenantContext has a tenant, loads per-tenant role from tenant_users.
+ * Tenant-aware: if TenantContext has a tenant, loads per-tenant role from tenant_users.
+ * BUG-94: Users not in tenant_users are denied access (no fallback to global role).
  */
 @Component
 public class LeadBoardAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(LeadBoardAuthenticationFilter.class);
 
     private final SessionRepository sessionRepository;
     private final TenantUserRepository tenantUserRepository;
@@ -51,19 +57,26 @@ public class LeadBoardAuthenticationFilter extends OncePerRequestFilter {
                 UserEntity user = session.getUser();
                 if (user != null) {
                     Long tenantId = TenantContext.getCurrentTenantId();
-                    AppRole tenantRole = user.getAppRole(); // fallback to global role
 
-                    // If we have a tenant context, look up per-tenant role
                     if (tenantId != null) {
+                        // BUG-94: Require tenant membership — do NOT fall back to global role
                         Optional<TenantUserEntity> tenantUserOpt =
                                 tenantUserRepository.findByTenantIdAndUserId(tenantId, user.getId());
                         if (tenantUserOpt.isPresent()) {
-                            tenantRole = tenantUserOpt.get().getAppRole();
+                            AppRole tenantRole = tenantUserOpt.get().getAppRole();
+                            LeadBoardAuthentication auth = new LeadBoardAuthentication(user, tenantId, tenantRole);
+                            SecurityContextHolder.getContext().setAuthentication(auth);
+                        } else {
+                            // User is not a member of this tenant — do not authenticate.
+                            // They will get 401 on authenticated endpoints, but OAuth flow can still add them.
+                            log.debug("User {} is not a member of tenant {}", user.getId(), tenantId);
                         }
+                    } else {
+                        // No tenant context — use global role (legacy / public schema mode)
+                        AppRole globalRole = user.getAppRole();
+                        LeadBoardAuthentication auth = new LeadBoardAuthentication(user, null, globalRole);
+                        SecurityContextHolder.getContext().setAuthentication(auth);
                     }
-
-                    LeadBoardAuthentication auth = new LeadBoardAuthentication(user, tenantId, tenantRole);
-                    SecurityContextHolder.getContext().setAuthentication(auth);
                 }
             }
         }

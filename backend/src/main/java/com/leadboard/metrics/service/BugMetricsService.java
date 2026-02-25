@@ -1,6 +1,6 @@
 package com.leadboard.metrics.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.BugMetricsResponse;
 import com.leadboard.metrics.dto.BugMetricsResponse.OpenBugDto;
@@ -25,16 +25,16 @@ public class BugMetricsService {
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
     private final BugSlaService bugSlaService;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
 
     public BugMetricsService(JiraIssueRepository issueRepository,
                              WorkflowConfigService workflowConfigService,
                              BugSlaService bugSlaService,
-                             JiraProperties jiraProperties) {
+                             JiraConfigResolver jiraConfigResolver) {
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
         this.bugSlaService = bugSlaService;
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
     }
 
     public BugMetricsResponse getBugMetrics(Long teamId) {
@@ -137,7 +137,7 @@ public class BugMetricsService {
     }
 
     private List<OpenBugDto> buildOpenBugList(List<JiraIssueEntity> openBugs) {
-        String baseUrl = jiraProperties.getBaseUrl();
+        String baseUrl = jiraConfigResolver.getBaseUrl();
         OffsetDateTime now = OffsetDateTime.now();
 
         List<OpenBugDto> list = openBugs.stream()

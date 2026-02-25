@@ -1,7 +1,7 @@
 package com.leadboard.competency;
 
 import com.leadboard.competency.dto.*;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
@@ -24,7 +24,7 @@ class CompetencyServiceTest {
     @Mock private MemberCompetencyRepository competencyRepository;
     @Mock private TeamMemberRepository memberRepository;
     @Mock private JiraClient jiraClient;
-    @Mock private JiraProperties jiraProperties;
+    @Mock private JiraConfigResolver jiraConfigResolver;
     @Mock private JiraIssueRepository issueRepository;
 
     private CompetencyService service;
@@ -32,7 +32,7 @@ class CompetencyServiceTest {
     @BeforeEach
     void setUp() {
         service = new CompetencyService(
-                competencyRepository, memberRepository, jiraClient, jiraProperties, issueRepository);
+                competencyRepository, memberRepository, jiraClient, jiraConfigResolver, issueRepository);
     }
 
     @Test
@@ -184,7 +184,7 @@ class CompetencyServiceTest {
 
     @Test
     void getAvailableComponents_fromJira() {
-        when(jiraProperties.getProjectKey()).thenReturn("PROJ");
+        when(jiraConfigResolver.getProjectKey()).thenReturn("PROJ");
         when(jiraClient.getProjectComponents("PROJ")).thenReturn(List.of("Frontend", "Backend"));
 
         List<String> result = service.getAvailableComponents();
@@ -193,7 +193,7 @@ class CompetencyServiceTest {
 
     @Test
     void getAvailableComponents_fallbackToDb() {
-        when(jiraProperties.getProjectKey()).thenReturn("PROJ");
+        when(jiraConfigResolver.getProjectKey()).thenReturn("PROJ");
         when(jiraClient.getProjectComponents("PROJ")).thenThrow(new RuntimeException("fail"));
         when(issueRepository.findDistinctComponents()).thenReturn(List.of("API", "Mobile"));
 

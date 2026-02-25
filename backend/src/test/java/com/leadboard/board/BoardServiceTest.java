@@ -1,6 +1,6 @@
 package com.leadboard.board;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.RoughEstimateProperties;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.UnifiedPlanningService;
@@ -39,7 +39,7 @@ class BoardServiceTest {
     private JiraIssueRepository issueRepository;
 
     @Mock
-    private JiraProperties jiraProperties;
+    private JiraConfigResolver jiraConfigResolver;
 
     @Mock
     private TeamRepository teamRepository;
@@ -63,7 +63,7 @@ class BoardServiceTest {
     void setUp() {
         boardService = new BoardService(
                 issueRepository,
-                jiraProperties,
+                jiraConfigResolver,
                 teamRepository,
                 roughEstimateProperties,
                 dataQualityService,
@@ -72,8 +72,8 @@ class BoardServiceTest {
         );
 
         // Common setup
-        when(jiraProperties.getProjectKey()).thenReturn("LB");
-        when(jiraProperties.getBaseUrl()).thenReturn("https://jira.example.com");
+        when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
         when(teamRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
         when(dataQualityService.checkEpic(any(), anyList())).thenReturn(Collections.emptyList());
         when(dataQualityService.checkStory(any(), any(), anyList())).thenReturn(Collections.emptyList());
@@ -115,7 +115,7 @@ class BoardServiceTest {
         @Test
         @DisplayName("should return empty board when no project key configured")
         void shouldReturnEmptyWhenNoProjectKey() {
-            when(jiraProperties.getProjectKey()).thenReturn(null);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(null);
 
             BoardResponse response = boardService.getBoard();
 
@@ -126,7 +126,7 @@ class BoardServiceTest {
         @Test
         @DisplayName("should return empty board when no base URL configured")
         void shouldReturnEmptyWhenNoBaseUrl() {
-            when(jiraProperties.getBaseUrl()).thenReturn(null);
+            when(jiraConfigResolver.getBaseUrl()).thenReturn(null);
 
             BoardResponse response = boardService.getBoard();
 

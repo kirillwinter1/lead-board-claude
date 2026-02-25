@@ -1,10 +1,7 @@
 package com.leadboard.jira;
 
 import com.leadboard.auth.OAuthService;
-import com.leadboard.config.JiraProperties;
-import com.leadboard.tenant.TenantContext;
-import com.leadboard.tenant.TenantJiraConfigEntity;
-import com.leadboard.tenant.TenantJiraConfigRepository;
+import com.leadboard.config.JiraConfigResolver;
 import io.netty.channel.ChannelOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,16 +29,13 @@ public class JiraClient {
     private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
 
     private final WebClient webClient;
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver configResolver;
     private final OAuthService oauthService;
-    private final TenantJiraConfigRepository tenantJiraConfigRepository;
 
-    public JiraClient(JiraProperties jiraProperties, OAuthService oauthService,
-                      TenantJiraConfigRepository tenantJiraConfigRepository,
+    public JiraClient(JiraConfigResolver configResolver, OAuthService oauthService,
                       WebClient.Builder webClientBuilder) {
-        this.jiraProperties = jiraProperties;
+        this.configResolver = configResolver;
         this.oauthService = oauthService;
-        this.tenantJiraConfigRepository = tenantJiraConfigRepository;
 
         // Increase buffer size for large Jira responses
         ExchangeStrategies strategies = ExchangeStrategies.builder()
@@ -97,28 +91,11 @@ public class JiraClient {
 
     private String buildFieldsList() {
         String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,updated,assignee,flagged,customfield_10021,issuelinks,components";
-        String teamFieldId = getEffectiveTeamFieldId();
+        String teamFieldId = configResolver.getTeamFieldId();
         if (teamFieldId != null && !teamFieldId.isEmpty()) {
             return baseFields + "," + teamFieldId;
         }
         return baseFields;
-    }
-
-    /**
-     * Get team field ID: from tenant config if available, else from JiraProperties.
-     */
-    private String getEffectiveTeamFieldId() {
-        if (TenantContext.hasTenant()) {
-            try {
-                return tenantJiraConfigRepository.findActive()
-                        .map(TenantJiraConfigEntity::getTeamFieldId)
-                        .orElse(jiraProperties.getTeamFieldId());
-            } catch (Exception e) {
-                // Fallback if tenant schema doesn't have the table yet
-                return jiraProperties.getTeamFieldId();
-            }
-        }
-        return jiraProperties.getTeamFieldId();
     }
 
     private JiraSearchResponse searchWithOAuth(String jql, int maxResults, String nextPageToken, String accessToken, String cloudId, String fields) {
@@ -141,15 +118,15 @@ public class JiraClient {
     }
 
     private JiraSearchResponse searchWithBasicAuth(String jql, int maxResults, String nextPageToken, String fields) {
-        if (jiraProperties.getBaseUrl() == null || jiraProperties.getBaseUrl().isEmpty()) {
+        if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
             throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
         }
 
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         return webClient.get()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/search/jql", uriBuilder -> {
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/search/jql", uriBuilder -> {
                         uriBuilder.queryParam("jql", jql)
                                   .queryParam("maxResults", maxResults)
                                   .queryParam("fields", fields);
@@ -230,11 +207,11 @@ public class JiraClient {
     }
 
     private String createIssueWithBasicAuth(Map<String, Object> body) {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         Map<String, Object> response = webClient.post()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(body)
                 .retrieve()
@@ -337,11 +314,11 @@ public class JiraClient {
     }
 
     private void updateIssueWithBasicAuth(String issueKey, Map<String, Object> body) {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         webClient.put()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey)
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey)
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(body)
                 .retrieve()
@@ -423,11 +400,11 @@ public class JiraClient {
      */
     @SuppressWarnings("unchecked")
     public List<JiraTransition> getTransitionsBasicAuth(String issueKey) {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         Map<String, Object> response = webClient.get()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .retrieve()
                 .bodyToMono(Map.class)
@@ -448,11 +425,11 @@ public class JiraClient {
      * Transition an issue using Basic Auth (system API token).
      */
     public void transitionIssueBasicAuth(String issueKey, String transitionId) {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         webClient.post()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(Map.of("transition", Map.of("id", transitionId)))
                 .retrieve()
@@ -464,11 +441,11 @@ public class JiraClient {
      * Assign an issue to a user using Basic Auth (system API token).
      */
     public void assignIssueBasicAuth(String issueKey, String accountId) {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         webClient.put()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/assignee")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/assignee")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(Map.of("accountId", accountId))
                 .retrieve()
@@ -480,13 +457,13 @@ public class JiraClient {
      * Add a worklog using Basic Auth (system API token).
      */
     public void addWorklogBasicAuth(String issueKey, int timeSpentSeconds, LocalDate date) {
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
 
         webClient.post()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(Map.of(
                         "timeSpentSeconds", timeSpentSeconds,
@@ -558,15 +535,15 @@ public class JiraClient {
     }
 
     private List<JiraChangelogResponse.ChangelogHistory> fetchChangelogWithBasicAuth(String issueKey) {
-        if (jiraProperties.getBaseUrl() == null || jiraProperties.getBaseUrl().isEmpty()) {
+        if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
             throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
         }
 
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         JiraChangelogResponse response = webClient.get()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "?expand=changelog&fields=status")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "?expand=changelog&fields=status")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.class)
@@ -597,7 +574,7 @@ public class JiraClient {
     private JiraChangelogResponse.PaginatedChangelog fetchChangelogPageBasicAuth(
             String issueKey, int startAt, String encodedAuth) {
         return webClient.get()
-                .uri(jiraProperties.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt)
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt)
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.PaginatedChangelog.class)
@@ -622,10 +599,10 @@ public class JiraClient {
                     .bodyToMono(List.class)
                     .block();
         } else {
-            String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+            String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
             String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
             components = webClient.get()
-                    .uri(jiraProperties.getBaseUrl() + "/rest/api/3/project/" + projectKey + "/components")
+                    .uri(configResolver.getBaseUrl() + "/rest/api/3/project/" + projectKey + "/components")
                     .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                     .retrieve()
                     .bodyToMono(List.class)

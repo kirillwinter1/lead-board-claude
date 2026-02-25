@@ -60,7 +60,7 @@ class WorkflowConfigControllerTest {
     @MockBean
     private JiraIssueRepository jiraIssueRepository;
     @MockBean
-    private JiraProperties jiraProperties;
+    private JiraConfigResolver jiraConfigResolver;
     @MockBean
     private SessionRepository sessionRepository;
     @MockBean

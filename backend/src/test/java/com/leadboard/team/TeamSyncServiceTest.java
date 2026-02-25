@@ -1,6 +1,6 @@
 package com.leadboard.team;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.AtlassianTeamsClient;
 import com.leadboard.jira.AtlassianTeamsClient.*;
@@ -38,7 +38,7 @@ class TeamSyncServiceTest {
     private TeamMemberRepository memberRepository;
 
     @Mock
-    private JiraProperties jiraProperties;
+    private JiraConfigResolver jiraConfigResolver;
 
     @Mock
     private JiraIssueRepository issueRepository;
@@ -59,14 +59,14 @@ class TeamSyncServiceTest {
                 teamsClient,
                 teamRepository,
                 memberRepository,
-                jiraProperties,
+                jiraConfigResolver,
                 issueRepository,
                 workflowConfigService,
                 teamService
         );
 
         // Common setup
-        when(jiraProperties.getOrganizationId()).thenReturn("org-123");
+        when(jiraConfigResolver.getOrganizationId()).thenReturn("org-123");
         when(teamRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
     }
 
@@ -207,7 +207,7 @@ class TeamSyncServiceTest {
         @Test
         @DisplayName("should handle missing organization ID")
         void shouldHandleMissingOrgId() {
-            when(jiraProperties.getOrganizationId()).thenReturn(null);
+            when(jiraConfigResolver.getOrganizationId()).thenReturn(null);
 
             TeamSyncService.TeamSyncStatus status = teamSyncService.syncTeams();
 

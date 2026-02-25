@@ -1,6 +1,6 @@
 package com.leadboard.config.service;
 
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.status.StatusCategory;
@@ -31,13 +31,13 @@ class WorkflowConfigServiceScoreTest {
     @Mock private IssueTypeMappingRepository issueTypeRepo;
     @Mock private StatusMappingRepository statusMappingRepo;
     @Mock private LinkTypeMappingRepository linkTypeRepo;
-    @Mock private JiraProperties jiraProperties;
+    @Mock private JiraConfigResolver jiraConfigResolver;
 
     private WorkflowConfigService service;
 
     @BeforeEach
     void setUp() {
-        when(jiraProperties.getProjectKey()).thenReturn("TEST");
+        when(jiraConfigResolver.getProjectKey()).thenReturn("TEST");
 
         ProjectConfigurationEntity config = new ProjectConfigurationEntity();
         config.setId(1L);
@@ -51,7 +51,7 @@ class WorkflowConfigServiceScoreTest {
 
         service = new WorkflowConfigService(
                 configRepo, roleRepo, issueTypeRepo, statusMappingRepo,
-                linkTypeRepo, new ObjectMapper(), jiraProperties);
+                linkTypeRepo, new ObjectMapper(), jiraConfigResolver);
     }
 
     // ==================== getDefaultScoreWeightForCategory ====================

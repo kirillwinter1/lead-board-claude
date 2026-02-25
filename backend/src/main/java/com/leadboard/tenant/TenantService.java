@@ -101,6 +101,14 @@ public class TenantService {
     }
 
     /**
+     * BUG-96: Check if a tenant has any users at all.
+     * Used to determine if a new user should be ADMIN (first user) or MEMBER.
+     */
+    public boolean tenantHasUsers(Long tenantId) {
+        return !tenantUserRepository.findByTenantId(tenantId).isEmpty();
+    }
+
+    /**
      * Returns true if slug passes format and reserved-word checks.
      * Used by check-slug endpoint for pre-validation (BUG-64).
      */

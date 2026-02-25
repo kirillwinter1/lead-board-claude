@@ -1,7 +1,7 @@
 package com.leadboard.config.service;
 
 import com.leadboard.auth.OAuthService;
-import com.leadboard.config.JiraProperties;
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.TrackerMetadataCacheEntity;
 import com.leadboard.config.repository.TrackerMetadataCacheRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -26,20 +26,20 @@ public class JiraMetadataService {
     private static final Logger log = LoggerFactory.getLogger(JiraMetadataService.class);
     private static final String ATLASSIAN_API_BASE = "https://api.atlassian.com";
 
-    private final JiraProperties jiraProperties;
+    private final JiraConfigResolver jiraConfigResolver;
     private final OAuthService oauthService;
     private final WebClient webClient;
     private final TrackerMetadataCacheRepository cacheRepo;
     private final ObjectMapper objectMapper;
 
     public JiraMetadataService(
-            JiraProperties jiraProperties,
+            JiraConfigResolver jiraConfigResolver,
             OAuthService oauthService,
             WebClient.Builder webClientBuilder,
             TrackerMetadataCacheRepository cacheRepo,
             ObjectMapper objectMapper
     ) {
-        this.jiraProperties = jiraProperties;
+        this.jiraConfigResolver = jiraConfigResolver;
         this.oauthService = oauthService;
         this.webClient = webClientBuilder.build();
         this.cacheRepo = cacheRepo;
@@ -52,7 +52,7 @@ public class JiraMetadataService {
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getIssueTypes() {
         // Check cache first (TTL: 1 hour)
-        String cacheKey = "issue_types_" + jiraProperties.getProjectKey();
+        String cacheKey = "issue_types_" + jiraConfigResolver.getProjectKey();
         String cached = getCachedValue(cacheKey, 60);
         if (cached != null) {
             try {
@@ -63,7 +63,7 @@ public class JiraMetadataService {
         }
 
         try {
-            String projectKey = jiraProperties.getProjectKey();
+            String projectKey = jiraConfigResolver.getProjectKey();
             Map<String, Object> project = callJiraApi("/rest/api/3/project/" + projectKey);
 
             List<Map<String, Object>> issueTypes = (List<Map<String, Object>>) project.get("issueTypes");
@@ -93,7 +93,7 @@ public class JiraMetadataService {
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getStatuses() {
-        String cacheKey = "statuses_" + jiraProperties.getProjectKey();
+        String cacheKey = "statuses_" + jiraConfigResolver.getProjectKey();
         String cached = getCachedValue(cacheKey, 60);
         if (cached != null) {
             try {
@@ -104,7 +104,7 @@ public class JiraMetadataService {
         }
 
         try {
-            String projectKey = jiraProperties.getProjectKey();
+            String projectKey = jiraConfigResolver.getProjectKey();
             List<Map<String, Object>> response = callJiraApiList(
                     "/rest/api/3/project/" + projectKey + "/statuses");
 
@@ -187,7 +187,7 @@ public class JiraMetadataService {
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getStatusesForIssueType(String issueTypeId) {
         try {
-            String projectKey = jiraProperties.getProjectKey();
+            String projectKey = jiraConfigResolver.getProjectKey();
             // Use /rest/api/3/statuses/search with issueTypeId and projectId filters
             Map<String, Object> response = callJiraApi(
                     "/rest/api/3/statuses/search?issueTypeId=" + issueTypeId + "&projectId=" + projectKey + "&maxResults=200");
@@ -255,7 +255,7 @@ public class JiraMetadataService {
         }
 
         // Basic auth fallback
-        return jiraProperties.getBaseUrl() + path;
+        return jiraConfigResolver.getBaseUrl() + path;
     }
 
     private HttpHeaders buildAuthHeaders() {
@@ -271,7 +271,7 @@ public class JiraMetadataService {
         }
 
         // Basic auth
-        String auth = jiraProperties.getEmail() + ":" + jiraProperties.getApiToken();
+        String auth = jiraConfigResolver.getEmail() + ":" + jiraConfigResolver.getApiToken();
         String encoded = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
         headers.set(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
         return headers;
