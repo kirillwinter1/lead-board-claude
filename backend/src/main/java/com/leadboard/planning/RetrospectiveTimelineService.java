@@ -88,7 +88,7 @@ public class RetrospectiveTimelineService {
         for (Map.Entry<String, RetroStory> entry : retroStoryMap.entrySet()) {
             JiraIssueEntity storyEntity = storyEntities.get(entry.getKey());
             String parentKey = storyEntity.getParentKey();
-            if (parentKey == null) parentKey = "NO_EPIC";
+            if (parentKey == null) continue; // Skip orphan stories without epic
             storiesByEpic.computeIfAbsent(parentKey, k -> new ArrayList<>()).add(entry.getValue());
         }
 
@@ -102,10 +102,7 @@ public class RetrospectiveTimelineService {
             epicStories.sort(Comparator.comparing(
                     s -> s.startDate() != null ? s.startDate() : LocalDate.MAX));
 
-            JiraIssueEntity epicEntity = null;
-            if (!"NO_EPIC".equals(epicKey)) {
-                epicEntity = issueRepository.findByIssueKey(epicKey).orElse(null);
-            }
+            JiraIssueEntity epicEntity = issueRepository.findByIssueKey(epicKey).orElse(null);
 
             // Calculate epic date range from stories
             LocalDate epicStart = epicStories.stream()
