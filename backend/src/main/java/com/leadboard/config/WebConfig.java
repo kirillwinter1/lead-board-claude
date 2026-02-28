@@ -21,37 +21,55 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
-        List<String> origins = new ArrayList<>();
+        List<String> exactOrigins = new ArrayList<>();
+        List<String> originPatterns = new ArrayList<>();
 
         // Localhost for development
-        origins.add("http://localhost:5173");
-        origins.add("http://localhost:3000");
+        exactOrigins.add("http://localhost:5173");
+        exactOrigins.add("http://localhost:3000");
 
-        // Production origins from env — explicit origins only, no wildcards
+        // Production origins from env
         if (corsAllowedOrigins != null && !corsAllowedOrigins.isBlank()) {
             for (String origin : corsAllowedOrigins.split(",")) {
                 String trimmed = origin.trim();
                 if (!trimmed.isEmpty()) {
-                    origins.add(trimmed);
+                    if (trimmed.contains("*")) {
+                        // Wildcards require allowedOriginPatterns (e.g. https://*.onelane.ru)
+                        originPatterns.add(trimmed);
+                    } else {
+                        exactOrigins.add(trimmed);
+                    }
                 }
             }
         }
 
-        String[] originsArray = origins.toArray(new String[0]);
         String[] headersArray = ALLOWED_HEADERS.toArray(new String[0]);
 
-        registry.addMapping("/api/**")
-                .allowedOrigins(originsArray)
+        var apiMapping = registry.addMapping("/api/**")
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
                 .allowedHeaders(headersArray)
                 .allowCredentials(true)
                 .maxAge(3600);
 
-        registry.addMapping("/oauth/**")
-                .allowedOrigins(originsArray)
+        var oauthMapping = registry.addMapping("/oauth/**")
                 .allowedMethods("GET", "POST", "OPTIONS")
                 .allowedHeaders(headersArray)
                 .allowCredentials(true)
                 .maxAge(3600);
+
+        if (!originPatterns.isEmpty()) {
+            String[] patterns = originPatterns.toArray(new String[0]);
+            String[] exact = exactOrigins.toArray(new String[0]);
+            // When using patterns, add exact origins as patterns too
+            List<String> allPatterns = new ArrayList<>(originPatterns);
+            exactOrigins.forEach(allPatterns::add);
+            String[] all = allPatterns.toArray(new String[0]);
+            apiMapping.allowedOriginPatterns(all);
+            oauthMapping.allowedOriginPatterns(all);
+        } else {
+            String[] exact = exactOrigins.toArray(new String[0]);
+            apiMapping.allowedOrigins(exact);
+            oauthMapping.allowedOrigins(exact);
+        }
     }
 }
