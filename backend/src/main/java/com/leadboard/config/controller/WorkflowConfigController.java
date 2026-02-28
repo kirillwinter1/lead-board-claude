@@ -349,6 +349,27 @@ public class WorkflowConfigController {
         ));
     }
 
+    @PostMapping("/statuses/resort-by-category")
+    @Transactional
+    public ResponseEntity<Map<String, Object>> resortStatusesByCategory(@RequestBody Map<String, String> body) {
+        String categoryStr = body.get("boardCategory");
+        if (categoryStr == null || categoryStr.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "boardCategory is required"));
+        }
+        BoardCategory category;
+        try {
+            category = BoardCategory.valueOf(categoryStr);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid boardCategory: " + categoryStr));
+        }
+        ProjectConfigurationEntity config = getDefaultConfig();
+        if (config == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No configuration found"));
+        }
+        autoDetectService.resortStatusesByCategory(config.getId(), category);
+        return ResponseEntity.ok(Map.of("resorted", true, "boardCategory", category.name()));
+    }
+
     // ==================== Validation ====================
 
     @PostMapping("/validate")

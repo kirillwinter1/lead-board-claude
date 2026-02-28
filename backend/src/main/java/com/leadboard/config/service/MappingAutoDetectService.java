@@ -200,9 +200,13 @@ public class MappingAutoDetectService {
                     issueTypeName, issueTypeId, boardCat, statuses.size());
             if (boardCat == null || boardCat == BoardCategory.IGNORE) continue;
 
+            // Sort statuses by statusCategory: TO_DO first, IN_PROGRESS middle, DONE last
+            List<Map<String, Object>> sortedStatuses = new ArrayList<>(statuses);
+            sortedStatuses.sort(Comparator.comparingInt(s -> statusCategorySortPriority((String) s.get("statusCategory"))));
+
             int statusSortOrder = 0;
             Map<String, StatusMappingEntity> savedMappings = new LinkedHashMap<>();
-            for (Map<String, Object> status : statuses) {
+            for (Map<String, Object> status : sortedStatuses) {
                 String statusName = (String) status.get("name");
                 String statusCategoryKey = (String) status.get("statusCategory");
                 if (statusName == null) continue;
@@ -240,6 +244,13 @@ public class MappingAutoDetectService {
                 savedMappings.put(dedupeKey, sm);
                 statusCount++;
                 statusSortOrder += 10;
+            }
+        }
+
+        // Re-sort statuses by category for all board categories
+        for (BoardCategory bc : BoardCategory.values()) {
+            if (bc != BoardCategory.IGNORE) {
+                resortStatusesByCategory(configId, bc);
             }
         }
 
@@ -360,7 +371,7 @@ public class MappingAutoDetectService {
         }
 
         // Get max sort order for this category
-        int sortOrder = statusMappingRepo.findByConfigIdAndIssueCategory(configId, boardCategory).stream()
+        int baseSortOrder = statusMappingRepo.findByConfigIdAndIssueCategory(configId, boardCategory).stream()
                 .mapToInt(StatusMappingEntity::getSortOrder)
                 .max()
                 .orElse(0) + 10;
@@ -371,8 +382,13 @@ public class MappingAutoDetectService {
             roles.add(role.getCode());
         }
 
+        // Sort statuses by statusCategory: TO_DO first, IN_PROGRESS middle, DONE last
+        List<Map<String, Object>> sortedStatuses = new ArrayList<>(typeStatuses);
+        sortedStatuses.sort(Comparator.comparingInt(s -> statusCategorySortPriority((String) s.get("statusCategory"))));
+
+        int sortOrder = baseSortOrder;
         int count = 0;
-        for (Map<String, Object> status : typeStatuses) {
+        for (Map<String, Object> status : sortedStatuses) {
             String statusName = (String) status.get("name");
             if (statusName == null || existingKeys.contains(statusName)) continue;
 
@@ -396,12 +412,52 @@ public class MappingAutoDetectService {
             sortOrder += 10;
         }
 
+        // Re-sort ALL statuses for this category (existing + new) by statusCategory
+        resortStatusesByCategory(configId, boardCategory);
+
         if (count > 0) {
             workflowConfigService.clearCache();
             log.info("Detected {} new status mappings for type '{}' (category={})", count, jiraTypeName, boardCategory);
         }
 
         return count;
+    }
+
+    /**
+     * Re-sort all statuses for a board category: TO_DO first, IN_PROGRESS middle, DONE last.
+     * Preserves relative order within each group.
+     */
+    public void resortStatusesByCategory(Long configId, BoardCategory boardCategory) {
+        List<StatusMappingEntity> all = new ArrayList<>(statusMappingRepo.findByConfigIdAndIssueCategory(configId, boardCategory));
+        if (all.isEmpty()) return;
+
+        all.sort(Comparator.comparingInt((StatusMappingEntity sm) -> statusCategoryGroupPriority(sm.getStatusCategory()))
+                .thenComparingInt(StatusMappingEntity::getSortOrder));
+
+        int order = 0;
+        boolean changed = false;
+        for (StatusMappingEntity sm : all) {
+            if (sm.getSortOrder() != order) {
+                sm.setSortOrder(order);
+                statusMappingRepo.save(sm);
+                changed = true;
+            }
+            order += 10;
+        }
+        if (changed) {
+            workflowConfigService.clearCache();
+        }
+    }
+
+    private static int statusCategoryGroupPriority(StatusCategory cat) {
+        if (cat == null) return 1;
+        return switch (cat) {
+            case NEW -> 0;
+            case REQUIREMENTS, PLANNED -> 1;
+            case IN_PROGRESS -> 2;
+            case DONE -> 3;
+            default -> 2;
+        };
     }
 
     @SuppressWarnings("unchecked")
@@ -519,6 +575,19 @@ public class MappingAutoDetectService {
                 yield 20;
             }
             default -> 0;
+        };
+    }
+
+    /**
+     * Sort priority for Jira statusCategory: TO_DO (new) first, IN_PROGRESS (indeterminate) middle, DONE last.
+     */
+    static int statusCategorySortPriority(String statusCategoryKey) {
+        if (statusCategoryKey == null) return 1;
+        return switch (statusCategoryKey) {
+            case "new" -> 0;
+            case "indeterminate" -> 1;
+            case "done" -> 2;
+            default -> 1;
         };
     }
 

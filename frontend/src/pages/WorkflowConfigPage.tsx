@@ -1108,6 +1108,14 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         {activeTab === 'statuses' && renderStatusesTab()}
         {activeTab === 'linkTypes' && renderLinkTypesTab()}
       </div>
+
+      {onComplete && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
+          <button className="btn btn-primary" style={{ fontSize: 15, padding: '10px 32px' }} onClick={onComplete}>
+            Continue →
+          </button>
+        </div>
+      )}
     </div>
   )
 
@@ -1990,6 +1998,15 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
 
         <div className="workflow-actions">
           <button className="btn btn-secondary" onClick={addStatus}>Add Status</button>
+          <button className="btn btn-secondary" onClick={async () => {
+            try {
+              await axios.post('/api/admin/workflow-config/statuses/resort-by-category', {
+                boardCategory: statusFilter
+              })
+              await loadConfig()
+              showSaveSuccess('Statuses re-sorted by category')
+            } catch { setError('Failed to re-sort statuses') }
+          }}>Auto-sort</button>
           <button className="btn btn-primary" onClick={handleSaveStatuses} disabled={saving}>
             {saving ? 'Saving...' : 'Save Statuses'}
           </button>
