@@ -74,7 +74,7 @@ public class LeadBoardAuthentication implements Authentication {
     }
 
     public AppRole getRole() {
-        return user.getAppRole();
+        return tenantRole;
     }
 
     public Long getUserId() {
