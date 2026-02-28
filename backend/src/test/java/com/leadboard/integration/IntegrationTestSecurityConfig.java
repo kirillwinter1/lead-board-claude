@@ -8,6 +8,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.web.client.RestTemplateCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
@@ -28,6 +29,16 @@ import java.io.IOException;
 @TestConfiguration
 @Profile("integration")
 public class IntegrationTestSecurityConfig {
+
+    @Bean
+    public RestTemplateCustomizer tenantHeaderCustomizer() {
+        return restTemplate -> restTemplate.getInterceptors().add(
+                (request, body, execution) -> {
+                    request.getHeaders().add("X-Tenant-Slug", IntegrationTestBase.TEST_SLUG);
+                    return execution.execute(request, body);
+                }
+        );
+    }
 
     @Bean
     @Primary

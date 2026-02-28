@@ -14,6 +14,11 @@ import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamMemberRepository;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantMigrationService;
+import com.leadboard.tenant.TenantRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +40,11 @@ import java.time.OffsetDateTime;
 @ActiveProfiles("integration")
 @Import(IntegrationTestSecurityConfig.class)
 public abstract class IntegrationTestBase {
+
+    static final String TEST_SCHEMA = "tenant_integtest";
+    static final String TEST_SLUG = "integtest";
+    private static boolean tenantSchemaCreated = false;
+    private static Long testTenantId;
 
     // Singleton container - started once, shared by all tests
     static final PostgreSQLContainer<?> postgres;
@@ -96,8 +106,39 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected WorkflowConfigService workflowConfigService;
 
+    @Autowired
+    private TenantMigrationService tenantMigrationService;
+
+    @Autowired
+    private TenantRepository tenantRepository;
+
     @BeforeEach
-    void cleanUp() {
+    void setUp() {
+        if (!tenantSchemaCreated) {
+            tenantMigrationService.createTenantSchema(TEST_SCHEMA);
+            if (!tenantRepository.existsBySlug(TEST_SLUG)) {
+                TenantEntity tenant = new TenantEntity();
+                tenant.setSlug(TEST_SLUG);
+                tenant.setName("Integration Test");
+                tenant.setSchemaName(TEST_SCHEMA);
+                tenant.setActive(true);
+                tenant = tenantRepository.save(tenant);
+                testTenantId = tenant.getId();
+            } else {
+                testTenantId = tenantRepository.findBySlug(TEST_SLUG).get().getId();
+            }
+            tenantSchemaCreated = true;
+        }
+        TenantContext.setTenant(testTenantId, TEST_SCHEMA);
+        cleanUp();
+    }
+
+    @AfterEach
+    void clearTenantContext() {
+        TenantContext.clear();
+    }
+
+    private void cleanUp() {
         // Delete in correct order to respect FK constraints
         pokerVoteRepository.deleteAll();
         pokerStoryRepository.deleteAll();

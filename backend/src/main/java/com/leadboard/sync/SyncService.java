@@ -104,18 +104,23 @@ public class SyncService {
      */
     @PostConstruct
     public void recoverStuckSync() {
-        syncStateRepository.findAll().forEach(state -> {
-            if (state.isSyncInProgress() && state.getLastSyncStartedAt() != null) {
-                Duration stuck = Duration.between(state.getLastSyncStartedAt(), OffsetDateTime.now());
-                if (stuck.toMinutes() > 30) {
-                    log.warn("Recovering stuck sync for project {} (stuck for {})",
-                            state.getProjectKey(), stuck);
-                    state.setSyncInProgress(false);
-                    state.setLastError("Sync was stuck, auto-recovered on startup");
-                    syncStateRepository.save(state);
+        try {
+            syncStateRepository.findAll().forEach(state -> {
+                if (state.isSyncInProgress() && state.getLastSyncStartedAt() != null) {
+                    Duration stuck = Duration.between(state.getLastSyncStartedAt(), OffsetDateTime.now());
+                    if (stuck.toMinutes() > 30) {
+                        log.warn("Recovering stuck sync for project {} (stuck for {})",
+                                state.getProjectKey(), stuck);
+                        state.setSyncInProgress(false);
+                        state.setLastError("Sync was stuck, auto-recovered on startup");
+                        syncStateRepository.save(state);
+                    }
                 }
-            }
-        });
+            });
+        } catch (Exception e) {
+            log.warn("Could not recover stuck syncs on startup (table may not exist in current schema): {}",
+                    e.getMessage());
+        }
     }
 
     @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")

@@ -60,9 +60,14 @@ public class MappingAutoDetectService {
 
     @EventListener(ApplicationReadyEvent.class)
     public void onStartup() {
-        int count = backfillMissingTypes();
-        if (count > 0) {
-            log.info("Backfilled {} missing issue type(s) from existing issues", count);
+        try {
+            int count = backfillMissingTypes();
+            if (count > 0) {
+                log.info("Backfilled {} missing issue type(s) from existing issues", count);
+            }
+        } catch (Exception e) {
+            log.warn("Could not backfill issue types on startup (table may not exist in current schema): {}",
+                    e.getMessage());
         }
     }
 
