@@ -62,16 +62,14 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
   const chartData = useMemo(() => {
     if (!burndownData || burndownData.idealLine.length === 0) return null
 
-    // Create a map of actual values by date
     const actualMap = new Map(
-      burndownData.actualLine.map(p => [p.date, p.remainingHours])
+      burndownData.actualLine.map(p => [p.date, p.remaining])
     )
 
-    // Merge ideal and actual into single dataset
     return burndownData.idealLine.map(point => ({
       date: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       fullDate: point.date,
-      ideal: point.remainingHours,
+      ideal: point.remaining,
       actual: actualMap.get(point.date) ?? null
     }))
   }, [burndownData])
@@ -94,7 +92,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
     return (
       <div className="burndown-section">
         <h3>Epic Burndown</h3>
-        <div className="burndown-empty">No epics found for this team.</div>
+        <div className="burndown-empty">No in-progress or completed epics found for this team.</div>
       </div>
     )
   }
@@ -103,7 +101,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
     <div className="burndown-section">
       <h3>Epic Burndown</h3>
       <p className="burndown-description">
-        Track progress of an epic. Ideal line shows linear completion, actual line shows real progress.
+        Track story completion progress. Ideal line shows linear completion, actual line shows real progress.
       </p>
 
       {/* Epic Selector */}
@@ -131,8 +129,8 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
           {/* Epic Info */}
           <div className="burndown-epic-info">
             <div className="burndown-epic-info-item">
-              <span className="burndown-epic-info-label">Total Estimate:</span>
-              <span className="burndown-epic-info-value">{burndownData.totalEstimateHours}h</span>
+              <span className="burndown-epic-info-label">Stories:</span>
+              <span className="burndown-epic-info-value">{burndownData.totalStories}</span>
             </div>
             {burndownData.startDate && (
               <div className="burndown-epic-info-item">
@@ -142,7 +140,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
             )}
             {burndownData.endDate && (
               <div className="burndown-epic-info-item">
-                <span className="burndown-epic-info-label">End:</span>
+                <span className="burndown-epic-info-label">{burndownData.totalStories > 0 && epics.find(e => e.key === selectedEpicKey)?.completed ? 'End:' : 'Today:'}</span>
                 <span className="burndown-epic-info-value">{formatDate(burndownData.endDate)}</span>
               </div>
             )}
@@ -164,7 +162,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
                     tick={{ fontSize: 11, fill: '#6b778c' }}
                     tickLine={false}
                     axisLine={{ stroke: '#dfe1e6' }}
-                    tickFormatter={(value) => `${value}h`}
+                    allowDecimals={false}
                   />
                   <Tooltip
                     contentStyle={{
@@ -175,7 +173,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
                       fontSize: 12
                     }}
                     labelStyle={{ color: 'white', fontWeight: 600 }}
-                    formatter={(value) => [`${value}h`]}
+                    formatter={(value) => [`${value} stories`]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                   <Line
@@ -204,7 +202,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
               No burndown data available for this epic.
               <br />
               <small style={{ color: '#6b778c' }}>
-                Burndown requires subtasks with estimates and time logged.
+                Burndown requires stories assigned to this epic.
               </small>
             </div>
           )}

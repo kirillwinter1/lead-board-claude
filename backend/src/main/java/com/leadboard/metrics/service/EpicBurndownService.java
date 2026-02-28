@@ -1,6 +1,7 @@
 package com.leadboard.metrics.service;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.EpicBurndownResponse;
 import com.leadboard.metrics.dto.EpicBurndownResponse.BurndownPoint;
 import com.leadboard.sync.JiraIssueEntity;
@@ -11,98 +12,83 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class EpicBurndownService {
 
     private final JiraIssueRepository issueRepository;
     private final WorkCalendarService calendarService;
+    private final WorkflowConfigService workflowConfigService;
     private final JdbcTemplate jdbcTemplate;
 
     public EpicBurndownService(JiraIssueRepository issueRepository,
                                 WorkCalendarService calendarService,
+                                WorkflowConfigService workflowConfigService,
                                 JdbcTemplate jdbcTemplate) {
         this.issueRepository = issueRepository;
         this.calendarService = calendarService;
+        this.workflowConfigService = workflowConfigService;
         this.jdbcTemplate = jdbcTemplate;
     }
 
     /**
      * Calculate burndown chart data for an epic.
+     * Uses story-count based burndown: tracks remaining stories over time.
      */
     public EpicBurndownResponse calculateBurndown(String epicKey) {
-        // Get epic
         JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
                 .orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicKey));
 
-        // Get all subtasks for this epic (via stories)
-        List<JiraIssueEntity> subtasks = getEpicSubtasks(epicKey);
+        // Get all stories/bugs for this epic (direct children)
+        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epicKey).stream()
+                .filter(s -> workflowConfigService.isStoryOrBug(s.getIssueType()))
+                .toList();
 
-        if (subtasks.isEmpty()) {
+        if (stories.isEmpty()) {
             return new EpicBurndownResponse(
-                    epicKey,
-                    epic.getSummary(),
-                    null,
-                    null,
-                    0,
-                    List.of(),
-                    List.of()
-            );
+                    epicKey, epic.getSummary(), null, null, 0, List.of(), List.of());
         }
 
-        // Calculate total estimate
-        int totalEstimateSeconds = subtasks.stream()
-                .mapToInt(s -> s.getOriginalEstimateSeconds() != null ? s.getOriginalEstimateSeconds().intValue() : 0)
-                .sum();
-        int totalEstimateHours = totalEstimateSeconds / 3600;
+        int totalStories = stories.size();
 
         // Find date range
-        LocalDate startDate = subtasks.stream()
-                .filter(s -> s.getStartedAt() != null)
-                .map(s -> s.getStartedAt().toLocalDate())
+        LocalDate startDate = stories.stream()
+                .map(s -> {
+                    if (s.getStartedAt() != null) return s.getStartedAt().toLocalDate();
+                    if (s.getJiraCreatedAt() != null) return s.getJiraCreatedAt().toLocalDate();
+                    return LocalDate.now();
+                })
                 .min(LocalDate::compareTo)
-                .orElse(epic.getJiraCreatedAt() != null ? epic.getJiraCreatedAt().toLocalDate() : LocalDate.now());
+                .orElse(LocalDate.now());
 
         LocalDate endDate = epic.getDoneAt() != null
                 ? epic.getDoneAt().toLocalDate()
                 : LocalDate.now();
 
-        // If epic is not done, extend to today
-        if (epic.getDoneAt() == null && endDate.isBefore(LocalDate.now())) {
-            endDate = LocalDate.now();
+        if (endDate.isBefore(startDate)) {
+            endDate = startDate;
         }
 
-        // Build ideal burndown line (linear from total to 0)
-        List<BurndownPoint> idealLine = buildIdealLine(startDate, endDate, totalEstimateHours);
-
-        // Build actual burndown line based on time spent
-        List<BurndownPoint> actualLine = buildActualLine(epicKey, startDate, endDate, totalEstimateHours);
+        List<BurndownPoint> idealLine = buildIdealLine(startDate, endDate, totalStories);
+        List<BurndownPoint> actualLine = buildActualLine(stories, startDate, endDate, totalStories);
 
         return new EpicBurndownResponse(
-                epicKey,
-                epic.getSummary(),
-                startDate,
-                endDate,
-                totalEstimateHours,
-                idealLine,
-                actualLine
-        );
+                epicKey, epic.getSummary(), startDate, endDate, totalStories, idealLine, actualLine);
     }
 
     /**
-     * Get list of epics for a team (for selector).
+     * Get list of epics for a team (in-progress and closed).
      */
     public List<EpicInfo> getEpicsForTeam(Long teamId) {
         String sql = """
-            SELECT issue_key, summary, status, done_at
+            SELECT issue_key, summary, status, done_at, started_at
             FROM jira_issues
             WHERE team_id = ?
-              AND issue_type = 'Epic'
+              AND board_category = 'EPIC'
+              AND started_at IS NOT NULL
             ORDER BY
               CASE WHEN done_at IS NULL THEN 0 ELSE 1 END,
-              COALESCE(done_at, jira_created_at) DESC
+              COALESCE(done_at, started_at) DESC
             LIMIT 50
             """;
 
@@ -115,49 +101,28 @@ public class EpicBurndownService {
     }
 
     /**
-     * Get all subtasks under an epic (via stories).
+     * Build ideal burndown line (linear descent over working days).
      */
-    private List<JiraIssueEntity> getEpicSubtasks(String epicKey) {
-        // Get stories for this epic
-        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epicKey);
-
-        // Get subtasks for all stories
-        List<String> storyKeys = stories.stream()
-                .map(JiraIssueEntity::getIssueKey)
-                .collect(Collectors.toList());
-
-        if (storyKeys.isEmpty()) {
-            return List.of();
-        }
-
-        return issueRepository.findByParentKeyIn(storyKeys);
-    }
-
-    /**
-     * Build ideal burndown line (linear).
-     */
-    private List<BurndownPoint> buildIdealLine(LocalDate start, LocalDate end, int totalHours) {
+    private List<BurndownPoint> buildIdealLine(LocalDate start, LocalDate end, int totalItems) {
         List<BurndownPoint> points = new ArrayList<>();
 
         int workingDays = calendarService.countWorkdays(start, end);
         if (workingDays <= 0) {
-            points.add(new BurndownPoint(start, totalHours));
+            points.add(new BurndownPoint(start, totalItems));
             points.add(new BurndownPoint(end, 0));
             return points;
         }
 
-        double hoursPerDay = (double) totalHours / workingDays;
-
+        double itemsPerDay = (double) totalItems / workingDays;
         LocalDate current = start;
-        int remaining = totalHours;
         int workingDaysSoFar = 0;
 
         while (!current.isAfter(end)) {
             if (calendarService.isWorkday(current)) {
                 workingDaysSoFar++;
-                remaining = totalHours - (int) (hoursPerDay * workingDaysSoFar);
-                if (remaining < 0) remaining = 0;
             }
+            int remaining = totalItems - (int) (itemsPerDay * workingDaysSoFar);
+            if (remaining < 0) remaining = 0;
             points.add(new BurndownPoint(current, remaining));
             current = current.plusDays(1);
         }
@@ -166,38 +131,23 @@ public class EpicBurndownService {
     }
 
     /**
-     * Build actual burndown line based on time spent.
+     * Build actual burndown line based on story completion dates.
      */
-    private List<BurndownPoint> buildActualLine(String epicKey, LocalDate start, LocalDate end, int totalHours) {
-        // Get time spent by day
-        String sql = """
-            SELECT
-                DATE(COALESCE(st.done_at, st.updated_at)) as work_date,
-                SUM(st.time_spent_seconds) / 3600 as hours_spent
-            FROM jira_issues st
-            JOIN jira_issues s ON st.parent_key = s.issue_key
-            WHERE s.parent_key = ?
-              AND st.time_spent_seconds > 0
-            GROUP BY DATE(COALESCE(st.done_at, st.updated_at))
-            ORDER BY work_date
-            """;
+    private List<BurndownPoint> buildActualLine(List<JiraIssueEntity> stories,
+                                                 LocalDate start, LocalDate end, int total) {
+        List<LocalDate> doneDates = stories.stream()
+                .filter(s -> s.getDoneAt() != null)
+                .map(s -> s.getDoneAt().toLocalDate())
+                .sorted()
+                .toList();
 
-        Map<LocalDate, Integer> spentByDay = jdbcTemplate.query(sql, (rs, rowNum) -> {
-            java.sql.Date date = rs.getDate("work_date");
-            int hours = rs.getInt("hours_spent");
-            return Map.entry(date.toLocalDate(), hours);
-        }, epicKey).stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Integer::sum));
-
-        // Build actual line
         List<BurndownPoint> points = new ArrayList<>();
         LocalDate current = start;
-        int totalSpent = 0;
 
         while (!current.isAfter(end)) {
-            totalSpent += spentByDay.getOrDefault(current, 0);
-            int remaining = totalHours - totalSpent;
-            if (remaining < 0) remaining = 0;
+            LocalDate date = current;
+            long doneByDate = doneDates.stream().filter(d -> !d.isAfter(date)).count();
+            int remaining = total - (int) doneByDate;
             points.add(new BurndownPoint(current, remaining));
             current = current.plusDays(1);
         }

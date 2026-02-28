@@ -69,7 +69,7 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should generate authorization URL with required parameters")
         void shouldGenerateAuthorizationUrl() {
-            String url = oAuthService.getAuthorizationUrl();
+            String url = oAuthService.getAuthorizationUrl(null);
 
             assertNotNull(url);
             assertTrue(url.contains("https://auth.atlassian.com/authorize"));
@@ -82,7 +82,7 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should include audience parameter")
         void shouldIncludeAudience() {
-            String url = oAuthService.getAuthorizationUrl();
+            String url = oAuthService.getAuthorizationUrl(null);
 
             assertTrue(url.contains("audience=api.atlassian.com"));
         }
@@ -90,7 +90,7 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should include prompt consent")
         void shouldIncludePromptConsent() {
-            String url = oAuthService.getAuthorizationUrl();
+            String url = oAuthService.getAuthorizationUrl(null);
 
             assertTrue(url.contains("prompt=consent"));
         }
@@ -98,8 +98,8 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should generate unique states for concurrent flows")
         void shouldGenerateUniqueStates() {
-            String url1 = oAuthService.getAuthorizationUrl();
-            String url2 = oAuthService.getAuthorizationUrl();
+            String url1 = oAuthService.getAuthorizationUrl(null);
+            String url2 = oAuthService.getAuthorizationUrl(null);
 
             String state1 = extractParam(url1, "state");
             String state2 = extractParam(url2, "state");
@@ -123,7 +123,7 @@ class OAuthServiceTest {
         @Test
         @DisplayName("should reject invalid state")
         void shouldRejectInvalidState() {
-            oAuthService.getAuthorizationUrl();
+            oAuthService.getAuthorizationUrl(null);
 
             OAuthService.CallbackResult result = oAuthService.handleCallback("code", "wrong-state");
 

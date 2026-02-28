@@ -215,6 +215,64 @@ public class JiraMetadataService {
         }
     }
 
+    /**
+     * Gets custom fields from Jira, filtered by keyword (case-insensitive).
+     * Used for auto-detecting team field ID.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, Object>> getCustomFields(String keyword) {
+        String cacheKey = "custom_fields";
+        String cached = getCachedValue(cacheKey, 60);
+
+        List<Map<String, Object>> allFields;
+        if (cached != null) {
+            try {
+                allFields = objectMapper.readValue(cached, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse cached custom fields", e);
+                allFields = fetchCustomFieldsFromJira();
+            }
+        } else {
+            allFields = fetchCustomFieldsFromJira();
+        }
+
+        if (keyword == null || keyword.isBlank()) {
+            return allFields;
+        }
+
+        String lowerKeyword = keyword.toLowerCase();
+        return allFields.stream()
+                .filter(f -> {
+                    String name = (String) f.get("name");
+                    return name != null && name.toLowerCase().contains(lowerKeyword);
+                })
+                .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> fetchCustomFieldsFromJira() {
+        try {
+            List<Map<String, Object>> response = callJiraApiList("/rest/api/3/field");
+
+            List<Map<String, Object>> result = response.stream()
+                    .filter(f -> Boolean.TRUE.equals(f.get("custom")))
+                    .map(f -> {
+                        Map<String, Object> simplified = new LinkedHashMap<>();
+                        simplified.put("id", f.get("id"));
+                        simplified.put("name", f.get("name"));
+                        simplified.put("key", f.get("key"));
+                        return simplified;
+                    })
+                    .toList();
+
+            cacheValue("custom_fields", objectMapper.writeValueAsString(result));
+            return result;
+        } catch (Exception e) {
+            log.error("Failed to fetch custom fields from Jira", e);
+            return List.of();
+        }
+    }
+
     // ==================== Private helpers ====================
 
     @SuppressWarnings("unchecked")

@@ -260,7 +260,7 @@ export async function getVelocity(
 
 export interface BurndownPoint {
   date: string
-  remainingHours: number
+  remaining: number
 }
 
 export interface EpicBurndownResponse {
@@ -268,7 +268,7 @@ export interface EpicBurndownResponse {
   summary: string
   startDate: string | null
   endDate: string | null
-  totalEstimateHours: number
+  totalStories: number
   idealLine: BurndownPoint[]
   actualLine: BurndownPoint[]
 }

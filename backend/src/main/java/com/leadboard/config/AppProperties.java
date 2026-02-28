@@ -28,6 +28,7 @@ public class AppProperties {
         private String cookieName = "LEAD_SESSION";
         private int maxAgeDays = 30;
         private String cookieDomain;
+        private boolean cookieSecure = true;
 
         public String getCookieName() {
             return cookieName;
@@ -51,6 +52,14 @@ public class AppProperties {
 
         public void setCookieDomain(String cookieDomain) {
             this.cookieDomain = cookieDomain;
+        }
+
+        public boolean isCookieSecure() {
+            return cookieSecure;
+        }
+
+        public void setCookieSecure(boolean cookieSecure) {
+            this.cookieSecure = cookieSecure;
         }
     }
 }

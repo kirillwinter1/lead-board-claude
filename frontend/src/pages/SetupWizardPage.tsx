@@ -34,6 +34,10 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
   const [jiraTestResult, setJiraTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [jiraSaveError, setJiraSaveError] = useState<string | null>(null)
 
+  // Issue types for step 2
+  const [jiraIssueTypes, setJiraIssueTypes] = useState<Array<{ name: string; iconUrl?: string; subtask?: boolean }>>([])
+  const [loadingIssueTypes, setLoadingIssueTypes] = useState(false)
+
   const [syncing, setSyncing] = useState(false)
   const [syncDone, setSyncDone] = useState(false)
   const [syncError, setSyncError] = useState<string | null>(null)
@@ -65,6 +69,17 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
     localStorage.setItem(WIZARD_MONTHS_KEY, String(months))
   }, [months])
 
+  // Fetch issue types when entering step 2
+  useEffect(() => {
+    if (step === 2 && jiraIssueTypes.length === 0) {
+      setLoadingIssueTypes(true)
+      axios.get<Array<{ name: string; iconUrl?: string; subtask?: boolean }>>('/api/admin/jira-metadata/issue-types')
+        .then(res => setJiraIssueTypes(res.data))
+        .catch(() => {})
+        .finally(() => setLoadingIssueTypes(false))
+    }
+  }, [step])
+
   // Cleanup poll on unmount
   useEffect(() => {
     return () => {
@@ -80,9 +95,15 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
       jiraEmail: string
       hasApiToken: boolean
       projectKey: string
+      setupCompleted?: boolean
     }>('/api/jira-config')
       .then(res => {
         const d = res.data
+        // If setup already completed, skip wizard entirely
+        if (d.setupCompleted) {
+          onComplete()
+          return
+        }
         if (d.jiraBaseUrl) setJiraBaseUrl(d.jiraBaseUrl)
         if (d.jiraEmail) setJiraEmail(d.jiraEmail)
         if (d.projectKey) setProjectKey(d.projectKey)
@@ -190,9 +211,13 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
   }, [months])
 
   const handleComplete = useCallback(() => {
-    localStorage.removeItem(WIZARD_STEP_KEY)
-    localStorage.removeItem(WIZARD_MONTHS_KEY)
-    onComplete()
+    axios.post('/api/jira-config/setup-complete')
+      .catch(() => {})
+      .finally(() => {
+        localStorage.removeItem(WIZARD_STEP_KEY)
+        localStorage.removeItem(WIZARD_MONTHS_KEY)
+        onComplete()
+      })
   }, [onComplete])
 
   const renderStepper = () => (
@@ -327,6 +352,30 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
       <p style={{ fontSize: 12, color: '#97a0af', margin: '0 0 16px' }}>
         Recommended: 3–12 months. Set to 0 to sync all issues (may take longer).
       </p>
+
+      {loadingIssueTypes && (
+        <p style={{ fontSize: 13, color: '#6B778C' }}>Loading issue types from Jira...</p>
+      )}
+      {jiraIssueTypes.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, color: '#42526E' }}>
+            Issue types discovered in your Jira project:
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {jiraIssueTypes.map(t => (
+              <span key={t.name} style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', background: '#F4F5F7', borderRadius: 12,
+                fontSize: 13, color: '#42526E'
+              }}>
+                {t.iconUrl && <img src={t.iconUrl} alt="" style={{ width: 16, height: 16 }} />}
+                {t.name}
+                {t.subtask && <span style={{ fontSize: 10, color: '#97a0af' }}>(subtask)</span>}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {issueCount !== null && (
         <div className="wizard-issue-count">

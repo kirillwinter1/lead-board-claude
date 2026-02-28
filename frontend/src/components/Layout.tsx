@@ -4,6 +4,7 @@ import axios from 'axios'
 import logo from '../icons/logo.png'
 import { useAuth } from '../contexts/AuthContext'
 import { SetupWizardPage } from '../pages/SetupWizardPage'
+import { getTenantSlug } from '../utils/tenant'
 import './Header.css'
 
 declare const __APP_VERSION__: string
@@ -28,9 +29,9 @@ export function Layout() {
   // Check if initial setup is needed
   useEffect(() => {
     if (auth.authenticated) {
-      axios.get<SyncStatus>('/api/sync/status')
+      axios.get<SyncStatus & { setupCompleted?: boolean }>('/api/sync/status')
         .then(res => {
-          setSetupRequired(res.data.lastSyncCompletedAt === null)
+          setSetupRequired(!res.data.setupCompleted)
         })
         .catch(() => {
           setSetupRequired(false)
@@ -39,7 +40,9 @@ export function Layout() {
   }, [auth.authenticated])
 
   const handleLogin = () => {
-    window.location.href = '/oauth/atlassian/authorize'
+    const slug = getTenantSlug()
+    const params = slug ? `?tenant=${encodeURIComponent(slug)}` : ''
+    window.location.href = `/oauth/atlassian/authorize${params}`
   }
 
   const showWizard = auth.authenticated && setupRequired === true

@@ -7,6 +7,7 @@ app:
     cookie-name: LEAD_SESSION
     max-age-days: 30
     cookie-domain: ${APP_SESSION_COOKIE_DOMAIN:}
+    cookie-secure: ${APP_SESSION_COOKIE_SECURE:false}
 
 # CORS configuration
 cors:

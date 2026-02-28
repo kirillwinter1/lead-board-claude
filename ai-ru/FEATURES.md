@@ -46,6 +46,7 @@
 | F44 | Multi-Tenancy & SaaS Packaging | 2026-02-23 | [features/F44](features/F44_MULTITENANCY.md) |
 | F45 | Гибридный таймлайн | 2026-02-23 | [features/F45](features/F45_HYBRID_TIMELINE.md) |
 | F46 | Security Hardening | 2026-02-25 | [features/F46](features/F46_SECURITY_HARDENING.md) |
+| F47 | Setup Wizard Improvements | 2026-02-28 | [features/F47](features/F47_SETUP_WIZARD_IMPROVEMENTS.md) |
 
 ## Бэклог (BF)
 

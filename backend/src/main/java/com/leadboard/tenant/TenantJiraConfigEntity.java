@@ -47,6 +47,9 @@ public class TenantJiraConfigEntity {
     @Column(name = "connected_by_user_id")
     private Long connectedByUserId;
 
+    @Column(name = "setup_completed", nullable = false)
+    private boolean setupCompleted = false;
+
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
@@ -109,6 +112,9 @@ public class TenantJiraConfigEntity {
 
     public Long getConnectedByUserId() { return connectedByUserId; }
     public void setConnectedByUserId(Long connectedByUserId) { this.connectedByUserId = connectedByUserId; }
+
+    public boolean isSetupCompleted() { return setupCompleted; }
+    public void setSetupCompleted(boolean setupCompleted) { this.setupCompleted = setupCompleted; }
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }

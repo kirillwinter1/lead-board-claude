@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
-import { setDevTenantSlug } from '../utils/tenant';
+import { setTenantSlug } from '../utils/tenant';
 
 export default function RegistrationPage() {
     const [name, setName] = useState('');
@@ -63,14 +63,8 @@ export default function RegistrationPage() {
 
         try {
             const { data } = await axios.post('/api/public/tenants/register', { name, slug });
-            // Dev mode (localhost): set tenant slug and redirect to /board
-            const host = window.location.hostname;
-            if (host === 'localhost' || host === '127.0.0.1') {
-                setDevTenantSlug(data.slug);
-                window.location.href = '/board';
-            } else if (data.redirectUrl) {
-                window.location.href = data.redirectUrl;
-            }
+            setTenantSlug(data.slug);
+            window.location.href = '/';
         } catch (err: unknown) {
             const axiosErr = err as { response?: { data?: { error?: string } } };
             setError(axiosErr.response?.data?.error || 'Registration failed');

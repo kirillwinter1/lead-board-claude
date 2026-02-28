@@ -1,6 +1,7 @@
 package com.leadboard.tenant;
 
 import com.leadboard.config.JiraConfigResolver;
+import com.leadboard.config.service.JiraMetadataService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -23,11 +24,14 @@ public class TenantJiraConfigController {
 
     private final TenantJiraConfigRepository configRepository;
     private final JiraConfigResolver jiraConfigResolver;
+    private final JiraMetadataService metadataService;
 
     public TenantJiraConfigController(TenantJiraConfigRepository configRepository,
-                                       JiraConfigResolver jiraConfigResolver) {
+                                       JiraConfigResolver jiraConfigResolver,
+                                       JiraMetadataService metadataService) {
         this.configRepository = configRepository;
         this.jiraConfigResolver = jiraConfigResolver;
+        this.metadataService = metadataService;
     }
 
     @GetMapping
@@ -55,18 +59,19 @@ public class TenantJiraConfigController {
         }
 
         TenantJiraConfigEntity config = configOpt.get();
-        return ResponseEntity.ok(Map.of(
-                "configured", true,
-                "id", config.getId(),
-                "jiraBaseUrl", nullToEmpty(config.getJiraBaseUrl()),
-                "jiraEmail", nullToEmpty(config.getJiraEmail()),
-                "hasApiToken", config.getJiraApiToken() != null && !config.getJiraApiToken().isBlank(),
-                "projectKey", nullToEmpty(config.getProjectKeys()),
-                "teamFieldId", nullToEmpty(config.getTeamFieldId()),
-                "organizationId", nullToEmpty(config.getOrganizationId()),
-                "syncIntervalSeconds", config.getSyncIntervalSeconds(),
-                "manualTeamManagement", config.isManualTeamManagement()
-        ));
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("configured", true);
+        result.put("id", config.getId());
+        result.put("jiraBaseUrl", nullToEmpty(config.getJiraBaseUrl()));
+        result.put("jiraEmail", nullToEmpty(config.getJiraEmail()));
+        result.put("hasApiToken", config.getJiraApiToken() != null && !config.getJiraApiToken().isBlank());
+        result.put("projectKey", nullToEmpty(config.getProjectKeys()));
+        result.put("teamFieldId", nullToEmpty(config.getTeamFieldId()));
+        result.put("organizationId", nullToEmpty(config.getOrganizationId()));
+        result.put("syncIntervalSeconds", config.getSyncIntervalSeconds());
+        result.put("manualTeamManagement", config.isManualTeamManagement());
+        result.put("setupCompleted", config.isSetupCompleted());
+        return ResponseEntity.ok(result);
     }
 
     @PutMapping
@@ -101,11 +106,45 @@ public class TenantJiraConfigController {
         config = configRepository.save(config);
         log.info("Jira config saved: baseUrl={}, project={}", config.getJiraBaseUrl(), config.getProjectKeys());
 
+        // Auto-detect team field if not set
+        if (config.getTeamFieldId() == null || config.getTeamFieldId().isBlank()) {
+            try {
+                var teamFields = metadataService.getCustomFields("team");
+                if (teamFields.size() == 1) {
+                    String detectedId = (String) teamFields.get(0).get("id");
+                    config.setTeamFieldId(detectedId);
+                    configRepository.save(config);
+                    log.info("Auto-detected team field: {} ({})", teamFields.get(0).get("name"), detectedId);
+                } else {
+                    log.info("Team field auto-detect: found {} matches, skipping", teamFields.size());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to auto-detect team field: {}", e.getMessage());
+            }
+        }
+
         return ResponseEntity.ok(Map.of(
                 "id", config.getId(),
                 "configured", true,
                 "message", "Jira configuration saved"
         ));
+    }
+
+    @PostMapping("/setup-complete")
+    public ResponseEntity<?> markSetupComplete() {
+        try {
+            TenantJiraConfigEntity config = configRepository.findActive().orElse(null);
+            if (config == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "No Jira config found"));
+            }
+            config.setSetupCompleted(true);
+            configRepository.save(config);
+            log.info("Setup wizard marked as completed");
+            return ResponseEntity.ok(Map.of("setupCompleted", true));
+        } catch (Exception e) {
+            log.error("Failed to mark setup as completed", e);
+            return ResponseEntity.internalServerError().body(Map.of("error", "Failed to complete setup"));
+        }
     }
 
     @PostMapping("/test")

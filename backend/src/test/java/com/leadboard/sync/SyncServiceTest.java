@@ -14,6 +14,7 @@ import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import com.leadboard.team.TeamSyncService;
+import com.leadboard.tenant.TenantJiraConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -85,6 +86,9 @@ class SyncServiceTest {
     @Mock
     private TeamSyncService teamSyncService;
 
+    @Mock
+    private TenantJiraConfigRepository tenantJiraConfigRepository;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -104,6 +108,7 @@ class SyncServiceTest {
                 autoDetectService,
                 changelogImportService,
                 teamSyncService,
+                tenantJiraConfigRepository,
                 null // self (not needed for unit tests, @Async not invoked via proxy)
         );
 

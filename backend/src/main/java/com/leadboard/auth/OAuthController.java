@@ -12,9 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.Arrays;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("/oauth/atlassian")
@@ -33,9 +31,23 @@ public class OAuthController {
     }
 
     @GetMapping("/authorize")
-    public void authorize(HttpServletResponse response) throws IOException {
-        String authUrl = oauthService.getAuthorizationUrl();
+    public void authorize(
+            @RequestParam(value = "tenant", required = false) String tenantSlug,
+            HttpServletResponse response) throws IOException {
+        // Browser navigation doesn't send X-Tenant-Slug header,
+        // so tenant slug is passed as query param
+        Long tenantId = resolveTenantId(tenantSlug);
+        String authUrl = oauthService.getAuthorizationUrl(tenantId);
         response.sendRedirect(authUrl);
+    }
+
+    private Long resolveTenantId(String slug) {
+        // 1. Try query param
+        if (slug != null && !slug.isBlank()) {
+            return tenantService.findBySlug(slug.trim()).map(TenantEntity::getId).orElse(null);
+        }
+        // 2. Fall back to TenantContext (set by TenantFilter from subdomain/header)
+        return com.leadboard.tenant.TenantContext.getCurrentTenantId();
     }
 
     @GetMapping("/callback")
@@ -65,7 +77,7 @@ public class OAuthController {
 
     @GetMapping("/login-url")
     public ResponseEntity<LoginUrlResponse> getLoginUrl() {
-        String url = oauthService.getAuthorizationUrl();
+        String url = oauthService.getAuthorizationUrl(null);
         return ResponseEntity.ok(new LoginUrlResponse(url));
     }
 
@@ -78,35 +90,11 @@ public class OAuthController {
     }
 
     /**
-     * Build redirect URL for the tenant's subdomain.
-     * If tenantId is present, redirects to https://{slug}.{baseDomain}
-     * Otherwise falls back to the configured frontendUrl.
+     * Returns the configured frontend URL for redirect after OAuth callback.
+     * Tenant context is handled by the frontend (localStorage / subdomain).
      */
     private String buildTenantRedirectUrl(Long tenantId) {
-        String frontendUrl = appProperties.getFrontendUrl();
-
-        if (tenantId == null) {
-            return frontendUrl;
-        }
-
-        Optional<TenantEntity> tenantOpt = tenantService.findById(tenantId);
-        if (tenantOpt.isEmpty()) {
-            return frontendUrl;
-        }
-
-        String slug = tenantOpt.get().getSlug();
-        try {
-            URI base = URI.create(frontendUrl);
-            String host = base.getHost();
-            // Construct subdomain URL: https://slug.onelane.ru
-            String tenantHost = slug + "." + host;
-            String tenantUrl = base.getScheme() + "://" + tenantHost;
-            log.info("Tenant redirect URL: {}", tenantUrl);
-            return tenantUrl;
-        } catch (Exception e) {
-            log.warn("Failed to build tenant redirect URL for slug '{}', falling back to frontendUrl", slug, e);
-            return frontendUrl;
-        }
+        return appProperties.getFrontendUrl();
     }
 
     private void addSessionCookie(HttpServletResponse response, String sessionId) {
@@ -116,7 +104,7 @@ public class OAuthController {
 
         Cookie cookie = new Cookie(cookieName, sessionId);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(appProperties.getSession().isCookieSecure());
         cookie.setPath("/");
         cookie.setMaxAge(maxAgeSeconds);
         cookie.setAttribute("SameSite", "Lax");

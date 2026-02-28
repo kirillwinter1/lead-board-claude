@@ -429,6 +429,138 @@ function suggestLinkTypes(jiraLinks: JiraLinkTypeMetadata[]): LinkTypeMappingDto
   })
 }
 
+// --- Epic Link Mode Section ---
+
+function EpicLinkModeSection({ epicLinkType, setEpicLinkType, epicLinkName, setEpicLinkName,
+  jiraLinkTypes, saving, setSaving, setError, showSaveSuccess, refreshWorkflowContext }: {
+  epicLinkType: string; setEpicLinkType: (v: string) => void
+  epicLinkName: string; setEpicLinkName: (v: string) => void
+  jiraLinkTypes: JiraLinkTypeMetadata[]
+  saving: boolean; setSaving: (v: boolean) => void
+  setError: (v: string | null) => void
+  showSaveSuccess: (msg: string) => void
+  refreshWorkflowContext: () => void
+}) {
+  const [detectResult, setDetectResult] = useState<{
+    detected: boolean; epicLinkType?: string; epicLinkName?: string; parentCount?: number; linkCount?: number; reason?: string
+  } | null>(null)
+  const [detecting, setDetecting] = useState(false)
+
+  useEffect(() => {
+    setDetecting(true)
+    axios.get<{ detected: boolean; epicLinkType?: string; epicLinkName?: string; parentCount?: number; linkCount?: number; reason?: string }>(
+      '/api/admin/workflow-config/detect-epic-link'
+    )
+      .then(res => setDetectResult(res.data))
+      .catch(() => {})
+      .finally(() => setDetecting(false))
+  }, [])
+
+  const applyDetected = () => {
+    if (!detectResult?.detected || !detectResult.epicLinkType) return
+    setEpicLinkType(detectResult.epicLinkType)
+    if (detectResult.epicLinkType === 'parent') {
+      setEpicLinkName('')
+    } else if (detectResult.epicLinkName) {
+      setEpicLinkName(detectResult.epicLinkName)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 24, padding: '16px 20px', background: '#F4F5F7', borderRadius: 8 }}>
+      <h3 style={{ margin: '0 0 12px', fontSize: 14, color: '#172B4D' }}>Project → Epic Link Mode</h3>
+
+      {detecting && <p style={{ fontSize: 13, color: '#6B778C' }}>Analyzing synced data...</p>}
+
+      {detectResult?.detected && (
+        <div style={{
+          marginBottom: 12, padding: '8px 14px', borderRadius: 6, fontSize: 13,
+          background: '#E3FCEF', border: '1px solid #ABF5D1', display: 'flex', alignItems: 'center', gap: 8
+        }}>
+          <span>
+            Detected: <strong>{detectResult.epicLinkType === 'parent' ? 'Parent' : 'Issue Link'}</strong>
+            {detectResult.epicLinkName && <> — <strong>{detectResult.epicLinkName}</strong></>}
+            {' '}({detectResult.parentCount} parent, {detectResult.linkCount} issue link connections)
+          </span>
+          {(detectResult.epicLinkType !== epicLinkType || (detectResult.epicLinkName && detectResult.epicLinkName !== epicLinkName)) && (
+            <button
+              className="btn btn-secondary"
+              style={{ fontSize: 12, padding: '2px 10px', marginLeft: 8 }}
+              onClick={applyDetected}
+            >
+              Apply
+            </button>
+          )}
+        </div>
+      )}
+
+      {detectResult && !detectResult.detected && (
+        <div style={{
+          marginBottom: 12, padding: '8px 14px', borderRadius: 6, fontSize: 13,
+          background: '#FFFBE6', border: '1px solid #FFE58F'
+        }}>
+          {detectResult.reason || 'Could not auto-detect link mode. Configure manually below.'}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+          <span>Link Type:</span>
+          <select
+            className="workflow-select"
+            value={epicLinkType}
+            onChange={e => setEpicLinkType(e.target.value)}
+            style={{ width: 140 }}
+          >
+            <option value="parent">Parent (default)</option>
+            <option value="issuelink">Issue Link</option>
+          </select>
+        </label>
+        {epicLinkType === 'issuelink' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
+            <span>Link Name:</span>
+            <select
+              className="workflow-select"
+              value={epicLinkName}
+              onChange={e => setEpicLinkName(e.target.value)}
+              style={{ width: 240 }}
+            >
+              <option value="">-- select link --</option>
+              {jiraLinkTypes.flatMap(lt => [
+                { value: lt.inward, label: `${lt.name}: ${lt.inward}` },
+                { value: lt.outward, label: `${lt.name}: ${lt.outward}` },
+              ]).map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
+        <button
+          className="btn btn-secondary"
+          style={{ fontSize: 13, padding: '4px 12px' }}
+          onClick={async () => {
+            try {
+              setSaving(true)
+              await axios.put('/api/admin/workflow-config', { epicLinkType, epicLinkName: epicLinkName || null })
+              refreshWorkflowContext()
+              showSaveSuccess('Epic link config saved')
+            } catch { setError('Failed to save epic link config') }
+            finally { setSaving(false) }
+          }}
+          disabled={saving}
+        >
+          Save Link Config
+        </button>
+      </div>
+      <div style={{ marginTop: 8, fontSize: 12, color: '#6B778C' }}>
+        {epicLinkType === 'parent'
+          ? 'Epics are linked to Projects via Jira parent field (Project is the parent of Epic).'
+          : 'Epics are linked to Projects via Jira issue links. Specify the link name used in your Jira project.'}
+      </div>
+    </div>
+  )
+}
+
 // --- Component ---
 
 interface WorkflowConfigPageProps {
@@ -436,7 +568,7 @@ interface WorkflowConfigPageProps {
 }
 
 export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {}) {
-  const { refresh: refreshWorkflowContext } = useWorkflowConfig()
+  const { refresh: refreshWorkflowContext, getIssueTypeIconUrl } = useWorkflowConfig()
   const [config, setConfig] = useState<WorkflowConfigResponse | null>(null)
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
     const params = new URLSearchParams(window.location.search)
@@ -476,6 +608,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const [wizardLinkTypes, setWizardLinkTypes] = useState<LinkTypeMappingDto[]>([])
   const [wizardJiraIssueTypes, setWizardJiraIssueTypes] = useState<JiraIssueTypeMetadata[]>([])
   const [wizardJiraLinkTypes, setWizardJiraLinkTypes] = useState<JiraLinkTypeMetadata[]>([])
+  const [jiraIssueTypesMetadata, setJiraIssueTypesMetadata] = useState<JiraIssueTypeMetadata[]>([])
+  const [jiraLinkTypesMetadata, setJiraLinkTypesMetadata] = useState<JiraLinkTypeMetadata[]>([])
   const [wizardStatusFilter, setWizardStatusFilter] = useState<string>('EPIC')
 
   useEffect(() => {
@@ -496,19 +630,34 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     try {
       setLoading(true)
       setError(null)
-      const [data, counts] = await Promise.all([
+      const [data, counts, jiraMeta, jiraLinks] = await Promise.all([
         workflowConfigApi.getConfig(),
         workflowConfigApi.getStatusIssueCounts().catch(() => [] as StatusIssueCountDto[]),
+        workflowConfigApi.fetchJiraIssueTypes().catch(() => [] as JiraIssueTypeMetadata[]),
+        workflowConfigApi.fetchJiraLinkTypes().catch(() => [] as JiraLinkTypeMetadata[]),
       ])
       if (signal?.aborted) return
       setConfig(data)
       setRoles(data.roles)
-      setIssueTypes(data.issueTypes)
       setStatuses(data.statuses)
       setLinkTypes(data.linkTypes)
       setIssueCounts(counts)
       setEpicLinkType(data.epicLinkType || 'parent')
       setEpicLinkName(data.epicLinkName || '')
+      setJiraIssueTypesMetadata(jiraMeta)
+      setJiraLinkTypesMetadata(jiraLinks)
+
+      // Merge: ensure all Jira issue types are present in issueTypes
+      const existingNames = new Set(data.issueTypes.map(t => t.jiraTypeName))
+      const missing = jiraMeta
+        .filter(jt => !existingNames.has(jt.name))
+        .map(jt => ({
+          id: null,
+          jiraTypeName: jt.name,
+          boardCategory: null,
+          workflowRoleCode: null,
+        } as IssueTypeMappingDto))
+      setIssueTypes([...data.issueTypes, ...missing])
     } catch (err) {
       if (signal?.aborted) return
       setError('Failed to load workflow configuration')
@@ -614,12 +763,6 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   }
 
   // -- Issue Type helpers --
-  const addIssueType = () => {
-    setIssueTypes([...issueTypes, {
-      id: null, jiraTypeName: '', boardCategory: 'IGNORE', workflowRoleCode: null,
-    }])
-  }
-
   const [detectingType, setDetectingType] = useState<string | null>(null)
 
   const updateIssueType = (index: number, field: keyof IssueTypeMappingDto, value: any) => {
@@ -645,6 +788,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const handleDetectStatuses = async (typeName: string, boardCategory: string) => {
     try {
       setDetectingType(typeName)
+      // Save all issue types first (ensures new types from Jira metadata merge exist in DB)
+      const currentTypes = issueTypes.map(t =>
+        t.jiraTypeName === typeName ? { ...t, boardCategory } as IssueTypeMappingDto : t
+      )
+      await workflowConfigApi.updateIssueTypes(currentTypes)
       const result = await workflowConfigApi.detectStatusesForType(typeName, boardCategory)
       showSaveSuccess(`Mapped "${typeName}" → ${boardCategory}, detected ${result.statusesDetected} statuses`)
       // Reload config to get updated data
@@ -655,10 +803,6 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     } finally {
       setDetectingType(null)
     }
-  }
-
-  const deleteIssueType = (index: number) => {
-    setIssueTypes(issueTypes.filter((_, i) => i !== index))
   }
 
   // -- Status helpers --
@@ -1141,12 +1285,79 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     )
   }
 
+  function renderRolePipelinePreview(rolesList: WorkflowRoleDto[]) {
+    const withCode = rolesList.filter(r => r.code)
+    if (withCode.length === 0) return null
+
+    // Group by sortOrder
+    const groups = new Map<number, WorkflowRoleDto[]>()
+    for (const role of withCode) {
+      const list = groups.get(role.sortOrder) || []
+      list.push(role)
+      groups.set(role.sortOrder, list)
+    }
+    const sortedOrders = Array.from(groups.keys()).sort((a, b) => a - b)
+    const hasParallel = Array.from(groups.values()).some(g => g.length > 1)
+
+    const renderBadge = (role: WorkflowRoleDto) => (
+      <span key={role.code} style={{
+        display: 'inline-block', padding: '2px 8px', borderRadius: 10,
+        fontSize: 12, fontWeight: 600, color: '#fff',
+        backgroundColor: role.color || '#6B778C'
+      }}>
+        {role.code}
+      </span>
+    )
+
+    return (
+      <div style={{ margin: '12px 0 4px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12, color: '#6B778C', marginRight: 4 }}>Pipeline:</span>
+          {sortedOrders.map((order, i) => {
+            const group = groups.get(order)!
+            const isParallel = group.length > 1
+            return (
+              <span key={order} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                {i > 0 && <span style={{ color: '#97a0af', fontSize: 14 }}>{'\u2192'}</span>}
+                {isParallel ? (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 6px', border: '1px dashed #E2B203', borderRadius: 12,
+                    background: '#FFFBE6'
+                  }}>
+                    {group.map((role, j) => (
+                      <span key={role.code} style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        {j > 0 && <span style={{ color: '#97a0af', fontSize: 11 }}>{'|'}</span>}
+                        {renderBadge(role)}
+                      </span>
+                    ))}
+                  </span>
+                ) : renderBadge(group[0])}
+              </span>
+            )
+          })}
+        </div>
+        {hasParallel && (
+          <div style={{ marginTop: 6, fontSize: 12, color: '#B45309', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {'\u26A0'} Roles with the same sort order run in parallel — forecasts assume they start simultaneously.
+          </div>
+        )}
+      </div>
+    )
+  }
+
   function renderWizardRoles() {
+    const sortedWizardRoles = wizardRoles
+      .map((role, originalIdx) => ({ role, originalIdx }))
+      .sort((a, b) => a.role.sortOrder - b.role.sortOrder)
+
     return (
       <>
         <div className="wizard-info-block">
           Роли отражают типы работ в команде (анализ, разработка, тестирование).
           OneLane использует роли для расчёта прогресса и прогноза сроков.
+          <br /><br />
+          <strong>Sort order defines the pipeline sequence</strong> — tasks are processed in this order (e.g. Analysis → Development → Testing).
         </div>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
@@ -1160,13 +1371,13 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
               </tr>
             </thead>
             <tbody>
-              {wizardRoles.map((role, idx) => (
-                <tr key={idx}>
+              {sortedWizardRoles.map(({ role, originalIdx }) => (
+                <tr key={originalIdx}>
                   <td>
                     <input
                       className="workflow-input"
                       value={role.code}
-                      onChange={e => updateWizardRole(idx, 'code', e.target.value.toUpperCase())}
+                      onChange={e => updateWizardRole(originalIdx, 'code', e.target.value.toUpperCase())}
                       placeholder="e.g. DEV"
                       style={{ width: 100 }}
                     />
@@ -1175,14 +1386,14 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                     <input
                       className="workflow-input"
                       value={role.displayName}
-                      onChange={e => updateWizardRole(idx, 'displayName', e.target.value)}
+                      onChange={e => updateWizardRole(originalIdx, 'displayName', e.target.value)}
                       placeholder="e.g. Development"
                     />
                   </td>
                   <td>
                     <ColorPicker
                       value={role.color}
-                      onChange={color => updateWizardRole(idx, 'color', color)}
+                      onChange={color => updateWizardRole(originalIdx, 'color', color)}
                     />
                   </td>
                   <td>
@@ -1190,12 +1401,12 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                       type="number"
                       className="workflow-input"
                       value={role.sortOrder}
-                      onChange={e => updateWizardRole(idx, 'sortOrder', parseInt(e.target.value) || 0)}
+                      onChange={e => updateWizardRole(originalIdx, 'sortOrder', parseInt(e.target.value) || 0)}
                       min={0}
                     />
                   </td>
                   <td>
-                    <button className="btn-danger-text" onClick={() => deleteWizardRole(idx)}>
+                    <button className="btn-danger-text" onClick={() => deleteWizardRole(originalIdx)}>
                       Delete
                     </button>
                   </td>
@@ -1207,6 +1418,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
             </tbody>
           </table>
         </div>
+        {renderRolePipelinePreview(wizardRoles)}
         <div className="workflow-actions">
           <button className="btn btn-secondary" onClick={addWizardRole}>Add Role</button>
         </div>
@@ -1445,8 +1657,15 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   // --- Tab rendering ---
 
   function renderRolesTab() {
+    const sortedRoles = roles
+      .map((role, originalIdx) => ({ role, originalIdx }))
+      .sort((a, b) => a.role.sortOrder - b.role.sortOrder)
+
     return (
       <>
+        <p style={{ fontSize: 13, color: '#6B778C', margin: '0 0 12px' }}>
+          Sort order defines the pipeline sequence — tasks are processed in this order.
+        </p>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
             <thead>
@@ -1459,13 +1678,13 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
               </tr>
             </thead>
             <tbody>
-              {roles.map((role, idx) => (
-                <tr key={role.id ?? `new-${idx}`}>
+              {sortedRoles.map(({ role, originalIdx }) => (
+                <tr key={role.id ?? `new-${originalIdx}`}>
                   <td>
                     <input
                       className="workflow-input"
                       value={role.code}
-                      onChange={e => updateRole(idx, 'code', e.target.value.toUpperCase())}
+                      onChange={e => updateRole(originalIdx, 'code', e.target.value.toUpperCase())}
                       placeholder="e.g. DEV"
                       style={{ width: 100 }}
                     />
@@ -1474,14 +1693,14 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                     <input
                       className="workflow-input"
                       value={role.displayName}
-                      onChange={e => updateRole(idx, 'displayName', e.target.value)}
+                      onChange={e => updateRole(originalIdx, 'displayName', e.target.value)}
                       placeholder="e.g. Development"
                     />
                   </td>
                   <td>
                     <ColorPicker
                       value={role.color}
-                      onChange={color => updateRole(idx, 'color', color)}
+                      onChange={color => updateRole(originalIdx, 'color', color)}
                     />
                   </td>
                   <td>
@@ -1489,12 +1708,12 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                       type="number"
                       className="workflow-input"
                       value={role.sortOrder}
-                      onChange={e => updateRole(idx, 'sortOrder', parseInt(e.target.value) || 0)}
+                      onChange={e => updateRole(originalIdx, 'sortOrder', parseInt(e.target.value) || 0)}
                       min={0}
                     />
                   </td>
                   <td>
-                    <button className="btn-danger-text" onClick={() => deleteRole(idx)}>
+                    <button className="btn-danger-text" onClick={() => deleteRole(originalIdx)}>
                       Delete
                     </button>
                   </td>
@@ -1506,6 +1725,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
             </tbody>
           </table>
         </div>
+        {renderRolePipelinePreview(roles)}
         <div className="workflow-actions">
           <button className="btn btn-secondary" onClick={addRole}>Add Role</button>
           <button className="btn btn-primary" onClick={handleSaveRoles} disabled={saving}>
@@ -1526,12 +1746,16 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       return a.it.jiraTypeName.localeCompare(b.it.jiraTypeName)
     })
 
+    const getIconUrl = (typeName: string) => {
+      const meta = jiraIssueTypesMetadata.find(j => j.name === typeName)
+      return meta?.iconUrl || getIssueTypeIconUrl(typeName)
+    }
+
     return (
       <>
         {unmappedCount > 0 && (
           <div style={{ marginBottom: 16, padding: '10px 16px', background: '#FFF7E6', border: '1px solid #FFE58F', borderRadius: 6, fontSize: 13 }}>
-            <strong>{unmappedCount} unmapped issue type{unmappedCount > 1 ? 's' : ''}</strong> discovered during sync.
-            Select a Board Category to configure — statuses will be auto-detected from Jira.
+            <strong>{unmappedCount} unmapped issue type{unmappedCount > 1 ? 's' : ''}</strong> — select a Board Category to configure.
           </div>
         )}
         <div className="workflow-table-wrapper">
@@ -1541,7 +1765,6 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                 <th>Jira Type Name</th>
                 <th>Board Category</th>
                 <th>Workflow Role</th>
-                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1552,12 +1775,10 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                   <tr key={it.id ?? `new-${originalIdx}`} style={isUnmapped ? { backgroundColor: '#FFFBE6' } : undefined}>
                     <td>
                       <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <input
-                          className="workflow-input"
-                          value={it.jiraTypeName}
-                          onChange={e => updateIssueType(originalIdx, 'jiraTypeName', e.target.value)}
-                          placeholder="e.g. Story"
-                        />
+                        {getIconUrl(it.jiraTypeName) && (
+                          <img src={getIconUrl(it.jiraTypeName)!} alt="" width={16} height={16} style={{ flexShrink: 0 }} />
+                        )}
+                        <strong style={{ fontSize: 13 }}>{it.jiraTypeName}</strong>
                         {isUnmapped && (
                           <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: '#E2B203', borderRadius: 8, padding: '1px 7px', whiteSpace: 'nowrap' }}>NEW</span>
                         )}
@@ -1573,7 +1794,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                         onChange={e => updateIssueType(originalIdx, 'boardCategory', e.target.value)}
                         disabled={isDetecting}
                       >
-                        {(isUnmapped ? BOARD_CATEGORIES_WITH_UNMAPPED : BOARD_CATEGORIES).map(c => (
+                        {BOARD_CATEGORIES_WITH_UNMAPPED.map(c => (
                           <option key={c} value={c}>{c === '' ? '-- unmapped --' : c}</option>
                         ))}
                       </select>
@@ -1594,78 +1815,34 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                         <span style={{ color: '#6B778C', fontSize: 13 }}>N/A</span>
                       )}
                     </td>
-                    <td>
-                      <button className="btn-danger-text" onClick={() => deleteIssueType(originalIdx)}>
-                        Delete
-                      </button>
-                    </td>
                   </tr>
                 )
               })}
               {issueTypes.length === 0 && (
-                <tr><td colSpan={4} style={{ textAlign: 'center', color: '#6B778C' }}>No issue types configured</td></tr>
+                <tr><td colSpan={3} style={{ textAlign: 'center', color: '#6B778C' }}>No issue types found. Run sync to discover types from Jira.</td></tr>
               )}
             </tbody>
           </table>
         </div>
         <div className="workflow-actions">
-          <button className="btn btn-secondary" onClick={addIssueType}>Add Issue Type</button>
           <button className="btn btn-primary" onClick={handleSaveIssueTypes} disabled={saving}>
             {saving ? 'Saving...' : 'Save Issue Types'}
           </button>
         </div>
 
         {issueTypes.some(t => t.boardCategory === 'PROJECT') && (
-          <div style={{ marginTop: 24, padding: '16px 20px', background: '#F4F5F7', borderRadius: 8 }}>
-            <h3 style={{ margin: '0 0 12px', fontSize: 14, color: '#172B4D' }}>Project → Epic Link Mode</h3>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                <span>Link Type:</span>
-                <select
-                  className="workflow-select"
-                  value={epicLinkType}
-                  onChange={e => setEpicLinkType(e.target.value)}
-                  style={{ width: 140 }}
-                >
-                  <option value="parent">Parent (default)</option>
-                  <option value="issuelink">Issue Link</option>
-                </select>
-              </label>
-              {epicLinkType === 'issuelink' && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-                  <span>Link Name:</span>
-                  <input
-                    className="workflow-input"
-                    value={epicLinkName}
-                    onChange={e => setEpicLinkName(e.target.value)}
-                    placeholder="e.g. is child of"
-                    style={{ width: 200 }}
-                  />
-                </label>
-              )}
-              <button
-                className="btn btn-secondary"
-                style={{ fontSize: 13, padding: '4px 12px' }}
-                onClick={async () => {
-                  try {
-                    setSaving(true)
-                    await axios.put('/api/admin/workflow-config', { epicLinkType, epicLinkName: epicLinkName || null })
-                    refreshWorkflowContext()
-                    showSaveSuccess('Epic link config saved')
-                  } catch { setError('Failed to save epic link config') }
-                  finally { setSaving(false) }
-                }}
-                disabled={saving}
-              >
-                Save Link Config
-              </button>
-            </div>
-            <div style={{ marginTop: 8, fontSize: 12, color: '#6B778C' }}>
-              {epicLinkType === 'parent'
-                ? 'Epics are linked to Projects via Jira parent field (Project is the parent of Epic).'
-                : 'Epics are linked to Projects via Jira issue links. Specify the link name used in your Jira project.'}
-            </div>
-          </div>
+          <EpicLinkModeSection
+            epicLinkType={epicLinkType}
+            setEpicLinkType={setEpicLinkType}
+            epicLinkName={epicLinkName}
+            setEpicLinkName={setEpicLinkName}
+            jiraLinkTypes={jiraLinkTypesMetadata}
+            saving={saving}
+            setSaving={setSaving}
+            setError={setError}
+            showSaveSuccess={showSaveSuccess}
+            refreshWorkflowContext={refreshWorkflowContext}
+          />
         )}
       </>
     )

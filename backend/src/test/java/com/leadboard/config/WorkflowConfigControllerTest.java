@@ -69,6 +69,8 @@ class WorkflowConfigControllerTest {
     private TenantUserRepository tenantUserRepository;
     @MockBean
     private TenantRepository tenantRepository;
+    @MockBean
+    private com.leadboard.jira.JiraClient jiraClient;
 
     @Test
     void getConfig_returnsFullConfiguration() throws Exception {

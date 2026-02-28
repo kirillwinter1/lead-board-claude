@@ -60,9 +60,11 @@ public class OAuthService {
 
     private record OAuthState(Instant expiry, Long tenantId) {}
 
-    public String getAuthorizationUrl() {
+    public String getAuthorizationUrl(Long tenantId) {
         String state = UUID.randomUUID().toString();
-        Long tenantId = TenantContext.getCurrentTenantId();
+        if (tenantId == null) {
+            tenantId = TenantContext.getCurrentTenantId();
+        }
         pendingStates.put(state, new OAuthState(Instant.now().plusSeconds(600), tenantId));
 
         // Cleanup expired states

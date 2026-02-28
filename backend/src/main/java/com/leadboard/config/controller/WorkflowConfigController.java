@@ -8,6 +8,8 @@ import com.leadboard.config.repository.*;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.MappingValidationService;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.jira.JiraClient;
+import com.leadboard.jira.JiraIssue;
 import com.leadboard.sync.JiraIssueRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -41,6 +43,7 @@ public class WorkflowConfigController {
     private final ObjectMapper objectMapper;
     private final JiraIssueRepository jiraIssueRepository;
     private final JiraConfigResolver jiraConfigResolver;
+    private final JiraClient jiraClient;
 
     public WorkflowConfigController(
             ProjectConfigurationRepository configRepo,
@@ -53,7 +56,8 @@ public class WorkflowConfigController {
             MappingAutoDetectService autoDetectService,
             ObjectMapper objectMapper,
             JiraIssueRepository jiraIssueRepository,
-            JiraConfigResolver jiraConfigResolver
+            JiraConfigResolver jiraConfigResolver,
+            JiraClient jiraClient
     ) {
         this.configRepo = configRepo;
         this.roleRepo = roleRepo;
@@ -66,6 +70,7 @@ public class WorkflowConfigController {
         this.objectMapper = objectMapper;
         this.jiraIssueRepository = jiraIssueRepository;
         this.jiraConfigResolver = jiraConfigResolver;
+        this.jiraClient = jiraClient;
     }
 
     // ==================== Full Config ====================
@@ -378,6 +383,108 @@ public class WorkflowConfigController {
     public ResponseEntity<Map<String, Object>> getConfigStatus() {
         boolean configured = !autoDetectService.isConfigEmpty();
         return ResponseEntity.ok(Map.of("configured", configured));
+    }
+
+    // ==================== Epic Link Auto-Detect ====================
+
+    @GetMapping("/detect-epic-link")
+    public ResponseEntity<Map<String, Object>> detectEpicLinkMode() {
+        var projects = jiraIssueRepository.findByBoardCategory("PROJECT");
+        if (projects.isEmpty()) {
+            return ResponseEntity.ok(Map.of("detected", false, "reason", "No PROJECT issues found"));
+        }
+
+        var epicKeys = new java.util.HashSet<String>();
+        for (var epic : jiraIssueRepository.findByBoardCategory("EPIC")) {
+            epicKeys.add(epic.getIssueKey());
+        }
+
+        // Check parent mode: any EPIC with parentKey pointing to a PROJECT?
+        int parentCount = 0;
+        for (var proj : projects) {
+            for (var epic : jiraIssueRepository.findByParentKey(proj.getIssueKey())) {
+                if (epicKeys.contains(epic.getIssueKey())) {
+                    parentCount++;
+                }
+            }
+        }
+
+        // Check issuelink mode: any PROJECT with childEpicKeys containing EPICs?
+        int linkCount = 0;
+        String sampleProjectKey = null;
+        for (var proj : projects) {
+            String[] linked = proj.getChildEpicKeys();
+            if (linked != null) {
+                for (String key : linked) {
+                    if (epicKeys.contains(key)) {
+                        linkCount++;
+                        if (sampleProjectKey == null) {
+                            sampleProjectKey = proj.getIssueKey();
+                        }
+                    }
+                }
+            }
+        }
+
+        if (parentCount > 0 && parentCount >= linkCount) {
+            return ResponseEntity.ok(Map.of(
+                "detected", true,
+                "epicLinkType", "parent",
+                "parentCount", parentCount,
+                "linkCount", linkCount
+            ));
+        } else if (linkCount > 0) {
+            // Detect specific link type name by fetching the PROJECT from Jira
+            String detectedLinkName = detectLinkTypeName(sampleProjectKey, epicKeys);
+
+            var result = new java.util.HashMap<String, Object>();
+            result.put("detected", true);
+            result.put("epicLinkType", "issuelink");
+            result.put("parentCount", parentCount);
+            result.put("linkCount", linkCount);
+            if (detectedLinkName != null) {
+                result.put("epicLinkName", detectedLinkName);
+            }
+            return ResponseEntity.ok(result);
+        }
+
+        return ResponseEntity.ok(Map.of(
+            "detected", false,
+            "reason", "No Project→Epic relationships found in synced data",
+            "parentCount", parentCount,
+            "linkCount", linkCount
+        ));
+    }
+
+    /**
+     * Fetch a PROJECT issue from Jira and find which link type connects it to EPICs.
+     * Returns the link direction label (e.g. "Epic Link: is child of") or null.
+     */
+    private String detectLinkTypeName(String projectKey, java.util.Set<String> epicKeys) {
+        try {
+            var response = jiraClient.search("key = " + projectKey, 1, null);
+            if (response == null || response.getIssues() == null || response.getIssues().isEmpty()) {
+                return null;
+            }
+            var issue = response.getIssues().get(0);
+            var links = issue.getFields().getIssuelinks();
+            if (links == null) return null;
+
+            for (JiraIssue.JiraIssueLink link : links) {
+                if (link.getType() == null) continue;
+                // Check outward direction: PROJECT --outward--> EPIC
+                if (link.getOutwardIssue() != null && epicKeys.contains(link.getOutwardIssue().getKey())) {
+                    return link.getType().getOutward();
+                }
+                // Check inward direction: EPIC --inward--> PROJECT
+                if (link.getInwardIssue() != null && epicKeys.contains(link.getInwardIssue().getKey())) {
+                    return link.getType().getInward();
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to detect link type name from Jira for {}: {}", projectKey, e.getMessage());
+        }
+        return null;
     }
 
     // ==================== Helpers ====================

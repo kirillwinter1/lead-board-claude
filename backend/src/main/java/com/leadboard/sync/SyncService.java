@@ -15,6 +15,7 @@ import com.leadboard.planning.StoryAutoScoreService;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import com.leadboard.team.TeamSyncService;
+import com.leadboard.tenant.TenantJiraConfigRepository;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,7 @@ public class SyncService {
     private final MappingAutoDetectService autoDetectService;
     private final ChangelogImportService changelogImportService;
     private final TeamSyncService teamSyncService;
+    private final TenantJiraConfigRepository tenantJiraConfigRepository;
     private final SyncService self;
 
     public SyncService(JiraClient jiraClient,
@@ -76,6 +78,7 @@ public class SyncService {
                        MappingAutoDetectService autoDetectService,
                        ChangelogImportService changelogImportService,
                        TeamSyncService teamSyncService,
+                       TenantJiraConfigRepository tenantJiraConfigRepository,
                        @Lazy SyncService self) {
         this.jiraClient = jiraClient;
         this.jiraConfigResolver = jiraConfigResolver;
@@ -91,6 +94,7 @@ public class SyncService {
         this.autoDetectService = autoDetectService;
         this.changelogImportService = changelogImportService;
         this.teamSyncService = teamSyncService;
+        this.tenantJiraConfigRepository = tenantJiraConfigRepository;
         this.self = self;
     }
 
@@ -181,8 +185,18 @@ public class SyncService {
         }
 
         JiraSyncStateEntity state = syncStateRepository.findByProjectKey(projectKey).orElse(null);
+
+        boolean setupCompleted = false;
+        try {
+            setupCompleted = tenantJiraConfigRepository.findActive()
+                    .map(c -> c.isSetupCompleted())
+                    .orElse(false);
+        } catch (Exception e) {
+            // tenant_jira_config may not exist in public schema
+        }
+
         if (state == null) {
-            return new SyncStatus(false, null, null, 0, null);
+            return new SyncStatus(false, null, null, 0, null, setupCompleted);
         }
 
         return new SyncStatus(
@@ -190,7 +204,8 @@ public class SyncService {
                 state.getLastSyncStartedAt(),
                 state.getLastSyncCompletedAt(),
                 state.getLastSyncIssuesCount(),
-                state.getLastError()
+                state.getLastError(),
+                setupCompleted
         );
     }
 
@@ -745,6 +760,13 @@ public class SyncService {
             OffsetDateTime lastSyncStartedAt,
             OffsetDateTime lastSyncCompletedAt,
             int issuesCount,
-            String error
-    ) {}
+            String error,
+            boolean setupCompleted
+    ) {
+        /** Backwards-compatible constructor (setupCompleted defaults to false). */
+        public SyncStatus(boolean syncInProgress, OffsetDateTime lastSyncStartedAt,
+                          OffsetDateTime lastSyncCompletedAt, int issuesCount, String error) {
+            this(syncInProgress, lastSyncStartedAt, lastSyncCompletedAt, issuesCount, error, false);
+        }
+    }
 }
