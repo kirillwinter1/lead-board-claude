@@ -456,6 +456,9 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
       <div className="wizard-done-icon">{'\u2705'}</div>
       <h2>Setup Complete!</h2>
       <p>Your board is ready. You can start managing your project.</p>
+      <div style={{ margin: '16px 0', padding: '12px 16px', background: '#E9F2FE', borderRadius: 8, fontSize: 14, color: '#172B4D' }}>
+        <strong>Next step:</strong> Go to the <strong>Teams</strong> tab to set up team members — assign roles, grades, and capacity for accurate planning and forecasting.
+      </div>
 
       <div className="wizard-actions">
         <button
