@@ -5,6 +5,7 @@ import logo from '../icons/logo.png'
 import { useAuth } from '../contexts/AuthContext'
 import { SetupWizardPage } from '../pages/SetupWizardPage'
 import { getTenantSlug } from '../utils/tenant'
+import { ChatWidget } from './chat/ChatWidget'
 import './Header.css'
 
 declare const __APP_VERSION__: string
@@ -136,6 +137,7 @@ export function Layout() {
           </button>
         </div>
       )}
+      {auth.authenticated && <ChatWidget />}
       <div style={{ position: 'fixed', bottom: '8px', right: '12px', fontSize: '11px', color: '#aaa', pointerEvents: 'none', zIndex: 1 }}>
         v{__APP_VERSION__}
       </div>

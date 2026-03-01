@@ -23,6 +23,14 @@ export function getTenantSlug(): string | null {
         }
     }
 
+    // subdomain.localhost (2 parts, local dev)
+    if (parts.length === 2 && parts[1] === 'localhost') {
+        const subdomain = parts[0];
+        if (subdomain !== 'www' && subdomain !== 'api') {
+            return subdomain;
+        }
+    }
+
     // Fallback: localStorage (works everywhere)
     return localStorage.getItem('tenant_slug');
 }

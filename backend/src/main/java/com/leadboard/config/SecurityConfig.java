@@ -55,6 +55,9 @@ public class SecurityConfig {
                 .requestMatchers("/api/config").permitAll()
                 .requestMatchers("/api/config/workflow/**").permitAll()
 
+                // Chat status (public - widget needs to know if chat is enabled)
+                .requestMatchers("/api/chat/status").permitAll()
+
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()
 
