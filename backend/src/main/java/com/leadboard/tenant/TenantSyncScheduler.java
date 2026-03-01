@@ -1,11 +1,14 @@
 package com.leadboard.tenant;
 
+import com.leadboard.sync.JiraSyncStateEntity;
+import com.leadboard.sync.JiraSyncStateRepository;
 import com.leadboard.sync.SyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -17,15 +20,20 @@ public class TenantSyncScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(TenantSyncScheduler.class);
 
+    private static final int DEFAULT_SYNC_INTERVAL_SECONDS = 300;
+
     private final TenantRepository tenantRepository;
     private final TenantJiraConfigRepository jiraConfigRepository;
+    private final JiraSyncStateRepository syncStateRepository;
     private final SyncService syncService;
 
     public TenantSyncScheduler(TenantRepository tenantRepository,
                                 TenantJiraConfigRepository jiraConfigRepository,
+                                JiraSyncStateRepository syncStateRepository,
                                 SyncService syncService) {
         this.tenantRepository = tenantRepository;
         this.jiraConfigRepository = jiraConfigRepository;
+        this.syncStateRepository = syncStateRepository;
         this.syncService = syncService;
     }
 
@@ -64,14 +72,32 @@ public class TenantSyncScheduler {
             return;
         }
 
+        int intervalSeconds = config.getSyncIntervalSeconds() > 0
+                ? config.getSyncIntervalSeconds()
+                : DEFAULT_SYNC_INTERVAL_SECONDS;
+
         List<String> projectKeys = config.getProjectKeysList();
         for (String projectKey : projectKeys) {
             try {
+                if (!isSyncDue(projectKey, intervalSeconds)) {
+                    log.debug("Sync not due yet for tenant '{}' project '{}' (interval={}s)",
+                            tenant.getSlug(), projectKey, intervalSeconds);
+                    continue;
+                }
                 syncService.syncProjectForTenant(projectKey);
             } catch (Exception e) {
                 log.error("Sync failed for tenant '{}' project '{}': {}",
                         tenant.getSlug(), projectKey, e.getMessage());
             }
         }
+    }
+
+    private boolean isSyncDue(String projectKey, int intervalSeconds) {
+        JiraSyncStateEntity state = syncStateRepository.findByProjectKey(projectKey).orElse(null);
+        if (state == null || state.getLastSyncCompletedAt() == null) {
+            return true; // never synced — sync now
+        }
+        OffsetDateTime nextSyncAt = state.getLastSyncCompletedAt().plusSeconds(intervalSeconds);
+        return OffsetDateTime.now().isAfter(nextSyncAt);
     }
 }

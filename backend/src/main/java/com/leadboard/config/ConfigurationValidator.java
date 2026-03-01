@@ -14,11 +14,9 @@ public class ConfigurationValidator {
 
     private static final Logger log = LoggerFactory.getLogger(ConfigurationValidator.class);
 
-    private final JiraProperties jiraProperties;
     private final AtlassianOAuthProperties oauthProperties;
 
-    public ConfigurationValidator(JiraProperties jiraProperties, AtlassianOAuthProperties oauthProperties) {
-        this.jiraProperties = jiraProperties;
+    public ConfigurationValidator(AtlassianOAuthProperties oauthProperties) {
         this.oauthProperties = oauthProperties;
     }
 
@@ -27,18 +25,14 @@ public class ConfigurationValidator {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
-        // Jira integration (optional in multi-tenant mode — tenants provide their own config)
-        validateRequired(jiraProperties.getBaseUrl(), "JIRA_BASE_URL (jira.base-url)", warnings);
-        validateRequired(jiraProperties.getEmail(), "JIRA_EMAIL (jira.email)", warnings);
-        validateRequired(jiraProperties.getApiToken(), "JIRA_API_TOKEN (jira.api-token)", warnings);
-        validateRequired(jiraProperties.getProjectKey(), "JIRA_PROJECT_KEY (jira.project-key)", warnings);
-        validateRequired(jiraProperties.getTeamFieldId(), "JIRA_TEAM_FIELD_ID (jira.team-field-id)", warnings);
+        // Jira config is per-tenant (configured via Setup Wizard, stored in tenant_jira_config)
+        log.info("Jira configuration is per-tenant (via Setup Wizard → tenant_jira_config)");
 
-        // Atlassian OAuth (required for user authentication)
+        // Atlassian OAuth (required for user authentication — shared across all tenants)
         validateRequired(oauthProperties.getClientId(), "ATLASSIAN_CLIENT_ID (atlassian.oauth.client-id)", errors);
         validateRequired(oauthProperties.getClientSecret(), "ATLASSIAN_CLIENT_SECRET (atlassian.oauth.client-secret)", errors);
         validateRequired(oauthProperties.getRedirectUri(), "ATLASSIAN_REDIRECT_URI (atlassian.oauth.redirect-uri)", warnings);
-        validateRequired(oauthProperties.getSiteBaseUrl(), "ATLASSIAN_SITE_BASE_URL (atlassian.oauth.site-base-url)", errors);
+        validateRequired(oauthProperties.getSiteBaseUrl(), "ATLASSIAN_SITE_BASE_URL (atlassian.oauth.site-base-url)", warnings);
 
         // Log warnings
         for (String warning : warnings) {

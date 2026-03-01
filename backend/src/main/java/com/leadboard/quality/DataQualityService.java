@@ -279,6 +279,22 @@ public class DataQualityService {
             }
         }
 
+        // STORY_TODO_BUT_HAS_WORK - Story is in TODO but subtasks have time logged
+        if (!subtasks.isEmpty()
+                && !workflowConfigService.isInProgress(story.getStatus(), story.getIssueType())
+                && !workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
+            long totalLogged = subtasks.stream()
+                    .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
+                    .sum();
+            if (totalLogged > 0) {
+                double loggedHours = totalLogged / 3600.0;
+                violations.add(DataQualityViolation.of(
+                        DataQualityRule.STORY_TODO_BUT_HAS_WORK,
+                        loggedHours
+                ));
+            }
+        }
+
         // STORY_FULLY_LOGGED_NOT_DONE - All time logged on subtasks but story not Done
         if (!workflowConfigService.isDone(story.getStatus(), story.getIssueType()) && !subtasks.isEmpty()) {
             long totalEstimate = subtasks.stream()

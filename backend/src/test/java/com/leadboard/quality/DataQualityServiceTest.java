@@ -391,6 +391,33 @@ class DataQualityServiceTest {
 
             assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_FULLY_LOGGED_NOT_DONE));
         }
+
+        @Test
+        void storyTodoButSubtasksHaveWork_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "New", "TEST-1");
+
+            JiraIssueEntity subtask = createSubtask("TEST-3", "Done", "TEST-2");
+            subtask.setOriginalEstimateSeconds(14400L); // 4h
+            subtask.setTimeSpentSeconds(14400L); // 4h
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask));
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_TODO_BUT_HAS_WORK));
+        }
+
+        @Test
+        void storyInProgressWithSubtaskWork_shouldNotReturnTodoWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setTimeSpentSeconds(7200L); // 2h
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(subtask));
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_TODO_BUT_HAS_WORK));
+        }
     }
 
     // ==================== Subtask Rules Tests ====================

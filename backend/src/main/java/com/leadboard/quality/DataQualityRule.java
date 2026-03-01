@@ -154,6 +154,12 @@ public enum DataQualityRule {
             "Bug has no progress for %d days"
     ),
 
+    // Story still in TODO but subtasks have work done
+    STORY_TODO_BUT_HAS_WORK(
+            DataQualitySeverity.WARNING,
+            "Story is in TODO status but subtasks have logged time (%.1f hours)"
+    ),
+
     // Story/Bug fully logged but not done
     STORY_FULLY_LOGGED_NOT_DONE(
             DataQualitySeverity.WARNING,
