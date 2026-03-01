@@ -209,7 +209,8 @@ class ForecastServiceTest {
                     1,
                     false,
                     null,
-                    null
+                    null,
+                    false
             );
 
             UnifiedPlanningResult unifiedResult = new UnifiedPlanningResult(
@@ -331,7 +332,7 @@ class ForecastServiceTest {
                     List.of(story1, story2),
                     aggregation,
                     "Developing", null, 0L, 0L, 0, emptyRoleProgress, 2, 2,
-                    false, null, null
+                    false, null, null, false
             );
 
             List<PlanningWarning> warnings = List.of(
@@ -571,7 +572,8 @@ class ForecastServiceTest {
                 1,
                 false,
                 null,
-                null
+                null,
+                false
         );
     }
 }

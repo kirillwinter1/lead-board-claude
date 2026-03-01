@@ -50,6 +50,8 @@
 | F48 | Per-Project Workflow Configuration | 2026-03-01 | [features/F48](features/F48_PER_PROJECT_WORKFLOW_CONFIG.md) |
 | F49 | Observability & Monitoring | 2026-03-01 | [features/F49](features/F49_OBSERVABILITY_MONITORING.md) |
 | F50 | Performance Testing Suite (k6) | 2026-03-01 | [features/F50](features/F50_PERFORMANCE_TESTING.md) |
+| F51 | Early Exit Planning Optimization | 2026-03-01 | [features/F51](features/F51_EARLY_EXIT_OPTIMIZATION.md) |
+| F52 | AI Chat Assistant | 2026-03-01 | [features/F52](features/F52_AI_CHAT_ASSISTANT.md) |
 
 ## Бэклог (BF)
 
@@ -98,6 +100,21 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-03-01: Board + Reorder Performance Optimization (Runs 5-7)
+- **SQL-level team filtering:** BoardService two-path loading — при `teamIds` загружает ~400 issues вместо 12K
+- **Board response cache:** 15s TTL `ConcurrentHashMap`, инвалидация при reorder и sync
+- **Bulk reorder:** N individual `save()` → один `UPDATE SET manual_order ± 1 WHERE ... BETWEEN`
+- **Covering index:** `(board_category, team_id, manual_order)` для ORDER BY elimination
+- **Composite index:** `(project_key, board_category)` для fast-path board queries
+- **T5 tenant migration:** `T5__board_performance_indexes.sql`
+- Board p50: 30s → 1ms (cache hit), Reorder: 2,119ms → 0.3ms, Throughput 4.8x
+
+### 2026-03-01: F51 Early Exit Planning Optimization
+- Early exit: day-by-day → математическая экстраполяция за горизонтом 130 рабочих дней
+- `planEpicFast()` / `planStoryFast()` / `planRoughEstimateFast()` — O(roles) вместо O(roles × assignees × days)
+- `PlannedEpic.approximate` флаг для приблизительных прогнозов
+- Planning cold start: 5-8s → 89ms (60x faster)
 
 ### 2026-03-01: F50 Performance Testing Suite (k6)
 - k6 performance testing suite с 6 сценариями (smoke, load, stress, soak, multi-tenant, reorder-stress)

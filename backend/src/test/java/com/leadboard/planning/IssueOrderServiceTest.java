@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.board.BoardService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -31,11 +32,14 @@ class IssueOrderServiceTest {
     @Mock
     private UnifiedPlanningService unifiedPlanningService;
 
+    @Mock
+    private BoardService boardService;
+
     private IssueOrderService service;
 
     @BeforeEach
     void setUp() {
-        service = new IssueOrderService(issueRepository, workflowConfigService, unifiedPlanningService);
+        service = new IssueOrderService(issueRepository, workflowConfigService, unifiedPlanningService, boardService);
 
         // Default type categorization
         lenient().when(workflowConfigService.isEpic("Epic")).thenReturn(true);
@@ -66,18 +70,8 @@ class IssueOrderServiceTest {
             Long teamId = 1L;
             JiraIssueEntity epic = createEpic("EPIC-4", teamId, 4);
 
-            List<JiraIssueEntity> allEpics = List.of(
-                createEpic("EPIC-1", teamId, 1),
-                createEpic("EPIC-2", teamId, 2),
-                createEpic("EPIC-3", teamId, 3),
-                createEpic("EPIC-4", teamId, 4),
-                createEpic("EPIC-5", teamId, 5)
-            );
-
             when(issueRepository.findByIssueKey("EPIC-4")).thenReturn(Optional.of(epic));
             when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(5);
-            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
-                .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -86,13 +80,8 @@ class IssueOrderServiceTest {
             // Then
             assertEquals(2, result.getManualOrder());
 
-            // Verify shifts: items at positions 2,3 should be shifted to 3,4
-            ArgumentCaptor<JiraIssueEntity> captor = ArgumentCaptor.forClass(JiraIssueEntity.class);
-            verify(issueRepository, atLeast(1)).save(captor.capture());
-
-            List<JiraIssueEntity> saved = captor.getAllValues();
-            // Should have saved the shifted items + the moved epic
-            assertTrue(saved.size() >= 1);
+            // Verify bulk shift: positions [2,4) shifted down (+1)
+            verify(issueRepository).shiftEpicOrdersDown(teamId, 2, 4);
         }
 
         @Test
@@ -101,18 +90,8 @@ class IssueOrderServiceTest {
             Long teamId = 1L;
             JiraIssueEntity epic = createEpic("EPIC-2", teamId, 2);
 
-            List<JiraIssueEntity> allEpics = List.of(
-                createEpic("EPIC-1", teamId, 1),
-                createEpic("EPIC-2", teamId, 2),
-                createEpic("EPIC-3", teamId, 3),
-                createEpic("EPIC-4", teamId, 4),
-                createEpic("EPIC-5", teamId, 5)
-            );
-
             when(issueRepository.findByIssueKey("EPIC-2")).thenReturn(Optional.of(epic));
             when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(5);
-            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
-                .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -120,6 +99,9 @@ class IssueOrderServiceTest {
 
             // Then
             assertEquals(4, result.getManualOrder());
+
+            // Verify bulk shift: positions (2,4] shifted up (-1)
+            verify(issueRepository).shiftEpicOrdersUp(teamId, 2, 4);
         }
 
         @Test
@@ -145,16 +127,8 @@ class IssueOrderServiceTest {
             Long teamId = 1L;
             JiraIssueEntity epic = createEpic("EPIC-3", teamId, 3);
 
-            List<JiraIssueEntity> allEpics = List.of(
-                createEpic("EPIC-1", teamId, 1),
-                createEpic("EPIC-2", teamId, 2),
-                createEpic("EPIC-3", teamId, 3)
-            );
-
             when(issueRepository.findByIssueKey("EPIC-3")).thenReturn(Optional.of(epic));
             when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(3);
-            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
-                .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -162,6 +136,7 @@ class IssueOrderServiceTest {
 
             // Then - should be clamped to 1
             assertEquals(1, result.getManualOrder());
+            verify(issueRepository).shiftEpicOrdersDown(teamId, 1, 3);
         }
 
         @Test
@@ -170,16 +145,8 @@ class IssueOrderServiceTest {
             Long teamId = 1L;
             JiraIssueEntity epic = createEpic("EPIC-1", teamId, 1);
 
-            List<JiraIssueEntity> allEpics = List.of(
-                createEpic("EPIC-1", teamId, 1),
-                createEpic("EPIC-2", teamId, 2),
-                createEpic("EPIC-3", teamId, 3)
-            );
-
             when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
             when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(3);
-            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
-                .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -187,6 +154,7 @@ class IssueOrderServiceTest {
 
             // Then - should be clamped to max (3)
             assertEquals(3, result.getManualOrder());
+            verify(issueRepository).shiftEpicOrdersUp(teamId, 1, 3);
         }
 
         @Test
@@ -221,15 +189,9 @@ class IssueOrderServiceTest {
             Long teamId = 1L;
             JiraIssueEntity epic = createEpic("EPIC-NEW", teamId, null);
 
-            List<JiraIssueEntity> allEpics = List.of(
-                createEpic("EPIC-1", teamId, 1),
-                createEpic("EPIC-2", teamId, 2)
-            );
-
             when(issueRepository.findByIssueKey("EPIC-NEW")).thenReturn(Optional.of(epic));
+            // maxOrder = 2, currentOrder becomes 2+1=3
             when(issueRepository.findMaxEpicOrderForTeam(eq(teamId))).thenReturn(2);
-            when(issueRepository.findEpicsByTeamOrderByManualOrder(eq(teamId)))
-                .thenReturn(new ArrayList<>(allEpics));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When - move to position 1
@@ -237,6 +199,8 @@ class IssueOrderServiceTest {
 
             // Then
             assertEquals(1, result.getManualOrder());
+            // currentOrder=3 (maxOrder+1), newPosition=1 → shift down [1,3)
+            verify(issueRepository).shiftEpicOrdersDown(teamId, 1, 3);
         }
     }
 
@@ -247,21 +211,13 @@ class IssueOrderServiceTest {
 
         @Test
         void reorderStory_moveUp_shiftsOthersDown() {
-            // Given: 4 stories in epic
+            // Given: 4 stories in epic, moving story at position 4 to position 2
             String parentKey = "EPIC-1";
             JiraIssueEntity story = createStory("STORY-4", parentKey, 4);
-
-            List<JiraIssueEntity> allStories = List.of(
-                createStory("STORY-1", parentKey, 1),
-                createStory("STORY-2", parentKey, 2),
-                createStory("STORY-3", parentKey, 3),
-                createStory("STORY-4", parentKey, 4)
-            );
+            story.setTeamId(1L);
 
             when(issueRepository.findByIssueKey("STORY-4")).thenReturn(Optional.of(story));
             when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(4);
-            when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
-                .thenReturn(new ArrayList<>(allStories));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -269,24 +225,18 @@ class IssueOrderServiceTest {
 
             // Then
             assertEquals(2, result.getManualOrder());
+            verify(issueRepository).shiftStoryOrdersDown(parentKey, 2, 4);
         }
 
         @Test
         void reorderStory_moveDown_shiftsOthersUp() {
-            // Given
+            // Given: moving story at position 1 to position 3
             String parentKey = "EPIC-1";
             JiraIssueEntity story = createStory("STORY-1", parentKey, 1);
-
-            List<JiraIssueEntity> allStories = List.of(
-                createStory("STORY-1", parentKey, 1),
-                createStory("STORY-2", parentKey, 2),
-                createStory("STORY-3", parentKey, 3)
-            );
+            story.setTeamId(1L);
 
             when(issueRepository.findByIssueKey("STORY-1")).thenReturn(Optional.of(story));
             when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(3);
-            when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
-                .thenReturn(new ArrayList<>(allStories));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -294,6 +244,7 @@ class IssueOrderServiceTest {
 
             // Then
             assertEquals(3, result.getManualOrder());
+            verify(issueRepository).shiftStoryOrdersUp(parentKey, 1, 3);
         }
 
         @Test
@@ -335,17 +286,10 @@ class IssueOrderServiceTest {
             bug.setIssueType("Bug");
             bug.setParentKey(parentKey);
             bug.setManualOrder(2);
-
-            List<JiraIssueEntity> allStories = List.of(
-                createStory("STORY-1", parentKey, 1),
-                bug,
-                createStory("STORY-3", parentKey, 3)
-            );
+            bug.setTeamId(1L);
 
             when(issueRepository.findByIssueKey("BUG-1")).thenReturn(Optional.of(bug));
             when(issueRepository.findMaxStoryOrderForParent(eq(parentKey))).thenReturn(3);
-            when(issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey))
-                .thenReturn(new ArrayList<>(allStories));
             when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
             // When
@@ -353,6 +297,7 @@ class IssueOrderServiceTest {
 
             // Then
             assertEquals(1, result.getManualOrder());
+            verify(issueRepository).shiftStoryOrdersDown(parentKey, 1, 2);
         }
     }
 

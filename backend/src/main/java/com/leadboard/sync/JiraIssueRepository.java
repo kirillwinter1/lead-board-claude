@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -69,6 +70,10 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     List<JiraIssueEntity> findByBoardCategoryAndTeamId(String boardCategory, Long teamId);
 
     List<JiraIssueEntity> findByBoardCategoryInAndTeamId(List<String> boardCategories, Long teamId);
+
+    List<JiraIssueEntity> findByBoardCategoryAndTeamIdIn(String boardCategory, Collection<Long> teamIds);
+
+    List<JiraIssueEntity> findByProjectKeyAndBoardCategory(String projectKey, String boardCategory);
 
     List<JiraIssueEntity> findByBoardCategoryAndTeamIdOrderByAutoScoreDesc(String boardCategory, Long teamId);
 
@@ -152,6 +157,36 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     Integer findMaxStoryOrderForParent(
             @Param("parentKey") String parentKey
     );
+
+    // ==================== Bulk reorder shifts (single UPDATE instead of N saves) ====================
+
+    @Modifying
+    @Query("UPDATE JiraIssueEntity e SET e.manualOrder = e.manualOrder + 1 " +
+           "WHERE e.teamId = :teamId AND e.boardCategory = 'EPIC' " +
+           "AND e.manualOrder >= :fromOrder AND e.manualOrder < :toOrder")
+    int shiftEpicOrdersDown(@Param("teamId") Long teamId,
+                            @Param("fromOrder") int fromOrder, @Param("toOrder") int toOrder);
+
+    @Modifying
+    @Query("UPDATE JiraIssueEntity e SET e.manualOrder = e.manualOrder - 1 " +
+           "WHERE e.teamId = :teamId AND e.boardCategory = 'EPIC' " +
+           "AND e.manualOrder > :fromOrder AND e.manualOrder <= :toOrder")
+    int shiftEpicOrdersUp(@Param("teamId") Long teamId,
+                          @Param("fromOrder") int fromOrder, @Param("toOrder") int toOrder);
+
+    @Modifying
+    @Query("UPDATE JiraIssueEntity e SET e.manualOrder = e.manualOrder + 1 " +
+           "WHERE e.parentKey = :parentKey AND e.boardCategory IN ('STORY', 'BUG') " +
+           "AND e.manualOrder >= :fromOrder AND e.manualOrder < :toOrder")
+    int shiftStoryOrdersDown(@Param("parentKey") String parentKey,
+                             @Param("fromOrder") int fromOrder, @Param("toOrder") int toOrder);
+
+    @Modifying
+    @Query("UPDATE JiraIssueEntity e SET e.manualOrder = e.manualOrder - 1 " +
+           "WHERE e.parentKey = :parentKey AND e.boardCategory IN ('STORY', 'BUG') " +
+           "AND e.manualOrder > :fromOrder AND e.manualOrder <= :toOrder")
+    int shiftStoryOrdersUp(@Param("parentKey") String parentKey,
+                           @Param("fromOrder") int fromOrder, @Param("toOrder") int toOrder);
 
     @Modifying
     @Transactional

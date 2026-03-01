@@ -294,9 +294,11 @@ class BoardServiceTest {
         @DisplayName("should filter epics by team ID")
         void shouldFilterByTeamId() {
             JiraIssueEntity epic1 = createEpic("LB-1", "Epic Team 1", "Новое", 1L);
-            JiraIssueEntity epic2 = createEpic("LB-2", "Epic Team 2", "Новое", 2L);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
+            // Fast path: teamIds provided → SQL-level filtering
+            when(issueRepository.findByBoardCategoryAndTeamIdIn("EPIC", List.of(1L))).thenReturn(List.of(epic1));
+            when(issueRepository.findByParentKeyIn(List.of("LB-1"))).thenReturn(Collections.emptyList());
+            when(issueRepository.findByProjectKeyAndBoardCategory("LB", "PROJECT")).thenReturn(Collections.emptyList());
 
             BoardResponse response = boardService.getBoard(null, null, List.of(1L), 0, 50, false);
 
@@ -350,9 +352,11 @@ class BoardServiceTest {
         @DisplayName("should exclude epics without team when filtering by team")
         void shouldExcludeEpicsWithoutTeam() {
             JiraIssueEntity epicWithTeam = createEpic("LB-1", "Epic With Team", "Новое", 1L);
-            JiraIssueEntity epicWithoutTeam = createEpic("LB-2", "Epic Without Team", "Новое", null);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epicWithTeam, epicWithoutTeam));
+            // Fast path: SQL-level filtering already excludes epics without matching teamId
+            when(issueRepository.findByBoardCategoryAndTeamIdIn("EPIC", List.of(1L))).thenReturn(List.of(epicWithTeam));
+            when(issueRepository.findByParentKeyIn(List.of("LB-1"))).thenReturn(Collections.emptyList());
+            when(issueRepository.findByProjectKeyAndBoardCategory("LB", "PROJECT")).thenReturn(Collections.emptyList());
 
             BoardResponse response = boardService.getBoard(null, null, List.of(1L), 0, 50, false);
 

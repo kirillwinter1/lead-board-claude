@@ -436,6 +436,162 @@ class UnifiedPlanningServiceTest {
         assertTrue(plannedEpic.totalEstimateSeconds() > 0, "Epic should accumulate done story estimates");
     }
 
+    @Test
+    void earlyExit_switchesToFastMode_whenEpicEndsBeyondHorizon() {
+        // Given: Many epics — later ones should get approximate=true
+        // Create 3 epics, make 1st SA take a very long time so it pushes past horizon
+        JiraIssueEntity epic1 = createEpic("EPIC-1", "First Epic", new BigDecimal("90"));
+        JiraIssueEntity epic2 = createEpic("EPIC-2", "Second Epic", new BigDecimal("80"));
+        JiraIssueEntity epic3 = createEpic("EPIC-3", "Third Epic", new BigDecimal("70"));
+
+        JiraIssueEntity story1 = createStory("STORY-1", "Story 1", "EPIC-1", new BigDecimal("50"));
+        JiraIssueEntity story2 = createStory("STORY-2", "Story 2", "EPIC-2", new BigDecimal("50"));
+        JiraIssueEntity story3 = createStory("STORY-3", "Story 3", "EPIC-3", new BigDecimal("50"));
+
+        // 1200h SA work = 150 workdays at 8h/day — way past 130-day horizon
+        JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 1200 * 3600L, 0L);
+        JiraIssueEntity dev2 = createSubtask("SUB-2", "DEV Task", "STORY-2", "Development", 8 * 3600L, 0L);
+        JiraIssueEntity dev3 = createSubtask("SUB-3", "DEV Task", "STORY-3", "Development", 8 * 3600L, 0L);
+
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
+                .thenReturn(List.of(epic1, epic2, epic3));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-2")).thenReturn(List.of(story2));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-3")).thenReturn(List.of(story3));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1", "EPIC-2", "EPIC-3")))
+                .thenReturn(List.of(story1, story2, story3));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2", "STORY-3")))
+                .thenReturn(List.of(sa1, dev2, dev3));
+
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8")),
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
+        ));
+
+        when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        UnifiedPlanningResult result = service.calculatePlan(TEAM_ID);
+
+        // Then
+        assertEquals(3, result.epics().size());
+        // First epic (1200h SA) should be planned precisely and push past horizon
+        assertFalse(result.epics().get(0).approximate(), "First epic should be precise");
+        // Subsequent epics should be approximate (fast mode)
+        assertTrue(result.epics().get(1).approximate(), "Second epic should be approximate");
+        assertTrue(result.epics().get(2).approximate(), "Third epic should be approximate");
+    }
+
+    @Test
+    void planStoryFast_calculatesCorrectDuration() {
+        // Given: 40h DEV work, 8h/day capacity = 5 workdays
+        JiraIssueEntity epic = createEpic("EPIC-1", "Test Epic", new BigDecimal("90"));
+        JiraIssueEntity farEpic = createEpic("EPIC-0", "Far Epic", new BigDecimal("95"));
+        JiraIssueEntity story = createStory("STORY-1", "Story 1", "EPIC-1", new BigDecimal("50"));
+        JiraIssueEntity farStory = createStory("STORY-0", "Far Story", "EPIC-0", new BigDecimal("50"));
+
+        // Far epic: 1200h to push past horizon
+        JiraIssueEntity farSa = createSubtask("SUB-0", "SA Task", "STORY-0", "Analysis", 1200 * 3600L, 0L);
+        // Target epic: 40h DEV (remaining after risk buffer: 40 * 1.2 = 48h, at 8h/day = 6 workdays)
+        JiraIssueEntity devSubtask = createSubtask("SUB-1", "DEV Task", "STORY-1", "Development", 40 * 3600L, 0L);
+
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
+                .thenReturn(List.of(farEpic, epic));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-0")).thenReturn(List.of(farStory));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-0", "EPIC-1")))
+                .thenReturn(List.of(farStory, story));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-0", "STORY-1")))
+                .thenReturn(List.of(farSa, devSubtask));
+
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8")),
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
+        ));
+
+        when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
+
+        // When
+        UnifiedPlanningResult result = service.calculatePlan(TEAM_ID);
+
+        // Then
+        assertEquals(2, result.epics().size());
+        PlannedEpic approxEpic = result.epics().get(1);
+        assertTrue(approxEpic.approximate());
+        assertEquals(1, approxEpic.stories().size());
+
+        PlannedStory approxStory = approxEpic.stories().get(0);
+        assertNotNull(approxStory.startDate());
+        assertNotNull(approxStory.endDate());
+        // Phase schedule should have no assignee (fast mode)
+        PhaseSchedule devPhase = approxStory.phases().get("DEV");
+        assertNotNull(devPhase);
+        assertNull(devPhase.assigneeAccountId(), "Fast mode should not assign specific person");
+        assertFalse(devPhase.noCapacity());
+        // 40h * 1.2 risk = 48h / 8h/day = 6 workdays
+        long daysBetween = java.time.temporal.ChronoUnit.DAYS.between(devPhase.startDate(), devPhase.endDate());
+        assertTrue(daysBetween >= 5 && daysBetween <= 7,
+                "Expected ~6 workdays for 48h at 8h/day, got " + daysBetween);
+    }
+
+    @Test
+    void earlyExit_respectsDependencies() {
+        // Given: Story 2 blocked by Story 1 in fast mode — should respect dependency
+        JiraIssueEntity farEpic = createEpic("EPIC-0", "Far Epic", new BigDecimal("95"));
+        JiraIssueEntity epic = createEpic("EPIC-1", "Test Epic", new BigDecimal("80"));
+
+        JiraIssueEntity farStory = createStory("STORY-0", "Far Story", "EPIC-0", new BigDecimal("50"));
+        JiraIssueEntity story1 = createStory("STORY-1", "Blocker", "EPIC-1", new BigDecimal("60"));
+        JiraIssueEntity story2 = createStory("STORY-2", "Blocked", "EPIC-1", new BigDecimal("50"));
+        story2.setIsBlockedBy(List.of("STORY-1"));
+
+        JiraIssueEntity farSa = createSubtask("SUB-0", "SA Task", "STORY-0", "Analysis", 1200 * 3600L, 0L);
+        JiraIssueEntity dev1 = createSubtask("SUB-1", "DEV Task", "STORY-1", "Development", 16 * 3600L, 0L);
+        JiraIssueEntity dev2 = createSubtask("SUB-2", "DEV Task", "STORY-2", "Development", 8 * 3600L, 0L);
+
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
+                .thenReturn(List.of(farEpic, epic));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-0")).thenReturn(List.of(farStory));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-0", "EPIC-1")))
+                .thenReturn(List.of(farStory, story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-0", "STORY-1", "STORY-2")))
+                .thenReturn(List.of(farSa, dev1, dev2));
+
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8")),
+                createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
+        ));
+
+        when(dependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> {
+            List<JiraIssueEntity> input = inv.getArgument(0);
+            // For EPIC-1's stories, return in dependency order
+            if (input.size() == 2 && input.stream().anyMatch(s -> s.getIssueKey().equals("STORY-1"))) {
+                return List.of(story1, story2);
+            }
+            return input; // default: return as-is
+        });
+
+        // When
+        UnifiedPlanningResult result = service.calculatePlan(TEAM_ID);
+
+        // Then
+        PlannedEpic approxEpic = result.epics().get(1);
+        assertTrue(approxEpic.approximate(), "Second epic should be approximate");
+        assertEquals(2, approxEpic.stories().size());
+
+        PlannedStory blockerStory = approxEpic.stories().stream()
+                .filter(s -> s.storyKey().equals("STORY-1")).findFirst().orElseThrow();
+        PlannedStory blockedStory = approxEpic.stories().stream()
+                .filter(s -> s.storyKey().equals("STORY-2")).findFirst().orElseThrow();
+
+        assertNotNull(blockerStory.endDate());
+        assertNotNull(blockedStory.startDate());
+        assertTrue(blockedStory.startDate().isAfter(blockerStory.endDate()),
+                "Blocked story should start after blocker ends even in fast mode. Blocker end: "
+                        + blockerStory.endDate() + ", Blocked start: " + blockedStory.startDate());
+    }
+
     // Helper methods
 
     private JiraIssueEntity createEpic(String key, String summary, BigDecimal autoScore) {

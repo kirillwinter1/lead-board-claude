@@ -73,7 +73,7 @@ class ProjectServiceTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 15),
                 List.of(), Map.of(), "Open", null,
                 36000L, 18000L, 50, Map.of(), 5, 3,
-                false, null, false);
+                false, null, false, false);
 
         UnifiedPlanningResult plan = new UnifiedPlanningResult(1L, OffsetDateTime.now(),
                 List.of(pe1), List.of(), Map.of());
@@ -113,7 +113,7 @@ class ProjectServiceTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 4, 30),
                 List.of(), Map.of(), "Open", LocalDate.of(2026, 6, 1),
                 72000L, 36000L, 50, Map.of(), 10, 5,
-                false, null, false);
+                false, null, false, false);
 
         UnifiedPlanningResult plan = new UnifiedPlanningResult(1L, OffsetDateTime.now(),
                 List.of(pe1), List.of(), Map.of());
@@ -260,12 +260,12 @@ class ProjectServiceTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 10),
                 List.of(), Map.of(), "Open", null,
                 36000L, 18000L, 50, Map.of(), 5, 3,
-                false, null, false);
+                false, null, false, false);
         PlannedEpic pe2 = new PlannedEpic("PROJ-11", "Epic 2", BigDecimal.ONE,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 20),
                 List.of(), Map.of(), "Open", null,
                 36000L, 18000L, 50, Map.of(), 5, 3,
-                false, null, false);
+                false, null, false, false);
 
         when(unifiedPlanningService.calculatePlan(1L)).thenReturn(
                 new UnifiedPlanningResult(1L, OffsetDateTime.now(), List.of(pe1), List.of(), Map.of()));

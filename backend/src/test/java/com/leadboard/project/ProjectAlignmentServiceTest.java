@@ -265,7 +265,7 @@ class ProjectAlignmentServiceTest {
                 LocalDate.of(2026, 1, 1), endDate,
                 List.of(), Map.of(), "Open", null,
                 36000L, 18000L, 50, Map.of(), 5, 3,
-                false, null, false);
+                false, null, false, false);
 
         when(unifiedPlanningService.calculatePlan(teamId)).thenReturn(
                 new UnifiedPlanningResult(teamId, OffsetDateTime.now(), List.of(pe), List.of(), Map.of()));

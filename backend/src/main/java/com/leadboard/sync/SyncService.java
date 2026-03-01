@@ -1,5 +1,6 @@
 package com.leadboard.sync;
 
+import com.leadboard.board.BoardService;
 import com.leadboard.config.ObservabilityMetrics;
 import com.leadboard.config.entity.LinkCategory;
 import com.leadboard.config.service.MappingAutoDetectService;
@@ -66,6 +67,7 @@ public class SyncService {
     private final TenantJiraConfigRepository tenantJiraConfigRepository;
     private final ObservabilityMetrics observabilityMetrics;
     private final com.leadboard.planning.UnifiedPlanningService unifiedPlanningService;
+    private final BoardService boardService;
     private final SyncService self;
 
     public SyncService(JiraClient jiraClient,
@@ -85,6 +87,7 @@ public class SyncService {
                        TenantJiraConfigRepository tenantJiraConfigRepository,
                        ObservabilityMetrics observabilityMetrics,
                        com.leadboard.planning.UnifiedPlanningService unifiedPlanningService,
+                       BoardService boardService,
                        @Lazy SyncService self) {
         this.jiraClient = jiraClient;
         this.jiraConfigResolver = jiraConfigResolver;
@@ -103,6 +106,7 @@ public class SyncService {
         this.tenantJiraConfigRepository = tenantJiraConfigRepository;
         this.observabilityMetrics = observabilityMetrics;
         this.unifiedPlanningService = unifiedPlanningService;
+        this.boardService = boardService;
         this.self = self;
     }
 
@@ -363,8 +367,9 @@ public class SyncService {
                 changelogImportService.importChangelogsForIssuesAsync(statusChangedKeys);
             }
 
-            // Invalidate planning cache after sync
+            // Invalidate planning and board caches after sync
             unifiedPlanningService.invalidateAllPlanCaches();
+            boardService.invalidateBoardCache();
 
             // Trigger team sync if organization ID is configured
             try {

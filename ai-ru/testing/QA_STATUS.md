@@ -33,7 +33,9 @@
 | 20 | **Multi-Tenancy / Registration** | F44 | ✅ Проверен | (входит в Workflow Config QA) | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
 | 21 | **Multi-Tenancy E2E Journey** | F44, F33 | ✅ Проверен + Исправлен | 11/11 fixed, 0 OPEN | [reports/2026-02-25_MULTITENANCY_E2E.md](reports/2026-02-25_MULTITENANCY_E2E.md) |
 
-**Прогресс: 21 / 21 экранов проверено (100%)**
+| 22 | **Early Exit Optimization** | Perf | ✅ Проверен | 1 High, 2 Medium | [reports/2026-03-01_EARLY_EXIT_OPTIMIZATION.md](reports/2026-03-01_EARLY_EXIT_OPTIMIZATION.md) |
+
+**Прогресс: 22 / 22 модулей проверено (100%)**
 
 ---
 
@@ -42,10 +44,10 @@
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
 | Critical | 2 | 8 | 10 |
-| High | 16 | 19 | 35 |
-| Medium | 34 | 31 | 65 |
+| High | 17 | 19 | 36 |
+| Medium | 36 | 31 | 67 |
 | Low | 24 | 13 | 37 |
-| **Итого** | **76** | **71** | **147** |
+| **Итого** | **79** | **71** | **150** |
 
 ---
 

@@ -17,8 +17,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +28,7 @@ public class BoardService {
 
     private static final Logger log = LoggerFactory.getLogger(BoardService.class);
     private static final long SECONDS_PER_DAY = 8 * 3600; // 8 hours per day
+    private static final long BOARD_CACHE_TTL_MS = 15_000; // 15 seconds
 
     private final JiraIssueRepository issueRepository;
     private final JiraConfigResolver jiraConfigResolver;
@@ -34,6 +37,14 @@ public class BoardService {
     private final DataQualityService dataQualityService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final WorkflowConfigService workflowConfigService;
+
+    private final ConcurrentHashMap<String, CachedBoard> boardCache = new ConcurrentHashMap<>();
+
+    private record CachedBoard(BoardResponse response, Instant cachedAt) {
+        boolean isExpired() {
+            return Instant.now().toEpochMilli() - cachedAt.toEpochMilli() > BOARD_CACHE_TTL_MS;
+        }
+    }
 
     public BoardService(JiraIssueRepository issueRepository, JiraConfigResolver jiraConfigResolver,
                         TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
@@ -49,6 +60,10 @@ public class BoardService {
         this.workflowConfigService = workflowConfigService;
     }
 
+    public void invalidateBoardCache() {
+        boardCache.clear();
+    }
+
     public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size, boolean includeDQ) {
         String projectKey = jiraConfigResolver.getProjectKey();
         String baseUrl = jiraConfigResolver.getBaseUrl();
@@ -57,14 +72,14 @@ public class BoardService {
             return new BoardResponse(Collections.emptyList(), 0);
         }
 
+        // Check board response cache
+        String cacheKey = buildCacheKey(projectKey, query, statuses, teamIds, page, size, includeDQ);
+        CachedBoard cached = boardCache.get(cacheKey);
+        if (cached != null && !cached.isExpired()) {
+            return cached.response();
+        }
+
         try {
-            List<JiraIssueEntity> allIssues = issueRepository.findByProjectKey(projectKey);
-
-            if (allIssues.isEmpty()) {
-                log.warn("No cached issues found for project: {}. Run sync first.", projectKey);
-                return new BoardResponse(Collections.emptyList(), 0);
-            }
-
             Map<Long, String> teamNames = new HashMap<>();
             Map<Long, String> teamColors = new HashMap<>();
             teamRepository.findByActiveTrue().forEach(team -> {
@@ -72,27 +87,73 @@ public class BoardService {
                 teamColors.put(team.getId(), team.getColor());
             });
 
-            Map<String, JiraIssueEntity> issueMap = allIssues.stream()
-                    .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, e -> e));
+            List<JiraIssueEntity> epics;
+            List<JiraIssueEntity> stories;
+            List<JiraIssueEntity> subtasks;
+            List<JiraIssueEntity> projectIssues;
+            Map<String, JiraIssueEntity> issueMap;
 
-            List<JiraIssueEntity> epics = allIssues.stream()
-                    .filter(e -> workflowConfigService.isEpic(e.getIssueType()))
-                    .collect(Collectors.toList());
+            boolean hasTeamFilter = teamIds != null && !teamIds.isEmpty();
 
-            List<JiraIssueEntity> stories = allIssues.stream()
-                    .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
-                    .collect(Collectors.toList());
+            if (hasTeamFilter) {
+                // FAST PATH: SQL-level team filtering (12K → ~400 issues)
+                epics = issueRepository.findByBoardCategoryAndTeamIdIn("EPIC", teamIds);
 
-            List<JiraIssueEntity> subtasks = allIssues.stream()
-                    .filter(JiraIssueEntity::isSubtask)
-                    .collect(Collectors.toList());
+                List<String> epicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
+                stories = epicKeys.isEmpty() ? List.of() :
+                        issueRepository.findByParentKeyIn(epicKeys).stream()
+                                .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
+                                .toList();
+
+                List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
+                subtasks = storyKeys.isEmpty() ? List.of() :
+                        issueRepository.findByParentKeyIn(storyKeys).stream()
+                                .filter(JiraIssueEntity::isSubtask)
+                                .toList();
+
+                projectIssues = issueRepository.findByProjectKeyAndBoardCategory(projectKey, "PROJECT");
+
+                // Build issueMap from loaded sets
+                issueMap = new HashMap<>();
+                epics.forEach(e -> issueMap.put(e.getIssueKey(), e));
+                stories.forEach(e -> issueMap.put(e.getIssueKey(), e));
+                subtasks.forEach(e -> issueMap.put(e.getIssueKey(), e));
+                projectIssues.forEach(e -> issueMap.put(e.getIssueKey(), e));
+            } else {
+                // FULL PATH: load all issues (existing behavior)
+                List<JiraIssueEntity> allIssues = issueRepository.findByProjectKey(projectKey);
+
+                if (allIssues.isEmpty()) {
+                    log.warn("No cached issues found for project: {}. Run sync first.", projectKey);
+                    return new BoardResponse(Collections.emptyList(), 0);
+                }
+
+                issueMap = allIssues.stream()
+                        .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, e -> e));
+
+                epics = allIssues.stream()
+                        .filter(e -> workflowConfigService.isEpic(e.getIssueType()))
+                        .collect(Collectors.toList());
+
+                stories = allIssues.stream()
+                        .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
+                        .collect(Collectors.toList());
+
+                subtasks = allIssues.stream()
+                        .filter(JiraIssueEntity::isSubtask)
+                        .collect(Collectors.toList());
+
+                projectIssues = allIssues.stream()
+                        .filter(e -> "PROJECT".equals(e.getBoardCategory()))
+                        .collect(Collectors.toList());
+            }
 
             // Pre-build subtasks-by-parent map — eliminates N+1 queries in mapToNode()
             Map<String, List<JiraIssueEntity>> subtasksByParent = subtasks.stream()
                     .filter(st -> st.getParentKey() != null)
                     .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
 
-            // Apply filters to epics
+            // Apply filters to epics (teamIds already applied in SQL for fast path)
             List<JiraIssueEntity> filteredEpics = epics.stream()
                     .filter(epic -> {
                         if (query != null && !query.isEmpty()) {
@@ -107,7 +168,7 @@ public class BoardService {
                                 return false;
                             }
                         }
-                        if (teamIds != null && !teamIds.isEmpty()) {
+                        if (!hasTeamFilter && teamIds != null && !teamIds.isEmpty()) {
                             if (epic.getTeamId() == null || !teamIds.contains(epic.getTeamId())) {
                                 return false;
                             }
@@ -125,35 +186,9 @@ public class BoardService {
                 epicMap.put(epic.getIssueKey(), node);
             }
 
-            // Build reverse lookup: epicKey → parentProjectKey
-            // Pre-build parentKey index to avoid O(n²) nested loop
-            Map<String, List<JiraIssueEntity>> childrenByParentKey = allIssues.stream()
-                    .filter(e -> e.getParentKey() != null)
-                    .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
-
-            List<JiraIssueEntity> projectIssues = allIssues.stream()
-                    .filter(e -> "PROJECT".equals(e.getBoardCategory()))
-                    .collect(Collectors.toList());
-            Map<String, String> epicToProjectKey = new HashMap<>();
-            for (JiraIssueEntity proj : projectIssues) {
-                // Parent mode: epics whose parentKey = project key — O(1) lookup
-                List<JiraIssueEntity> projChildren = childrenByParentKey.getOrDefault(proj.getIssueKey(), List.of());
-                for (JiraIssueEntity child : projChildren) {
-                    if ("EPIC".equals(child.getBoardCategory())) {
-                        epicToProjectKey.putIfAbsent(child.getIssueKey(), proj.getIssueKey());
-                    }
-                }
-                // Link mode: childEpicKeys
-                String[] linkedKeys = proj.getChildEpicKeys();
-                if (linkedKeys != null) {
-                    for (String lk : linkedKeys) {
-                        JiraIssueEntity linked = issueMap.get(lk);
-                        if (linked != null && "EPIC".equals(linked.getBoardCategory())) {
-                            epicToProjectKey.putIfAbsent(lk, proj.getIssueKey());
-                        }
-                    }
-                }
-            }
+            // Build epic → project mapping
+            Map<String, String> epicToProjectKey = buildEpicToProjectMapping(
+                    projectIssues, filteredEpics, issueMap);
 
             // Set parentProjectKey on epic nodes
             for (Map.Entry<String, BoardNode> entry : epicMap.entrySet()) {
@@ -240,7 +275,12 @@ public class BoardService {
             int toIndex = Math.min(fromIndex + size, total);
             List<BoardNode> pagedItems = items.subList(fromIndex, toIndex);
 
-            return new BoardResponse(pagedItems, total);
+            BoardResponse response = new BoardResponse(pagedItems, total);
+
+            // Store in board cache
+            boardCache.put(cacheKey, new CachedBoard(response, Instant.now()));
+
+            return response;
         } catch (Exception e) {
             log.error("Failed to build board from cache: {}", e.getMessage(), e);
             return new BoardResponse(Collections.emptyList(), 0);
@@ -449,6 +489,48 @@ public class BoardService {
         long[] metrics = roleMetrics.computeIfAbsent(roleCode, k -> new long[]{0, 0});
         metrics[0] += rm.getEstimateSeconds();
         metrics[1] += rm.getLoggedSeconds();
+    }
+
+    private Map<String, String> buildEpicToProjectMapping(
+            List<JiraIssueEntity> projectIssues,
+            List<JiraIssueEntity> filteredEpics,
+            Map<String, JiraIssueEntity> issueMap) {
+        Map<String, String> epicToProjectKey = new HashMap<>();
+
+        // Build set of epic keys for fast lookup
+        Set<String> epicKeys = filteredEpics.stream()
+                .map(JiraIssueEntity::getIssueKey)
+                .collect(Collectors.toSet());
+
+        for (JiraIssueEntity proj : projectIssues) {
+            // Parent mode: epics whose parentKey = project key
+            for (JiraIssueEntity epic : filteredEpics) {
+                if (proj.getIssueKey().equals(epic.getParentKey())) {
+                    epicToProjectKey.putIfAbsent(epic.getIssueKey(), proj.getIssueKey());
+                }
+            }
+            // Link mode: childEpicKeys
+            String[] linkedKeys = proj.getChildEpicKeys();
+            if (linkedKeys != null) {
+                for (String lk : linkedKeys) {
+                    if (epicKeys.contains(lk)) {
+                        epicToProjectKey.putIfAbsent(lk, proj.getIssueKey());
+                    }
+                }
+            }
+        }
+        return epicToProjectKey;
+    }
+
+    private String buildCacheKey(String projectKey, String query, List<String> statuses,
+                                  List<Long> teamIds, int page, int size, boolean includeDQ) {
+        StringBuilder sb = new StringBuilder(projectKey);
+        sb.append('|').append(query != null ? query : "");
+        sb.append('|').append(statuses != null ? statuses : "");
+        sb.append('|').append(teamIds != null ? teamIds : "");
+        sb.append('|').append(page).append('|').append(size);
+        sb.append('|').append(includeDQ);
+        return sb.toString();
     }
 
     private void enrichStoriesWithForecast(Map<String, BoardNode> epicMap) {

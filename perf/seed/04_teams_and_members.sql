@@ -12,7 +12,7 @@ DECLARE
     ];
     roles TEXT[] := ARRAY['SA', 'SA', 'DEV', 'DEV', 'DEV', 'DEV', 'DEV', 'QA', 'QA', 'QA'];
     grades TEXT[] := ARRAY['SENIOR', 'MIDDLE', 'SENIOR', 'SENIOR', 'MIDDLE', 'MIDDLE', 'JUNIOR', 'SENIOR', 'MIDDLE', 'MIDDLE'];
-    hours DECIMAL[] := ARRAY[6.0, 6.0, 7.0, 7.0, 6.0, 6.0, 8.0, 6.0, 6.0, 7.0];
+    hours DECIMAL[] := ARRAY[7.5, 6.0, 8.0, 7.0, 6.0, 5.0, 8.0, 7.5, 6.0, 7.0];
     pk_idx INT;
     t INT;
     m INT;
@@ -27,12 +27,13 @@ BEGIN
         FOR t IN 1..5 LOOP
             global_team := global_team + 1;
 
-            INSERT INTO teams (name, jira_team_value, active, color)
+            INSERT INTO teams (name, jira_team_value, active, color, planning_config)
             VALUES (
                 project_letters[pk_idx] || '-Team ' || t,
                 'perf-team-' || global_team,
                 TRUE,
-                team_colors[1 + (global_team - 1) % 12]
+                team_colors[1 + (global_team - 1) % 12],
+                '{"gradeCoefficients": {"senior": 0.8, "middle": 1.0, "junior": 1.5}, "riskBuffer": 0.2, "wipLimits": {"team": 6, "roleLimits": {"SA": 2, "DEV": 3, "QA": 2}}, "storyDuration": {"roleDurations": {"SA": 2, "DEV": 3, "QA": 2}}}'::jsonb
             )
             RETURNING id INTO team_id;
 

@@ -9,9 +9,10 @@ export const TENANTS = [
     { slug: 'perf-gamma', name: 'gamma', userCount: 10 },
 ];
 
-// 50 teams per tenant (10 project keys × 5 teams each)
-// Team IDs are auto-generated; we use indices 1-50 per tenant
-export const TEAMS_PER_TENANT = 50;
+// Board loads issues from the first project key only (getProjectKey()),
+// so only teams 1-5 (project PERF-A) are visible on the board.
+// VUs must target teams within the visible range.
+export const TEAMS_PER_TENANT = 5;
 export const MEMBERS_PER_TEAM = 10;
 
 // Project keys (F48 multi-project): 10 keys per tenant

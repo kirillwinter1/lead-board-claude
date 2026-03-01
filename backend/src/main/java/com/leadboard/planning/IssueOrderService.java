@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.board.BoardService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -21,12 +22,14 @@ public class IssueOrderService {
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
     private final UnifiedPlanningService unifiedPlanningService;
+    private final BoardService boardService;
 
     public IssueOrderService(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService,
-                             UnifiedPlanningService unifiedPlanningService) {
+                             UnifiedPlanningService unifiedPlanningService, BoardService boardService) {
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
         this.unifiedPlanningService = unifiedPlanningService;
+        this.boardService = boardService;
     }
 
     /**
@@ -83,6 +86,7 @@ public class IssueOrderService {
         epic.setManualOrder(newPosition);
         JiraIssueEntity saved = issueRepository.save(epic);
         unifiedPlanningService.invalidatePlanCache(teamId);
+        boardService.invalidateBoardCache();
         return saved;
     }
 
@@ -142,6 +146,7 @@ public class IssueOrderService {
         if (story.getTeamId() != null) {
             unifiedPlanningService.invalidatePlanCache(story.getTeamId());
         }
+        boardService.invalidateBoardCache();
         return saved;
     }
 
@@ -211,49 +216,19 @@ public class IssueOrderService {
     }
 
     private void shiftEpicsDown(Long teamId, int fromPosition, int toPosition) {
-        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamOrderByManualOrder(teamId);
-        for (JiraIssueEntity e : epics) {
-            Integer order = e.getManualOrder();
-            if (order != null && order >= fromPosition && order < toPosition) {
-                e.setManualOrder(order + 1);
-                issueRepository.save(e);
-            }
-        }
+        issueRepository.shiftEpicOrdersDown(teamId, fromPosition, toPosition);
     }
 
     private void shiftEpicsUp(Long teamId, int fromPosition, int toPosition) {
-        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamOrderByManualOrder(teamId);
-        for (JiraIssueEntity e : epics) {
-            Integer order = e.getManualOrder();
-            if (order != null && order > fromPosition && order <= toPosition) {
-                e.setManualOrder(order - 1);
-                issueRepository.save(e);
-            }
-        }
+        issueRepository.shiftEpicOrdersUp(teamId, fromPosition, toPosition);
     }
 
     private void shiftStoriesDown(String parentKey, int fromPosition, int toPosition) {
-        List<JiraIssueEntity> stories = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
-        for (JiraIssueEntity s : stories) {
-            if (!workflowConfigService.isStoryOrBug(s.getIssueType())) continue;
-            Integer order = s.getManualOrder();
-            if (order != null && order >= fromPosition && order < toPosition) {
-                s.setManualOrder(order + 1);
-                issueRepository.save(s);
-            }
-        }
+        issueRepository.shiftStoryOrdersDown(parentKey, fromPosition, toPosition);
     }
 
     private void shiftStoriesUp(String parentKey, int fromPosition, int toPosition) {
-        List<JiraIssueEntity> stories = issueRepository.findByParentKeyOrderByManualOrderAsc(parentKey);
-        for (JiraIssueEntity s : stories) {
-            if (!workflowConfigService.isStoryOrBug(s.getIssueType())) continue;
-            Integer order = s.getManualOrder();
-            if (order != null && order > fromPosition && order <= toPosition) {
-                s.setManualOrder(order - 1);
-                issueRepository.save(s);
-            }
-        }
+        issueRepository.shiftStoryOrdersUp(parentKey, fromPosition, toPosition);
     }
 
 }

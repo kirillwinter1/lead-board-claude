@@ -98,6 +98,16 @@ management:
       percentiles:
         http.server.requests: 0.5,0.95,0.99
 
+chat:
+  enabled: ${CHAT_ENABLED:false}
+  provider: ${CHAT_PROVIDER:openrouter}
+  api-key: ${CHAT_API_KEY:}
+  model: ${CHAT_MODEL:google/gemini-2.5-flash}
+  base-url: ${CHAT_BASE_URL:https://openrouter.ai/api/v1}
+  max-history-messages: ${CHAT_MAX_HISTORY:20}
+  timeout-seconds: ${CHAT_TIMEOUT:30}
+  max-tool-calls: ${CHAT_MAX_TOOL_CALLS:5}
+
 simulation:
   enabled: ${SIMULATION_ENABLED:false}
   cron: ${SIMULATION_CRON:0 0 19 * * MON-FRI}

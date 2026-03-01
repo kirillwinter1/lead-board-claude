@@ -96,6 +96,9 @@ class SyncServiceTest {
     @Mock
     private com.leadboard.planning.UnifiedPlanningService unifiedPlanningService;
 
+    @Mock
+    private com.leadboard.board.BoardService boardService;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -120,6 +123,7 @@ class SyncServiceTest {
                 tenantJiraConfigRepository,
                 observabilityMetrics,
                 unifiedPlanningService,
+                boardService,
                 null // self (not needed for unit tests, @Async not invoked via proxy)
         );
 

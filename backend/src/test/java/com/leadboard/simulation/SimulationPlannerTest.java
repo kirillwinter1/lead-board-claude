@@ -343,7 +343,7 @@ class SimulationPlannerTest {
                 stories, Map.of(),
                 "Developing", null, 0L, 0L, 0,
                 Map.of(), stories.size(), stories.size(),
-                false, null, null
+                false, null, null, false
         );
     }
 }

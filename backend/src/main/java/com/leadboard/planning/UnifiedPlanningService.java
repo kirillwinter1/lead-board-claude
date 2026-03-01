@@ -49,6 +49,7 @@ public class UnifiedPlanningService {
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
     private static final BigDecimal SECONDS_PER_HOUR = new BigDecimal("3600");
     private static final long CACHE_TTL_MS = 60_000; // 60 seconds
+    private static final int EARLY_EXIT_WORKDAYS = 130; // ~6 months horizon for fast estimation
 
     private final ConcurrentHashMap<Long, CachedPlan> planCache = new ConcurrentHashMap<>();
 
@@ -150,7 +151,14 @@ public class UnifiedPlanningService {
         // 5. Get dynamic pipeline roles
         List<String> pipelineRoles = workflowConfigService.getRoleCodesInPipelineOrder();
 
-        // 5a. Batch-load all subtasks for all stories in team's epics — eliminates N+1
+        // 5a. Pre-compute team capacity per role for fast estimation
+        Map<String, BigDecimal> roleCapacityPerDay = new HashMap<>();
+        for (AssigneeSchedule schedule : assigneeSchedules.values()) {
+            roleCapacityPerDay.merge(schedule.getRoleCode(),
+                    schedule.getEffectiveHoursPerDay(), BigDecimal::add);
+        }
+
+        // 5b. Batch-load all subtasks for all stories in team's epics — eliminates N+1
         List<String> epicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
         List<JiraIssueEntity> allStories = epicKeys.isEmpty() ? List.of()
                 : issueRepository.findByParentKeyIn(epicKeys).stream()
@@ -167,19 +175,40 @@ public class UnifiedPlanningService {
         List<PlanningWarning> globalWarnings = new ArrayList<>();
         Map<String, LocalDate> storyEndDates = new HashMap<>(); // For dependency tracking
 
+        boolean useFastMode = false;
+        LocalDate horizonDate = calendarService.addWorkdays(LocalDate.now(), EARLY_EXIT_WORKDAYS);
+        LocalDate currentPlanDate = LocalDate.now();
+
         for (JiraIssueEntity epic : epics) {
-            PlannedEpic plannedEpic = planEpic(
-                    epic,
-                    assigneeSchedules,
-                    storyEndDates,
-                    calendarHelper,
-                    riskBuffer,
-                    pipelineRoles,
-                    globalWarnings,
-                    competencyMap,
-                    subtasksByStory
-            );
+            PlannedEpic plannedEpic;
+            if (useFastMode) {
+                plannedEpic = planEpicFast(
+                        epic, roleCapacityPerDay, currentPlanDate,
+                        riskBuffer, pipelineRoles, subtasksByStory, storyEndDates,
+                        globalWarnings
+                );
+            } else {
+                plannedEpic = planEpic(
+                        epic,
+                        assigneeSchedules,
+                        storyEndDates,
+                        calendarHelper,
+                        riskBuffer,
+                        pipelineRoles,
+                        globalWarnings,
+                        competencyMap,
+                        subtasksByStory
+                );
+                if (plannedEpic.endDate() != null && plannedEpic.endDate().isAfter(horizonDate)) {
+                    useFastMode = true;
+                    log.info("Early exit: switching to fast mode after epic {} (endDate {} > horizon {})",
+                            epic.getIssueKey(), plannedEpic.endDate(), horizonDate);
+                }
+            }
             plannedEpics.add(plannedEpic);
+            if (plannedEpic.endDate() != null) {
+                currentPlanDate = plannedEpic.endDate();
+            }
         }
 
         // 7. Build assignee utilization map
@@ -458,7 +487,8 @@ public class UnifiedPlanningService {
                 storiesActive,
                 isRoughEstimate,
                 epic.getRoughEstimates(),
-                epic.getFlagged()
+                epic.getFlagged(),
+                false
         );
     }
 
@@ -963,7 +993,347 @@ public class UnifiedPlanningService {
                 0,
                 true,
                 epic.getRoughEstimates(),
-                epic.getFlagged()
+                epic.getFlagged(),
+                false
+        );
+    }
+
+    /**
+     * Fast estimation of an epic — uses math instead of day-by-day simulation.
+     * Used for epics beyond the planning horizon (early exit optimization).
+     */
+    private PlannedEpic planEpicFast(
+            JiraIssueEntity epic,
+            Map<String, BigDecimal> roleCapacityPerDay,
+            LocalDate epicStartDate,
+            BigDecimal riskBuffer,
+            List<String> pipelineRoles,
+            Map<String, List<JiraIssueEntity>> subtasksByStory,
+            Map<String, LocalDate> storyEndDates,
+            List<PlanningWarning> globalWarnings
+    ) {
+        String epicKey = epic.getIssueKey();
+        log.debug("Fast-planning epic {}", epicKey);
+
+        List<JiraIssueEntity> stories = getStoriesSorted(epicKey);
+
+        if (stories.isEmpty() && workflowConfigService.isPlanningAllowed(epic.getStatus()) && hasRoughEstimates(epic)) {
+            return planRoughEstimateFast(epic, roleCapacityPerDay, epicStartDate, riskBuffer, pipelineRoles);
+        }
+
+        List<PlannedStory> plannedStories = new ArrayList<>();
+        LocalDate fastEpicStart = null;
+        LocalDate fastEpicEnd = null;
+
+        Map<String, BigDecimal> totalRoleHours = new LinkedHashMap<>();
+        Map<String, LocalDate> roleStartDates = new HashMap<>();
+        Map<String, LocalDate> roleEndDates = new HashMap<>();
+        for (String role : pipelineRoles) {
+            totalRoleHours.put(role, BigDecimal.ZERO);
+        }
+
+        long epicTotalEstimate = 0;
+        long epicTotalLogged = 0;
+        int storiesTotal = stories.size();
+        int storiesActive = 0;
+
+        Map<String, Long> roleEstimate = new HashMap<>();
+        Map<String, Long> roleLogged = new HashMap<>();
+        Map<String, Boolean> roleExists = new HashMap<>();
+        Map<String, Boolean> roleDone = new HashMap<>();
+        for (String role : pipelineRoles) {
+            roleEstimate.put(role, 0L);
+            roleLogged.put(role, 0L);
+            roleExists.put(role, false);
+            roleDone.put(role, true);
+        }
+
+        for (JiraIssueEntity story : stories) {
+            if (workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
+                StoryProgressData doneProgress = extractProgressData(story, subtasksByStory);
+                if (doneProgress.totalEstimate() > 0) {
+                    epicTotalEstimate += doneProgress.totalEstimate();
+                    epicTotalLogged += doneProgress.totalLogged();
+                }
+                Map<String, PhaseProgressInfo> rp = doneProgress.roleProgress();
+                if (rp != null) {
+                    for (Map.Entry<String, PhaseProgressInfo> e : rp.entrySet()) {
+                        accumulateRoleProgress(e.getValue(), e.getKey(), roleEstimate, roleLogged, roleExists, roleDone);
+                    }
+                }
+                plannedStories.add(new PlannedStory(
+                        story.getIssueKey(), story.getSummary(), story.getAutoScore(),
+                        story.getStatus(), null, null, Map.of(),
+                        story.getIsBlockedBy() != null ? story.getIsBlockedBy() : List.of(),
+                        List.of(), story.getIssueType(), story.getPriority(), story.getFlagged(),
+                        doneProgress.totalEstimate(), doneProgress.totalLogged(),
+                        doneProgress.progressPercent(), doneProgress.roleProgress()
+                ));
+                continue;
+            }
+
+            if (Boolean.TRUE.equals(story.getFlagged())) {
+                globalWarnings.add(new PlanningWarning(
+                        story.getIssueKey(), WarningType.FLAGGED, "Story is flagged (work paused)"));
+                continue;
+            }
+
+            Map<String, BigDecimal> phaseHoursMap = extractPhaseHoursMap(story, epic, subtasksByStory);
+            boolean isEmpty = phaseHoursMap.values().stream()
+                    .allMatch(h -> h.compareTo(BigDecimal.ZERO) == 0);
+
+            if (isEmpty) {
+                globalWarnings.add(new PlanningWarning(
+                        story.getIssueKey(), WarningType.NO_ESTIMATE, "Story has no subtasks with estimates"));
+
+                StoryProgressData progressData = extractProgressData(story, subtasksByStory);
+                if (progressData.totalEstimate() > 0 || progressData.totalLogged() > 0) {
+                    epicTotalEstimate += progressData.totalEstimate();
+                    epicTotalLogged += progressData.totalLogged();
+                }
+                plannedStories.add(new PlannedStory(
+                        story.getIssueKey(), story.getSummary(), story.getAutoScore(),
+                        story.getStatus(), null, null, Map.of(),
+                        story.getIsBlockedBy() != null ? story.getIsBlockedBy() : List.of(),
+                        List.of(new PlanningWarning(story.getIssueKey(), WarningType.NO_ESTIMATE, "No estimate")),
+                        story.getIssueType(), story.getPriority(), story.getFlagged(),
+                        progressData.totalEstimate(), progressData.totalLogged(),
+                        progressData.progressPercent(), progressData.roleProgress()
+                ));
+                continue;
+            }
+
+            BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
+            Map<String, BigDecimal> bufferedHours = new LinkedHashMap<>();
+            for (Map.Entry<String, BigDecimal> entry : phaseHoursMap.entrySet()) {
+                bufferedHours.put(entry.getKey(),
+                        entry.getValue().multiply(multiplier).setScale(2, RoundingMode.HALF_UP));
+            }
+
+            PlannedStory plannedStory = planStoryFast(
+                    story, bufferedHours, pipelineRoles,
+                    roleCapacityPerDay, storyEndDates, subtasksByStory,
+                    epicStartDate
+            );
+
+            plannedStories.add(plannedStory);
+
+            if (plannedStory.endDate() != null) {
+                storyEndDates.put(story.getIssueKey(), plannedStory.endDate());
+            }
+
+            if (plannedStory.startDate() != null) {
+                if (fastEpicStart == null || plannedStory.startDate().isBefore(fastEpicStart)) {
+                    fastEpicStart = plannedStory.startDate();
+                }
+            }
+            if (plannedStory.endDate() != null) {
+                if (fastEpicEnd == null || plannedStory.endDate().isAfter(fastEpicEnd)) {
+                    fastEpicEnd = plannedStory.endDate();
+                }
+            }
+
+            Map<String, PhaseSchedule> phases = plannedStory.phases();
+            for (Map.Entry<String, PhaseSchedule> e : phases.entrySet()) {
+                aggregatePhaseData(e.getValue(), e.getKey(), totalRoleHours, roleStartDates, roleEndDates);
+            }
+
+            if (plannedStory.totalEstimateSeconds() != null) epicTotalEstimate += plannedStory.totalEstimateSeconds();
+            if (plannedStory.totalLoggedSeconds() != null) epicTotalLogged += plannedStory.totalLoggedSeconds();
+
+            Map<String, PhaseProgressInfo> rp = plannedStory.roleProgress();
+            if (rp != null) {
+                for (Map.Entry<String, PhaseProgressInfo> e : rp.entrySet()) {
+                    accumulateRoleProgress(e.getValue(), e.getKey(), roleEstimate, roleLogged, roleExists, roleDone);
+                }
+            }
+
+            if (!workflowConfigService.isDone(plannedStory.status(), story.getIssueType())) {
+                storiesActive++;
+            }
+        }
+
+        Map<String, PhaseAggregationEntry> aggregation = new LinkedHashMap<>();
+        for (String role : pipelineRoles) {
+            BigDecimal hours = totalRoleHours.getOrDefault(role, BigDecimal.ZERO);
+            if (hours.compareTo(BigDecimal.ZERO) > 0 || roleStartDates.containsKey(role)) {
+                aggregation.put(role, new PhaseAggregationEntry(hours, roleStartDates.get(role), roleEndDates.get(role)));
+            }
+        }
+
+        int epicProgressPercent = epicTotalEstimate > 0
+                ? (int) Math.min(100, (epicTotalLogged * 100) / epicTotalEstimate) : 0;
+
+        Map<String, PhaseProgressInfo> epicRoleProgress = new LinkedHashMap<>();
+        for (String role : pipelineRoles) {
+            if (roleExists.getOrDefault(role, false)) {
+                epicRoleProgress.put(role, new PhaseProgressInfo(
+                        roleEstimate.get(role), roleLogged.get(role), roleDone.get(role)));
+            }
+        }
+
+        return new PlannedEpic(
+                epicKey, epic.getSummary(), epic.getAutoScore(),
+                fastEpicStart, fastEpicEnd, plannedStories, aggregation,
+                epic.getStatus(), epic.getDueDate(),
+                epicTotalEstimate, epicTotalLogged, epicProgressPercent, epicRoleProgress,
+                storiesTotal, storiesActive,
+                false, epic.getRoughEstimates(), epic.getFlagged(),
+                true
+        );
+    }
+
+    /**
+     * Fast estimation of a story — uses ceil(hours/capacity) instead of day-by-day simulation.
+     * No assignee selection, no state mutation, no competency scoring.
+     * Complexity: O(roles) instead of O(roles × assignees × 365).
+     */
+    private PlannedStory planStoryFast(
+            JiraIssueEntity story,
+            Map<String, BigDecimal> bufferedHours,
+            List<String> pipelineRoles,
+            Map<String, BigDecimal> roleCapacityPerDay,
+            Map<String, LocalDate> storyEndDates,
+            Map<String, List<JiraIssueEntity>> subtasksByStory,
+            LocalDate epicStartDate
+    ) {
+        String storyKey = story.getIssueKey();
+        List<PlanningWarning> warnings = new ArrayList<>();
+
+        LocalDate earliestStart = epicStartDate != null && epicStartDate.isAfter(LocalDate.now())
+                ? epicStartDate : LocalDate.now();
+        List<String> blockedBy = story.getIsBlockedBy();
+        if (blockedBy != null && !blockedBy.isEmpty()) {
+            for (String blockerKey : blockedBy) {
+                LocalDate blockerEnd = storyEndDates.get(blockerKey);
+                if (blockerEnd != null) {
+                    LocalDate afterBlocker = calendarService.addWorkdays(blockerEnd, 1);
+                    if (afterBlocker.isAfter(earliestStart)) {
+                        earliestStart = afterBlocker;
+                    }
+                }
+            }
+        }
+
+        LocalDate currentDate = earliestStart;
+        Map<String, PhaseSchedule> roleSchedules = new LinkedHashMap<>();
+
+        for (String roleCode : pipelineRoles) {
+            BigDecimal hours = bufferedHours.getOrDefault(roleCode, BigDecimal.ZERO);
+            if (hours.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal capacity = roleCapacityPerDay.getOrDefault(roleCode, BigDecimal.ZERO);
+                if (capacity.compareTo(BigDecimal.ZERO) > 0) {
+                    int workdays = hours.divide(capacity, 0, RoundingMode.CEILING).intValue();
+                    LocalDate endDate = calendarService.addWorkdays(currentDate, Math.max(workdays, 1));
+                    roleSchedules.put(roleCode, new PhaseSchedule(
+                            null, null, currentDate, endDate, hours, false));
+                    currentDate = calendarService.addWorkdays(endDate, 1);
+                } else {
+                    warnings.add(new PlanningWarning(storyKey, WarningType.NO_CAPACITY,
+                            "No " + roleCode + " capacity in team"));
+                    roleSchedules.put(roleCode, PhaseSchedule.noCapacity(hours));
+                }
+            }
+        }
+
+        LocalDate storyStart = null;
+        LocalDate storyEnd = null;
+        for (String roleCode : pipelineRoles) {
+            PhaseSchedule schedule = roleSchedules.get(roleCode);
+            if (schedule != null && schedule.startDate() != null && storyStart == null) {
+                storyStart = schedule.startDate();
+            }
+            if (schedule != null && schedule.endDate() != null) {
+                storyEnd = schedule.endDate();
+            }
+        }
+
+        StoryProgressData progressData = extractProgressData(story, subtasksByStory);
+
+        return new PlannedStory(
+                storyKey, story.getSummary(), story.getAutoScore(),
+                story.getStatus(), storyStart, storyEnd, roleSchedules,
+                blockedBy != null ? blockedBy : List.of(), warnings,
+                story.getIssueType(), story.getPriority(), story.getFlagged(),
+                progressData.totalEstimate(), progressData.totalLogged(),
+                progressData.progressPercent(), progressData.roleProgress()
+        );
+    }
+
+    /**
+     * Fast rough-estimate planning — uses math instead of assignee-based planPhase.
+     */
+    private PlannedEpic planRoughEstimateFast(
+            JiraIssueEntity epic,
+            Map<String, BigDecimal> roleCapacityPerDay,
+            LocalDate startDate,
+            BigDecimal riskBuffer,
+            List<String> pipelineRoles
+    ) {
+        String epicKey = epic.getIssueKey();
+        log.debug("Fast rough-estimate planning epic {}", epicKey);
+
+        Map<String, BigDecimal> roleHours = new LinkedHashMap<>();
+        Map<String, BigDecimal> roughEstimates = epic.getRoughEstimates();
+        if (roughEstimates != null) {
+            for (Map.Entry<String, BigDecimal> entry : roughEstimates.entrySet()) {
+                if (entry.getValue() != null && entry.getValue().compareTo(BigDecimal.ZERO) > 0) {
+                    roleHours.put(entry.getKey(), entry.getValue().multiply(HOURS_PER_DAY));
+                }
+            }
+        }
+
+        BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
+        for (Map.Entry<String, BigDecimal> entry : roleHours.entrySet()) {
+            entry.setValue(entry.getValue().multiply(multiplier).setScale(2, RoundingMode.HALF_UP));
+        }
+
+        LocalDate currentDate = startDate != null && startDate.isAfter(LocalDate.now())
+                ? startDate : LocalDate.now();
+        Map<String, LocalDate> startDates = new HashMap<>();
+        Map<String, LocalDate> endDates = new HashMap<>();
+
+        for (String roleCode : pipelineRoles) {
+            BigDecimal hours = roleHours.getOrDefault(roleCode, BigDecimal.ZERO);
+            if (hours.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal capacity = roleCapacityPerDay.getOrDefault(roleCode, BigDecimal.ZERO);
+                if (capacity.compareTo(BigDecimal.ZERO) > 0) {
+                    int workdays = hours.divide(capacity, 0, RoundingMode.CEILING).intValue();
+                    LocalDate endDate = calendarService.addWorkdays(currentDate, Math.max(workdays, 1));
+                    startDates.put(roleCode, currentDate);
+                    endDates.put(roleCode, endDate);
+                    currentDate = calendarService.addWorkdays(endDate, 1);
+                }
+            }
+        }
+
+        LocalDate epicStartDate = null;
+        LocalDate epicEndDate = null;
+        for (String roleCode : pipelineRoles) {
+            if (startDates.containsKey(roleCode) && epicStartDate == null) {
+                epicStartDate = startDates.get(roleCode);
+            }
+            if (endDates.containsKey(roleCode)) {
+                epicEndDate = endDates.get(roleCode);
+            }
+        }
+
+        Map<String, PhaseAggregationEntry> aggregation = new LinkedHashMap<>();
+        for (String role : pipelineRoles) {
+            BigDecimal hours = roleHours.getOrDefault(role, BigDecimal.ZERO);
+            if (hours.compareTo(BigDecimal.ZERO) > 0) {
+                aggregation.put(role, new PhaseAggregationEntry(
+                        hours, startDates.get(role), endDates.get(role)));
+            }
+        }
+
+        return new PlannedEpic(
+                epicKey, epic.getSummary(), epic.getAutoScore(),
+                epicStartDate, epicEndDate, List.of(), aggregation,
+                epic.getStatus(), epic.getDueDate(),
+                0L, 0L, 0, Map.of(), 0, 0,
+                true, epic.getRoughEstimates(), epic.getFlagged(),
+                true
         );
     }
 
