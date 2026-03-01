@@ -28,11 +28,14 @@ class IssueOrderServiceTest {
     @Mock
     private WorkflowConfigService workflowConfigService;
 
+    @Mock
+    private UnifiedPlanningService unifiedPlanningService;
+
     private IssueOrderService service;
 
     @BeforeEach
     void setUp() {
-        service = new IssueOrderService(issueRepository, workflowConfigService);
+        service = new IssueOrderService(issueRepository, workflowConfigService, unifiedPlanningService);
 
         // Default type categorization
         lenient().when(workflowConfigService.isEpic("Epic")).thenReturn(true);

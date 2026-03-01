@@ -106,6 +106,8 @@ cmd_stress() { run_k6 "stress"; }
 cmd_soak()   { run_k6 "soak"; }
 cmd_multi()  { run_k6 "multi-tenant"; }
 
+cmd_reorder() { run_k6 "reorder-stress"; }
+
 cmd_all() {
     cmd_seed
     echo ""
@@ -127,6 +129,7 @@ usage() {
     echo "  stress    Run stress test (0-500 VUs, 3 min)"
     echo "  soak      Run soak test (100 VUs, 30 min)"
     echo "  multi     Run multi-tenant test (3×50 VUs, 4 min)"
+    echo "  reorder   Run epic reorder + forecast stress test (50 VUs, 5 min)"
     echo "  all       Run seed + smoke + load"
     echo ""
     echo "Environment variables:"
@@ -154,6 +157,7 @@ case "${1:-}" in
     stress)  cmd_stress ;;
     soak)    cmd_soak ;;
     multi)   cmd_multi ;;
+    reorder) cmd_reorder ;;
     all)     cmd_all ;;
     *)       usage ;;
 esac

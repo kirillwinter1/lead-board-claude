@@ -1,6 +1,7 @@
 package com.leadboard.sync;
 
 import com.leadboard.config.JiraConfigResolver;
+import com.leadboard.config.ObservabilityMetrics;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
@@ -89,10 +90,18 @@ class SyncServiceTest {
     @Mock
     private TenantJiraConfigRepository tenantJiraConfigRepository;
 
+    @Mock
+    private ObservabilityMetrics observabilityMetrics;
+
+    @Mock
+    private com.leadboard.planning.UnifiedPlanningService unifiedPlanningService;
+
     private SyncService syncService;
 
     @BeforeEach
     void setUp() {
+        when(observabilityMetrics.startSyncTimer()).thenReturn(io.micrometer.core.instrument.Timer.start(io.micrometer.core.instrument.Metrics.globalRegistry));
+
         syncService = new SyncService(
                 jiraClient,
                 jiraConfigResolver,
@@ -109,6 +118,8 @@ class SyncServiceTest {
                 changelogImportService,
                 teamSyncService,
                 tenantJiraConfigRepository,
+                observabilityMetrics,
+                unifiedPlanningService,
                 null // self (not needed for unit tests, @Async not invoked via proxy)
         );
 

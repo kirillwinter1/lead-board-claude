@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-02-25
+**Последнее обновление:** 2026-03-01
 
 ---
 
@@ -16,7 +16,7 @@
 | 4 | **Timeline** | F14, F20, F21, F45 | ✅ Проверен | 0 багов (11 fixed) | [reports/2026-02-25_TIMELINE.md](reports/2026-02-25_TIMELINE.md) |
 | 5 | **Data Quality** | F18, F36, F42 | ✅ Проверен | (входит в Board QA) | [reports/2026-02-19_BOARD_DQ_BUGSLA.md](reports/2026-02-19_BOARD_DQ_BUGSLA.md) |
 | 6 | **Planning Poker** | F23 | ⏸️ Отложен | Известные баги с Jira | — |
-| 7 | **Workflow Config** | F17, F29, F38 | ✅ Проверен | 2 Critical, 2 High, 7 Medium, 5 Low | [reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md](reports/2026-02-25_WORKFLOW_TENANT_WIZARD.md) |
+| 7 | **Workflow Config** | F17, F29, F38, F48 | ✅ Проверен | 2 Critical, 4 High, 10 Medium, 8 Low | [reports/2026-03-01_F48_PER_PROJECT_WORKFLOW.md](reports/2026-03-01_F48_PER_PROJECT_WORKFLOW.md) |
 | 8 | **Simulation** | F28 | ✅ Проверен | 2 Critical, 4 High, 7 Medium, 5 Low | [reports/2026-02-25_SIMULATION.md](reports/2026-02-25_SIMULATION.md) |
 | 9 | **Projects** | F35 | ✅ Проверен | 1 High (test regression), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 10 | **RICE Scoring** | F36 | ✅ Проверен | 2 Medium (case-sensitive, FP), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
@@ -42,10 +42,10 @@
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
 | Critical | 2 | 8 | 10 |
-| High | 14 | 19 | 33 |
-| Medium | 29 | 31 | 60 |
-| Low | 19 | 13 | 32 |
-| **Итого** | **64** | **71** | **135** |
+| High | 16 | 19 | 35 |
+| Medium | 34 | 31 | 65 |
+| Low | 24 | 13 | 37 |
+| **Итого** | **76** | **71** | **147** |
 
 ---
 
@@ -297,6 +297,22 @@
 | BUG-106 | Low | OAuth tokens stored in plaintext — DB compromise leaks all Jira tokens | OPEN |
 | BUG-107 | Low | Sessions not bound to client fingerprint — stolen cookie works from any location | OPEN |
 
+### Board Endpoint Optimization — 2026-03-01
+
+**Scope:** N+1 fix, O(n^2) fix, TTL cache, DQ decoupling, HikariCP tuning
+**API tests:** 18 проверок — 18 PASS, 0 FAIL
+**Backend tests:** 785 ALL PASS
+**Performance:** p50 132ms (no DQ), p50 384ms (with DQ) на 61K issues — было 30s timeout
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-136 | Medium | Cache not invalidated when team planning config changes (TeamService.updatePlanningConfig) | OPEN |
+| BUG-137 | Medium | Cache not invalidated when team members change (add/remove/deactivate) | OPEN |
+| BUG-138 | Low | Unbounded ConcurrentHashMap growth — no eviction for deleted teams | OPEN |
+| BUG-139 | Low | Frontend always sends includeDQ=true — negates 3x speedup opportunity | OPEN |
+
+---
+
 ### Member Profile (F30) — 2026-02-25
 
 **API endpoint (1):** 14 проверок — 12 PASS, 1 BUG, 1 NOTE
@@ -337,7 +353,8 @@ ai-ru/testing/
     ├── 2026-02-25_SIMULATION.md       ← QA-отчёт: Simulation (F28)
     ├── 2026-02-25_AUTH_RBAC.md        ← QA-отчёт: Auth / RBAC
     ├── 2026-02-25_MULTITENANCY_E2E.md ← QA-отчёт: Multi-Tenancy E2E Customer Journey
-    └── 2026-02-25_MEMBER_PROFILE.md   ← QA-отчёт: Member Profile (F30)
+    ├── 2026-02-25_MEMBER_PROFILE.md   ← QA-отчёт: Member Profile (F30)
+    └── 2026-03-01_BOARD_OPTIMIZATION.md ← QA-отчёт: Board Endpoint Optimization
 ```
 
 ## Процесс

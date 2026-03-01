@@ -58,7 +58,8 @@ public class TenantFilter extends OncePerRequestFilter {
                     String path = request.getRequestURI();
                     boolean isPublicRoute = path.startsWith("/api/public/")
                             || path.startsWith("/oauth/")
-                            || path.equals("/api/health");
+                            || path.equals("/api/health")
+                            || path.startsWith("/actuator/");
                     if (!isPublicRoute) {
                         log.warn("Unknown tenant slug: '{}' — access denied", slug);
                         response.sendError(HttpServletResponse.SC_NOT_FOUND, "Tenant not found");

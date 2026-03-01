@@ -19,9 +19,11 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -46,6 +48,15 @@ public class UnifiedPlanningService {
     private static final Logger log = LoggerFactory.getLogger(UnifiedPlanningService.class);
     private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
     private static final BigDecimal SECONDS_PER_HOUR = new BigDecimal("3600");
+    private static final long CACHE_TTL_MS = 60_000; // 60 seconds
+
+    private final ConcurrentHashMap<Long, CachedPlan> planCache = new ConcurrentHashMap<>();
+
+    private record CachedPlan(UnifiedPlanningResult result, Instant cachedAt) {
+        boolean isExpired() {
+            return Instant.now().toEpochMilli() - cachedAt.toEpochMilli() > CACHE_TTL_MS;
+        }
+    }
 
     private final JiraIssueRepository issueRepository;
     private final TeamService teamService;
@@ -77,9 +88,33 @@ public class UnifiedPlanningService {
     }
 
     /**
-     * Main entry point for unified planning.
+     * Main entry point for unified planning. Results are cached for 60 seconds.
      */
     public UnifiedPlanningResult calculatePlan(Long teamId) {
+        CachedPlan cached = planCache.get(teamId);
+        if (cached != null && !cached.isExpired()) {
+            log.debug("Returning cached plan for team {} (age {}ms)", teamId,
+                    Instant.now().toEpochMilli() - cached.cachedAt().toEpochMilli());
+            return cached.result();
+        }
+        return calculatePlanUncached(teamId);
+    }
+
+    /**
+     * Invalidate plan cache for a specific team (call after sync/reorder).
+     */
+    public void invalidatePlanCache(Long teamId) {
+        planCache.remove(teamId);
+    }
+
+    /**
+     * Invalidate all plan caches.
+     */
+    public void invalidateAllPlanCaches() {
+        planCache.clear();
+    }
+
+    private UnifiedPlanningResult calculatePlanUncached(Long teamId) {
         log.info("Starting unified planning for team {}", teamId);
 
         // 1. Load configuration
@@ -115,6 +150,18 @@ public class UnifiedPlanningService {
         // 5. Get dynamic pipeline roles
         List<String> pipelineRoles = workflowConfigService.getRoleCodesInPipelineOrder();
 
+        // 5a. Batch-load all subtasks for all stories in team's epics — eliminates N+1
+        List<String> epicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
+        List<JiraIssueEntity> allStories = epicKeys.isEmpty() ? List.of()
+                : issueRepository.findByParentKeyIn(epicKeys).stream()
+                        .filter(c -> workflowConfigService.isStoryOrBug(c.getIssueType()))
+                        .toList();
+        List<String> allStoryKeys = allStories.stream().map(JiraIssueEntity::getIssueKey).toList();
+        Map<String, List<JiraIssueEntity>> subtasksByStory = allStoryKeys.isEmpty()
+                ? Map.of()
+                : issueRepository.findByParentKeyIn(allStoryKeys).stream()
+                        .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+
         // 6. Plan all stories across all epics
         List<PlannedEpic> plannedEpics = new ArrayList<>();
         List<PlanningWarning> globalWarnings = new ArrayList<>();
@@ -129,7 +176,8 @@ public class UnifiedPlanningService {
                     riskBuffer,
                     pipelineRoles,
                     globalWarnings,
-                    competencyMap
+                    competencyMap,
+                    subtasksByStory
             );
             plannedEpics.add(plannedEpic);
         }
@@ -140,13 +188,16 @@ public class UnifiedPlanningService {
         log.info("Unified planning completed: {} epics, {} warnings",
                 plannedEpics.size(), globalWarnings.size());
 
-        return new UnifiedPlanningResult(
+        UnifiedPlanningResult result = new UnifiedPlanningResult(
                 teamId,
                 OffsetDateTime.now(),
                 plannedEpics,
                 globalWarnings,
                 utilization
         );
+
+        planCache.put(teamId, new CachedPlan(result, Instant.now()));
+        return result;
     }
 
     /**
@@ -160,7 +211,8 @@ public class UnifiedPlanningService {
             BigDecimal riskBuffer,
             List<String> pipelineRoles,
             List<PlanningWarning> globalWarnings,
-            Map<String, Map<String, Integer>> competencyMap
+            Map<String, Map<String, Integer>> competencyMap,
+            Map<String, List<JiraIssueEntity>> subtasksByStory
     ) {
         String epicKey = epic.getIssueKey();
         log.debug("Planning epic {}", epicKey);
@@ -205,7 +257,7 @@ public class UnifiedPlanningService {
         for (JiraIssueEntity story : stories) {
             // Done stories: accumulate progress and add placeholder PlannedStory (dates come from retro)
             if (workflowConfigService.isDone(story.getStatus(), story.getIssueType())) {
-                StoryProgressData doneProgress = extractProgressData(story);
+                StoryProgressData doneProgress = extractProgressData(story, subtasksByStory);
                 if (doneProgress.totalEstimate() > 0) {
                     epicTotalEstimate += doneProgress.totalEstimate();
                     epicTotalLogged += doneProgress.totalLogged();
@@ -249,7 +301,7 @@ public class UnifiedPlanningService {
             }
 
             // Extract phase hours from subtasks (dynamic by role)
-            Map<String, BigDecimal> phaseHoursMap = extractPhaseHoursMap(story, epic);
+            Map<String, BigDecimal> phaseHoursMap = extractPhaseHoursMap(story, epic, subtasksByStory);
 
             // Check if story has estimates
             boolean isEmpty = phaseHoursMap.values().stream()
@@ -262,7 +314,7 @@ public class UnifiedPlanningService {
                         "Story has no subtasks with estimates"
                 ));
 
-                StoryProgressData progressData = extractProgressData(story);
+                StoryProgressData progressData = extractProgressData(story, subtasksByStory);
 
                 // Accumulate progress even for stories without estimates (may have logged time)
                 if (progressData.totalEstimate() > 0 || progressData.totalLogged() > 0) {
@@ -306,7 +358,8 @@ public class UnifiedPlanningService {
                     assigneeSchedules,
                     storyEndDates,
                     calendarHelper,
-                    competencyMap
+                    competencyMap,
+                    subtasksByStory
             );
 
             plannedStories.add(plannedStory);
@@ -445,7 +498,8 @@ public class UnifiedPlanningService {
             Map<String, AssigneeSchedule> assigneeSchedules,
             Map<String, LocalDate> storyEndDates,
             AssigneeSchedule.WorkCalendarHelper calendarHelper,
-            Map<String, Map<String, Integer>> competencyMap
+            Map<String, Map<String, Integer>> competencyMap,
+            Map<String, List<JiraIssueEntity>> subtasksByStory
     ) {
         String storyKey = story.getIssueKey();
         List<PlanningWarning> warnings = new ArrayList<>();
@@ -470,7 +524,7 @@ public class UnifiedPlanningService {
         Map<String, PhaseSchedule> roleSchedules = new LinkedHashMap<>();
 
         // Resolve components: subtasks first, then story fallback
-        List<String> storyComponents = resolveComponents(story);
+        List<String> storyComponents = resolveComponents(story, subtasksByStory);
 
         for (String roleCode : pipelineRoles) {
             BigDecimal hours = phaseHoursMap.getOrDefault(roleCode, BigDecimal.ZERO);
@@ -507,7 +561,7 @@ public class UnifiedPlanningService {
         }
 
         // Get progress data from subtasks
-        StoryProgressData progressData = extractProgressData(story);
+        StoryProgressData progressData = extractProgressData(story, subtasksByStory);
 
         return new PlannedStory(
                 storyKey,
@@ -601,8 +655,9 @@ public class UnifiedPlanningService {
     /**
      * Extracts phase hours from story's subtasks (dynamic by role code).
      */
-    private Map<String, BigDecimal> extractPhaseHoursMap(JiraIssueEntity story, JiraIssueEntity epic) {
-        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
+    private Map<String, BigDecimal> extractPhaseHoursMap(JiraIssueEntity story, JiraIssueEntity epic,
+                                                        Map<String, List<JiraIssueEntity>> subtasksByStory) {
+        List<JiraIssueEntity> subtasks = subtasksByStory.getOrDefault(story.getIssueKey(), List.of());
 
         Map<String, BigDecimal> roleHours = new LinkedHashMap<>();
 
@@ -655,8 +710,9 @@ public class UnifiedPlanningService {
     /**
      * Extracts progress data from story's subtasks (for tooltip display).
      */
-    private StoryProgressData extractProgressData(JiraIssueEntity story) {
-        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
+    private StoryProgressData extractProgressData(JiraIssueEntity story,
+                                                  Map<String, List<JiraIssueEntity>> subtasksByStory) {
+        List<JiraIssueEntity> subtasks = subtasksByStory.getOrDefault(story.getIssueKey(), List.of());
 
         // Dynamic role accumulators
         Map<String, Long> roleEstimate = new HashMap<>();
@@ -935,9 +991,10 @@ public class UnifiedPlanningService {
     /**
      * Resolves components for a story: subtask components first, then story fallback.
      */
-    private List<String> resolveComponents(JiraIssueEntity story) {
+    private List<String> resolveComponents(JiraIssueEntity story,
+                                          Map<String, List<JiraIssueEntity>> subtasksByStory) {
         // Try subtask components first
-        List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
+        List<JiraIssueEntity> subtasks = subtasksByStory.getOrDefault(story.getIssueKey(), List.of());
         Set<String> subtaskComponents = new LinkedHashSet<>();
         for (JiraIssueEntity subtask : subtasks) {
             if (subtask.getComponents() != null) {

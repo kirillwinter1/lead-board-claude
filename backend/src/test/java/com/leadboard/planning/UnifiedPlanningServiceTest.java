@@ -93,6 +93,9 @@ class UnifiedPlanningServiceTest {
         when(workflowConfigService.getSubtaskRole("Testing")).thenReturn("QA");
         when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
         when(workflowConfigService.isPlanningAllowed(anyString())).thenReturn(true);
+
+        // Default batch loading mock — returns empty; tests override with specific data
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of());
     }
 
     @Test
@@ -107,7 +110,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask, devSubtask, qaSubtask));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1"))).thenReturn(List.of(saSubtask, devSubtask, qaSubtask));
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
                 createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8")),
@@ -154,8 +158,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
-        when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(sa2));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2"))).thenReturn(List.of(sa1, sa2));
 
         // 2 SAs available
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
@@ -199,8 +203,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
-        when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(sa2));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2"))).thenReturn(List.of(sa1, sa2));
 
         // Only 1 SA
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
@@ -238,7 +242,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of()); // No subtasks
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1"))).thenReturn(List.of()); // No subtasks
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
                 createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
@@ -274,8 +279,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(dev1));
-        when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(dev2));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2"))).thenReturn(List.of(dev1, dev2));
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
                 createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))
@@ -315,8 +320,8 @@ class UnifiedPlanningServiceTest {
                 .thenReturn(List.of(epic1, epic2)); // Sorted by manual_order ASC
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-2")).thenReturn(List.of(story2));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(sa1));
-        when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(sa2));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1", "EPIC-2"))).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2"))).thenReturn(List.of(sa1, sa2));
 
         // Only 1 SA
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
@@ -361,7 +366,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(saSubtask));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1"))).thenReturn(List.of(saSubtask));
 
         // Only DEV, no SA
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
@@ -397,8 +403,8 @@ class UnifiedPlanningServiceTest {
         when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID))
                 .thenReturn(List.of(epic));
         when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(doneStory, activeStory));
-        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(doneSubtask));
-        when(issueRepository.findByParentKey("STORY-2")).thenReturn(List.of(devSubtask));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(doneStory, activeStory));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2"))).thenReturn(List.of(doneSubtask, devSubtask));
 
         when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
                 createMember("dev-1", "Bob DEV", "DEV", Grade.MIDDLE, new BigDecimal("8"))

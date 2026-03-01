@@ -298,7 +298,7 @@ class BoardServiceTest {
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
 
-            BoardResponse response = boardService.getBoard(null, null, List.of(1L), 0, 50);
+            BoardResponse response = boardService.getBoard(null, null, List.of(1L), 0, 50, false);
 
             assertEquals(1, response.getTotal());
             assertEquals("LB-1", response.getItems().get(0).getIssueKey());
@@ -312,7 +312,7 @@ class BoardServiceTest {
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
 
-            BoardResponse response = boardService.getBoard(null, List.of("Новое"), null, 0, 50);
+            BoardResponse response = boardService.getBoard(null, List.of("Новое"), null, 0, 50, false);
 
             assertEquals(1, response.getTotal());
             assertEquals("LB-1", response.getItems().get(0).getIssueKey());
@@ -326,7 +326,7 @@ class BoardServiceTest {
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
 
-            BoardResponse response = boardService.getBoard("LB-100", null, null, 0, 50);
+            BoardResponse response = boardService.getBoard("LB-100", null, null, 0, 50, false);
 
             assertEquals(1, response.getTotal());
             assertEquals("LB-100", response.getItems().get(0).getIssueKey());
@@ -340,7 +340,7 @@ class BoardServiceTest {
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
 
-            BoardResponse response = boardService.getBoard("payment", null, null, 0, 50);
+            BoardResponse response = boardService.getBoard("payment", null, null, 0, 50, false);
 
             assertEquals(1, response.getTotal());
             assertEquals("LB-2", response.getItems().get(0).getIssueKey());
@@ -354,7 +354,7 @@ class BoardServiceTest {
 
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epicWithTeam, epicWithoutTeam));
 
-            BoardResponse response = boardService.getBoard(null, null, List.of(1L), 0, 50);
+            BoardResponse response = boardService.getBoard(null, null, List.of(1L), 0, 50, false);
 
             assertEquals(1, response.getTotal());
             assertEquals("LB-1", response.getItems().get(0).getIssueKey());
@@ -439,21 +439,21 @@ class BoardServiceTest {
             when(issueRepository.findByProjectKey("LB")).thenReturn(epics);
 
             // Page 0, size 2
-            BoardResponse page0 = boardService.getBoard(null, null, null, 0, 2);
+            BoardResponse page0 = boardService.getBoard(null, null, null, 0, 2, false);
             assertEquals(5, page0.getTotal());
             assertEquals(2, page0.getItems().size());
             assertEquals("LB-1", page0.getItems().get(0).getIssueKey());
             assertEquals("LB-2", page0.getItems().get(1).getIssueKey());
 
             // Page 1, size 2
-            BoardResponse page1 = boardService.getBoard(null, null, null, 1, 2);
+            BoardResponse page1 = boardService.getBoard(null, null, null, 1, 2, false);
             assertEquals(5, page1.getTotal());
             assertEquals(2, page1.getItems().size());
             assertEquals("LB-3", page1.getItems().get(0).getIssueKey());
             assertEquals("LB-4", page1.getItems().get(1).getIssueKey());
 
             // Page 2, size 2 (last page, only 1 item)
-            BoardResponse page2 = boardService.getBoard(null, null, null, 2, 2);
+            BoardResponse page2 = boardService.getBoard(null, null, null, 2, 2, false);
             assertEquals(5, page2.getTotal());
             assertEquals(1, page2.getItems().size());
             assertEquals("LB-5", page2.getItems().get(0).getIssueKey());
@@ -476,7 +476,7 @@ class BoardServiceTest {
             when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic));
             when(dataQualityService.checkEpic(any(), anyList())).thenReturn(List.of(violation));
 
-            BoardResponse response = boardService.getBoard();
+            BoardResponse response = boardService.getBoard(null, null, null, 0, 50, true);
 
             BoardNode epicNode = response.getItems().get(0);
             assertFalse(epicNode.getAlerts().isEmpty());

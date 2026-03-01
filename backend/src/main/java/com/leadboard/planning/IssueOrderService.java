@@ -20,10 +20,13 @@ public class IssueOrderService {
 
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final UnifiedPlanningService unifiedPlanningService;
 
-    public IssueOrderService(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
+    public IssueOrderService(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService,
+                             UnifiedPlanningService unifiedPlanningService) {
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
+        this.unifiedPlanningService = unifiedPlanningService;
     }
 
     /**
@@ -78,7 +81,9 @@ public class IssueOrderService {
         }
 
         epic.setManualOrder(newPosition);
-        return issueRepository.save(epic);
+        JiraIssueEntity saved = issueRepository.save(epic);
+        unifiedPlanningService.invalidatePlanCache(teamId);
+        return saved;
     }
 
     /**
@@ -133,7 +138,11 @@ public class IssueOrderService {
         }
 
         story.setManualOrder(newPosition);
-        return issueRepository.save(story);
+        JiraIssueEntity saved = issueRepository.save(story);
+        if (story.getTeamId() != null) {
+            unifiedPlanningService.invalidatePlanCache(story.getTeamId());
+        }
+        return saved;
     }
 
     /**

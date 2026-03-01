@@ -64,7 +64,7 @@ class BoardControllerTest {
 
     @Test
     void getBoardReturnsEmptyListWhenNoEpics() throws Exception {
-        when(boardService.getBoard(isNull(), isNull(), isNull(), eq(0), eq(50)))
+        when(boardService.getBoard(isNull(), isNull(), isNull(), eq(0), eq(50), eq(false)))
                 .thenReturn(new BoardResponse(List.of(), 0));
 
         mockMvc.perform(get("/api/board"))
@@ -80,7 +80,7 @@ class BoardControllerTest {
         BoardNode epic = new BoardNode("PROJ-1", "Epic title", "To Do", "Epic", "https://jira.example.com/browse/PROJ-1");
         epic.addChild(story);
 
-        when(boardService.getBoard(isNull(), isNull(), isNull(), eq(0), eq(50)))
+        when(boardService.getBoard(isNull(), isNull(), isNull(), eq(0), eq(50), eq(false)))
                 .thenReturn(new BoardResponse(List.of(epic), 1));
 
         mockMvc.perform(get("/api/board"))
@@ -97,7 +97,7 @@ class BoardControllerTest {
     void getBoardWithQueryFilter() throws Exception {
         BoardNode epic = new BoardNode("PROJ-1", "Search result", "To Do", "Epic", "https://jira.example.com/browse/PROJ-1");
 
-        when(boardService.getBoard(eq("search"), isNull(), isNull(), eq(0), eq(50)))
+        when(boardService.getBoard(eq("search"), isNull(), isNull(), eq(0), eq(50), eq(false)))
                 .thenReturn(new BoardResponse(List.of(epic), 1));
 
         mockMvc.perform(get("/api/board").param("query", "search"))
@@ -110,7 +110,7 @@ class BoardControllerTest {
     void getBoardWithStatusFilter() throws Exception {
         BoardNode epic = new BoardNode("PROJ-1", "In Progress Epic", "In Progress", "Epic", "https://jira.example.com/browse/PROJ-1");
 
-        when(boardService.getBoard(isNull(), eq(List.of("In Progress")), isNull(), eq(0), eq(50)))
+        when(boardService.getBoard(isNull(), eq(List.of("In Progress")), isNull(), eq(0), eq(50), eq(false)))
                 .thenReturn(new BoardResponse(List.of(epic), 1));
 
         mockMvc.perform(get("/api/board").param("statuses", "In Progress"))
@@ -125,7 +125,7 @@ class BoardControllerTest {
         epic.setTeamId(1L);
         epic.setTeamName("Team A");
 
-        when(boardService.getBoard(isNull(), isNull(), eq(List.of(1L)), eq(0), eq(50)))
+        when(boardService.getBoard(isNull(), isNull(), eq(List.of(1L)), eq(0), eq(50), eq(false)))
                 .thenReturn(new BoardResponse(List.of(epic), 1));
 
         mockMvc.perform(get("/api/board").param("teamIds", "1"))

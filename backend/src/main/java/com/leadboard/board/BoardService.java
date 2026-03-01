@@ -49,7 +49,7 @@ public class BoardService {
         this.workflowConfigService = workflowConfigService;
     }
 
-    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size) {
+    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size, boolean includeDQ) {
         String projectKey = jiraConfigResolver.getProjectKey();
         String baseUrl = jiraConfigResolver.getBaseUrl();
 
@@ -87,6 +87,11 @@ public class BoardService {
                     .filter(JiraIssueEntity::isSubtask)
                     .collect(Collectors.toList());
 
+            // Pre-build subtasks-by-parent map — eliminates N+1 queries in mapToNode()
+            Map<String, List<JiraIssueEntity>> subtasksByParent = subtasks.stream()
+                    .filter(st -> st.getParentKey() != null)
+                    .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+
             // Apply filters to epics
             List<JiraIssueEntity> filteredEpics = epics.stream()
                     .filter(epic -> {
@@ -116,20 +121,26 @@ public class BoardService {
             Map<String, BoardNode> storyMap = new LinkedHashMap<>();
 
             for (JiraIssueEntity epic : filteredEpics) {
-                BoardNode node = mapToNode(epic, baseUrl, teamNames, teamColors);
+                BoardNode node = mapToNode(epic, baseUrl, teamNames, teamColors, subtasksByParent);
                 epicMap.put(epic.getIssueKey(), node);
             }
 
             // Build reverse lookup: epicKey → parentProjectKey
+            // Pre-build parentKey index to avoid O(n²) nested loop
+            Map<String, List<JiraIssueEntity>> childrenByParentKey = allIssues.stream()
+                    .filter(e -> e.getParentKey() != null)
+                    .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+
             List<JiraIssueEntity> projectIssues = allIssues.stream()
                     .filter(e -> "PROJECT".equals(e.getBoardCategory()))
                     .collect(Collectors.toList());
             Map<String, String> epicToProjectKey = new HashMap<>();
             for (JiraIssueEntity proj : projectIssues) {
-                // Parent mode: epics whose parentKey = project key
-                for (JiraIssueEntity issue : allIssues) {
-                    if (proj.getIssueKey().equals(issue.getParentKey()) && "EPIC".equals(issue.getBoardCategory())) {
-                        epicToProjectKey.putIfAbsent(issue.getIssueKey(), proj.getIssueKey());
+                // Parent mode: epics whose parentKey = project key — O(1) lookup
+                List<JiraIssueEntity> projChildren = childrenByParentKey.getOrDefault(proj.getIssueKey(), List.of());
+                for (JiraIssueEntity child : projChildren) {
+                    if ("EPIC".equals(child.getBoardCategory())) {
+                        epicToProjectKey.putIfAbsent(child.getIssueKey(), proj.getIssueKey());
                     }
                 }
                 // Link mode: childEpicKeys
@@ -153,7 +164,7 @@ public class BoardService {
             }
 
             for (JiraIssueEntity story : stories) {
-                BoardNode storyNode = mapToNode(story, baseUrl, teamNames, teamColors);
+                BoardNode storyNode = mapToNode(story, baseUrl, teamNames, teamColors, subtasksByParent);
                 storyMap.put(story.getIssueKey(), storyNode);
 
                 String parentKey = story.getParentKey();
@@ -163,7 +174,7 @@ public class BoardService {
             }
 
             for (JiraIssueEntity subtask : subtasks) {
-                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames, teamColors);
+                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames, teamColors, subtasksByParent);
 
                 // Use WorkflowConfigService for role detection
                 String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
@@ -185,7 +196,9 @@ public class BoardService {
                 aggregateProgress(epic);
             }
 
-            addDataQualityAlerts(filteredEpics, stories, subtasks, issueMap, epicMap, storyMap);
+            if (includeDQ) {
+                addDataQualityAlerts(filteredEpics, stories, subtasks, issueMap, epicMap, storyMap);
+            }
 
             // Sort children within each epic by manualOrder
             for (BoardNode epic : epicMap.values()) {
@@ -235,10 +248,11 @@ public class BoardService {
     }
 
     public BoardResponse getBoard() {
-        return getBoard(null, null, null, 0, 50);
+        return getBoard(null, null, null, 0, 50, false);
     }
 
-    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames, Map<Long, String> teamColors) {
+    private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames,
+                                Map<Long, String> teamColors, Map<String, List<JiraIssueEntity>> subtasksByParent) {
         String jiraUrl = baseUrl + "/browse/" + entity.getIssueKey();
         BoardNode node = new BoardNode(
                 entity.getIssueKey(),
@@ -297,7 +311,7 @@ public class BoardService {
             node.setAssigneeAccountId(entity.getAssigneeAccountId());
             node.setAssigneeDisplayName(entity.getAssigneeDisplayName());
 
-            List<JiraIssueEntity> childSubtasks = issueRepository.findByParentKey(entity.getIssueKey());
+            List<JiraIssueEntity> childSubtasks = subtasksByParent.getOrDefault(entity.getIssueKey(), List.of());
             long subtaskEstimate = 0;
             long subtaskSpent = 0;
             for (JiraIssueEntity st : childSubtasks) {

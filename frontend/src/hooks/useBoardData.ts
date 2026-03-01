@@ -14,7 +14,7 @@ export function useBoardData() {
   const fetchBoard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const response = await axios.get<BoardResponse>('/api/board')
+      const response = await axios.get<BoardResponse>('/api/board', { params: { includeDQ: true } })
       setBoard(response.data.items)
     } catch (err: unknown) {
       if (!silent) setError(err instanceof Error ? err.message : 'Failed to load board')

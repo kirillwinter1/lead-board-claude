@@ -1,5 +1,6 @@
 package com.leadboard.sync;
 
+import com.leadboard.config.ObservabilityMetrics;
 import com.leadboard.config.entity.LinkCategory;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.WorkflowConfigService;
@@ -16,6 +17,7 @@ import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
 import com.leadboard.team.TeamSyncService;
 import com.leadboard.tenant.TenantJiraConfigRepository;
+import io.micrometer.core.instrument.Timer;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +64,8 @@ public class SyncService {
     private final ChangelogImportService changelogImportService;
     private final TeamSyncService teamSyncService;
     private final TenantJiraConfigRepository tenantJiraConfigRepository;
+    private final ObservabilityMetrics observabilityMetrics;
+    private final com.leadboard.planning.UnifiedPlanningService unifiedPlanningService;
     private final SyncService self;
 
     public SyncService(JiraClient jiraClient,
@@ -79,6 +83,8 @@ public class SyncService {
                        ChangelogImportService changelogImportService,
                        TeamSyncService teamSyncService,
                        TenantJiraConfigRepository tenantJiraConfigRepository,
+                       ObservabilityMetrics observabilityMetrics,
+                       com.leadboard.planning.UnifiedPlanningService unifiedPlanningService,
                        @Lazy SyncService self) {
         this.jiraClient = jiraClient;
         this.jiraConfigResolver = jiraConfigResolver;
@@ -95,6 +101,8 @@ public class SyncService {
         this.changelogImportService = changelogImportService;
         this.teamSyncService = teamSyncService;
         this.tenantJiraConfigRepository = tenantJiraConfigRepository;
+        this.observabilityMetrics = observabilityMetrics;
+        this.unifiedPlanningService = unifiedPlanningService;
         this.self = self;
     }
 
@@ -241,6 +249,7 @@ public class SyncService {
         syncStateRepository.save(state);
 
         List<String> statusChangedKeys = new ArrayList<>();
+        Timer.Sample syncTimer = observabilityMetrics.startSyncTimer();
 
         try {
             int totalSynced = 0;
@@ -289,6 +298,9 @@ public class SyncService {
             state.setLastSyncCompletedAt(OffsetDateTime.now());
             state.setLastSyncIssuesCount(totalSynced);
             syncStateRepository.save(state);
+
+            observabilityMetrics.stopSyncTimer(syncTimer);
+            observabilityMetrics.recordIssuesSynced(totalSynced);
 
             log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
                     lastSync != null ? "incremental" : "full");
@@ -351,6 +363,9 @@ public class SyncService {
                 changelogImportService.importChangelogsForIssuesAsync(statusChangedKeys);
             }
 
+            // Invalidate planning cache after sync
+            unifiedPlanningService.invalidateAllPlanCaches();
+
             // Trigger team sync if organization ID is configured
             try {
                 String orgId = jiraConfigResolver.getOrganizationId();
@@ -363,6 +378,8 @@ public class SyncService {
             }
 
         } catch (Exception e) {
+            observabilityMetrics.stopSyncTimer(syncTimer);
+            observabilityMetrics.recordSyncError();
             log.error("Sync failed for project: {}", projectKey, e);
             state.setSyncInProgress(false);
             state.setLastError(e.getMessage());

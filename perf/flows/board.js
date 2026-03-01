@@ -28,7 +28,7 @@ export function boardFlow(tenantSlug, tenantName, userIndex, teamIndex) {
 
     // 2. Get board filtered by team
     apiGet(
-        `${BASE_URL}/api/board?teamId=${teamIndex}`,
+        `${BASE_URL}/api/board?teamIds=${teamIndex}`,
         headers,
         'board',
         'board_team'
