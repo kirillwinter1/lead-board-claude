@@ -11,6 +11,8 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import org.springframework.beans.factory.annotation.Value;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,8 +37,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int OAUTH_LIMIT = 20;
     private static final int SYNC_LIMIT = 5;
     private static final int REGISTRATION_LIMIT = 10;
-    private static final int GENERAL_API_LIMIT = 200;
     private static final long WINDOW_MS = 60_000; // 1 minute
+
+    @Value("${app.rate-limit.general:200}")
+    private int generalApiLimit;
 
     // Cleanup interval: remove stale entries every 5 minutes
     private static final long CLEANUP_INTERVAL_MS = 300_000;
@@ -92,7 +96,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/public/tenants/register")) {
             return REGISTRATION_LIMIT;
         }
-        return GENERAL_API_LIMIT;
+        return generalApiLimit;
     }
 
     private String resolveBucketGroup(String path) {
