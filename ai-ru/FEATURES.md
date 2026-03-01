@@ -48,6 +48,8 @@
 | F46 | Security Hardening | 2026-02-25 | [features/F46](features/F46_SECURITY_HARDENING.md) |
 | F47 | Setup Wizard Improvements | 2026-02-28 | [features/F47](features/F47_SETUP_WIZARD_IMPROVEMENTS.md) |
 | F48 | Per-Project Workflow Configuration | 2026-03-01 | [features/F48](features/F48_PER_PROJECT_WORKFLOW_CONFIG.md) |
+| F49 | Observability & Monitoring | 2026-03-01 | [features/F49](features/F49_OBSERVABILITY_MONITORING.md) |
+| F50 | Performance Testing Suite (k6) | 2026-03-01 | [features/F50](features/F50_PERFORMANCE_TESTING.md) |
 
 ## Бэклог (BF)
 
@@ -96,6 +98,25 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-03-01: F50 Performance Testing Suite (k6)
+- k6 performance testing suite с 6 сценариями (smoke, load, stress, soak, multi-tenant, reorder-stress)
+- Seed data: 3 тенанта × ~61K issues = 183K total, 50 teams per tenant, 10 users per tenant
+- 7 SQL seed-скриптов (tenants, schemas, workflow config, teams, issues, changelog, RICE)
+- 8 flow-файлов: board, reorder-forecast, metrics, projects, timeline, data-quality, bug-metrics, multi-tenant
+- Общая библиотека: auth (session cookies), http (custom Trend metrics), tenant (VU routing), generators
+- CLI runner `run.sh` с командами seed/cleanup/smoke/load/stress/soak/multi/reorder
+- Трекинг результатов в `PERF_RESULTS.md` (3 run'а: baseline → optimized → fixed filter)
+- Board p50: 30,000ms → 1,041ms (28.8x improvement после оптимизации)
+
+### 2026-03-01: F49 Observability & Monitoring
+- Prometheus + Grafana стек (docker-compose) с auto-provisioned datasources и dashboards
+- Spring Boot Actuator + Micrometer Registry Prometheus для экспорта метрик
+- Кастомный `ObservabilityMetrics` компонент: sync_duration_seconds (Timer), sync_issues_total (Gauge)
+- SyncService: записывает sync duration и issue count после каждой синхронизации
+- TenantFilter: tenant_slug tag на HTTP-метриках
+- 3 Grafana дашборда: HTTP API (rate, latency, errors), Business + HikariCP (sync, pool), JVM & System (heap, GC, threads)
+- Management endpoints: health, info, metrics, prometheus
 
 ### 2026-03-01: F48 Per-Project Workflow Configuration
 - Per-project storage: каждый project key получает свою `ProjectConfigurationEntity` с отдельным `config_id`
