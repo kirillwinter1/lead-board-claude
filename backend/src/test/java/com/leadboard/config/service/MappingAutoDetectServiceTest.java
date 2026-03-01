@@ -190,7 +190,7 @@ class MappingAutoDetectServiceTest {
 
         @BeforeEach
         void setupJiraMetadata() {
-            when(jiraMetadataService.getIssueTypes()).thenReturn(List.of(
+            when(jiraMetadataService.getIssueTypes(any())).thenReturn(List.of(
                     issueType("Epic", false),
                     issueType("Story", false),
                     issueType("Bug", false),
@@ -201,7 +201,7 @@ class MappingAutoDetectServiceTest {
                     issueType("Sub-task", true)
             ));
 
-            when(jiraMetadataService.getStatuses()).thenReturn(List.of(
+            when(jiraMetadataService.getStatuses(any())).thenReturn(List.of(
                     statusGroup("Epic", List.of(
                             status("New", "new"),
                             status("Requirements", "indeterminate"),
@@ -331,7 +331,7 @@ class MappingAutoDetectServiceTest {
 
         @BeforeEach
         void setupJiraMetadata() {
-            when(jiraMetadataService.getIssueTypes()).thenReturn(List.of(
+            when(jiraMetadataService.getIssueTypes(any())).thenReturn(List.of(
                     issueType("Эпик", false),
                     issueType("История", false),
                     issueType("Баг", false),
@@ -340,7 +340,7 @@ class MappingAutoDetectServiceTest {
                     issueType("Тестирование", true)
             ));
 
-            when(jiraMetadataService.getStatuses()).thenReturn(List.of(
+            when(jiraMetadataService.getStatuses(any())).thenReturn(List.of(
                     statusGroup("Эпик", List.of(
                             status("Новый", "new"),
                             status("Требования", "indeterminate"),
@@ -412,12 +412,12 @@ class MappingAutoDetectServiceTest {
 
         @BeforeEach
         void setup() {
-            when(jiraMetadataService.getIssueTypes()).thenReturn(List.of(
+            when(jiraMetadataService.getIssueTypes(any())).thenReturn(List.of(
                     issueType("Epic", false),
                     issueType("Story", false),
                     issueType("Sub-task", true)  // generic subtask, no role in name
             ));
-            when(jiraMetadataService.getStatuses()).thenReturn(List.of());
+            when(jiraMetadataService.getStatuses(any())).thenReturn(List.of());
             when(jiraMetadataService.getLinkTypes()).thenReturn(List.of());
             when(roleRepo.findByConfigIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
         }
@@ -443,7 +443,7 @@ class MappingAutoDetectServiceTest {
         @DisplayName("should warn about no role-specific subtasks")
         void noSubtasksShouldTriggerDefaultRoles() {
             // Setup with NO subtask types at all
-            when(jiraMetadataService.getIssueTypes()).thenReturn(List.of(
+            when(jiraMetadataService.getIssueTypes(any())).thenReturn(List.of(
                     issueType("Epic", false),
                     issueType("Story", false)
             ));
@@ -465,10 +465,10 @@ class MappingAutoDetectServiceTest {
         @Test
         @DisplayName("should clear existing mappings before inserting new ones")
         void shouldClearBeforeInsert() {
-            when(jiraMetadataService.getIssueTypes()).thenReturn(List.of(
+            when(jiraMetadataService.getIssueTypes(any())).thenReturn(List.of(
                     issueType("Story", false)
             ));
-            when(jiraMetadataService.getStatuses()).thenReturn(List.of());
+            when(jiraMetadataService.getStatuses(any())).thenReturn(List.of());
             when(jiraMetadataService.getLinkTypes()).thenReturn(List.of());
             when(roleRepo.findByConfigIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
 

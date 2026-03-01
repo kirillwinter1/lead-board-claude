@@ -51,34 +51,36 @@ public class PublicConfigController {
 
     @GetMapping("/issue-type-categories")
     public ResponseEntity<Map<String, String>> getIssueTypeCategories() {
-        Long configId = workflowConfigService.getDefaultConfigId();
-        if (configId == null) {
+        List<Long> configIds = workflowConfigService.getAllConfigIds();
+        if (configIds.isEmpty()) {
             return ResponseEntity.ok(Map.of());
         }
-        List<IssueTypeMappingEntity> mappings = issueTypeRepo.findByConfigId(configId);
         Map<String, String> result = new LinkedHashMap<>();
-        for (IssueTypeMappingEntity m : mappings) {
-            if (m.getBoardCategory() == null) continue; // Skip unmapped types (BUG-66)
-            result.put(m.getJiraTypeName(), m.getBoardCategory().name());
+        for (Long configId : configIds) {
+            for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(configId)) {
+                if (m.getBoardCategory() == null) continue; // Skip unmapped types (BUG-66)
+                result.putIfAbsent(m.getJiraTypeName(), m.getBoardCategory().name());
+            }
         }
         return ResponseEntity.ok(result);
     }
 
     @GetMapping("/status-styles")
     public ResponseEntity<Map<String, Map<String, String>>> getStatusStyles() {
-        Long configId = workflowConfigService.getDefaultConfigId();
-        if (configId == null) {
+        List<Long> configIds = workflowConfigService.getAllConfigIds();
+        if (configIds.isEmpty()) {
             return ResponseEntity.ok(Map.of());
         }
-        List<StatusMappingEntity> statuses = statusMappingRepo.findByConfigId(configId);
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
-        for (StatusMappingEntity s : statuses) {
-            String name = s.getJiraStatusName();
-            if (!result.containsKey(name)) {
-                Map<String, String> style = new LinkedHashMap<>();
-                style.put("color", s.getColor());
-                style.put("statusCategory", s.getStatusCategory().name());
-                result.put(name, style);
+        for (Long configId : configIds) {
+            for (StatusMappingEntity s : statusMappingRepo.findByConfigId(configId)) {
+                String name = s.getJiraStatusName();
+                if (!result.containsKey(name)) {
+                    Map<String, String> style = new LinkedHashMap<>();
+                    style.put("color", s.getColor());
+                    style.put("statusCategory", s.getStatusCategory().name());
+                    result.put(name, style);
+                }
             }
         }
         return ResponseEntity.ok(result);

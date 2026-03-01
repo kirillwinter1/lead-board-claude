@@ -73,11 +73,35 @@ public class WorkflowConfigController {
         this.jiraClient = jiraClient;
     }
 
+    // ==================== Project Configs List ====================
+
+    @GetMapping("/projects")
+    public ResponseEntity<List<Map<String, Object>>> getProjectConfigs() {
+        List<String> allKeys = jiraConfigResolver.getAllProjectKeys();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (String key : allKeys) {
+            var config = configRepo.findByProjectKey(key).orElse(null);
+            var entry = new java.util.LinkedHashMap<String, Object>();
+            entry.put("projectKey", key);
+            entry.put("configured", config != null
+                    && !issueTypeRepo.findByConfigId(config.getId()).isEmpty());
+            entry.put("isDefault", config != null && config.isDefault());
+            entry.put("configId", config != null ? config.getId() : null);
+            result.add(entry);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
     // ==================== Full Config ====================
 
     @GetMapping
-    public ResponseEntity<WorkflowConfigResponse> getConfig() {
-        ProjectConfigurationEntity config = getDefaultConfig();
+    public ResponseEntity<WorkflowConfigResponse> getConfig(
+            @RequestParam(required = false) String projectKey) {
+        ProjectConfigurationEntity config = projectKey != null
+                ? getConfigForProject(projectKey)
+                : getDefaultConfig();
         if (config == null) {
             return ResponseEntity.notFound().build();
         }
@@ -102,8 +126,12 @@ public class WorkflowConfigController {
     }
 
     @PutMapping
-    public ResponseEntity<WorkflowConfigResponse> updateProjectConfig(@RequestBody ProjectConfigUpdateRequest request) {
-        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+    public ResponseEntity<WorkflowConfigResponse> updateProjectConfig(
+            @RequestParam(required = false) String projectKey,
+            @RequestBody ProjectConfigUpdateRequest request) {
+        ProjectConfigurationEntity config = projectKey != null
+                ? getOrCreateConfigForProject(projectKey)
+                : getOrCreateDefaultConfig();
 
         if (request.name() != null) {
             config.setName(request.name());
@@ -132,14 +160,16 @@ public class WorkflowConfigController {
         workflowConfigService.clearCache();
         log.info("Project configuration updated: {}", config.getName());
 
-        return getConfig();
+        return getConfig(projectKey);
     }
 
     // ==================== Roles ====================
 
     @GetMapping("/roles")
-    public ResponseEntity<List<WorkflowRoleDto>> getRoles() {
-        ProjectConfigurationEntity config = getDefaultConfig();
+    public ResponseEntity<List<WorkflowRoleDto>> getRoles(
+            @RequestParam(required = false) String projectKey) {
+        ProjectConfigurationEntity config = projectKey != null
+                ? getConfigForProject(projectKey) : getDefaultConfig();
         if (config == null) return ResponseEntity.ok(List.of());
 
         return ResponseEntity.ok(mapRoles(roleRepo.findByConfigIdOrderBySortOrderAsc(config.getId())));
@@ -147,11 +177,14 @@ public class WorkflowConfigController {
 
     @Transactional
     @PutMapping("/roles")
-    public ResponseEntity<List<WorkflowRoleDto>> updateRoles(@RequestBody List<WorkflowRoleDto> roles) {
+    public ResponseEntity<List<WorkflowRoleDto>> updateRoles(
+            @RequestParam(required = false) String projectKey,
+            @RequestBody List<WorkflowRoleDto> roles) {
         if (roles == null || roles.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+        ProjectConfigurationEntity config = projectKey != null
+                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
         Long configId = config.getId();
 
         // Delete existing and replace
@@ -178,8 +211,10 @@ public class WorkflowConfigController {
     // ==================== Issue Types ====================
 
     @GetMapping("/issue-types")
-    public ResponseEntity<List<IssueTypeMappingDto>> getIssueTypes() {
-        ProjectConfigurationEntity config = getDefaultConfig();
+    public ResponseEntity<List<IssueTypeMappingDto>> getIssueTypes(
+            @RequestParam(required = false) String projectKey) {
+        ProjectConfigurationEntity config = projectKey != null
+                ? getConfigForProject(projectKey) : getDefaultConfig();
         if (config == null) return ResponseEntity.ok(List.of());
 
         return ResponseEntity.ok(mapIssueTypes(issueTypeRepo.findByConfigId(config.getId())));
@@ -187,11 +222,14 @@ public class WorkflowConfigController {
 
     @Transactional
     @PutMapping("/issue-types")
-    public ResponseEntity<List<IssueTypeMappingDto>> updateIssueTypes(@RequestBody List<IssueTypeMappingDto> issueTypes) {
+    public ResponseEntity<List<IssueTypeMappingDto>> updateIssueTypes(
+            @RequestParam(required = false) String projectKey,
+            @RequestBody List<IssueTypeMappingDto> issueTypes) {
         if (issueTypes == null || issueTypes.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+        ProjectConfigurationEntity config = projectKey != null
+                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
         Long configId = config.getId();
 
         issueTypeRepo.deleteByConfigId(configId);
@@ -215,8 +253,10 @@ public class WorkflowConfigController {
     // ==================== Statuses ====================
 
     @GetMapping("/statuses")
-    public ResponseEntity<List<StatusMappingDto>> getStatuses() {
-        ProjectConfigurationEntity config = getDefaultConfig();
+    public ResponseEntity<List<StatusMappingDto>> getStatuses(
+            @RequestParam(required = false) String projectKey) {
+        ProjectConfigurationEntity config = projectKey != null
+                ? getConfigForProject(projectKey) : getDefaultConfig();
         if (config == null) return ResponseEntity.ok(List.of());
 
         return ResponseEntity.ok(mapStatuses(statusMappingRepo.findByConfigId(config.getId())));
@@ -224,11 +264,14 @@ public class WorkflowConfigController {
 
     @Transactional
     @PutMapping("/statuses")
-    public ResponseEntity<List<StatusMappingDto>> updateStatuses(@RequestBody List<StatusMappingDto> statuses) {
+    public ResponseEntity<List<StatusMappingDto>> updateStatuses(
+            @RequestParam(required = false) String projectKey,
+            @RequestBody List<StatusMappingDto> statuses) {
         if (statuses == null || statuses.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+        ProjectConfigurationEntity config = projectKey != null
+                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
         Long configId = config.getId();
 
         statusMappingRepo.deleteByConfigId(configId);
@@ -272,8 +315,10 @@ public class WorkflowConfigController {
     // ==================== Link Types ====================
 
     @GetMapping("/link-types")
-    public ResponseEntity<List<LinkTypeMappingDto>> getLinkTypes() {
-        ProjectConfigurationEntity config = getDefaultConfig();
+    public ResponseEntity<List<LinkTypeMappingDto>> getLinkTypes(
+            @RequestParam(required = false) String projectKey) {
+        ProjectConfigurationEntity config = projectKey != null
+                ? getConfigForProject(projectKey) : getDefaultConfig();
         if (config == null) return ResponseEntity.ok(List.of());
 
         return ResponseEntity.ok(mapLinkTypes(linkTypeRepo.findByConfigId(config.getId())));
@@ -281,11 +326,14 @@ public class WorkflowConfigController {
 
     @Transactional
     @PutMapping("/link-types")
-    public ResponseEntity<List<LinkTypeMappingDto>> updateLinkTypes(@RequestBody List<LinkTypeMappingDto> linkTypes) {
+    public ResponseEntity<List<LinkTypeMappingDto>> updateLinkTypes(
+            @RequestParam(required = false) String projectKey,
+            @RequestBody List<LinkTypeMappingDto> linkTypes) {
         if (linkTypes == null || linkTypes.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+        ProjectConfigurationEntity config = projectKey != null
+                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
         Long configId = config.getId();
 
         linkTypeRepo.deleteByConfigId(configId);
@@ -311,6 +359,7 @@ public class WorkflowConfigController {
     @Transactional
     public ResponseEntity<Map<String, Object>> detectStatusesForType(
             @PathVariable String typeName,
+            @RequestParam(required = false) String projectKey,
             @RequestBody Map<String, String> body) {
 
         String categoryStr = body.get("boardCategory");
@@ -325,7 +374,8 @@ public class WorkflowConfigController {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid boardCategory: " + categoryStr));
         }
 
-        ProjectConfigurationEntity config = getOrCreateDefaultConfig();
+        ProjectConfigurationEntity config = projectKey != null
+                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
         IssueTypeMappingEntity mapping = issueTypeRepo
                 .findByConfigIdAndJiraTypeName(config.getId(), typeName)
                 .orElseThrow(() -> new IllegalArgumentException("Issue type not found: " + typeName));
@@ -394,7 +444,13 @@ public class WorkflowConfigController {
     // ==================== Auto-detect ====================
 
     @PostMapping("/auto-detect")
-    public ResponseEntity<MappingAutoDetectService.AutoDetectResult> autoDetect() {
+    public ResponseEntity<MappingAutoDetectService.AutoDetectResult> autoDetect(
+            @RequestParam(required = false) String projectKey) {
+        if (projectKey != null) {
+            log.info("Manual auto-detect triggered via API for project {}", projectKey);
+            var result = autoDetectService.autoDetectForProject(projectKey);
+            return ResponseEntity.ok(result);
+        }
         log.info("Manual auto-detect triggered via API");
         var result = autoDetectService.autoDetect();
         return ResponseEntity.ok(result);
@@ -509,6 +565,23 @@ public class WorkflowConfigController {
     }
 
     // ==================== Helpers ====================
+
+    private ProjectConfigurationEntity getConfigForProject(String projectKey) {
+        if (projectKey == null) return getDefaultConfig();
+        return configRepo.findByProjectKey(projectKey).orElse(null);
+    }
+
+    private ProjectConfigurationEntity getOrCreateConfigForProject(String projectKey) {
+        if (projectKey == null) return getOrCreateDefaultConfig();
+        return configRepo.findByProjectKey(projectKey).orElseGet(() -> {
+            boolean hasAny = configRepo.findByIsDefaultTrue().isPresent();
+            ProjectConfigurationEntity config = new ProjectConfigurationEntity();
+            config.setName(projectKey);
+            config.setProjectKey(projectKey);
+            config.setDefault(!hasAny);
+            return configRepo.save(config);
+        });
+    }
 
     private ProjectConfigurationEntity getDefaultConfig() {
         String envProjectKey = jiraConfigResolver.getProjectKey();

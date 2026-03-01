@@ -38,12 +38,14 @@ class WorkflowConfigServiceScoreTest {
     @BeforeEach
     void setUp() {
         when(jiraConfigResolver.getProjectKey()).thenReturn("TEST");
+        when(jiraConfigResolver.getAllProjectKeys()).thenReturn(List.of("TEST"));
 
         ProjectConfigurationEntity config = new ProjectConfigurationEntity();
         config.setId(1L);
         config.setProjectKey("TEST");
         config.setDefault(true);
         when(configRepo.findByProjectKey("TEST")).thenReturn(Optional.of(config));
+        when(configRepo.findAllByProjectKeyIn(List.of("TEST"))).thenReturn(new java.util.ArrayList<>(List.of(config)));
 
         when(roleRepo.findByConfigIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
         when(issueTypeRepo.findByConfigId(1L)).thenReturn(List.of());

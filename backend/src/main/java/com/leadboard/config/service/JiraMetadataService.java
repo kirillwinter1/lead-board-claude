@@ -47,12 +47,21 @@ public class JiraMetadataService {
     }
 
     /**
-     * Gets issue types for the configured project.
+     * Gets issue types for the configured (first) project.
+     */
+    public List<Map<String, Object>> getIssueTypes() {
+        return getIssueTypes(jiraConfigResolver.getProjectKey());
+    }
+
+    /**
+     * Gets issue types for a specific project key.
      */
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> getIssueTypes() {
+    public List<Map<String, Object>> getIssueTypes(String projectKey) {
+        if (projectKey == null || projectKey.isBlank()) return List.of();
+
         // Check cache first (TTL: 1 hour)
-        String cacheKey = "issue_types_" + jiraConfigResolver.getProjectKey();
+        String cacheKey = "issue_types_" + projectKey;
         String cached = getCachedValue(cacheKey, 60);
         if (cached != null) {
             try {
@@ -63,7 +72,6 @@ public class JiraMetadataService {
         }
 
         try {
-            String projectKey = jiraConfigResolver.getProjectKey();
             Map<String, Object> project = callJiraApi("/rest/api/3/project/" + projectKey);
 
             List<Map<String, Object>> issueTypes = (List<Map<String, Object>>) project.get("issueTypes");
@@ -83,17 +91,26 @@ public class JiraMetadataService {
             cacheValue(cacheKey, objectMapper.writeValueAsString(result));
             return result;
         } catch (Exception e) {
-            log.error("Failed to fetch issue types from Jira", e);
+            log.error("Failed to fetch issue types from Jira for project {}", projectKey, e);
             return List.of();
         }
     }
 
     /**
-     * Gets statuses grouped by issue type for the configured project.
+     * Gets statuses grouped by issue type for the configured (first) project.
+     */
+    public List<Map<String, Object>> getStatuses() {
+        return getStatuses(jiraConfigResolver.getProjectKey());
+    }
+
+    /**
+     * Gets statuses grouped by issue type for a specific project key.
      */
     @SuppressWarnings("unchecked")
-    public List<Map<String, Object>> getStatuses() {
-        String cacheKey = "statuses_" + jiraConfigResolver.getProjectKey();
+    public List<Map<String, Object>> getStatuses(String projectKey) {
+        if (projectKey == null || projectKey.isBlank()) return List.of();
+
+        String cacheKey = "statuses_" + projectKey;
         String cached = getCachedValue(cacheKey, 60);
         if (cached != null) {
             try {
@@ -104,7 +121,6 @@ public class JiraMetadataService {
         }
 
         try {
-            String projectKey = jiraConfigResolver.getProjectKey();
             List<Map<String, Object>> response = callJiraApiList(
                     "/rest/api/3/project/" + projectKey + "/statuses");
 
@@ -138,7 +154,7 @@ public class JiraMetadataService {
             cacheValue(cacheKey, objectMapper.writeValueAsString(result));
             return result;
         } catch (Exception e) {
-            log.error("Failed to fetch statuses from Jira", e);
+            log.error("Failed to fetch statuses from Jira for project {}", projectKey, e);
             return List.of();
         }
     }

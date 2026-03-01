@@ -47,6 +47,7 @@
 | F45 | Гибридный таймлайн | 2026-02-23 | [features/F45](features/F45_HYBRID_TIMELINE.md) |
 | F46 | Security Hardening | 2026-02-25 | [features/F46](features/F46_SECURITY_HARDENING.md) |
 | F47 | Setup Wizard Improvements | 2026-02-28 | [features/F47](features/F47_SETUP_WIZARD_IMPROVEMENTS.md) |
+| F48 | Per-Project Workflow Configuration | 2026-03-01 | [features/F48](features/F48_PER_PROJECT_WORKFLOW_CONFIG.md) |
 
 ## Бэклог (BF)
 
@@ -95,6 +96,20 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-03-01: F48 Per-Project Workflow Configuration
+- Per-project storage: каждый project key получает свою `ProjectConfigurationEntity` с отдельным `config_id`
+- Merged reading: `WorkflowConfigService` загружает все конфиги тенанта, мержит через `putIfAbsent` (first-wins)
+- Auto-detect isolation: `autoDetectForProject(projectKey)` работает только с конфигом конкретного проекта
+- `JiraConfigResolver.getAllProjectKeys()` — поддержка нескольких project keys в tenant_jira_config
+- `JiraMetadataService`: overloads `getIssueTypes(projectKey)`, `getStatuses(projectKey)`
+- `SyncService`: per-project auto-detect при синке, `registerUnknownTypeIfNeeded(typeName, projectKey)`
+- `PublicConfigController`: merged view из всех configIds
+- `WorkflowConfigController`: `GET /projects`, `?projectKey` параметр на всех endpoints
+- Frontend: project selector tabs в WorkflowConfigPage, badge "NEW" для ненастроенных проектов
+- 6 новых тестов (PerProjectWorkflowConfigTest)
+- Backward compatible: API без `?projectKey` работает как раньше, 39+ consumer services без изменений
+- Версия 0.48.0
 
 ### 2026-02-23: F44 Multi-Tenancy & SaaS Packaging (BF19)
 - Schema-per-tenant мультитенантность: каждая компания в отдельной PostgreSQL-схеме

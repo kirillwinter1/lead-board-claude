@@ -82,20 +82,40 @@ public class MappingAutoDetectService {
     }
 
     /**
-     * Main auto-detect method. Fetches Jira metadata and populates all mapping tables.
-     * Clears existing mappings before inserting (idempotent).
+     * Returns true if workflow config for a specific project is empty.
+     */
+    public boolean isConfigEmptyForProject(String projectKey) {
+        var config = configRepo.findByProjectKey(projectKey).orElse(null);
+        if (config == null) return true;
+        Long configId = config.getId();
+        return roleRepo.findByConfigIdOrderBySortOrderAsc(configId).isEmpty()
+                && issueTypeRepo.findByConfigId(configId).isEmpty();
+    }
+
+    /**
+     * Main auto-detect method. Delegates to autoDetectForProject with the default (first) project key.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AutoDetectResult autoDetect() {
+        String projectKey = jiraConfigResolver.getProjectKey();
+        return autoDetectForProject(projectKey);
+    }
+
+    /**
+     * Per-project auto-detect. Fetches Jira metadata for a specific project and populates
+     * its mapping tables. Only affects this project's config — does NOT touch other projects.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @SuppressWarnings("unchecked")
-    public AutoDetectResult autoDetect() {
-        log.info("Starting auto-detection of workflow configuration from Jira...");
+    public AutoDetectResult autoDetectForProject(String projectKey) {
+        log.info("Starting auto-detection of workflow configuration from Jira for project {}...", projectKey);
         List<String> warnings = new ArrayList<>();
 
-        Long configId = getOrCreateDefaultConfigId();
+        Long configId = getOrCreateConfigIdForProject(projectKey);
 
-        // Fetch Jira metadata
-        List<Map<String, Object>> issueTypes = jiraMetadataService.getIssueTypes();
-        List<Map<String, Object>> statusesByType = jiraMetadataService.getStatuses();
+        // Fetch Jira metadata for this specific project
+        List<Map<String, Object>> issueTypes = jiraMetadataService.getIssueTypes(projectKey);
+        List<Map<String, Object>> statusesByType = jiraMetadataService.getStatuses(projectKey);
         List<Map<String, Object>> linkTypes = jiraMetadataService.getLinkTypes();
 
         if (issueTypes.isEmpty()) {
@@ -287,7 +307,7 @@ public class MappingAutoDetectService {
     // ==================== Incremental type registration ====================
 
     /**
-     * Registers an unknown issue type with NULL board_category.
+     * Registers an unknown issue type with NULL board_category (default project).
      * Thread-safe, idempotent — skips if already registered.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -304,6 +324,24 @@ public class MappingAutoDetectService {
         mapping.setBoardCategory(null); // Awaiting user configuration
         issueTypeRepo.save(mapping);
         log.info("Registered unknown issue type '{}' — awaiting configuration in Workflow Settings", jiraTypeName);
+    }
+
+    /**
+     * Registers an unknown issue type for a specific project's config.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void registerUnknownTypeIfNeeded(String jiraTypeName, String projectKey) {
+        if (jiraTypeName == null) return;
+        Long configId = getOrCreateConfigIdForProject(projectKey);
+
+        if (issueTypeRepo.findByConfigIdAndJiraTypeName(configId, jiraTypeName).isPresent()) return;
+
+        IssueTypeMappingEntity mapping = new IssueTypeMappingEntity();
+        mapping.setConfigId(configId);
+        mapping.setJiraTypeName(jiraTypeName);
+        mapping.setBoardCategory(null);
+        issueTypeRepo.save(mapping);
+        log.info("Registered unknown issue type '{}' for project {} — awaiting configuration", jiraTypeName, projectKey);
     }
 
     /**
@@ -643,6 +681,32 @@ public class MappingAutoDetectService {
             if (byKey.isPresent()) return byKey.get().getId();
         }
         return configRepo.findByIsDefaultTrue().map(ProjectConfigurationEntity::getId).orElse(null);
+    }
+
+    /**
+     * Gets or creates a ProjectConfigurationEntity for a specific project key.
+     * The first project for the tenant becomes is_default=true.
+     */
+    Long getOrCreateConfigIdForProject(String projectKey) {
+        if (projectKey == null || projectKey.isBlank()) {
+            return getOrCreateDefaultConfigId();
+        }
+
+        // Try exact match by project_key
+        var byKey = configRepo.findByProjectKey(projectKey);
+        if (byKey.isPresent()) return byKey.get().getId();
+
+        // Check if ANY config exists — if not, this is the first (default)
+        boolean hasAnyConfig = configRepo.findByIsDefaultTrue().isPresent();
+
+        ProjectConfigurationEntity config = new ProjectConfigurationEntity();
+        config.setName(projectKey);
+        config.setProjectKey(projectKey);
+        config.setDefault(!hasAnyConfig); // First project = default
+        config = configRepo.save(config);
+        log.info("Created project configuration for '{}' (isDefault={})", projectKey, config.isDefault());
+
+        return config.getId();
     }
 
     private Long getOrCreateDefaultConfigId() {

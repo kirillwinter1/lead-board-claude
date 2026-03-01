@@ -89,21 +89,35 @@ export interface WorkflowConfigResponse {
   epicLinkName: string | null
 }
 
+export interface ProjectConfigInfo {
+  projectKey: string
+  configured: boolean
+  isDefault: boolean
+  configId: number | null
+}
+
+function pkParam(projectKey?: string | null): string {
+  return projectKey ? `?projectKey=${encodeURIComponent(projectKey)}` : ''
+}
+
 export const workflowConfigApi = {
-  getConfig: () =>
-    axios.get<WorkflowConfigResponse>('/api/admin/workflow-config').then(r => r.data),
+  getConfig: (projectKey?: string | null) =>
+    axios.get<WorkflowConfigResponse>(`/api/admin/workflow-config${pkParam(projectKey)}`).then(r => r.data),
 
-  updateRoles: (roles: WorkflowRoleDto[]) =>
-    axios.put<WorkflowRoleDto[]>('/api/admin/workflow-config/roles', roles).then(r => r.data),
+  getProjectConfigs: () =>
+    axios.get<ProjectConfigInfo[]>('/api/admin/workflow-config/projects').then(r => r.data),
 
-  updateIssueTypes: (types: IssueTypeMappingDto[]) =>
-    axios.put<IssueTypeMappingDto[]>('/api/admin/workflow-config/issue-types', types).then(r => r.data),
+  updateRoles: (roles: WorkflowRoleDto[], projectKey?: string | null) =>
+    axios.put<WorkflowRoleDto[]>(`/api/admin/workflow-config/roles${pkParam(projectKey)}`, roles).then(r => r.data),
 
-  updateStatuses: (statuses: StatusMappingDto[]) =>
-    axios.put<StatusMappingDto[]>('/api/admin/workflow-config/statuses', statuses).then(r => r.data),
+  updateIssueTypes: (types: IssueTypeMappingDto[], projectKey?: string | null) =>
+    axios.put<IssueTypeMappingDto[]>(`/api/admin/workflow-config/issue-types${pkParam(projectKey)}`, types).then(r => r.data),
 
-  updateLinkTypes: (links: LinkTypeMappingDto[]) =>
-    axios.put<LinkTypeMappingDto[]>('/api/admin/workflow-config/link-types', links).then(r => r.data),
+  updateStatuses: (statuses: StatusMappingDto[], projectKey?: string | null) =>
+    axios.put<StatusMappingDto[]>(`/api/admin/workflow-config/statuses${pkParam(projectKey)}`, statuses).then(r => r.data),
+
+  updateLinkTypes: (links: LinkTypeMappingDto[], projectKey?: string | null) =>
+    axios.put<LinkTypeMappingDto[]>(`/api/admin/workflow-config/link-types${pkParam(projectKey)}`, links).then(r => r.data),
 
   validate: () =>
     axios.post<ValidationResult>('/api/admin/workflow-config/validate').then(r => r.data),
@@ -111,8 +125,8 @@ export const workflowConfigApi = {
   getConfigStatus: () =>
     axios.get<{ configured: boolean }>('/api/admin/workflow-config/status').then(r => r.data),
 
-  runAutoDetect: () =>
-    axios.post<AutoDetectResult>('/api/admin/workflow-config/auto-detect').then(r => r.data),
+  runAutoDetect: (projectKey?: string | null) =>
+    axios.post<AutoDetectResult>(`/api/admin/workflow-config/auto-detect${pkParam(projectKey)}`).then(r => r.data),
 
   getStatusIssueCounts: () =>
     axios.get<StatusIssueCountDto[]>('/api/admin/workflow-config/status-issue-counts').then(r => r.data),
@@ -126,9 +140,9 @@ export const workflowConfigApi = {
   fetchJiraLinkTypes: () =>
     axios.get<JiraLinkTypeMetadata[]>('/api/admin/jira-metadata/link-types').then(r => r.data),
 
-  detectStatusesForType: (typeName: string, boardCategory: string) =>
+  detectStatusesForType: (typeName: string, boardCategory: string, projectKey?: string | null) =>
     axios.post<{ typeName: string; boardCategory: string; statusesDetected: number }>(
-      `/api/admin/workflow-config/issue-types/${encodeURIComponent(typeName)}/detect-statuses`,
+      `/api/admin/workflow-config/issue-types/${encodeURIComponent(typeName)}/detect-statuses${pkParam(projectKey)}`,
       { boardCategory }
     ).then(r => r.data),
 }

@@ -12,6 +12,7 @@ import {
   JiraStatusesByType,
   JiraLinkTypeMetadata,
   StatusIssueCountDto,
+  ProjectConfigInfo,
 } from '../api/workflowConfig'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './WorkflowConfigPage.css'
@@ -594,6 +595,10 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const [epicLinkType, setEpicLinkType] = useState<string>('parent')
   const [epicLinkName, setEpicLinkName] = useState<string>('')
 
+  // --- Per-project state ---
+  const [projectConfigs, setProjectConfigs] = useState<ProjectConfigInfo[]>([])
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null)
+
   // --- Wizard state ---
   const [wizardMode, setWizardMode] = useState(false)
   const [wizardStep, setWizardStep] = useState(0)
@@ -614,9 +619,28 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
 
   useEffect(() => {
     const abortController = new AbortController()
+    // Load project configs first, then load config for selected project
+    workflowConfigApi.getProjectConfigs()
+      .then(configs => {
+        if (abortController.signal.aborted) return
+        setProjectConfigs(configs)
+        // If multiple projects and none selected, select the default one
+        if (configs.length > 1 && !selectedProjectKey) {
+          const defaultConf = configs.find(c => c.isDefault) || configs[0]
+          setSelectedProjectKey(defaultConf.projectKey)
+        }
+      })
+      .catch(() => {})
     loadConfig(abortController.signal)
     return () => abortController.abort()
   }, [])
+
+  // Reload config when selected project changes
+  useEffect(() => {
+    if (selectedProjectKey !== null) {
+      loadConfig()
+    }
+  }, [selectedProjectKey])
 
   // Auto-start wizard when config is empty
   useEffect(() => {
@@ -630,8 +654,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     try {
       setLoading(true)
       setError(null)
+      const pk = selectedProjectKey
       const [data, counts, jiraMeta, jiraLinks] = await Promise.all([
-        workflowConfigApi.getConfig(),
+        workflowConfigApi.getConfig(pk),
         workflowConfigApi.getStatusIssueCounts().catch(() => [] as StatusIssueCountDto[]),
         workflowConfigApi.fetchJiraIssueTypes().catch(() => [] as JiraIssueTypeMetadata[]),
         workflowConfigApi.fetchJiraLinkTypes().catch(() => [] as JiraLinkTypeMetadata[]),
@@ -678,7 +703,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     try {
       setSaving(true)
       setError(null)
-      const updated = await workflowConfigApi.updateRoles(roles)
+      const updated = await workflowConfigApi.updateRoles(roles, selectedProjectKey)
       setRoles(updated)
       refreshWorkflowContext()
       showSaveSuccess('Roles saved')
@@ -693,7 +718,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     try {
       setSaving(true)
       setError(null)
-      const updated = await workflowConfigApi.updateIssueTypes(issueTypes)
+      const updated = await workflowConfigApi.updateIssueTypes(issueTypes, selectedProjectKey)
       setIssueTypes(updated)
       refreshWorkflowContext()
       showSaveSuccess('Issue types saved')
@@ -708,7 +733,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     try {
       setSaving(true)
       setError(null)
-      const updated = await workflowConfigApi.updateStatuses(statuses)
+      const updated = await workflowConfigApi.updateStatuses(statuses, selectedProjectKey)
       setStatuses(updated)
       showSaveSuccess('Statuses saved')
     } catch (err: any) {
@@ -722,7 +747,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     try {
       setSaving(true)
       setError(null)
-      const updated = await workflowConfigApi.updateLinkTypes(linkTypes)
+      const updated = await workflowConfigApi.updateLinkTypes(linkTypes, selectedProjectKey)
       setLinkTypes(updated)
       showSaveSuccess('Link types saved')
     } catch (err: any) {
@@ -792,8 +817,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       const currentTypes = issueTypes.map(t =>
         t.jiraTypeName === typeName ? { ...t, boardCategory } as IssueTypeMappingDto : t
       )
-      await workflowConfigApi.updateIssueTypes(currentTypes)
-      const result = await workflowConfigApi.detectStatusesForType(typeName, boardCategory)
+      await workflowConfigApi.updateIssueTypes(currentTypes, selectedProjectKey)
+      const result = await workflowConfigApi.detectStatusesForType(typeName, boardCategory, selectedProjectKey)
       showSaveSuccess(`Mapped "${typeName}" → ${boardCategory}, detected ${result.statusesDetected} statuses`)
       // Reload config to get updated data
       await loadConfig()
@@ -947,10 +972,10 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       setWizardSaving(true)
       setWizardError(null)
 
-      await workflowConfigApi.updateRoles(wizardRoles)
-      await workflowConfigApi.updateIssueTypes(wizardIssueTypes)
-      await workflowConfigApi.updateStatuses(wizardStatuses)
-      await workflowConfigApi.updateLinkTypes(wizardLinkTypes)
+      await workflowConfigApi.updateRoles(wizardRoles, selectedProjectKey)
+      await workflowConfigApi.updateIssueTypes(wizardIssueTypes, selectedProjectKey)
+      await workflowConfigApi.updateStatuses(wizardStatuses, selectedProjectKey)
+      await workflowConfigApi.updateLinkTypes(wizardLinkTypes, selectedProjectKey)
 
       const validationResult = await workflowConfigApi.validate()
       setWizardValidation(validationResult)
@@ -1064,6 +1089,38 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
           </button>
         </div>
       </div>
+
+      {projectConfigs.length > 1 && (
+        <div className="workflow-project-selector" style={{
+          display: 'flex', gap: 4, marginBottom: 16, padding: '4px',
+          background: '#F4F5F7', borderRadius: 6, width: 'fit-content'
+        }}>
+          {projectConfigs.map(pc => (
+            <button
+              key={pc.projectKey}
+              className={`btn ${selectedProjectKey === pc.projectKey ? 'btn-primary' : 'btn-ghost'}`}
+              style={{
+                fontSize: 13, padding: '4px 14px', borderRadius: 4,
+                position: 'relative',
+                background: selectedProjectKey === pc.projectKey ? '#0052CC' : 'transparent',
+                color: selectedProjectKey === pc.projectKey ? '#fff' : '#42526E',
+                border: 'none', cursor: 'pointer',
+                fontWeight: selectedProjectKey === pc.projectKey ? 600 : 400,
+              }}
+              onClick={() => setSelectedProjectKey(pc.projectKey)}
+            >
+              {pc.projectKey}
+              {!pc.configured && (
+                <span style={{
+                  position: 'absolute', top: -4, right: -4,
+                  fontSize: 9, fontWeight: 700, background: '#FF5630', color: '#fff',
+                  borderRadius: 6, padding: '1px 5px', lineHeight: '14px',
+                }}>NEW</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {error && (
         <div style={{ color: '#DE350B', marginBottom: 16, padding: '8px 12px', background: '#FFEBE6', borderRadius: 4 }}>

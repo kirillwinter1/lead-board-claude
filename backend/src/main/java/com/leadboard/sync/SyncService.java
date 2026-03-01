@@ -378,18 +378,18 @@ public class SyncService {
         try {
             JiraSyncStateEntity state = syncStateRepository.findByProjectKey(projectKey).orElse(null);
             boolean isFirstSync = (state == null || state.getLastSyncCompletedAt() == null);
-            if (isFirstSync && autoDetectService.isConfigEmpty()) {
-                log.info("First sync: auto-detecting workflow configuration from Jira...");
-                var result = autoDetectService.autoDetect();
-                log.info("Auto-detected: {} types, {} roles, {} statuses, {} links",
-                        result.issueTypeCount(), result.roleCount(),
+            if (isFirstSync && autoDetectService.isConfigEmptyForProject(projectKey)) {
+                log.info("First sync for project {}: auto-detecting workflow configuration from Jira...", projectKey);
+                var result = autoDetectService.autoDetectForProject(projectKey);
+                log.info("Auto-detected for {}: {} types, {} roles, {} statuses, {} links",
+                        projectKey, result.issueTypeCount(), result.roleCount(),
                         result.statusMappingCount(), result.linkTypeCount());
                 if (!result.warnings().isEmpty()) {
                     result.warnings().forEach(w -> log.warn("Auto-detect warning: {}", w));
                 }
             }
         } catch (Exception e) {
-            log.error("Auto-detection failed, fallback substring matching will be used", e);
+            log.error("Auto-detection failed for project {}, fallback substring matching will be used", projectKey, e);
         }
     }
 
@@ -425,10 +425,10 @@ public class SyncService {
         String issueTypeName = jiraIssue.getFields().getIssuetype().getName();
         boolean isSubtaskFlag = jiraIssue.getFields().getIssuetype().isSubtask();
         entity.setBoardCategory(workflowConfigService.computeBoardCategory(issueTypeName, isSubtaskFlag));
-        // Register unknown type if not yet mapped
+        // Register unknown type if not yet mapped (per-project)
         if (entity.getBoardCategory() == null) {
             try {
-                autoDetectService.registerUnknownTypeIfNeeded(issueTypeName);
+                autoDetectService.registerUnknownTypeIfNeeded(issueTypeName, projectKey);
             } catch (Exception e) {
                 log.warn("Failed to register unknown type '{}': {}", issueTypeName, e.getMessage());
             }

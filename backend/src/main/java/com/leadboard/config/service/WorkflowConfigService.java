@@ -34,6 +34,7 @@ public class WorkflowConfigService {
 
     // Cached lookups (for current tenant — reloaded when tenant changes)
     private volatile Long defaultConfigId;
+    private volatile List<Long> allConfigIds = List.of();
     private final ConcurrentHashMap<String, BoardCategory> typeToCategory = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> typeToRoleCode = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, StatusCategory> statusLookup = new ConcurrentHashMap<>();
@@ -110,97 +111,142 @@ public class WorkflowConfigService {
 
     private void loadConfiguration() {
         try {
-            String envProjectKey = jiraConfigResolver.getProjectKey();
-            ProjectConfigurationEntity config = null;
+            // Find ALL project configurations for this tenant
+            List<String> allKeys = jiraConfigResolver.getAllProjectKeys();
+            List<ProjectConfigurationEntity> configs;
 
-            // 1. Try to find by project_key from env
-            if (envProjectKey != null && !envProjectKey.isBlank()) {
-                config = configRepo.findByProjectKey(envProjectKey).orElse(null);
+            if (!allKeys.isEmpty()) {
+                configs = new ArrayList<>(configRepo.findAllByProjectKeyIn(allKeys));
+                // Also include default config if it's not project-specific
+                configRepo.findByIsDefaultTrue().ifPresent(def -> {
+                    if (configs.stream().noneMatch(c -> c.getId().equals(def.getId()))) {
+                        configs.add(0, def);
+                    }
+                });
+            } else {
+                // No project keys configured — load default only
+                configs = new ArrayList<>();
+                configRepo.findByIsDefaultTrue().ifPresent(configs::add);
             }
 
-            // 2. Fallback: find default config
-            if (config == null) {
-                config = configRepo.findByIsDefaultTrue().orElse(null);
-            }
-
-            if (config == null) {
-                log.warn("No default project configuration found in DB. Using empty config.");
+            if (configs.isEmpty()) {
+                log.warn("No project configuration found in DB. Using empty config.");
                 defaultConfigId = null;
+                allConfigIds = List.of();
                 projectKey = null;
                 return;
             }
 
-            // 3. Auto-assign project_key if config has none and env has one
-            if (config.getProjectKey() == null && envProjectKey != null && !envProjectKey.isBlank()) {
-                config.setProjectKey(envProjectKey);
-                configRepo.save(config);
-                log.info("Auto-assigned project key '{}' to default configuration", envProjectKey);
+            // Sort: default first, then by creation time
+            configs.sort((a, b) -> {
+                if (a.isDefault() && !b.isDefault()) return -1;
+                if (!a.isDefault() && b.isDefault()) return 1;
+                return Long.compare(a.getId(), b.getId());
+            });
+
+            // Default config = first one (is_default=true or earliest)
+            ProjectConfigurationEntity defaultConfig = configs.get(0);
+
+            // Auto-assign project_key to default config if missing
+            String firstKey = allKeys.isEmpty() ? null : allKeys.get(0);
+            if (defaultConfig.getProjectKey() == null && firstKey != null) {
+                defaultConfig.setProjectKey(firstKey);
+                configRepo.save(defaultConfig);
+                log.info("Auto-assigned project key '{}' to default configuration", firstKey);
             }
 
-            defaultConfigId = config.getId();
-            projectKey = config.getProjectKey();
+            defaultConfigId = defaultConfig.getId();
+            allConfigIds = configs.stream().map(ProjectConfigurationEntity::getId).toList();
+            projectKey = defaultConfig.getProjectKey();
 
-            // Load roles
-            cachedRoles = roleRepo.findByConfigIdOrderBySortOrderAsc(defaultConfigId);
+            // ==== Merged loading: union all configs, first-wins ====
 
-            // Load issue type mappings
+            // Clear all caches
             typeToCategory.clear();
             typeToRoleCode.clear();
-            List<IssueTypeMappingEntity> typeMappings = issueTypeRepo.findByConfigId(defaultConfigId);
+            statusLookup.clear();
+            statusToRoleCode.clear();
+            statusSortOrder.clear();
+            statusScoreWeight.clear();
+            statusColor.clear();
+            linkTypeLookup.clear();
+
             Set<String> projectNames = new HashSet<>();
             Set<String> epicNames = new HashSet<>();
             Set<String> storyNames = new HashSet<>();
             Set<String> bugNames = new HashSet<>();
             Set<String> subtaskNames = new HashSet<>();
-            for (IssueTypeMappingEntity m : typeMappings) {
-                if (m.getBoardCategory() == null) continue; // Skip unmapped types
-                typeToCategory.put(m.getJiraTypeName().toLowerCase(), m.getBoardCategory());
-                if (m.getWorkflowRoleCode() != null) {
-                    typeToRoleCode.put(m.getJiraTypeName().toLowerCase(), m.getWorkflowRoleCode());
+            List<WorkflowRoleEntity> mergedRoles = new ArrayList<>();
+            Set<String> seenRoleCodes = new HashSet<>();
+            int totalTypeMappings = 0;
+            int totalStatusMappings = 0;
+            int totalLinkMappings = 0;
+
+            for (ProjectConfigurationEntity config : configs) {
+                Long configId = config.getId();
+
+                // Merge roles: union by code (first-wins)
+                for (WorkflowRoleEntity role : roleRepo.findByConfigIdOrderBySortOrderAsc(configId)) {
+                    if (seenRoleCodes.add(role.getCode())) {
+                        mergedRoles.add(role);
+                    }
                 }
-                switch (m.getBoardCategory()) {
-                    case PROJECT -> projectNames.add(m.getJiraTypeName());
-                    case EPIC -> epicNames.add(m.getJiraTypeName());
-                    case STORY -> storyNames.add(m.getJiraTypeName());
-                    case BUG -> bugNames.add(m.getJiraTypeName());
-                    case SUBTASK -> subtaskNames.add(m.getJiraTypeName());
-                    default -> {}
+
+                // Merge issue type mappings: union by jiraTypeName.toLowerCase() (first-wins)
+                for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(configId)) {
+                    if (m.getBoardCategory() == null) continue;
+                    String typeKey = m.getJiraTypeName().toLowerCase();
+                    typeToCategory.putIfAbsent(typeKey, m.getBoardCategory());
+                    if (m.getWorkflowRoleCode() != null) {
+                        typeToRoleCode.putIfAbsent(typeKey, m.getWorkflowRoleCode());
+                    }
+                    switch (m.getBoardCategory()) {
+                        case PROJECT -> projectNames.add(m.getJiraTypeName());
+                        case EPIC -> epicNames.add(m.getJiraTypeName());
+                        case STORY -> storyNames.add(m.getJiraTypeName());
+                        case BUG -> bugNames.add(m.getJiraTypeName());
+                        case SUBTASK -> subtaskNames.add(m.getJiraTypeName());
+                        default -> {}
+                    }
+                    totalTypeMappings++;
+                }
+
+                // Merge status mappings: union by boardCategory:statusName (first-wins)
+                for (StatusMappingEntity sm : statusMappingRepo.findByConfigId(configId)) {
+                    String key = buildStatusKey(sm.getIssueCategory().name(), sm.getJiraStatusName());
+                    statusLookup.putIfAbsent(key, sm.getStatusCategory());
+                    if (sm.getWorkflowRoleCode() != null) {
+                        statusToRoleCode.putIfAbsent(key, sm.getWorkflowRoleCode());
+                    }
+                    statusSortOrder.putIfAbsent(key, sm.getSortOrder());
+                    statusScoreWeight.putIfAbsent(key, sm.getScoreWeight());
+                    if (sm.getColor() != null) {
+                        statusColor.putIfAbsent(key, sm.getColor());
+                    }
+                    totalStatusMappings++;
+                }
+
+                // Merge link types: union by name.toLowerCase() (first-wins)
+                for (LinkTypeMappingEntity lm : linkTypeRepo.findByConfigId(configId)) {
+                    linkTypeLookup.putIfAbsent(lm.getJiraLinkTypeName().toLowerCase(), lm.getLinkCategory());
+                    totalLinkMappings++;
                 }
             }
+
+            cachedRoles = mergedRoles;
             projectTypeNames = Set.copyOf(projectNames);
             epicTypeNames = Set.copyOf(epicNames);
             storyTypeNames = Set.copyOf(storyNames);
             bugTypeNames = Set.copyOf(bugNames);
             subtaskTypeNames = Set.copyOf(subtaskNames);
 
-            // Load epic link config
-            epicLinkType = config.getEpicLinkType();
-            epicLinkName = config.getEpicLinkName();
+            // Load epic link config and score weights from default config
+            epicLinkType = defaultConfig.getEpicLinkType();
+            epicLinkName = defaultConfig.getEpicLinkName();
 
-            // Load status mappings
-            statusLookup.clear();
-            statusToRoleCode.clear();
-            statusSortOrder.clear();
-            statusScoreWeight.clear();
-            statusColor.clear();
-            List<StatusMappingEntity> statusMappings = statusMappingRepo.findByConfigId(defaultConfigId);
-            for (StatusMappingEntity sm : statusMappings) {
-                String key = buildStatusKey(sm.getIssueCategory().name(), sm.getJiraStatusName());
-                statusLookup.put(key, sm.getStatusCategory());
-                if (sm.getWorkflowRoleCode() != null) {
-                    statusToRoleCode.put(key, sm.getWorkflowRoleCode());
-                }
-                statusSortOrder.put(key, sm.getSortOrder());
-                statusScoreWeight.put(key, sm.getScoreWeight());
-                if (sm.getColor() != null) {
-                    statusColor.put(key, sm.getColor());
-                }
-            }
-
-            // Load score weights from JSONB
-            if (config.getStatusScoreWeights() != null && !config.getStatusScoreWeights().isEmpty()) {
+            if (defaultConfig.getStatusScoreWeights() != null && !defaultConfig.getStatusScoreWeights().isEmpty()) {
                 try {
-                    scoreWeightsMap = objectMapper.readValue(config.getStatusScoreWeights(),
+                    scoreWeightsMap = objectMapper.readValue(defaultConfig.getStatusScoreWeights(),
                             new TypeReference<Map<String, Integer>>() {});
                 } catch (Exception e) {
                     log.error("Failed to parse status_score_weights JSONB", e);
@@ -208,19 +254,12 @@ public class WorkflowConfigService {
                 }
             }
 
-            // Load link type mappings
-            linkTypeLookup.clear();
-            List<LinkTypeMappingEntity> linkMappings = linkTypeRepo.findByConfigId(defaultConfigId);
-            for (LinkTypeMappingEntity lm : linkMappings) {
-                linkTypeLookup.put(lm.getJiraLinkTypeName().toLowerCase(), lm.getLinkCategory());
-            }
-
-            if (cachedRoles.isEmpty() && typeMappings.isEmpty()) {
+            if (mergedRoles.isEmpty() && totalTypeMappings == 0) {
                 log.warn("Workflow configuration is EMPTY — no roles or type mappings found. " +
                         "Auto-detect will populate config on first Jira sync, or configure manually via Settings > Workflow.");
             } else {
-                log.info("Workflow configuration loaded: {} roles, {} type mappings, {} status mappings, {} link mappings",
-                        cachedRoles.size(), typeMappings.size(), statusMappings.size(), linkMappings.size());
+                log.info("Workflow configuration loaded (merged {} configs): {} roles, {} type mappings, {} status mappings, {} link mappings",
+                        configs.size(), mergedRoles.size(), totalTypeMappings, totalStatusMappings, totalLinkMappings);
             }
         } catch (Exception e) {
             log.error("Failed to load workflow configuration from DB", e);
@@ -710,6 +749,25 @@ public class WorkflowConfigService {
     public Long getDefaultConfigId() {
         ensureLoaded();
         return defaultConfigId;
+    }
+
+    /**
+     * Returns all config IDs loaded for this tenant (merged view).
+     */
+    public List<Long> getAllConfigIds() {
+        ensureLoaded();
+        return allConfigIds;
+    }
+
+    /**
+     * Returns config ID for a specific project key, or null if not found.
+     */
+    public Long getConfigIdForProject(String projectKey) {
+        if (projectKey == null) return getDefaultConfigId();
+        ensureLoaded();
+        return configRepo.findByProjectKey(projectKey)
+                .map(ProjectConfigurationEntity::getId)
+                .orElse(null);
     }
 
     public String getProjectKey() {

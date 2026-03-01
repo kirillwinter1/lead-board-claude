@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -59,6 +61,29 @@ public class JiraConfigResolver {
                 })
                 .filter(s -> s != null && !s.isBlank())
                 .orElse(jiraProperties.getProjectKey());
+    }
+
+    /**
+     * Returns ALL configured project keys.
+     * For tenants with multiple projects (e.g. "PROJ1,PROJ2"), returns all of them.
+     * Falls back to single-key from .env if no tenant config.
+     */
+    public List<String> getAllProjectKeys() {
+        Optional<TenantJiraConfigEntity> tenantConfig = getTenantConfig();
+        if (tenantConfig.isPresent()) {
+            List<String> keys = tenantConfig.get().getProjectKeysList();
+            if (!keys.isEmpty()) return keys;
+        }
+        // Fallback to .env (single key)
+        String envKey = jiraProperties.getProjectKey();
+        if (envKey != null && !envKey.isBlank()) {
+            // Support comma-separated in .env too
+            return Arrays.stream(envKey.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+        }
+        return List.of();
     }
 
     public String getTeamFieldId() {
