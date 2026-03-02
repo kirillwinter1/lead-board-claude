@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker статус \"ACTIVE\" для сессии означает, что голосование по стори в этой сессии активно и участники могут голосовать.","sessionId":"q636-1772445113"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q636-1772445113"}

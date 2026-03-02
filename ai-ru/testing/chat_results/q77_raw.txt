@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"team_list","sessionId":"q77-1772443267"}
+
+event:text
+data:{"type":"text","content":"Обе команды имеют по 3 участника.","sessionId":"q77-1772443267"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q77-1772443267"}

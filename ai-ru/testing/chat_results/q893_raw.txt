@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"OKR не отслеживаются напрямую в LeadBoard. Система фокусируется на прогрессе задач (эпиков, стори) и метриках команды. Вы можете связать эпики с вашими OKR и отслеживать их прогресс через дашборд **Projects** или **Timeline**.","sessionId":"q893-1772446011"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q893-1772446011"}

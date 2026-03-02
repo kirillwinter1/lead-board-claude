@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уточните, пожалуйста, для какой команды вы хотите узнать SLA compliance.","sessionId":"q194-1772443657"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q194-1772443657"}

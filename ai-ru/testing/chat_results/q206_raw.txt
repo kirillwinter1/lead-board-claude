@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Проект в LeadBoard — это сущность верхнего уровня в иерархии задач, которая объединяет эпики. Он может иметь свой статус, прогресс, менеджера и RICE Score.","sessionId":"q206-1772443695"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q206-1772443695"}

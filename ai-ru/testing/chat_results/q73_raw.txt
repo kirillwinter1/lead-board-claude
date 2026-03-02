@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"team_list","sessionId":"q73-1772443247"}
+
+event:text
+data:{"type":"text","content":"Всего 2 команды.","sessionId":"q73-1772443247"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q73-1772443247"}

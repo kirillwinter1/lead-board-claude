@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Проектный таймлайн можно отфильтровать по PM.","sessionId":"q794-1772445647"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q794-1772445647"}

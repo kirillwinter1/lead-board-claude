@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"PROJECT_MANAGER может управлять проектами, использовать RICE-скоринг и просматривать кросс-командные данные. TEAM_LEAD управляет только своей командой.","sessionId":"q955-1772446224"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q955-1772446224"}

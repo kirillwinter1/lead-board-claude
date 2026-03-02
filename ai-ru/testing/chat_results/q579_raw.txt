@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Шкала компетенций:\n*   **1** — No experience (нет опыта)\n*   **2** — Beginner (начинающий)\n*   **3** — Competent (компетентный)\n*   **4** — Proficient (опытный)\n*   **5** — Expert (эксперт)\n","sessionId":"q579-1772444922"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q579-1772444922"}

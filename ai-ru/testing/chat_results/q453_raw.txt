@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, создать свой RICE шаблон нельзя.","sessionId":"q453-1772444508"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q453-1772444508"}

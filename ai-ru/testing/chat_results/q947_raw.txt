@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице настроек (Settings) есть раздел \"Jira Sync\". Там вы можете увидеть кнопку \"Sync Now\", которая запускает синхронизацию. Рядом с ней отображается дата и время последней синхронизации.","sessionId":"q947-1772446198"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q947-1772446198"}

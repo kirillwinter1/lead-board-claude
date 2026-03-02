@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, в базе знаний нет информации о \"overlay data\". Возможно, вы имели в виду что-то другое?","sessionId":"q977-1772446296"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q977-1772446296"}

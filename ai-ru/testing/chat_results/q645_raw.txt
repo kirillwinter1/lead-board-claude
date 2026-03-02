@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker нет истории покер-сессий. Вы можете видеть только активные и завершенные сессии в таблице.","sessionId":"q645-1772445141"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q645-1772445141"}

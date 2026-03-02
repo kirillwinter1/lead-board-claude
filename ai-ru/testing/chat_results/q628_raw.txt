@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Финальная оценка, введенная ведущим, сохраняется в системе.","sessionId":"q628-1772445080"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q628-1772445080"}

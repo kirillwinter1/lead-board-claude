@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, я не могу показать throughput отдельного участника. Я могу предоставить метрики throughput только для команды в целом.","sessionId":"q524-1772444737"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q524-1772444737"}

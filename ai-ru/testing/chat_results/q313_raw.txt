@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, я могу показать throughput только за последние 30 дней.","sessionId":"q313-1772444047"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q313-1772444047"}

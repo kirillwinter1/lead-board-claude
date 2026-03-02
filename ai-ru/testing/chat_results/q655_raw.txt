@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AutoScore стори складывается из 9 факторов:\n1. Статус\n2. Прогресс\n3. Дата завершения (Due Date)\n4. Приоритет\n5. Размер\n6. Возраст\n7. RICE Boost\n8. Alignment\n9. Flagged (если работа приостановлена)","sessionId":"q655-1772445173"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q655-1772445173"}

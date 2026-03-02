@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Вы находитесь на экране Board (Доска).","sessionId":"q7-1772443028"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q7-1772443028"}

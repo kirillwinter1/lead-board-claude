@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Точность прогноза (Forecast Accuracy) рассчитывается на основе двух показателей:\n\n1.  **accuracy_ratio**: `planned_days / actual_days`\n2.  **schedule_variance**: `actual_end − planned_end` (в днях)\n\nСтатусы точности прогноза:\n*   **ON_TIME**: variance ≤ 0\n*   **LATE**: variance > 0\n*   **EARLY**: variance < 0","sessionId":"q341-1772444135"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q341-1772444135"}

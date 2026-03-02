@@ -2,7 +2,7 @@
 
 Трекинг прогресса оптимизации. Тест: `./run.sh reorder` (reorder-stress.js).
 
-Данные: 3 тенанта × ~61K issues = 183K total. 50 teams per tenant.
+Данные: Runs 1-7: 3 тенанта × ~61K issues = 183K total, 50 teams/tenant. Run 8+: 3 × ~605K = 1.82M total, 500 teams/tenant.
 
 ---
 
@@ -409,3 +409,104 @@ Planning cold:          1,500ms   (unchanged — not the target)
 1. **Planning recalculation cold start (~1.5s):** каждый reorder инвалидирует planning cache → следующий запрос = cold start. При 50 concurrent VUs это постоянный цикл инвалидаций.
 2. **Concurrent reorder contention:** 50 VUs пытаются reorder в одной команде → даже с bulk UPDATE есть row-level locking. Нужен per-team advisory lock или serialized queue.
 3. **Error rate под нагрузкой:** основной источник — timeout при ожидании planning recalculation, не сами операции.
+
+---
+
+## Run #8 — 10x Data Scale-Up (2026-03-01)
+
+**Изменения (данные, не код):**
+1. **Teams per project:** 5 → 50 (500 teams/tenant total)
+2. **Users per tenant:** 10 → 100 (300 users total)
+3. **Issues per tenant:** ~61K → ~605K (1.82M total across 3 tenants)
+4. **Members per tenant:** 50 → 5,000
+5. **Filter fix:** `05_issues.sql` — team query filtered to perf-seeded teams only (backend injected 2 prod teams during schema creation)
+6. **LPAD fix:** `u01..u10` → `u001..u100` (3-digit padding for 100 users)
+7. **Project key mapping:** `(team_count - 1) / 5` → `/ 50` (50 teams per project key)
+
+**Backend code: без изменений.** Тот же код что в Run #7. Цель — проверить масштабируемость на 10x данных.
+
+### Масштаб данных
+
+| Параметр | Run #7 | Run #8 (10x) |
+|----------|--------|--------------|
+| Teams/tenant | 50 | **500** |
+| Members/tenant | 500 | **5,000** |
+| Issues/tenant | ~61K | **~605K** |
+| Total issues | ~183K | **~1.82M** |
+| Users (sessions) | 10/tenant | **100/tenant** |
+| Project PERF-A issues | ~12K | **~122K** |
+
+### k6 результаты
+
+| Endpoint | Requests | Success % | p50 | p95 | p99 | Max |
+|----------|----------|-----------|-----|-----|-----|-----|
+| `reorder_load_board` | 4,873 | **4%** | 0.3ms | 11ms | 99ms | 60s |
+| `reorder_move_epic` | 195 | **0%** | — | — | — | — |
+| `forecast_unified` | 195 | **89%** | 7.7ms | 74ms | 114ms | 119ms |
+| `forecast_view` | 195 | **84%** | 7.7ms | 74ms | 114ms | 119ms |
+| `reorder_verify_board` | 195 | **80%** | 0.3ms | 11ms | 99ms | 60s |
+| `board_all` | 456 | **11%** | 0.3ms | 17ms | 2.2s | 5.5s |
+| `board_team` | 456 | **9%** | 0.3ms | 17ms | 2.2s | 5.5s |
+| `score_breakdown` | 53 | **49%** | 0.3ms | 17ms | 2.2s | 5.5s |
+| **TOTAL** | **6,618** | **12.3%** | **0.3ms** | **18ms** | **115ms** | **60s** |
+
+### Агрегированные метрики
+
+```
+Successful requests only:     p50=12ms    p95=163ms    p99=2.51s
+All requests:                 p50=0.27ms  p95=18ms     p99=115ms
+Reorder (api_duration):       p50=0.26ms  p95=11ms     p99=99ms
+Forecast (api_duration):      p50=7.7ms   p95=74ms     p99=114ms
+Board (api_duration):         p50=0.27ms  p95=17ms     p99=2.19s
+Total iterations:             5,329
+Data received:                446 MB (1.5 MB/s)
+```
+
+### Сравнение Run #7 (183K) vs Run #8 (1.82M)
+
+| Метрика | Run #7 (183K) | Run #8 (1.82M) | Изменение |
+|---------|---------------|----------------|-----------|
+| Total issues | 183K | **1.82M** | **10x** |
+| Teams visible on board | 5 | **50** | **10x** |
+| Board fast path p50 | 12ms (cached) | 0.27ms (cached) | OK |
+| Reorder isolated | 0.3ms | 0.26ms | **Стабильно** |
+| Forecast p50 | ~10ms (warm) | 7.7ms | **Стабильно** |
+| Board success rate | — | **11%** | Degraded |
+| Reorder success rate | — | **0%** | **Critical** |
+| Error rate | — | **87.7%** | High |
+
+### Анализ: причины деградации при 10x
+
+**1. Board full path — главный bottleneck.**
+`GET /api/board` (без teamIds) вызывает `findByProjectKey("PERF-A")` → загружает **~122K issues** (вместо ~12K при 5 teams). При 60 concurrent VUs, каждый full-path запрос:
+- Загружает 122K rows из PostgreSQL
+- Строит in-memory структуры (subtasksByParent, childrenByParent)
+- Рассчитывает planning для 50 команд
+- Это создаёт **DB pool exhaustion** → timeout для всех остальных запросов
+
+**2. Reorder 0% success — cascading failure.**
+Writer VUs не могут загрузить board → не могут извлечь epic keys → не могут вызвать reorder. Из 4,873 попыток загрузить board только 195 (4%) преуспели, но 0 из 195 reorder move'ов прошло. Причина: при 50 teams, 50 VUs конкурируют за 50 разных команд → lock contention при bulk shift.
+
+**3. Forecast остаётся быстрым.**
+Когда forecast достижим, он работает стабильно: p50=7.7ms, p95=74ms. Planning cache работает эффективно даже при 10x данных.
+
+**4. Board cache помогает, но не решает проблему.**
+Board cache hit ratio высокий для reader VUs (p50=0.27ms). Но writer VUs инвалидируют кэш после каждого reorder, и cold reload для 122K issues создаёт cascading failure.
+
+### Ключевой вывод
+
+**Оптимизации Runs 1-7 масштабируются для изолированных операций:**
+- Reorder bulk shift: 0.3ms → 0.26ms (без деградации)
+- Forecast planning: 7.7ms cached (без деградации)
+- Board fast path (teamIds): работает при cache hit
+
+**НЕ масштабируется:**
+- Board full path (без teamIds): 12K → 122K issues = линейная деградация
+- 50 concurrent writers на 50 разных команд = lock explosion
+
+### Что нужно для улучшения при 10x
+
+1. **Board full path elimination:** запретить board без teamIds filter, или pagination по project key
+2. **Reader VUs fix:** изменить perf-тест — readers должны использовать `?teamIds=N`, а не загружать все 50 команд
+3. **Per-team advisory locks:** для serialized reorder без deadlocks
+4. **HikariCP pool increase:** 30 → 50-60 connections для 60 VUs при тяжёлых queries

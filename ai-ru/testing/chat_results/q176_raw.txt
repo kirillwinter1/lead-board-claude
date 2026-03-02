@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило EPIC_NO_TEAM означает, что у эпика не указана команда. Это ошибка, которая блокирует планирование.","sessionId":"q176-1772443600"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q176-1772443600"}

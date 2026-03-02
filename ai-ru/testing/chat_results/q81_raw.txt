@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, пользователь может состоять в нескольких командах.","sessionId":"q81-1772443279"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q81-1772443279"}

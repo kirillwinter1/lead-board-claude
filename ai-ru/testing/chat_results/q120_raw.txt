@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Метрики команды\" есть график Velocity Chart, который показывает емкость команды и залогированные часы по неделям.","sessionId":"q120-1772443404"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q120-1772443404"}

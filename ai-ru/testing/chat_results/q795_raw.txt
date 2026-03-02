@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Project Timeline вы можете переключать масштаб, используя элементы управления: **День**, **Неделя** или **Месяц**.","sessionId":"q795-1772445650"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q795-1772445650"}

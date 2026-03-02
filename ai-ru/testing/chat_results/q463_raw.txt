@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, RICE-скоринг не наследуется от проекта к эпикам. RICE-оценка производится для каждой задачи отдельно.","sessionId":"q463-1772444540"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q463-1772444540"}

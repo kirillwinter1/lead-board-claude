@@ -67,7 +67,7 @@ class ChatServiceTest {
     void chatDisabledReturnsError() {
         when(chatProperties.isEnabled()).thenReturn(false);
 
-        List<ChatSseEvent> events = chatService.processMessage("session1", "Hello")
+        List<ChatSseEvent> events = chatService.processMessage("session1", "Hello", null)
                 .collectList().block();
 
         assertNotNull(events);
@@ -82,7 +82,7 @@ class ChatServiceTest {
         LlmResponse response = new LlmResponse("Hello! How can I help?", null, "stop");
         when(llmClient.chat(anyList(), anyList())).thenReturn(response);
 
-        List<ChatSseEvent> events = chatService.processMessage("session1", "Hi")
+        List<ChatSseEvent> events = chatService.processMessage("session1", "Hi", null)
                 .collectList().block();
 
         assertNotNull(events);
@@ -105,7 +105,7 @@ class ChatServiceTest {
 
         when(toolExecutor.executeTool("team_list", "{}")).thenReturn("{\"teams\":[]}");
 
-        List<ChatSseEvent> events = chatService.processMessage("session1", "List teams")
+        List<ChatSseEvent> events = chatService.processMessage("session1", "List teams", null)
                 .collectList().block();
 
         assertNotNull(events);
@@ -119,7 +119,7 @@ class ChatServiceTest {
         LlmResponse response = new LlmResponse("Hello!", null, "stop");
         when(llmClient.chat(anyList(), anyList())).thenReturn(response);
 
-        chatService.processMessage("session1", "Hi").collectList().block();
+        chatService.processMessage("session1", "Hi", null).collectList().block();
         assertFalse(chatService.getSessions().isEmpty());
 
         chatService.clearSession("session1");
@@ -134,15 +134,48 @@ class ChatServiceTest {
         when(llmClient.chat(anyList(), anyList())).thenReturn(response);
 
         // Send multiple messages to exceed max (each round adds user + assistant = 2 messages)
-        chatService.processMessage("session1", "msg1").collectList().block();
-        chatService.processMessage("session1", "msg2").collectList().block();
-        chatService.processMessage("session1", "msg3").collectList().block();
-        chatService.processMessage("session1", "msg4").collectList().block();
+        chatService.processMessage("session1", "msg1", null).collectList().block();
+        chatService.processMessage("session1", "msg2", null).collectList().block();
+        chatService.processMessage("session1", "msg3", null).collectList().block();
+        chatService.processMessage("session1", "msg4", null).collectList().block();
 
         List<LlmMessage> history = chatService.getSessions().get("session1");
         assertNotNull(history);
         // After trimming, history should not exceed maxHistoryMessages
         assertTrue(history.size() <= 5, "History size " + history.size() + " should be trimmed");
+    }
+
+    @Test
+    @DisplayName("Current page context is included in system prompt")
+    void currentPageContextIncluded() {
+        LlmResponse response = new LlmResponse("The green color means DEV phase.", null, "stop");
+        when(llmClient.chat(anyList(), anyList())).thenReturn(response);
+
+        List<ChatSseEvent> events = chatService.processMessage("session1", "What does green mean?",
+                        "Timeline (Таймлайн Gantt)")
+                .collectList().block();
+
+        assertNotNull(events);
+        assertTrue(events.stream().anyMatch(e -> "text".equals(e.type())));
+        // Verify that the system prompt passed to LLM contains the current page
+        verify(llmClient).chat(argThat(messages -> {
+            LlmMessage system = messages.get(0);
+            return system.content() != null && system.content().contains("Timeline (Таймлайн Gantt)");
+        }), anyList());
+    }
+
+    @Test
+    @DisplayName("Null current page does not add page context to system prompt")
+    void nullCurrentPageOmitsContext() {
+        LlmResponse response = new LlmResponse("Hello!", null, "stop");
+        when(llmClient.chat(anyList(), anyList())).thenReturn(response);
+
+        chatService.processMessage("session1", "Hi", null).collectList().block();
+
+        verify(llmClient).chat(argThat(messages -> {
+            LlmMessage system = messages.get(0);
+            return system.content() != null && !system.content().contains("Текущая страница пользователя");
+        }), anyList());
     }
 
     @Test
@@ -160,7 +193,7 @@ class ChatServiceTest {
         // Stream the final response since tool loop finished without text
         when(llmClient.streamChat(anyList())).thenReturn(Flux.just("Done"));
 
-        List<ChatSseEvent> events = chatService.processMessage("session1", "Loop test")
+        List<ChatSseEvent> events = chatService.processMessage("session1", "Loop test", null)
                 .collectList().block();
 
         // Should have called chat at most maxToolCalls + the initial = 2 times for tools

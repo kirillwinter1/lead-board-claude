@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, вы не можете изменить свою роль. Это может сделать только ADMIN.","sessionId":"q18-1772443064"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q18-1772443064"}

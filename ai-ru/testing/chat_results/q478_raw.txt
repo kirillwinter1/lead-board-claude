@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Workflow Config, во вкладке \"Issue Types\", можно настроить маппинг типов задач Jira на следующие категории LeadBoard:\n*   PROJECT\n*   EPIC\n*   STORY\n*   BUG\n*   SUBTASK\n*   IGNORE","sessionId":"q478-1772444587"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q478-1772444587"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о времени нахождения задачи на паузе.","sessionId":"q673-1772445229"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q673-1772445229"}

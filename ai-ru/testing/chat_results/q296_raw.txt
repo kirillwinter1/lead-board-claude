@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нажмите кнопку «Обновить» на верхней панели. Это запустит синхронизацию с Jira.","sessionId":"q296-1772443995"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q296-1772443995"}

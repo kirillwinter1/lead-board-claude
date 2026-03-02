@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Bug Metrics\" (Метрики багов) есть таблица \"Open Bugs\" (Открытые баги), где в колонке \"SLA\" указано, нарушен ли SLA для каждого бага (Breach/OK).","sessionId":"q196-1772443663"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q196-1772443663"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу показать throughput только для конкретной команды. Уточните, пожалуйста, для какой команды вам нужна эта информация.","sessionId":"q822-1772445745"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q822-1772445745"}

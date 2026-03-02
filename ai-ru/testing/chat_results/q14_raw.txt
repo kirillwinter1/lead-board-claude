@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я — AI-ассистент и не могу помочь с выходом из системы. У меня нет доступа к функциям управления аккаунтом.","sessionId":"q14-1772443050"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q14-1772443050"}

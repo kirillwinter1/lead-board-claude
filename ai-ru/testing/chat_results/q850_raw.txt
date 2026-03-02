@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скоринг используется для оценки проектов и эпиков. Он помогает приоритизировать задачи на основе 4 факторов: Reach (охват), Impact (влияние), Confidence (уверенность) и Effort (трудозатраты).\n\nФормула RICE: `(Reach × Impact × Confidence) / Effort`.\n\nВ LeadBoard RICE-скоринг влияет на AutoScore эпика, что в свою очередь определяет его приоритет на доске. Чем выше RICE-скор, тем выше AutoScore и, соответственно, приоритет.\n\nRICE-оценка заполняется для задач в статусе Planned. Если RICE-оценка отсутствует для такой задачи, система выдаст предупреждение `RICE_MISSING_ASSESSMENT`.","sessionId":"q850-1772445851"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q850-1772445851"}

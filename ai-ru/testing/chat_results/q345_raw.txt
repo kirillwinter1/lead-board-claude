@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"On-Time Rate — это процент эпиков, которые были завершены в срок, то есть их DSR (Done Story Ratio) меньше или равен 1.1.","sessionId":"q345-1772444149"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q345-1772444149"}

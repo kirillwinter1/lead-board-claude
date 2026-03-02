@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Changelog импорт необходим для точного расчета метрик DSR и Cycle Time.","sessionId":"q945-1772446193"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q945-1772446193"}

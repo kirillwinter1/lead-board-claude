@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На борду можно перейти по ссылке `/`.","sessionId":"q226-1772443759"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q226-1772443759"}

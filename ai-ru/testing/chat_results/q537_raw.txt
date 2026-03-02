@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, массовое добавление участников недоступно. Вы можете добавлять участников по одному.","sessionId":"q537-1772444777"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q537-1772444777"}

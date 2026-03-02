@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"data_quality_summary","sessionId":"q165-1772443562"}
+
+event:text
+data:{"type":"text","content":"Основные проблемы с данными:\n*   **11 эпиков** не имеют даты завершения (дедлайна).\n*   **0 эпиков** просрочены.\n*   **0 эпиков** не привязаны к команде.","sessionId":"q165-1772443562"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q165-1772443562"}

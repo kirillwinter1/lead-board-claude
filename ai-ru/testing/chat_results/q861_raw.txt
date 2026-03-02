@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу предсказать, что произойдет, если увеличить команду. У меня нет таких возможностей.","sessionId":"q861-1772445894"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q861-1772445894"}

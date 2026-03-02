@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уточните, пожалуйста, какая именно команда вас интересует?","sessionId":"q90-1772443308"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q90-1772443308"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, в LeadBoard нет функции визуализации графа зависимостей.","sessionId":"q660-1772445188"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q660-1772445188"}

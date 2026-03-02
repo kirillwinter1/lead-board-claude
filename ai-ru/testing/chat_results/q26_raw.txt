@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я общаюсь на русском языке.","sessionId":"q26-1772443089"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q26-1772443089"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Reach — это один из параметров RICE-скоринга, который оценивает охват пользователей (от 0 до 100).","sessionId":"q444-1772444481"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q444-1772444481"}

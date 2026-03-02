@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Impact — один из факторов, влияющих на расчет RICE Score. RICE Score, в свою очередь, является одним из 9 факторов, формирующих AutoScore (приоритет задачи). Чем выше Impact, тем выше будет RICE Score, и, соответственно, выше AutoScore.","sessionId":"q775-1772445586"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q775-1772445586"}

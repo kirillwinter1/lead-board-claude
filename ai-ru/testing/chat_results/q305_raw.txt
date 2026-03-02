@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Задача считается \"в паузе\", если она помечена флагом (flagged). Это означает, что работа над ней временно приостановлена.","sessionId":"q305-1772444023"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q305-1772444023"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"DSR Actual рассчитывается на основе фактически затраченного времени и дней паузы, а DSR Forecast — на основе прогнозных данных из снимков планирования.","sessionId":"q310-1772444037"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q310-1772444037"}

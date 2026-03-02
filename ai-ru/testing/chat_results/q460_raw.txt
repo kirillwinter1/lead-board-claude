@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE ranking — это метод приоритизации проектов или задач, основанный на четырех факторах: Reach (охват), Impact (влияние), Confidence (уверенность) и Effort (трудозатраты).\n\nФормула для расчета RICE Score:\n**(Reach × Impact × Confidence) / Effort**\n\nКаждый фактор оценивается по шкале:\n*   **Reach**: охват пользователей (от 0 до 100)\n*   **Impact**: ценность (от 0 до 100)\n*   **Confidence**: уверенность (от 0.4 до 1.0)\n*   **Effort**: трудозатраты в человеко-месяцах (автоматически из подзадач или T-shirt размеры)\n\nНормализованный RICE Score используется для сравнения проектов.\n","sessionId":"q460-1772444531"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q460-1772444531"}

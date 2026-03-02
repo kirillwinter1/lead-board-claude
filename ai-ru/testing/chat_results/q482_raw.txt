@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Auto-detect — это функция в разделе Workflow Config, которая автоматически определяет типы задач Jira (например, \"bug\" или \"epic\") и маппит их на соответствующие категории LeadBoard (BUG, EPIC и т.д.). Для нераспознанных типов задач отображается бэдж \"NEW\".","sessionId":"q482-1772444600"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q482-1772444600"}

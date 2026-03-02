@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Cycle Time участника можно посмотреть на странице его профиля.","sessionId":"q525-1772444740"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q525-1772444740"}

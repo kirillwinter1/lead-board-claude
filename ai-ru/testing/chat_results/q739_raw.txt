@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, откат симуляции невозможен.","sessionId":"q739-1772445468"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q739-1772445468"}

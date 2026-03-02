@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уровень 5 (Expert) уменьшает длительность задачи на 30% по сравнению с базовой оценкой (уровень 3 Competent).","sessionId":"q598-1772444983"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q598-1772444983"}

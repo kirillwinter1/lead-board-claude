@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для оценки компетенции участника нужно перейти на страницу **Team Competency** (`/teams/:teamId/competency`). Там представлена матрица компетенций, где можно оценить каждого участника по различным компонентам по шкале от 1 до 5.","sessionId":"q578-1772444919"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q578-1772444919"}

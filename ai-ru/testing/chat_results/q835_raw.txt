@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Lead Time и Cycle Time — это метрики, которые помогут измерить Time to Market.","sessionId":"q835-1772445789"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q835-1772445789"}

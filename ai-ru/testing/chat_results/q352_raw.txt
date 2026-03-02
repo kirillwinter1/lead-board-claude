@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Метрики команды\" вы можете выбрать период для отображения метрик: 7, 14, 30, 60 или 90 дней.","sessionId":"q352-1772444176"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q352-1772444176"}

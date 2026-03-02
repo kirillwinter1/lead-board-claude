@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице **Board** (Доска) выберите одну команду в фильтре. Затем вы сможете перетаскивать эпики, чтобы изменить их порядок.","sessionId":"q765-1772445554"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q765-1772445554"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Штраф -200 для зафлаженной стори не существует в системе LeadBoard. Возможно, вы имели в виду эпик.\n\nЕсли эпик помечен флагом (flagged), его AutoScore снижается на 100. Это означает, что работа над ним приостановлена.","sessionId":"q656-1772445176"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q656-1772445176"}

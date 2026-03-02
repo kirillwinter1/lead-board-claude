@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Роли для участников: **ADMIN**, **PROJECT_MANAGER**, **TEAM_LEAD**, **MEMBER**, **VIEWER**.","sessionId":"q506-1772444676"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q506-1772444676"}

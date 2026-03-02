@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, не обязательно оценивать все эпики. Оценка (RICE-скоринг) нужна для эпиков со статусом Planned+, чтобы они учитывались в планировании.\n","sessionId":"q667-1772445210"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q667-1772445210"}

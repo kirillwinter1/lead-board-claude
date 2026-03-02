@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, я не могу отобразить график \"Time in Status\" напрямую. У меня нет инструмента для генерации графиков. Я могу предоставить только текстовую информацию.","sessionId":"q327-1772444090"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q327-1772444090"}

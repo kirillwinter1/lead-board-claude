@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Прогноз обновляется ежедневно в 3:00 AM.","sessionId":"q395-1772444319"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q395-1772444319"}

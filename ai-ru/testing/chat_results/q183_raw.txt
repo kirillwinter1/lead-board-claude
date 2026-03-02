@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Метрики по багам можно посмотреть на странице \"Bug Metrics\".","sessionId":"q183-1772443623"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q183-1772443623"}

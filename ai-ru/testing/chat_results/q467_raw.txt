@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Настроить workflow можно на странице Workflow Config.","sessionId":"q467-1772444552"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q467-1772444552"}

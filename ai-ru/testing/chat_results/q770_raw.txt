@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не нашел информации о \"Business шаблоне RICE\". Возможно, вы имели в виду RICE-скоринг. Могу рассказать о нем подробнее, если это так.","sessionId":"q770-1772445570"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q770-1772445570"}

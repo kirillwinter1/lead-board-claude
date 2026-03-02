@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Ошибки исправляются в Jira, так как LeadBoard синхронизируется с ней и отображает данные из Jira.","sessionId":"q174-1772443594"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q174-1772443594"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Баг — это тип задачи, который обрабатывается как Story, но с отдельными SLA-правилами.","sessionId":"q40-1772443139"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q40-1772443139"}

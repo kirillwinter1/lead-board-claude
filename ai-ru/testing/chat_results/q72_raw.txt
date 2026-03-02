@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"team_list","sessionId":"q72-1772443244"}
+
+event:text
+data:{"type":"text","content":"Вот список команд:\n*   **Команда победителей** (ID: 1, Участников: 3)\n*   **Красивые** (ID: 2, Участников: 3)","sessionId":"q72-1772443244"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q72-1772443244"}

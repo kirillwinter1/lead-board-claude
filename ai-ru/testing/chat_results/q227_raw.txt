@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти на таймлайн, используй маршрут `/timeline`.","sessionId":"q227-1772443762"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q227-1772443762"}

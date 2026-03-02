@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Зелёный DSR означает, что задача выполняется вовремя или даже с опережением графика. Значение DSR ≤ 1.1 считается хорошим показателем.","sessionId":"q113-1772443382"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q113-1772443382"}

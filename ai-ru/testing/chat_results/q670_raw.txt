@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу снять флаг с задачи. У меня нет таких функций.","sessionId":"q670-1772445220"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q670-1772445220"}

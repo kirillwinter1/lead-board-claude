@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker нет ограничений по количеству участников в сессии.","sessionId":"q641-1772445129"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q641-1772445129"}

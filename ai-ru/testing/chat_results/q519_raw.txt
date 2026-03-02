@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Профиль участника можно посмотреть на странице `/teams/:teamId/member/:memberId`.","sessionId":"q519-1772444721"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q519-1772444721"}

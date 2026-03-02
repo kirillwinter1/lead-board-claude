@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q63-1772443215"}
+
+event:text
+data:{"type":"text","content":"Найдено 2 задачи по слову \"API\":\n*   **LB-206**: Эпик \"API для партнёров (Partner API)\" в статусе \"Новое\" (Команда Красивые)\n*   **LB-209**: История \"API для CRM системы\" в статусе \"Новое\" (Команда Победителей)","sessionId":"q63-1772443215"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q63-1772443215"}

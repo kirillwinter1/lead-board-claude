@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Changelog Import — это функция в разделе Settings, которая позволяет импортировать историю изменений (changelog) из Jira за выбранный период. Это необходимо для точного расчета метрик DSR и Cycle Time.","sessionId":"q943-1772446187"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q943-1772446187"}

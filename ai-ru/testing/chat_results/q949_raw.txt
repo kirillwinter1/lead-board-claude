@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, но я не нашел информации о \"auto-assign subtasks\" в предоставленной базе знаний. Возможно, это функция, которая не описана в текущей документации.","sessionId":"q949-1772446205"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q949-1772446205"}

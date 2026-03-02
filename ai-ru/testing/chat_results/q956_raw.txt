@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"TEAM_LEAD может управлять своей командой, приоритетами и участниками. MEMBER может только просматривать доску и участвовать в Planning Poker.","sessionId":"q956-1772446227"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q956-1772446227"}

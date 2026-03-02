@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Epic Link Mode — это настройка в Workflow Config, которая определяет, как LeadBoard связывает эпики со стори: через родительскую связь или через Jira Issue Link.","sessionId":"q498-1772444651"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q498-1772444651"}

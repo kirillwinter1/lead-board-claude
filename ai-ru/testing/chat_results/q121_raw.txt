@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Forecast Accuracy — это метрика, которая показывает точность прогноза завершения задач. Она рассчитывается на основе двух показателей:\n\n*   `accuracy_ratio` = `planned_days` / `actual_days`\n*   `schedule_variance` = `actual_end` − `planned_end` (в днях)\n\nСтатусы точности прогноза:\n*   **ON_TIME**: отклонение ≤ 0\n*   **LATE**: отклонение > 0\n*   **EARLY**: отклонение < 0","sessionId":"q121-1772443407"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q121-1772443407"}

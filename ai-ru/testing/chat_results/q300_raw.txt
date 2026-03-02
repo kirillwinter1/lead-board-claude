@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, синхронизировать одну задачу нельзя. Синхронизация происходит для всего проекта или по заданному периоду.","sessionId":"q300-1772444007"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q300-1772444007"}

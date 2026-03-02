@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Lead Time измеряется в днях.","sessionId":"q317-1772444058"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q317-1772444058"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно выбрать эпик для Burndown.","sessionId":"q339-1772444129"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q339-1772444129"}

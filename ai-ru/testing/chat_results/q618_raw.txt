@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Room code (код комнаты) — это 6-символьный код, который генерируется при создании сессии Planning Poker. Он используется для того, чтобы участники могли присоединиться к этой сессии.","sessionId":"q618-1772445048"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q618-1772445048"}

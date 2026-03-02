@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Качество данных можно посмотреть на текущей странице \"Data Quality\".","sessionId":"q157-1772443533"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q157-1772443533"}

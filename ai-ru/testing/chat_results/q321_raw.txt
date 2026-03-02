@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Cycle Time = дата_завершения − дата_начала_работы (без ожидания).","sessionId":"q321-1772444071"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q321-1772444071"}

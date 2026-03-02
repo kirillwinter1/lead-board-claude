@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скор можно посмотреть на странице **Projects** (`/projects`). Он отображается в виде бэджа на карточке проекта. Чтобы увидеть детали, кликни на проект.","sessionId":"q461-1772444534"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q461-1772444534"}

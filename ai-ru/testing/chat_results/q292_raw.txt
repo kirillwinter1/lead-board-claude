@@ -1,0 +1,14 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q292-1772443977"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q292-1772443977"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q292-1772443977"}
+
+event:text
+data:{"type":"text","content":"Задачи без команды могут быть из-за ошибки `EPIC_NO_TEAM`. Это означает, что эпик не привязан к команде. Такие задачи не будут учитываться в планировании.\n","sessionId":"q292-1772443977"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q292-1772443977"}

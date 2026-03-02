@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило **EPIC_NO_ESTIMATE** относится к категории **WARNING** и означает, что у эпика нет оценки. Это может быть либо rough estimate, либо оценки по подзадачам.","sessionId":"q418-1772444399"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q418-1772444399"}

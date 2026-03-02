@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Drag-and-drop на доске работает, если выбран **одна команда**. Это позволяет менять порядок эпиков и стори.","sessionId":"q265-1772443890"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q265-1772443890"}

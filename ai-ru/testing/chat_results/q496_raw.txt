@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Workflow Config, в разделе \"Issue Types\", функция \"Auto-detect statuses\" автоматически определяет статусы Jira для выбранного типа задачи и маппит их на категории LeadBoard (NEW/REQUIREMENTS/PLANNED/IN_PROGRESS/DONE).","sessionId":"q496-1772444645"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q496-1772444645"}

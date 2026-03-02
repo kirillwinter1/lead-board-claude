@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Jira Account ID сотрудника можно найти на странице **Team Members** в таблице участников.","sessionId":"q536-1772444774"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q536-1772444774"}

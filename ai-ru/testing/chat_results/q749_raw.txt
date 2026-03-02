@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу симулировать задержку выполнения задачи. Могу ли я помочь с чем-то еще?","sessionId":"q749-1772445500"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q749-1772445500"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Интерфейс на русском языке.","sessionId":"q25-1772443086"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q25-1772443086"}

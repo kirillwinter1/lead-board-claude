@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"В системе LeadBoard нет такого понятия, как \"simulation log\". Возможно, вы имели в виду что-то другое? Уточните, пожалуйста.","sessionId":"q735-1772445456"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q735-1772445456"}

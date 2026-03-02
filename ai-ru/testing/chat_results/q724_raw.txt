@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, в моей базе знаний нет информации о \"dry-run\". Могу ли я помочь с чем-то еще?","sessionId":"q724-1772445423"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q724-1772445423"}

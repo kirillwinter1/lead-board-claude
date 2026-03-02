@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Таймлайн проекта можно посмотреть на странице **Project Timeline** (`/project-timeline`).","sessionId":"q216-1772443727"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q216-1772443727"}

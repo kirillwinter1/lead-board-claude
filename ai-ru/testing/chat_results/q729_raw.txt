@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Simulation нет логов симуляций.","sessionId":"q729-1772445439"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q729-1772445439"}

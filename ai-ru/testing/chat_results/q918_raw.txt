@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Порог для \"stale bugs\" (багов без обновлений) по умолчанию составляет 14 дней и не настраивается.\n","sessionId":"q918-1772446102"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q918-1772446102"}

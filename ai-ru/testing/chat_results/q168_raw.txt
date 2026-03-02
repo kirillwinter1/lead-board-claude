@@ -1,0 +1,14 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q168-1772443573"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q168-1772443573"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q168-1772443573"}
+
+event:text
+data:{"type":"text","content":"Я не могу напрямую ответить на этот вопрос, так как у меня нет функции для поиска эпиков без команды. Однако, я могу показать эпики, у которых есть команда, и вы можете сравнить.\n\nНа данный момент в работе находятся следующие эпики с командами:\n*   **Команда победителей**:\n    *   LB-95: Управление сотрудниками (People Management)\n    *   LB-202: Автоматизация отчётности (Reporting Automation)\n*   **Красивые**:\n    *   LB-160: Доступы и ролевая модель (Access & Permissions)\n    *   LB-205: Дашборды и виджеты (Dashboards)\n    *   LB-5: Второй жопик\n    *   LB-58: Метрики команды (Delivery Analytics)","sessionId":"q168-1772443573"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q168-1772443573"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Проблемы с alignment показывают следующие метрики:\n*   **Alignment Badge** на карточке проекта:\n    *   `✓` (вовремя, ≤2д)\n    *   `⚠️+Xd` (отстаёт >2д от среднего)\n*   **AutoScore** фактор **Alignment**: дни отставания × 1, макс 10.","sessionId":"q678-1772445247"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q678-1772445247"}

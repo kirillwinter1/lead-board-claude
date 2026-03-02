@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Velocity считается как отношение залогированных часов к ёмкости команды за неделю, выраженное в процентах.\n","sessionId":"q333-1772444110"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q333-1772444110"}

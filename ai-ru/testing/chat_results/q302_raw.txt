@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Формула DSR: `DSR = (рабочие_дни − дни_паузы) / оценка_в_днях`.","sessionId":"q302-1772444013"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q302-1772444013"}

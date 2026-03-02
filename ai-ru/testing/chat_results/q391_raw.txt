@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу запустить recalculate. Эта функция недоступна через меня.","sessionId":"q391-1772444307"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q391-1772444307"}

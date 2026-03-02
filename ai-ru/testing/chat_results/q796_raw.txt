@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, у меня нет возможности искать эпики по проекту или по статусу \"просрочен\". Я могу искать задачи только по категориям статусов: **TODO**, **IN_PROGRESS**, **DONE**.","sessionId":"q796-1772445653"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q796-1772445653"}

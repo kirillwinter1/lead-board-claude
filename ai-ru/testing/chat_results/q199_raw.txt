@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q199-1772443673"}
+
+event:text
+data:{"type":"text","content":"На данный момент нет багов, нарушающих SLA.","sessionId":"q199-1772443673"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q199-1772443673"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Качество данных\" вы можете отфильтровать нарушения по правилу, используя соответствующий фильтр.","sessionId":"q423-1772444414"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q423-1772444414"}

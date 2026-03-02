@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Lead Time рассчитывается как разница между датой завершения задачи и датой ее создания.","sessionId":"q316-1772444056"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q316-1772444056"}

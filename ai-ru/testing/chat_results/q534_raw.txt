@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"`Jira Account ID` — это уникальный идентификатор пользователя в Jira. Он используется для привязки участников команды LeadBoard к их аккаунтам в Jira.","sessionId":"q534-1772444768"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q534-1772444768"}

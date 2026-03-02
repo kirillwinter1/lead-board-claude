@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На главном экране (Board) отображается иерархическая таблица, включающая эпики, стори и подзадачи.","sessionId":"q10-1772443037"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q10-1772443037"}

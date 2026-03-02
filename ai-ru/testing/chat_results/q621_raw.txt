@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"В Planning Poker используются карты со значениями: 2, 4, 8, 12, 16, 24, 32, 40 часов, а также карта с вопросительным знаком (?).","sessionId":"q621-1772445059"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q621-1772445059"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На какой странице вы находитесь? Уточните, пожалуйста, контекст, чтобы я мог дать релевантные рекомендации.","sessionId":"q782-1772445608"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q782-1772445608"}

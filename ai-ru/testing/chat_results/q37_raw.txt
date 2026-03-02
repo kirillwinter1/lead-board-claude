@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q37-1772443129"}
+
+event:text
+data:{"type":"text","content":"В системе 172 подзадачи.","sessionId":"q37-1772443129"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q37-1772443129"}

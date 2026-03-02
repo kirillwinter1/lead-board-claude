@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу дать такую рекомендацию. Уточните, пожалуйста, что вы имеете в виду под \"смягчить SLA\" и для каких задач это нужно.","sessionId":"q915-1772446091"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q915-1772446091"}

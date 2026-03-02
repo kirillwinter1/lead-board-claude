@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE Score рассчитывается по формуле: `(Reach × Impact × Confidence) / Effort`.\n\nКаждый из этих параметров имеет следующее значение:\n*   **Reach**: охват пользователей (от 0 до 100).\n*   **Impact**: ценность (от 0 до 100).\n*   **Confidence**: уверенность (от 0.4 до 1.0).\n*   **Effort**: трудозатраты в человеко-месяцах (автоматически определяется из подзадач или T-shirt размера).\n\nЗатем применяется нормализация: `Normalized = (raw − min) / (max − min) × 100 × strategic_weight`.","sessionId":"q214-1772443719"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q214-1772443719"}

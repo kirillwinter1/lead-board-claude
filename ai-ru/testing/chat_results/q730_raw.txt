@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, историю симуляций можно посмотреть на странице Timeline. Там есть возможность выбрать \"Дату снимка\" (\"Сегодня (live)\" или историческая дата из forecast snapshots).","sessionId":"q730-1772445442"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q730-1772445442"}

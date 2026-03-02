@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"PREPARING - это статус сессии Planning Poker, который означает, что сессия создана, но голосование еще не началось.","sessionId":"q635-1772445110"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q635-1772445110"}

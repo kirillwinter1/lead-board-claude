@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Параметра `includeDQ` не существует. Возможно, вы имели в виду `data_quality_summary`?","sessionId":"q288-1772443964"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q288-1772443964"}

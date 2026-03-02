@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Impact — это один из факторов, используемых при расчете RICE Score. Он отражает ценность задачи и измеряется по шкале от 0 до 100.","sessionId":"q445-1772444484"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q445-1772444484"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"У меня нет функции для очистки истории чата.","sessionId":"q245-1772443817"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q245-1772443817"}

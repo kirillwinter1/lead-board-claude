@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу предоставить информацию о задачах, которые дольше всего находятся в статусе \"Code Review\", так как у меня нет возможности фильтровать задачи по конкретным статусам Jira, только по категориям статусов (TODO, IN_PROGRESS, DONE).","sessionId":"q325-1772444084"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q325-1772444084"}

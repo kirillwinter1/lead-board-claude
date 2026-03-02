@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, порядок ролей можно изменить на вкладке \"Roles\" в разделе \"Workflow Config\".","sessionId":"q471-1772444564"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q471-1772444564"}

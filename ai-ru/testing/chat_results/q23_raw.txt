@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Настройки доступны только для роли ADMIN. Вы можете найти их в разделе `/settings`.","sessionId":"q23-1772443080"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q23-1772443080"}

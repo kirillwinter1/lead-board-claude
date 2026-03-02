@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Задачи синхронизируются из Jira.","sessionId":"q28-1772443094"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q28-1772443094"}

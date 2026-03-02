@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE расшифровывается как Reach, Impact, Confidence, Effort.","sessionId":"q442-1772444475"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q442-1772444475"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, но такого инструмента как \"calendar workdays API\" не существует в системе LeadBoard. Возможно, вы имели в виду что-то другое?","sessionId":"q400-1772444334"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q400-1772444334"}

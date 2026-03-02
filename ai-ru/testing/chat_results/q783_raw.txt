@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Alignment boost — это фактор AutoScore, который добавляет до 10 баллов в зависимости от отставания эпика от среднего прогресса. Чем больше отставание, тем выше буст.\n","sessionId":"q783-1772445611"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q783-1772445611"}

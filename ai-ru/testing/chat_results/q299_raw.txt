@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Параметр `months` при синхронизации означает количество месяцев, за которые будут импортированы данные из Jira. Это нужно для точных метрик DSR и Cycle Time.","sessionId":"q299-1772444004"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q299-1772444004"}

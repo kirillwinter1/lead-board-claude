@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"board_summary","sessionId":"q33-1772443114"}
+
+event:text
+data:{"type":"text","content":"На доске сейчас:\n*   **Эпики:** 6 в работе, 7 новых. Всего 13.\n*   **Стори:** 8 завершено, 9 в работе, 16 новых. Всего 33.","sessionId":"q33-1772443114"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q33-1772443114"}

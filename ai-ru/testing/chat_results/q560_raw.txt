@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, система учитывает больничные. Они отображаются в разделе \"Отсутствия\" на странице команды.","sessionId":"q560-1772444851"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q560-1772444851"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker голоса до раскрытия видит только ведущий сессии.","sessionId":"q624-1772445068"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q624-1772445068"}

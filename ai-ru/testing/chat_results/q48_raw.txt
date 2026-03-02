@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Статус `IN_PROGRESS` означает, что задача находится в работе.","sessionId":"q48-1772443163"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q48-1772443163"}

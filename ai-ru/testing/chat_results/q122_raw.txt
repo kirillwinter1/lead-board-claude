@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Метрики команды считаются за последние 30 дней.","sessionId":"q122-1772443412"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q122-1772443412"}

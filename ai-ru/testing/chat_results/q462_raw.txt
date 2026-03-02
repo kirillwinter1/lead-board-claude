@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скоринг применяется только к эпикам. Пересчитать его для всех эпиков можно, обновив данные по каждому проекту.","sessionId":"q462-1772444537"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q462-1772444537"}

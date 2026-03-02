@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу предоставить информацию о загрузке по ролям для конкретной команды. Для этого мне нужно знать ID команды.\n","sessionId":"q830-1772445774"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q830-1772445774"}

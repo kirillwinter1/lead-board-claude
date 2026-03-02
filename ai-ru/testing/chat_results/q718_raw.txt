@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы показать прогресс команды за месяц, мне нужно знать ID команды. Какая команда вас интересует?","sessionId":"q718-1772445404"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q718-1772445404"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скоринг применяется к эпикам, а не к проектам. Чтобы оценить эпик по RICE, перейдите на страницу **Projects**, выберите нужный проект, затем эпик. Там вы найдете форму для оценки по RICE.","sessionId":"q768-1772445563"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q768-1772445563"}

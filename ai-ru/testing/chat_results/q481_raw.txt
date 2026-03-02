@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы добавить новый тип задачи, перейдите на вкладку \"Issue Types\" в разделе \"Workflow Config\". Там вы сможете сопоставить типы задач Jira с категориями LeadBoard.","sessionId":"q481-1772444597"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q481-1772444597"}

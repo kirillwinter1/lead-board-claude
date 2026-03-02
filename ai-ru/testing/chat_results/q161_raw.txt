@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"ERROR в качестве данных — это критические проблемы, которые блокируют планирование.","sessionId":"q161-1772443549"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q161-1772443549"}

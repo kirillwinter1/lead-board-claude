@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Expected Done для проекта — это прогнозируемая дата завершения проекта. Она рассчитывается как максимальная дата завершения (Expected Done) среди всех незавершённых эпиков проекта.","sessionId":"q212-1772443713"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q212-1772443713"}

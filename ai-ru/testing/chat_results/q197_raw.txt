@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"SLA настраивается в разделе **Settings** (Настройки), на вкладке **Bug SLA Settings** (Настройки SLA для багов). Там вы можете установить часы SLA для каждого приоритета.","sessionId":"q197-1772443666"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q197-1772443666"}

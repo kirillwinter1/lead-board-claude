@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE Score нормализуется по формуле:\n\n```\nNormalized = (raw − min) / (max − min) × 100 × strategic_weight\n```\nГде:\n- `raw` — это исходный RICE Score.\n- `min` и `max` — минимальное и максимальное значения RICE Score.\n- `strategic_weight` — стратегический вес.","sessionId":"q454-1772444512"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q454-1772444512"}

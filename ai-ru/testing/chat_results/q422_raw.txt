@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На этой странице вы можете отфильтровать нарушения по серьезности (severity), выбрав один из вариантов: **ERROR**, **WARNING** или **INFO**.","sessionId":"q422-1772444411"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q422-1772444411"}

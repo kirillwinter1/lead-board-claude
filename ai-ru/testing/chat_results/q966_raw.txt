@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, у меня нет информации о различиях между manual и Jira-синхронизированными командами.","sessionId":"q966-1772446257"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q966-1772446257"}

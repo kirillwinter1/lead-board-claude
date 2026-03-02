@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Настройки доступны по адресу `/settings`.","sessionId":"q232-1772443777"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q232-1772443777"}

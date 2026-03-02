@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"У задач есть следующие статусы:\n*   **TODO** (Предстоит сделать)\n*   **IN_PROGRESS** (В работе)\n*   **DONE** (Готово)","sessionId":"q46-1772443157"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q46-1772443157"}

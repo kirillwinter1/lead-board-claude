@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу оценить риски нового проекта. Могу показать метрики команды, качество данных, или список задач.","sessionId":"q833-1772445783"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q833-1772445783"}

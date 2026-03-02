@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"В навигационном меню находятся следующие разделы:\n\n*   **Board** (Доска) — `/`\n*   **Timeline** (Таймлайн) — `/timeline`\n*   **Metrics** (Метрики команды) — `/metrics`\n*   **Data Quality** (Качество данных) — `/data-quality`\n*   **Bugs** (Метрики багов) — `/bug-metrics`\n*   **Projects** (Проекты) — `/projects`\n*   **Project Timeline** — `/project-timeline`\n*   **Teams** (Команды) — `/teams`\n*   **Planning Poker** — `/poker`\n*   **Settings** (Настройки) — `/settings` (доступно только для ADMIN)\n*   **Workflow Config** (Конфигурация рабочего процесса) — `/workflow` (доступно только для ADMIN)\n*   **Registration** (Регистрация) — `/register` (для регистрации компании)\n*   **Setup Wizard** (Мастер настройки) — для первичной настройки системы","sessionId":"q235-1772443786"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q235-1772443786"}

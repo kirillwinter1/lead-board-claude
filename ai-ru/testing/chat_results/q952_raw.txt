@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы назначить роль PROJECT_MANAGER:\n1. Перейди на страницу **Settings** (`/settings`).\n2. Найди нужного пользователя в таблице.\n3. Измени его роль, используя выпадающий список.\n\nЭту операцию может выполнить только пользователь с ролью **ADMIN**.","sessionId":"q952-1772446214"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q952-1772446214"}

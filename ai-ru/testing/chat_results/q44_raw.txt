@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Подзадача (Subtask) — это самый нижний уровень иерархии задач в LeadBoard. Она не существует без стори и является единственным местом для оценки времени и логирования трудозатрат.","sessionId":"q44-1772443151"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q44-1772443151"}

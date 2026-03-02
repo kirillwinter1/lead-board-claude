@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу получить информацию о количестве багов по приоритету. Я могу получить только общее количество багов.","sessionId":"q187-1772443635"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q187-1772443635"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило `RICE_MISSING_ASSESSMENT` означает, что для задачи со статусом `Planned` или выше отсутствует оценка RICE. Это предупреждение (`WARNING`), которое указывает на неполноту данных для планирования.","sessionId":"q180-1772443613"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q180-1772443613"}

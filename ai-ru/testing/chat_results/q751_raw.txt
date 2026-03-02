@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На данный момент у меня нет информации о ваших проектах. Я могу показать список эпиков, если вы хотите.","sessionId":"q751-1772445507"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q751-1772445507"}

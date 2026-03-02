@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Workflow Config, во вкладке \"Link Types\", ты можешь настроить \"Epic Link Mode\".\n\n*   **Parent** означает, что эпики и стори связаны через стандартное родительско-дочернее отношение в Jira.\n*   **Issuelink** означает, что они связаны через обычные ссылки между задачами в Jira.\n\nВыбор зависит от того, как у вас настроена иерархия задач в Jira.","sessionId":"q499-1772444654"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q499-1772444654"}

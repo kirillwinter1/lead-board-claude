@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уровень 3 в матрице компетенций означает \"Competent\" (Компетентный).","sessionId":"q581-1772444928"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q581-1772444928"}

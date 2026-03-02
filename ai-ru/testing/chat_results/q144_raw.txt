@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Forecast (прогноз) — это полосатые бары на диаграмме Ганта на странице Timeline, которые показывают будущую работу. Он строится на основе планирования и оценок задач.","sessionId":"q144-1772443492"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q144-1772443492"}

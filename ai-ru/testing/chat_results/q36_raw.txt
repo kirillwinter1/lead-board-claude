@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q36-1772443125"}
+
+event:text
+data:{"type":"text","content":"На доске 1 баг.","sessionId":"q36-1772443125"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q36-1772443125"}

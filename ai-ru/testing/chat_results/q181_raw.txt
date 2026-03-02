@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Баг в LeadBoard обрабатывается как Story, но с отдельными SLA-правилами.","sessionId":"q181-1772443616"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q181-1772443616"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Динамику Velocity можно посмотреть на графике Velocity Chart на странице метрик команды.","sessionId":"q701-1772445334"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q701-1772445334"}

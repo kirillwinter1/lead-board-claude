@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AutoScore складывается из 9 факторов:\n1.  **Status** (Статус)\n2.  **Progress** (Прогресс)\n3.  **Due Date** (Срок выполнения)\n4.  **Priority** (Приоритет)\n5.  **Size** (Размер)\n6.  **Age** (Возраст)\n7.  **RICE Boost** (Усиление RICE)\n8.  **Alignment** (Согласованность)\n9.  **Flagged** (Помечено флагом)","sessionId":"q252-1772443847"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q252-1772443847"}

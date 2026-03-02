@@ -1,7 +1,18 @@
+import { getTenantSlug } from '../utils/tenant'
+
 export interface ChatSseEvent {
   type: 'text' | 'tool_call' | 'done' | 'error'
   content: string | null
   sessionId: string
+}
+
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const slug = getTenantSlug()
+  if (slug) {
+    headers['X-Tenant-Slug'] = slug
+  }
+  return headers
 }
 
 export interface ChatMessage {
@@ -14,6 +25,7 @@ export interface ChatMessage {
 export function sendChatMessage(
   message: string,
   sessionId: string,
+  currentPage: string | null,
   onEvent: (event: ChatSseEvent) => void,
   onError: (error: string) => void
 ): AbortController {
@@ -21,9 +33,9 @@ export function sendChatMessage(
 
   fetch('/api/chat/message', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildHeaders(),
     credentials: 'include',
-    body: JSON.stringify({ message, sessionId }),
+    body: JSON.stringify({ message, sessionId, currentPage }),
     signal: controller.signal,
   })
     .then(async (response) => {
@@ -86,7 +98,7 @@ export function sendChatMessage(
 }
 
 export async function clearChatSession(sessionId: string): Promise<void> {
-  await fetch(`/api/chat/session/${sessionId}`, { method: 'DELETE', credentials: 'include' })
+  await fetch(`/api/chat/session/${sessionId}`, { method: 'DELETE', headers: buildHeaders(), credentials: 'include' })
 }
 
 export async function getChatStatus(): Promise<{ enabled: boolean }> {

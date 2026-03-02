@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу оценить ramp-up time нового участника. Могу показать метрики команды или конкретного участника, если он уже в системе.","sessionId":"q863-1772445900"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q863-1772445900"}

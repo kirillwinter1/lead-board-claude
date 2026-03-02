@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, такой возможности нет. Отсутствия можно добавлять только вручную.","sessionId":"q567-1772444881"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q567-1772444881"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, на странице \"Metrics\" доступен дашборд для мониторинга метрик команды.","sessionId":"q707-1772445364"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q707-1772445364"}

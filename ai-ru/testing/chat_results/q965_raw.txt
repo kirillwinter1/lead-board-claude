@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не нашел информации о \"manual team management\" в базе знаний. Возможно, вы имели в виду что-то другое? Уточните, пожалуйста.","sessionId":"q965-1772446254"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q965-1772446254"}

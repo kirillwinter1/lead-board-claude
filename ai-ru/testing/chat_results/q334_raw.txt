@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Залогированное время — это время, которое фактически было потрачено и учтено на выполнение задачи.","sessionId":"q334-1772444113"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q334-1772444113"}

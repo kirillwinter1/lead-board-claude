@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу показать тренд Quality Score. У меня нет таких метрик. Я могу показать только общее количество ошибок, предупреждений и информационной сложности.","sessionId":"q431-1772444441"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q431-1772444441"}

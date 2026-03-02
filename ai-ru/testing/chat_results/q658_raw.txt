@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Стори А должна быть завершена раньше, чем стори Б, так как она является блокирующей.","sessionId":"q658-1772445182"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q658-1772445182"}

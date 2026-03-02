@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Ключ задачи можно скопировать, нажав на него в таблице. Он также является ссылкой на Jira.","sessionId":"q241-1772443806"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q241-1772443806"}

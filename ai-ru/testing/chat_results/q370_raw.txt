@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Risk Buffer — это запас в 20% к оценке задачи, который используется в планировании. Например, если оценка задачи 10 часов, то с Risk Buffer она будет планироваться как 12 часов (10 * 1.2).","sessionId":"q370-1772444238"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q370-1772444238"}

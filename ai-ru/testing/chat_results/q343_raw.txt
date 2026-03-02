@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уточни, пожалуйста, о каком именно графике Accuracy идет речь? На странице метрик команды есть раздел \"Forecast Accuracy\", но там нет графика с точками.","sessionId":"q343-1772444142"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q343-1772444142"}

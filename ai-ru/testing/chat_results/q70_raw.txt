@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Прогресс эпика рассчитывается как отношение залогированного времени к общей оценке: `progress = (loggedSeconds / estimateSeconds) × 100`.","sessionId":"q70-1772443237"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q70-1772443237"}

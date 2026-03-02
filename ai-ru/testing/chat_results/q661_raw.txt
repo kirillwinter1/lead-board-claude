@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Система учитывает все уровни зависимостей, так как использует топологическую сортировку для планирования стори.","sessionId":"q661-1772445191"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q661-1772445191"}

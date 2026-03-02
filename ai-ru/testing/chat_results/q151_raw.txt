@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. На странице Timeline вы можете выбрать историческую дату из \"forecast snapshots\" для сравнения прогнозов.","sessionId":"q151-1772443514"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q151-1772443514"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о scatter plot.","sessionId":"q712-1772445383"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q712-1772445383"}

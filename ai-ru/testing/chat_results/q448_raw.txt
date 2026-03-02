@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Effort рассчитывается автоматически из подзадач.","sessionId":"q448-1772444493"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q448-1772444493"}

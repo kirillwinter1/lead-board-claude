@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Workflow Config — это раздел, где администратор настраивает соответствие между сущностями Jira и LeadBoard. Он включает 4 вкладки: Roles, Issue Types, Statuses и Link Types.\n","sessionId":"q466-1772444549"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q466-1772444549"}

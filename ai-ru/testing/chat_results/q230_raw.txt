@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти на страницу багов, используй путь `/bug-metrics`.","sessionId":"q230-1772443771"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q230-1772443771"}

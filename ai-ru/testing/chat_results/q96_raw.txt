@@ -1,0 +1,14 @@
+event:tool_call
+data:{"type":"tool_call","content":"team_list","sessionId":"q96-1772443327"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q96-1772443327"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q96-1772443327"}
+
+event:text
+data:{"type":"text","content":"Нет, все команды имеют задачи.\n*   **Команда победителей**: 26 задач\n*   **Красивые**: 27 задач","sessionId":"q96-1772443327"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q96-1772443327"}

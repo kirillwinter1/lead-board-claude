@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти на метрики, используй путь `/metrics`.","sessionId":"q228-1772443765"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q228-1772443765"}

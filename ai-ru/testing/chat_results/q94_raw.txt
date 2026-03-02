@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу показать количество задач в работе для каждой команды по отдельности. Укажите, пожалуйста, ID команды.","sessionId":"q94-1772443321"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q94-1772443321"}

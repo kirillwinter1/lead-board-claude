@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Масштаб таймлайна можно переключить с помощью элементов управления: **День**, **Неделя**, **Месяц**.","sessionId":"q138-1772443471"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q138-1772443471"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, прогноз учитывает выходные дни. Они отображаются серым фоном на диаграмме Ганта.","sessionId":"q396-1772444322"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q396-1772444322"}

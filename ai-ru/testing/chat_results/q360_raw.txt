@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для оценки здоровья команды наиболее важны следующие метрики:\n*   **DSR Actual** (Done Story Ratio)\n*   **DSR Forecast**\n*   **Throughput** (пропускная способность)\n*   **On-Time Rate** (процент выполнения в срок)\n*   **Role Load** (загрузка по ролям)\n*   **Forecast Accuracy** (точность прогноза)\n*   **Velocity Chart** (скорость работы)\n*   **Time in Status** (время в статусах)\n\nЭти метрики позволяют оценить эффективность, предсказуемость, загруженность и качество работы команды.","sessionId":"q360-1772444204"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q360-1772444204"}

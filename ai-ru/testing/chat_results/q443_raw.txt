@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Формула RICE: `(Reach × Impact × Confidence) / Effort`.","sessionId":"q443-1772444478"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q443-1772444478"}

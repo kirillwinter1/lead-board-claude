@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На этой странице нет возможности деактивировать участника. Вы можете только изменить его роль, грейд или часы в день.","sessionId":"q515-1772444709"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q515-1772444709"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уровень 5 в матрице компетенций означает \"Эксперт\".\n","sessionId":"q582-1772444931"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q582-1772444931"}

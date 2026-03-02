@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для отслеживания выполнения SLA по багам перейди на страницу **Bug Metrics** (`/bug-metrics`). Там ты найдешь:\n\n*   **SLA Compliance** — процент багов, решенных в рамках SLA.\n*   **Priority Breakdown** — таблицу с разбивкой по приоритетам, где указаны SLA-лимиты и соответствие им.\n\nНастройки SLA по багам доступны в **Settings** (`/settings`) на вкладке **Bug SLA Settings**.","sessionId":"q720-1772445411"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q720-1772445411"}

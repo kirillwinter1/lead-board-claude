@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, период расчёта метрик можно изменить.","sessionId":"q123-1772443414"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q123-1772443414"}

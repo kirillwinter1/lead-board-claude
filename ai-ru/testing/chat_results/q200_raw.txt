@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу найти команду Backend. Могу показать список всех команд.","sessionId":"q200-1772443676"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q200-1772443676"}

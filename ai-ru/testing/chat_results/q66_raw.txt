@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. На доске задач (Board) в колонке \"NAME (Название)\" есть ключ-ссылка на Jira.","sessionId":"q66-1772443225"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q66-1772443225"}

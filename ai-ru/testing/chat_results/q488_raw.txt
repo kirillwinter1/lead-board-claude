@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Link Type mapping — это настройка связей между задачами Jira и их типами в LeadBoard. Она позволяет определить, какие типы связей в Jira будут интерпретироваться как:\n\n*   **BLOCKS** (блокирует)\n*   **RELATED** (связанные)\n*   **IGNORE** (игнорировать)\n\nТакже здесь настраивается **Epic Link Mode** (как определять родительский эпик: через parent или issuelink).\n\nЭта настройка находится на странице **Workflow Config** во вкладке **Link Types**.","sessionId":"q488-1772444619"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q488-1772444619"}

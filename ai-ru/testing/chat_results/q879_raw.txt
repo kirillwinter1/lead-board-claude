@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На текущей странице (Таймлайн Gantt) нет информации о скорости сгорания задач. Эта метрика доступна на странице \"Metrics\" в разделе \"Epic Burndown\".","sessionId":"q879-1772445956"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q879-1772445956"}

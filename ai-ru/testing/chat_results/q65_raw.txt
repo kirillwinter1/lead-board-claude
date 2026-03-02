@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы посмотреть детали задачи, мне нужен ее ключ или название. Уточните, пожалуйста, что именно вы ищете.","sessionId":"q65-1772443222"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q65-1772443222"}

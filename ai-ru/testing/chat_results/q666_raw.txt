@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, наоборот. Эпики с меньшей оценкой (Size) получают более высокий AutoScore. Если у эпика нет оценки, он получает -5 баллов.","sessionId":"q666-1772445207"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q666-1772445207"}

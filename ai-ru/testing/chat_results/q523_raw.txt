@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, я не могу показать DSR конкретного участника. Я могу предоставить только общие метрики команды.","sessionId":"q523-1772444734"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q523-1772444734"}

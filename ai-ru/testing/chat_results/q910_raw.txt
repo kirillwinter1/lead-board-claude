@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу получить информацию о заблокированных стори. Могу показать только общее количество стори.","sessionId":"q910-1772446076"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q910-1772446076"}

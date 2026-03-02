@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу посмотреть список проектов. Могу помочь с задачами, командами или метриками.","sessionId":"q207-1772443698"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q207-1772443698"}

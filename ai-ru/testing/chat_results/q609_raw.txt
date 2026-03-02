@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о компетенциях отдельных участников команды.","sessionId":"q609-1772445019"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q609-1772445019"}

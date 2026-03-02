@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Тип связи BLOCKS означает, что одна задача блокирует выполнение другой.\n","sessionId":"q489-1772444624"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q489-1772444624"}

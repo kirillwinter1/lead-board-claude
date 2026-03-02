@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Фаза DEV (Development) — это этап разработки задачи в рамках общего пайплайна (SA → DEV → QA). На этом этапе происходит непосредственное написание кода и реализация функционала.","sessionId":"q154-1772443523"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q154-1772443523"}

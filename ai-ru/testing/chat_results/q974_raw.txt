@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, LeadBoard не изменяет данные в Jira. Он только синхронизируется с Jira для получения информации.","sessionId":"q974-1772446286"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q974-1772446286"}

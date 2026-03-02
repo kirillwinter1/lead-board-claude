@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скоринг можно посмотреть на странице **Projects** (`/projects`). На этой странице отображаются карточки проектов, где есть **RICE Score Badge**. Чтобы увидеть детали и форму оценки, нужно кликнуть на карточку проекта.","sessionId":"q458-1772444524"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q458-1772444524"}

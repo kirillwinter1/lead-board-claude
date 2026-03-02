@@ -26,11 +26,12 @@ public class ChatController {
     public Flux<ServerSentEvent<ChatSseEvent>> sendMessage(@RequestBody ChatMessageRequest request) {
         String sessionId = request.sessionId() != null ? request.sessionId() : UUID.randomUUID().toString();
 
-        return chatService.processMessage(sessionId, request.message())
+        return chatService.processMessage(sessionId, request.message(), request.currentPage())
                 .map(event -> ServerSentEvent.<ChatSseEvent>builder()
                         .event(event.type())
                         .data(event)
-                        .build());
+                        .build())
+                .cache();
     }
 
     @DeleteMapping("/session/{sessionId}")

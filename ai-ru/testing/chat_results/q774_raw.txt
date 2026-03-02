@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Reach — это один из факторов, влияющих на RICE Score. RICE Score, в свою очередь, является одним из факторов, влияющих на AutoScore (приоритет). Чем выше Reach, тем выше RICE Score, и, соответственно, выше AutoScore.","sessionId":"q774-1772445583"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q774-1772445583"}

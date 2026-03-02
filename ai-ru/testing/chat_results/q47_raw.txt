@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Статус TODO означает, что задача находится в категории \"К выполнению\".","sessionId":"q47-1772443160"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q47-1772443160"}

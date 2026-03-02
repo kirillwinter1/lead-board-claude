@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"По умолчанию настроены роли SA, DEV, QA.","sessionId":"q469-1772444558"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q469-1772444558"}

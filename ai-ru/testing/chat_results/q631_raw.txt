@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. На странице Planning Poker в комнате есть возможность импортировать стори из Jira или создать их вручную.","sessionId":"q631-1772445089"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q631-1772445089"}

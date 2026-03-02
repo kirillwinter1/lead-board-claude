@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уровень 1 (No experience) увеличивает длительность задачи на 60% по сравнению с уровнем 3 (Competent).","sessionId":"q597-1772444980"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q597-1772444980"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Auto-detect определяет Epic Link Mode на основе анализа существующих связей в Jira. Если в Jira есть стандартные связи \"Epic Link\" (родитель-потомок), то будет выбран режим \"parent\". Если используются другие типы связей для обозначения эпиков, то будет выбран режим \"issuelink\".\n","sessionId":"q500-1772444658"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q500-1772444658"}

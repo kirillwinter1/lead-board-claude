@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AutoScore учитывает \"флаг\" Jira, вычитая 100 баллов, если работа приостановлена.","sessionId":"q669-1772445217"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q669-1772445217"}

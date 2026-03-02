@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уточните, пожалуйста, какую команду вы имеете в виду? У вас есть доступ к командам: Команда победителей (id=1), Красивые (id=2).","sessionId":"q104-1772443354"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q104-1772443354"}

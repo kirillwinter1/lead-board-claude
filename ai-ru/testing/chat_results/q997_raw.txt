@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"LeadBoard не имеет прямой интеграции или поддержки SAFe. Он фокусируется на управлении командной разработкой и метриках производительности.","sessionId":"q997-1772446378"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q997-1772446378"}

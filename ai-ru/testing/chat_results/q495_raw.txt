@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Бейдж NEW на типе задачи означает, что этот тип задачи не распознан системой LeadBoard и не был сопоставлен ни с одним из стандартных типов (PROJECT/EPIC/STORY/BUG/SUBTASK/IGNORE).","sessionId":"q495-1772444642"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q495-1772444642"}

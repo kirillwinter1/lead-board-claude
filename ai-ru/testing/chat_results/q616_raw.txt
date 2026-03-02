@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, в системе LeadBoard нет такого понятия, как \"eligible epic\". Возможно, вы имели в виду что-то другое?","sessionId":"q616-1772445042"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q616-1772445042"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уровень компетенции можно изменить на странице **Team Competency** (`/teams/:teamId/competency`). Там представлена матрица компетенций, где для каждого участника команды и компонента можно выставить оценку от 1 до 5.","sessionId":"q583-1772444934"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q583-1772444934"}

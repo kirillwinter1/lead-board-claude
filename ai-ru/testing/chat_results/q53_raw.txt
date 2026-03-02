@@ -1,0 +1,11 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q53-1772443180"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q53-1772443180"}
+
+event:text
+data:{"type":"text","content":"Процент завершенных задач составляет 11.11% (8 из 72).","sessionId":"q53-1772443180"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q53-1772443180"}

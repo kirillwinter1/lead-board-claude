@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Первую синхронизацию можно запустить на странице Settings. Там будет кнопка \"Sync Now\".","sessionId":"q941-1772446181"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q941-1772446181"}

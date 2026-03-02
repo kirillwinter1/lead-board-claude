@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Карта \"?\" в Planning Poker означает, что участник не может оценить задачу.","sessionId":"q622-1772445062"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q622-1772445062"}

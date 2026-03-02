@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для ответа на этот вопрос мне нужно знать, какой именно проект вы имеете в виду. Пожалуйста, уточните название или ID проекта.","sessionId":"q754-1772445516"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q754-1772445516"}

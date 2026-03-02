@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу определить \"bottleneck\" эпик напрямую. Могу показать список эпиков, находящихся в работе, или эпиков с низким AutoScore. Уточните, что именно вас интересует.","sessionId":"q764-1772445551"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q764-1772445551"}

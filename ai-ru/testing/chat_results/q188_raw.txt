@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q188-1772443638"}
+
+event:text
+data:{"type":"text","content":"В работе 1 баг: **LB-7** \"Неверный рассчет комиссии у клиента\".","sessionId":"q188-1772443638"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q188-1772443638"}

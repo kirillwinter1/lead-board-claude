@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Баги могут влиять на Data Quality Score. Например, правило `BUG_SLA_BREACH` (баг превысил SLA) является ошибкой (ERROR), а `BUG_STALE` (баг без обновлений >14 дней) — предупреждением (WARNING). Эти нарушения будут учтены в общем показателе качества данных.\n","sessionId":"q921-1772446112"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q921-1772446112"}

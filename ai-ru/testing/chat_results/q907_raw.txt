@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу получить информацию о критичности багов. Могу показать только количество открытых багов.","sessionId":"q907-1772446066"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q907-1772446066"}

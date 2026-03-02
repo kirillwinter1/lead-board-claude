@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Bug Metrics — это страница, на которой отображаются метрики, связанные с багами.","sessionId":"q184-1772443626"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q184-1772443626"}

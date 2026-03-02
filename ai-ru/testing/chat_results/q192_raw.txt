@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Баг считается устаревшим (stale), если он не обновлялся более 14 дней.","sessionId":"q192-1772443651"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q192-1772443651"}

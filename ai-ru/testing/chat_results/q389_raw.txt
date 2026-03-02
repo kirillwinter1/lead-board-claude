@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу пересчитать AutoScore. Система автоматически рассчитывает его на основе 9 факторов.","sessionId":"q389-1772444302"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q389-1772444302"}

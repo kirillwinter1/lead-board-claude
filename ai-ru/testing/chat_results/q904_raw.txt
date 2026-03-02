@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу предоставить SLA compliance по всем командам. У меня нет инструмента для получения этой информации.","sessionId":"q904-1772446057"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q904-1772446057"}

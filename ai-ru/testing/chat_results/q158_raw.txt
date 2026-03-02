@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"data_quality_summary","sessionId":"q158-1772443536"}
+
+event:text
+data:{"type":"text","content":"На доске есть **11 информационных нарушений** (эпики без даты выполнения). Ошибок и предупреждений нет.","sessionId":"q158-1772443536"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q158-1772443536"}

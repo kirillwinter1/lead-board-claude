@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уточните, пожалуйста, о каких сигналах идет речь? На этой странице отображаются метрики команды.","sessionId":"q683-1772445264"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q683-1772445264"}

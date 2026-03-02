@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Симуляция запускается автоматически каждый день в 3:00 ночи. Исторические снимки хранятся 180 дней.","sessionId":"q731-1772445445"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q731-1772445445"}

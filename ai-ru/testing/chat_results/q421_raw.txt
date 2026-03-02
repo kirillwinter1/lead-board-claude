@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило STORY_BLOCKED_NO_PROGRESS относится к категории **WARNING** и означает, что стори заблокирована более 30 дней без прогресса по блокирующей задаче.","sessionId":"q421-1772444408"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q421-1772444408"}

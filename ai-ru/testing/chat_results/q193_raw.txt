@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"bug_sla_settings","sessionId":"q193-1772443653"}
+
+event:text
+data:{"type":"text","content":"Извините, у меня нет информации о SLA для критических багов.","sessionId":"q193-1772443653"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q193-1772443653"}

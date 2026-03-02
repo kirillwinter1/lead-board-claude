@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Команда перегружена, если в разделе **Role Load** на странице **Metrics** (Метрики команды) для какой-либо роли отображается статус **OVERLOAD** (>100%).","sessionId":"q684-1772445267"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q684-1772445267"}

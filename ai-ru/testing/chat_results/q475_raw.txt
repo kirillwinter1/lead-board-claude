@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Цвет роли QA не указан в доступной информации.","sessionId":"q475-1772444578"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q475-1772444578"}

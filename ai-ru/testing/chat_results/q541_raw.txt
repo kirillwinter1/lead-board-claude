@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Team Members\" есть раскрывающаяся секция \"Отсутствия\". Там вы можете увидеть таймлайн отсутствий участников команды.","sessionId":"q541-1772444790"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q541-1772444790"}

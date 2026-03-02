@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я — AI-ассистент системы LeadBoard. Всю информацию обо мне и системе вы можете найти в **Базе знаний**, которая является частью моего контекста.","sessionId":"q250-1772443839"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q250-1772443839"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Logged hours (залогированные часы) и capacity (ёмкость) соотносятся через метрику **Utilization (Утилизация)**.\n\nФормула: `Utilization = (logged_hours / capacity_hours) × 100%`\n\n*   **Зелёный** цвет: 85-110%\n*   **Жёлтый** цвет: 70-130%\n*   **Красный** цвет: остальное\n\nЭта метрика показывает, насколько эффективно команда использует свою доступную ёмкость.","sessionId":"q336-1772444119"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q336-1772444119"}

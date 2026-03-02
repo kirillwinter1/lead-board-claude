@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, ошибки качества данных могут влиять на планирование. Например, ошибки категории `ERROR` блокируют планирование.","sessionId":"q172-1772443588"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q172-1772443588"}

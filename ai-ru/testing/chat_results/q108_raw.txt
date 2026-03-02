@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"**Lead Time** — это общее время от создания задачи до её завершения.\n\n**Cycle Time** — это время от начала работы над задачей до её завершения, исключая время ожидания.","sessionId":"q108-1772443365"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q108-1772443365"}

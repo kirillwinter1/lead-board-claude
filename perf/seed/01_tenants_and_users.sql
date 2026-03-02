@@ -2,7 +2,7 @@
 -- All in public schema
 
 -- ============================================================
--- 1. Users (30 total: 10 per tenant)
+-- 1. Users (300 total: 100 per tenant)
 -- ============================================================
 DO $$
 DECLARE
@@ -12,11 +12,11 @@ DECLARE
     user_id BIGINT;
 BEGIN
     FOREACH tenant_prefix IN ARRAY prefixes LOOP
-        FOR i IN 1..10 LOOP
+        FOR i IN 1..100 LOOP
             INSERT INTO public.users (atlassian_account_id, email, display_name, avatar_url, app_role)
             VALUES (
-                'perf-' || tenant_prefix || '-u' || LPAD(i::TEXT, 2, '0'),
-                'perf_' || tenant_prefix || '_u' || LPAD(i::TEXT, 2, '0') || '@test.local',
+                'perf-' || tenant_prefix || '-u' || LPAD(i::TEXT, 3, '0'),
+                'perf_' || tenant_prefix || '_u' || LPAD(i::TEXT, 3, '0') || '@test.local',
                 'Perf User ' || tenant_prefix || '-' || i,
                 'https://avatar.example.com/perf/' || tenant_prefix || '/' || i || '.png',
                 CASE WHEN i = 1 THEN 'ADMIN' WHEN i <= 3 THEN 'TEAM_LEAD' ELSE 'MEMBER' END
@@ -54,9 +54,9 @@ BEGIN
         t_prefix := prefixes[idx];
         SELECT id INTO t_id FROM public.tenants WHERE slug = t_slug;
 
-        FOR i IN 1..10 LOOP
+        FOR i IN 1..100 LOOP
             SELECT id INTO u_id FROM public.users
-            WHERE atlassian_account_id = 'perf-' || t_prefix || '-u' || LPAD(i::TEXT, 2, '0');
+            WHERE atlassian_account_id = 'perf-' || t_prefix || '-u' || LPAD(i::TEXT, 3, '0');
 
             INSERT INTO public.tenant_users (tenant_id, user_id, app_role)
             VALUES (
@@ -92,11 +92,11 @@ BEGIN
         slug_name := slug_names[idx];
         SELECT id INTO t_id FROM public.tenants WHERE slug = t_slug;
 
-        FOR i IN 1..10 LOOP
+        FOR i IN 1..100 LOOP
             SELECT id INTO u_id FROM public.users
-            WHERE atlassian_account_id = 'perf-' || t_prefix || '-u' || LPAD(i::TEXT, 2, '0');
+            WHERE atlassian_account_id = 'perf-' || t_prefix || '-u' || LPAD(i::TEXT, 3, '0');
 
-            session_id := 'perf-session-' || slug_name || '-u' || LPAD(i::TEXT, 2, '0');
+            session_id := 'perf-session-' || slug_name || '-u' || LPAD(i::TEXT, 3, '0');
 
             INSERT INTO public.user_sessions (id, user_id, tenant_id, created_at, expires_at)
             VALUES (

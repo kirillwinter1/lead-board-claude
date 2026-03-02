@@ -1,5 +1,5 @@
--- 04_teams_and_members.sql: 50 teams × 10 members per tenant
--- Structure: 10 project keys × 5 teams each = 50 teams
+-- 04_teams_and_members.sql: 500 teams × 10 members per tenant
+-- Structure: 10 project keys × 50 teams each = 500 teams
 -- Each team has 10 members (2 SA, 5 DEV, 3 QA)
 
 CREATE OR REPLACE FUNCTION perf_seed_teams(schema_name TEXT, tenant_prefix TEXT) RETURNS VOID AS $$
@@ -24,7 +24,7 @@ BEGIN
 
     global_team := 0;
     FOR pk_idx IN 1..10 LOOP
-        FOR t IN 1..5 LOOP
+        FOR t IN 1..50 LOOP
             global_team := global_team + 1;
 
             INSERT INTO teams (name, jira_team_value, active, color, planning_config)
@@ -64,4 +64,4 @@ SELECT perf_seed_teams('tenant_perf_gamma', 't3');
 
 DROP FUNCTION IF EXISTS perf_seed_teams(TEXT, TEXT);
 
-SELECT 'Teams seeded (50 teams × 10 members per tenant)' AS status;
+SELECT 'Teams seeded (500 teams × 10 members per tenant)' AS status;

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Данные синхронизируются с Jira каждые 5 минут.","sessionId":"q27-1772443091"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q27-1772443091"}

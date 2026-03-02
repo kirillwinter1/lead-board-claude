@@ -122,7 +122,7 @@ usage() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  seed      Seed database with test data (3 tenants, ~183K issues)"
+    echo "  seed      Seed database with test data (3 tenants, ~1.83M issues)"
     echo "  cleanup   Remove all test data"
     echo "  smoke     Run smoke test (1 VU, 30s)"
     echo "  load      Run load test (10-200 VUs, 5 min)"

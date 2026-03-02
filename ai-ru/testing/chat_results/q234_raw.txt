@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы открыть страницу команды, перейдите в раздел **Teams** и выберите нужную команду из списка.","sessionId":"q234-1772443783"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q234-1772443783"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. В таблице участников команды есть колонка \"Jira Account ID\", где указывается ID аккаунта Jira для каждого участника.","sessionId":"q533-1772444765"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q533-1772444765"}

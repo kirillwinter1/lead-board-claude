@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Главная страница — это и есть борд. Вы можете перейти на нее, используя путь `/`.","sessionId":"q8-1772443031"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q8-1772443031"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Ваша роль — **ADMIN**.","sessionId":"q16-1772443057"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q16-1772443057"}

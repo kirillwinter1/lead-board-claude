@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу получить информацию о загруженности отдельных участников. Могу показать загрузку по ролям для команды.","sessionId":"q529-1772444751"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q529-1772444751"}

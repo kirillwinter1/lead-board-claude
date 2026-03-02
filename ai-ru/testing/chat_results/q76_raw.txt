@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"team_list","sessionId":"q76-1772443263"}
+
+event:text
+data:{"type":"text","content":"В командах \"Команда победителей\" и \"Красивые\" одинаковое количество людей — по 3 человека.","sessionId":"q76-1772443263"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q76-1772443263"}

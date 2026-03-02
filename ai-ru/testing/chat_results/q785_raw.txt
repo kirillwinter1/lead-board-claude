@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о том, какие команды работают синхронно.","sessionId":"q785-1772445617"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q785-1772445617"}

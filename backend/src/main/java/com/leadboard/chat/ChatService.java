@@ -8,6 +8,7 @@ import com.leadboard.chat.tools.ChatToolExecutor;
 import com.leadboard.chat.tools.ChatToolRegistry;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ClassPathResource;
@@ -64,17 +65,23 @@ public class ChatService {
         }
     }
 
-    public Flux<ChatSseEvent> processMessage(String sessionId, String userMessage) {
+    public Flux<ChatSseEvent> processMessage(String sessionId, String userMessage, String currentPage) {
         if (!chatProperties.isEnabled()) {
             return Flux.just(ChatSseEvent.error("Chat is not enabled", sessionId));
         }
 
+        // Capture request-thread context BEFORE Flux — ThreadLocals are lost in reactive threads
+        Long tenantId = TenantContext.getCurrentTenantId();
+        String tenantSchema = TenantContext.hasTenant() ? TenantContext.getCurrentSchema() : null;
+        LlmMessage systemPrompt = buildSystemPrompt(currentPage);
+
         return Flux.create(sink -> {
             try {
+                // Restore tenant context on the Flux execution thread
+                if (tenantId != null && tenantSchema != null) {
+                    TenantContext.setTenant(tenantId, tenantSchema);
+                }
                 List<LlmMessage> history = sessions.computeIfAbsent(sessionId, k -> new ArrayList<>());
-
-                // Build system prompt
-                LlmMessage systemPrompt = buildSystemPrompt();
 
                 // Add user message
                 history.add(LlmMessage.user(userMessage));
@@ -167,19 +174,45 @@ public class ChatService {
         sessions.remove(sessionId);
     }
 
-    private LlmMessage buildSystemPrompt() {
+    private LlmMessage buildSystemPrompt(String currentPage) {
         LeadBoardAuthentication auth = authorizationService.getCurrentAuth();
         String role = auth != null ? auth.getRole().name() : "VIEWER";
         String userName = auth != null ? auth.getName() : "Unknown";
+        boolean isAdmin = authorizationService.isAdmin() || authorizationService.isProjectManager();
+
+        List<TeamEntity> allTeams = teamRepository.findByActiveTrue();
+        String allTeamsInfo = allTeams.stream()
+                .map(t -> t.getName() + " (id=" + t.getId() + ")")
+                .collect(Collectors.joining(", "));
 
         Set<Long> userTeamIds = authorizationService.getUserTeamIds();
-        String teamInfo = "";
-        if (!userTeamIds.isEmpty()) {
-            List<TeamEntity> teams = teamRepository.findByActiveTrue();
-            teamInfo = teams.stream()
+        String userTeamsInfo;
+        if (isAdmin) {
+            userTeamsInfo = "все (ADMIN имеет доступ ко всем командам)";
+        } else if (!userTeamIds.isEmpty()) {
+            userTeamsInfo = allTeams.stream()
                     .filter(t -> userTeamIds.contains(t.getId()))
                     .map(t -> t.getName() + " (id=" + t.getId() + ")")
                     .collect(Collectors.joining(", "));
+        } else {
+            userTeamsInfo = "не назначены";
+        }
+
+        String pageContext = "";
+        if (currentPage != null && !currentPage.isBlank()) {
+            String pageToolHint = switch (currentPage.toLowerCase()) {
+                case String p when p.contains("bug-metrics") || p.contains("bug") -> "\nПредпочитай tool bug_metrics для этой страницы.";
+                case String p when p.contains("projects") -> "\nПредпочитай tools project_list и rice_ranking для этой страницы.";
+                case String p when p.contains("team-members") || p.contains("members") -> "\nПредпочитай tools team_members и member_absences для этой страницы.";
+                case String p when p.contains("data-quality") -> "\nПредпочитай tool data_quality_summary для этой страницы.";
+                case String p when p.contains("metrics") -> "\nПредпочитай tool team_metrics для этой страницы.";
+                default -> "";
+            };
+            pageContext = """
+
+                Текущая страница пользователя: %s
+                Учитывай контекст страницы при ответе. Если вопрос связан с тем, что пользователь видит на экране — отвечай в контексте этой страницы.%s
+                """.formatted(currentPage, pageToolHint);
         }
 
         String prompt = """
@@ -188,18 +221,28 @@ public class ChatService {
                 Роль пользователя: %s
                 Имя пользователя: %s
                 Команды пользователя: %s
-
+                Все команды в системе: %s
+                %s
                 ПРАВИЛА:
-                1. Используй инструменты (tools) для получения актуальных данных. Не выдумывай числа.
-                2. Отвечай на вопросы о навигации, метриках, задачах на основе базы знаний ниже.
-                3. НЕ раскрывай внутренние алгоритмы (AutoScore формулы, веса факторов).
-                4. Если пользователь TEAM_LEAD или MEMBER — показывай данные только его команд.
-                5. Форматируй ответы с markdown: жирный текст, списки, таблицы где уместно.
-                6. Если не знаешь ответ — честно скажи об этом.
+                1. ВСЕГДА используй инструменты (tools) для получения данных. НИКОГДА не отвечай "у меня нет данных" — сначала вызови подходящий tool.
+                2. Для вопросов "какие задачи/стори/эпики" — используй tool task_search.
+                3. Для вопросов "сколько задач" — используй tool task_count.
+                4. Для вопросов "какие команды" — используй tool team_list.
+                5. Для метрик команды — используй tool team_metrics.
+                6. Для обзора доски — используй tool board_summary.
+                7. Если пользователь TEAM_LEAD или MEMBER — показывай данные только его команд.
+                8. Форматируй ответы с markdown: жирный текст, списки.
+                9. Для bug metrics, SLA, открытых багов — используй tool bug_metrics.
+                10. Для списка проектов, прогресса проектов — используй tool project_list.
+                11. Для RICE-ранжирования, приоритизации — используй tool rice_ranking.
+                12. Для отпусков, отсутствий, больничных — используй tool member_absences.
+                13. Для SLA настроек багов — используй tool bug_sla_settings.
+                14. Для деталей конкретной задачи по ключу (PROJ-123) — используй tool task_details.
+                15. Для списка участников команды, состава команды — используй tool team_members.
 
                 БАЗА ЗНАНИЙ:
                 %s
-                """.formatted(role, userName, teamInfo.isEmpty() ? "не назначены" : teamInfo, knowledgeBase);
+                """.formatted(role, userName, userTeamsInfo, allTeamsInfo, pageContext, knowledgeBase);
 
         return LlmMessage.system(prompt);
     }

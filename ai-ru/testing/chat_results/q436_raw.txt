@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Стори без подзадач — это WARNING, потому что **STORY_NO_SUBTASK_ESTIMATES** означает, что у стори нет оценок подзадач, что делает планирование невозможным.","sessionId":"q436-1772444456"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q436-1772444456"}

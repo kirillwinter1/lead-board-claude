@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу запустить симуляцию. У меня нет такой функции.","sessionId":"q723-1772445421"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q723-1772445421"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно сортировать задачи. На доске (Board) при выборе одной команды можно перетаскивать эпики и стори, чтобы изменить их порядок.","sessionId":"q238-1772443796"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q238-1772443796"}

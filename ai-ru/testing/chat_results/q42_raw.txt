@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Стори и баг обрабатываются схожим образом, но у багов есть отдельные правила SLA (Service Level Agreement).","sessionId":"q42-1772443145"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q42-1772443145"}

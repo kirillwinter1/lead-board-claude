@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"В rough estimate по умолчанию нет фиксированного количества дней. Rough estimates для эпиков в статусе TODO редактируются вручную и указываются в днях по ролям (SA/DEV/QA).","sessionId":"q273-1772443915"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q273-1772443915"}

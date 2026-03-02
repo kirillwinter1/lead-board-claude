@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило BUG_STALE относится к категории WARNING и означает, что баг не обновлялся более 14 дней.","sessionId":"q419-1772444402"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q419-1772444402"}

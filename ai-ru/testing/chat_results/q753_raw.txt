@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу получить информацию о проектах. Могу помочь с задачами, командами и метриками.","sessionId":"q753-1772445513"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q753-1772445513"}

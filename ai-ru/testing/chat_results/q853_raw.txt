@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу оценить бюджет на проект. Могу предоставить информацию о задачах, командах и метриках.","sessionId":"q853-1772445862"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q853-1772445862"}

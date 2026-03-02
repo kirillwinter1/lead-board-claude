@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Цвет роли SA не указан в доступных мне инструментах. Я могу только сказать, что по умолчанию роли pipeline: SA → DEV → QA.","sessionId":"q473-1772444572"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q473-1772444572"}

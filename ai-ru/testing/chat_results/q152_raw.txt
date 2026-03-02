@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Фазы на таймлайне — это цветные сегменты внутри горизонтальных баров стори, которые показывают расписание работы по ролям (SA/DEV/QA).\n","sessionId":"q152-1772443517"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q152-1772443517"}

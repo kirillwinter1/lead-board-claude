@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На диаграмме Ганта отсутствия не отображаются. Они видны на странице **Team Members** в разделе **Отсутствия**.","sessionId":"q568-1772444884"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q568-1772444884"}

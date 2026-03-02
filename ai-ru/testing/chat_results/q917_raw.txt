@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q917-1772446098"}
+
+event:text
+data:{"type":"text","content":"На данный момент нет багов, которые не двигаются дольше 2 недель.","sessionId":"q917-1772446098"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q917-1772446098"}

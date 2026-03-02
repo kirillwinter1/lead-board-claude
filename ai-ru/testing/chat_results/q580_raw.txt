@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уровень 1 в матрице компетенций означает \"No experience\" (нет опыта).","sessionId":"q580-1772444925"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q580-1772444925"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, DQ-алерты скрыть нельзя. Они показывают проблемы с качеством данных, которые важно отслеживать.","sessionId":"q287-1772443961"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q287-1772443961"}

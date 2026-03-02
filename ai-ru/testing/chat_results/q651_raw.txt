@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, ручной порядок эпиков сохраняется после синхронизации, если выбрана одна команда.","sessionId":"q651-1772445161"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q651-1772445161"}

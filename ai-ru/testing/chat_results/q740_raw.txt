@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Симуляцию может запускать только ADMIN.","sessionId":"q740-1772445471"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q740-1772445471"}

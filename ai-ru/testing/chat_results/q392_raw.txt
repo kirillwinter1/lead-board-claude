@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, пересчитать AutoScore для одного эпика нельзя. Он рассчитывается автоматически по 9 факторам.","sessionId":"q392-1772444310"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q392-1772444310"}

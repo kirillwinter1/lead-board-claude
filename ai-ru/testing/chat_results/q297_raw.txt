@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извини, у меня нет информации об инкрементальной синхронизации. Могу я помочь с чем-то еще?","sessionId":"q297-1772443998"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q297-1772443998"}

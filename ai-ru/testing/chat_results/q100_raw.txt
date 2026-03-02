@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Цвет команды можно посмотреть на странице \"Команды\" (Teams). Он отображается рядом с названием команды.","sessionId":"q100-1772443340"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q100-1772443340"}

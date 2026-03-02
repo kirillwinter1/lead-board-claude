@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"ChatWidget — это компонент пользовательского интерфейса, который позволяет пользователям взаимодействовать с чат-ботом или службой поддержки.\n","sessionId":"q247-1772443829"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q247-1772443829"}

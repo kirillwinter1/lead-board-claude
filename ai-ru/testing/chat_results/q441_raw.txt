@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE scoring — это метод приоритизации задач, который оценивает их по четырем критериям: Reach (охват), Impact (влияние), Confidence (уверенность) и Effort (трудозатраты). Формула для расчета RICE: `(Reach × Impact × Confidence) / Effort`.\n\nВ LeadBoard RICE используется для оценки проектов. Raw-значение RICE нормализуется от 0 до 100 и умножается на стратегический вес.","sessionId":"q441-1772444472"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q441-1772444472"}

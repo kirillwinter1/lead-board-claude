@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу помочь с переброской ресурсов между командами. Эта функция недоступна через меня.","sessionId":"q788-1772445626"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q788-1772445626"}

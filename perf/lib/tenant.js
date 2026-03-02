@@ -4,7 +4,7 @@ import { SharedArray } from 'k6/data';
 import { TENANTS, TEAMS_PER_TENANT } from '../config/env.js';
 
 /**
- * SharedArray of all VU contexts (90 total: 3 tenants × 10 users × rotated teams).
+ * SharedArray of all VU contexts (300 total: 3 tenants × 100 users × rotated teams).
  * Each entry: { tenantSlug, tenantName, userIndex, teamIndex }
  */
 export const userPool = new SharedArray('perf-user-pool', function () {

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, на проектном таймлайне эпики отображаются с фазами.","sessionId":"q793-1772445644"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q793-1772445644"}

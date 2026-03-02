@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти к следующей стори в Planning Poker, ведущий сессии должен завершить текущую стори. После этого станет доступна следующая стори из списка.","sessionId":"q630-1772445086"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q630-1772445086"}

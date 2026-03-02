@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Если у вас нет доступа, обратитесь к **администратору LeadBoard** в вашей компании. Он сможет предоставить необходимые права.","sessionId":"q19-1772443067"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q19-1772443067"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я — AI-ассистент системы LeadBoard. У меня нет информации о том, как организовать bug bash. Могу помочь с вопросами по функциям LeadBoard.","sessionId":"q924-1772446122"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q924-1772446122"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу сказать, в какой команде вы состоите. У меня нет информации о вашем профиле пользователя.","sessionId":"q75-1772443255"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q75-1772443255"}

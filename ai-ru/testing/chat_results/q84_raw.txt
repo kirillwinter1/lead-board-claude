@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти на страницу команды, выберите нужную команду из списка на текущей странице.","sessionId":"q84-1772443290"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q84-1772443290"}

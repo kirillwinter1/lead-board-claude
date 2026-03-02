@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useLocation } from 'react-router-dom'
 import { sendChatMessage, clearChatSession, getChatStatus, ChatMessage, ChatSseEvent } from '../../api/chat'
 import './ChatWidget.css'
 
@@ -6,7 +7,35 @@ function generateSessionId(): string {
   return 'chat-' + Math.random().toString(36).substring(2, 10)
 }
 
+const PAGE_NAMES: Record<string, string> = {
+  '/': 'Board (Доска задач)',
+  '/timeline': 'Timeline (Таймлайн Gantt)',
+  '/metrics': 'Metrics (Метрики команды)',
+  '/data-quality': 'Data Quality (Качество данных)',
+  '/bug-metrics': 'Bug Metrics (Метрики багов)',
+  '/projects': 'Projects (Проекты)',
+  '/project-timeline': 'Project Timeline (Таймлайн проектов)',
+  '/teams': 'Teams (Команды)',
+  '/poker': 'Planning Poker',
+  '/settings': 'Settings (Настройки)',
+  '/workflow': 'Workflow Config (Конфигурация workflow)',
+}
+
+function getPageName(pathname: string): string {
+  // Exact match first
+  if (PAGE_NAMES[pathname]) return PAGE_NAMES[pathname]
+
+  // Pattern matching for dynamic routes
+  if (/^\/poker\/room\//.test(pathname)) return 'Poker Room (Покер-комната)'
+  if (/^\/teams\/\d+\/member\//.test(pathname)) return 'Member Profile (Профиль участника)'
+  if (/^\/teams\/\d+\/competency/.test(pathname)) return 'Team Competency (Компетенции)'
+  if (/^\/teams\/\d+/.test(pathname)) return 'Team Members (Участники команды)'
+
+  return pathname
+}
+
 export function ChatWidget() {
+  const location = useLocation()
   const [isOpen, setIsOpen] = useState(false)
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -17,6 +46,14 @@ export function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+
+  const currentPageInfo = useMemo(() => {
+    const pageName = getPageName(location.pathname)
+    const params = new URLSearchParams(location.search)
+    const queryParts: string[] = []
+    params.forEach((value, key) => queryParts.push(`${key}=${value}`))
+    return queryParts.length > 0 ? `${pageName} (${queryParts.join(', ')})` : pageName
+  }, [location.pathname, location.search])
 
   useEffect(() => {
     getChatStatus()
@@ -60,6 +97,7 @@ export function ChatWidget() {
     abortRef.current = sendChatMessage(
       text,
       sessionId,
+      currentPageInfo,
       (event: ChatSseEvent) => {
         switch (event.type) {
           case 'text':
@@ -101,7 +139,7 @@ export function ChatWidget() {
         setToolCallInProgress(null)
       }
     )
-  }, [input, isLoading, sessionId])
+  }, [input, isLoading, sessionId, currentPageInfo])
 
   const handleClear = useCallback(() => {
     setMessages([])

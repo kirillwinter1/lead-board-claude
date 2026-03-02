@@ -1,6 +1,6 @@
 -- 05_issues.sql: Generate realistic issues via PL/pgSQL
--- Per tenant: 50 teams × 20 epics × ~15 stories × ~3 subtasks ≈ 61K issues
--- Teams are grouped by project key: teams 1-5 → PERF-A, 6-10 → PERF-B, ... 46-50 → PERF-J
+-- Per tenant: 500 teams × 20 epics × ~15 stories × ~3 subtasks ≈ 610K issues
+-- Teams are grouped by project key: teams 1-50 → PERF-A, 51-100 → PERF-B, ... 451-500 → PERF-J
 --
 -- Realistic data:
 -- - Varied stories per epic (8-22), varied subtasks per story (1-5)
@@ -76,9 +76,10 @@ DECLARE
 BEGIN
     EXECUTE format('SET search_path TO %I', schema_name);
 
-    FOR team_rec IN SELECT id, name FROM teams ORDER BY id LOOP
+    -- Filter to perf-seeded teams only (exclude any teams created by running backend)
+    FOR team_rec IN SELECT id, name FROM teams WHERE name ~ '^[A-J]-Team \d+$' ORDER BY id LOOP
         team_count := team_count + 1;
-        project_key := project_keys[1 + (team_count - 1) / 5];
+        project_key := project_keys[1 + (team_count - 1) / 50];
 
         -- Pre-load team members by role
         SELECT array_agg(jira_account_id), array_agg(display_name)
@@ -520,4 +521,4 @@ SELECT perf_seed_issues('tenant_perf_gamma');
 
 DROP FUNCTION IF EXISTS perf_seed_issues(TEXT);
 
-SELECT 'Issues seeded (realistic data, ~60K per tenant)' AS status;
+SELECT 'Issues seeded (realistic data, ~610K per tenant)' AS status;

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Компетенции команды можно посмотреть на странице \"Team Competency\". Для этого перейдите в раздел \"Teams\", выберите нужную команду, а затем вкладку \"Competency Matrix\".","sessionId":"q577-1772444915"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q577-1772444915"}

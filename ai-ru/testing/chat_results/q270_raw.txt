@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Rough estimates — это приблизительные оценки времени, которые можно редактировать для эпиков в статусе TODO. Они указываются в днях по ролям (SA/DEV/QA) и отображаются в колонке \"ROLE-BASED PROGRESS\" на доске задач.","sessionId":"q270-1772443906"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q270-1772443906"}

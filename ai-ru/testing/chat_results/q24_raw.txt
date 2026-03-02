@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"У LeadBoard нет мобильной версии.","sessionId":"q24-1772443083"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q24-1772443083"}

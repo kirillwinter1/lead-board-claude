@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-оценки может ставить **PROJECT_MANAGER**.","sessionId":"q465-1772444546"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q465-1772444546"}

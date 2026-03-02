@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу показать предстоящие отсутствия в команде, так как у меня нет доступа к этой информации.","sessionId":"q552-1772444826"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q552-1772444826"}

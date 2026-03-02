@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Категории статусов: NEW, REQUIREMENTS, PLANNED, IN_PROGRESS, DONE.","sessionId":"q485-1772444610"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q485-1772444610"}

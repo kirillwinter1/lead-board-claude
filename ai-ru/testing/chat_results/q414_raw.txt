@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило уровня INFO:\n*   **EPIC_NO_DUE_DATE** — нет дедлайна у эпика.","sessionId":"q414-1772444387"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q414-1772444387"}

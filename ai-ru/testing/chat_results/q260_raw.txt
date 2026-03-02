@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE Boost может дать до 15 баллов.","sessionId":"q260-1772443874"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q260-1772443874"}

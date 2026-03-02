@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу показать загрузку только одной команды. Укажите, пожалуйста, ID команды.","sessionId":"q98-1772443334"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q98-1772443334"}

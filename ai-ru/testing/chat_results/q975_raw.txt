@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, LeadBoard разработан с учетом безопасности и может быть подключен к production Jira. Он использует стандартные механизмы аутентификации Jira (API токены) и запрашивает только необходимые для работы данные.","sessionId":"q975-1772446288"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q975-1772446288"}

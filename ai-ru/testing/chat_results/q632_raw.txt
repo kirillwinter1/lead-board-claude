@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, в покер-сессии можно импортировать стори из Jira или создать их вручную.","sessionId":"q632-1772445092"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q632-1772445092"}

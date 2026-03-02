@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q167-1772443569"}
+
+event:text
+data:{"type":"text","content":"Я не могу определить, у каких эпиков нет дедлайна, так как в ответе отсутствуют данные о дедлайнах. Я могу показать только те эпики, которые есть в системе.","sessionId":"q167-1772443569"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q167-1772443569"}

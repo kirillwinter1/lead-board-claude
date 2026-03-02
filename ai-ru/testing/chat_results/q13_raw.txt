@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я — AI-ассистент системы LeadBoard. Моя база знаний ограничена информацией, касающейся LeadBoard. К сожалению, у меня нет информации об OAuth авторизации.","sessionId":"q13-1772443047"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q13-1772443047"}

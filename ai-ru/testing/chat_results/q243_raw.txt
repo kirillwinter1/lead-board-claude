@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я — AI-ассистент системы LeadBoard. Могу помочь с вопросами по функциям системы.","sessionId":"q243-1772443811"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q243-1772443811"}

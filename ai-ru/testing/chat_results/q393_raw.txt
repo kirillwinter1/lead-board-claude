@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, AutoScore пересчитывается для всех эпиков в системе, а не для отдельных команд.","sessionId":"q393-1772444313"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q393-1772444313"}

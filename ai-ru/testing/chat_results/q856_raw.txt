@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, я не могу предоставить информацию о Story Points, так как система LeadBoard не использует эту метрику. Она оперирует часами и днями для оценки задач.","sessionId":"q856-1772445873"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q856-1772445873"}

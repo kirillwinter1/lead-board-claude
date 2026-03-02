@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о \"Business шаблонах\" и \"Technical шаблонах\".","sessionId":"q452-1772444506"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q452-1772444506"}

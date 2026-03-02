@@ -34,8 +34,9 @@
 | 21 | **Multi-Tenancy E2E Journey** | F44, F33 | ✅ Проверен + Исправлен | 11/11 fixed, 0 OPEN | [reports/2026-02-25_MULTITENANCY_E2E.md](reports/2026-02-25_MULTITENANCY_E2E.md) |
 
 | 22 | **Early Exit Optimization** | Perf | ✅ Проверен | 1 High, 2 Medium | [reports/2026-03-01_EARLY_EXIT_OPTIMIZATION.md](reports/2026-03-01_EARLY_EXIT_OPTIMIZATION.md) |
+| 23 | **Board Perf Optimization** | Perf | ✅ Проверен | 1 High, 2 Medium, 2 Low | [reports/2026-03-01_BOARD_OPTIMIZATION.md](reports/2026-03-01_BOARD_OPTIMIZATION.md) |
 
-**Прогресс: 22 / 22 модулей проверено (100%)**
+**Прогресс: 23 / 23 модулей проверено (100%)**
 
 ---
 

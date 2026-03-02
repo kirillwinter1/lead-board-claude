@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не нашел информации о функции \"recalculate stories\". Возможно, вы имели в виду что-то другое?","sessionId":"q394-1772444316"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q394-1772444316"}

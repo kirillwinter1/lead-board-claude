@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q169-1772443577"}
+
+event:text
+data:{"type":"text","content":"На текущей странице нет просроченных эпиков.","sessionId":"q169-1772443577"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q169-1772443577"}

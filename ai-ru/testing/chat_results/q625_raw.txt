@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker, после того как участники проголосуют, ведущий сессии может нажать кнопку \"Раскрыть голоса\", чтобы показать результаты голосования.","sessionId":"q625-1772445071"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q625-1772445071"}

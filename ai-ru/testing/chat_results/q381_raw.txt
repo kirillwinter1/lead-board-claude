@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Снимки прогноза (forecast snapshots) создаются автоматически ежедневно в 3:00 AM. Вручную их создать нельзя.","sessionId":"q381-1772444277"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q381-1772444277"}

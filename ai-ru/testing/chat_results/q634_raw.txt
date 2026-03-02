@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"У покер-сессии есть следующие статусы:\n*   **PREPARING** (подготовка)\n*   **ACTIVE** (активна)\n*   **COMPLETED** (завершена)","sessionId":"q634-1772445107"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q634-1772445107"}

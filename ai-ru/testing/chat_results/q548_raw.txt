@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Участники команды\" (Team Members) в секции \"Отсутствия\" есть возможность редактировать отсутствия через модальное окно.","sessionId":"q548-1772444813"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q548-1772444813"}

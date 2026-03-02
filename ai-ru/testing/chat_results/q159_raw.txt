@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"data_quality_summary","sessionId":"q159-1772443539"}
+
+event:text
+data:{"type":"text","content":"Найдено **0 ошибок**, **0 предупреждений** и **11 информационных** нарушений.","sessionId":"q159-1772443539"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q159-1772443539"}

@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q934-1772446156"}
+
+event:text
+data:{"type":"text","content":"К сожалению, я не могу показать распределение багов по приоритетам. У меня есть только общее количество багов.","sessionId":"q934-1772446156"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q934-1772446156"}

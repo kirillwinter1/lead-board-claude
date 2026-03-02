@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, у меня нет возможности строить графики или диаграммы. Я могу предоставить только текстовую информацию.","sessionId":"q342-1772444139"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q342-1772444139"}

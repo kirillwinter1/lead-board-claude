@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Это категории статусов задач в LeadBoard, которые настраиваются на странице Workflow Config. Каждая категория соответствует определенному этапу жизненного цикла задачи:\n\n*   **NEW**: Новая задача.\n*   **REQUIREMENTS**: Сбор требований.\n*   **PLANNED**: Запланирована.\n*   **IN_PROGRESS**: В работе.\n*   **DONE**: Выполнена.","sessionId":"q486-1772444613"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q486-1772444613"}

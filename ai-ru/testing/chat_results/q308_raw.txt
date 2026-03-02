@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, я не могу показать DSR по каждому эпику. У меня нет такой функции. Я могу показать только общие метрики команды.","sessionId":"q308-1772444032"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q308-1772444032"}

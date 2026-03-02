@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Effort в RICE — это трудозатраты в человеко-месяцах. Они автоматически рассчитываются из подзадач или задаются вручную (T-shirt sizing).","sessionId":"q447-1772444490"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q447-1772444490"}

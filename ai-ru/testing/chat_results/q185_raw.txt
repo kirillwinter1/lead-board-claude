@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"У багов есть следующие приоритеты: Highest, High, Medium, Low, Lowest.","sessionId":"q185-1772443629"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q185-1772443629"}

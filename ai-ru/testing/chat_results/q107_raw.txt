@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Cycle Time — это время, которое проходит с момента начала работы над задачей до момента ее завершения.","sessionId":"q107-1772443363"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q107-1772443363"}

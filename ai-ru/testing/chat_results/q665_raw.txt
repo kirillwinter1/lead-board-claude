@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Rough estimate влияет на приоритизацию через фактор **Size** в AutoScore. Чем меньше оценка, тем выше приоритет. Если оценки нет, то эпик получает -5 баллов.","sessionId":"q665-1772445204"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q665-1772445204"}

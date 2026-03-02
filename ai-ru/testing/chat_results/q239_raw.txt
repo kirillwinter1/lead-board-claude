@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На борде нет пагинации. Все эпики и стори отображаются на одной странице.","sessionId":"q239-1772443799"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q239-1772443799"}

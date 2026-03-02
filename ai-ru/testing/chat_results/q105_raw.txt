@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Throughput — это количество завершённых задач (эпиков, стори, подзадач) за выбранный период.","sessionId":"q105-1772443357"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q105-1772443357"}

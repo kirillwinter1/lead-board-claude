@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для тестирования подключения к Jira перейдите в раздел **Settings** (Настройки) и найдите блок **Jira Sync**. Там будет кнопка для запуска синхронизации, которая также проверит подключение.\n","sessionId":"q940-1772446178"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q940-1772446178"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Статус DONE означает, что задача завершена.","sessionId":"q49-1772443165"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q49-1772443165"}

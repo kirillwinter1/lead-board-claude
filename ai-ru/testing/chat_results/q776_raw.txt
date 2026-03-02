@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Confidence влияет на приоритет через фактор RICE Boost в AutoScore. Чем выше Confidence, тем выше RICE Score, что в свою очередь увеличивает AutoScore.","sessionId":"q776-1772445589"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q776-1772445589"}

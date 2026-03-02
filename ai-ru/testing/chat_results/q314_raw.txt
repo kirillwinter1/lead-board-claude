@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, я не могу показать throughput с разбивкой по типам задач. Я могу предоставить только общие метрики throughput для команды.","sessionId":"q314-1772444050"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q314-1772444050"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Проекты\" вы можете увидеть карточки проектов с RICE Score. Для сравнения двух проектов, вам нужно посмотреть на их RICE Score. Чем выше RICE Score, тем более приоритетным считается проект.","sessionId":"q778-1772445595"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q778-1772445595"}

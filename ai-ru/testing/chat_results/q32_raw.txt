@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q32-1772443108"}
+
+event:text
+data:{"type":"text","content":"На доске 72 задачи:\n*   **Эпики**: 13\n*   **Стори**: 58\n*   **Баги**: 1","sessionId":"q32-1772443108"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q32-1772443108"}

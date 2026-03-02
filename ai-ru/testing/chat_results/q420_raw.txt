@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило RICE_MISSING_ASSESSMENT относится к категории предупреждений (WARNING) и означает, что для задачи со статусом \"Planned\" или выше отсутствует оценка RICE. Это может затруднить приоритизацию и планирование.","sessionId":"q420-1772444405"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q420-1772444405"}

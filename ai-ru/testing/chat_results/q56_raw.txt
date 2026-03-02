@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q56-1772443193"}
+
+event:text
+data:{"type":"text","content":"На доске нет задач со статусом \"TODO\".","sessionId":"q56-1772443193"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q56-1772443193"}

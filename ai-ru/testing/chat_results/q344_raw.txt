@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Forecast Accuracy 80% означает, что 80% задач были выполнены в срок или с небольшим отклонением от прогноза. Это хороший показатель, но всегда есть место для улучшения.","sessionId":"q344-1772444145"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q344-1772444145"}

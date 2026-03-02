@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Score breakdown для задачи — это детализация числового показателя AutoScore по факторам, которые на него влияют. При наведении на AutoScore в тултипе отображается разбивка по следующим факторам:\n\n*   **Status** (Статус)\n*   **Progress** (Прогресс)\n*   **Due Date** (Дедлайн)\n*   **Priority** (Приоритет)\n*   **Size** (Размер)\n*   **Age** (Возраст)\n*   **RICE Boost** (Усиление RICE)\n*   **Alignment** (Согласованность)\n*   **Flagged** (Приостановлено)\n\nКаждый из этих факторов вносит свой вклад в итоговый AutoScore задачи.","sessionId":"q283-1772443946"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q283-1772443946"}

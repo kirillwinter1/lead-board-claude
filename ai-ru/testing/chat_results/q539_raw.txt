@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу посмотреть завершенные задачи конкретного участника. Могу показать только общую информацию по задачам.","sessionId":"q539-1772444783"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q539-1772444783"}

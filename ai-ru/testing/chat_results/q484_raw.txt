@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Status mapping — это настройка соответствия статусов Jira категориям LeadBoard (NEW, REQUIREMENTS, PLANNED, IN_PROGRESS, DONE). Это позволяет системе правильно интерпретировать прогресс задач.","sessionId":"q484-1772444607"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q484-1772444607"}

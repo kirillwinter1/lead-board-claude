@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q34-1772443118"}
+
+event:text
+data:{"type":"text","content":"На доске 13 эпиков.","sessionId":"q34-1772443118"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q34-1772443118"}

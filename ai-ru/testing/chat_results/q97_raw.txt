@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу определить вашу команду. Пожалуйста, уточните ID команды.","sessionId":"q97-1772443331"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q97-1772443331"}

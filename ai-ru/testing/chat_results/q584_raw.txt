@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"В матрице компетенций компонент — это навык или область знаний, по которой оцениваются участники команды.","sessionId":"q584-1772444937"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q584-1772444937"}

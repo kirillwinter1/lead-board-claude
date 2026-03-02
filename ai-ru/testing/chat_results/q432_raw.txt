@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Data Quality не отображается timestamp генерации отчёта.","sessionId":"q432-1772444444"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q432-1772444444"}

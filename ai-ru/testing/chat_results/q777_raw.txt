@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Effort является одним из факторов, влияющих на RICE Score, который, в свою очередь, может быть использован как один из факторов для расчета AutoScore (приоритета). Чем выше Effort, тем ниже RICE Score.","sessionId":"q777-1772445592"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q777-1772445592"}

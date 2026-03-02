@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы попасть в команду, нужно быть приглашенным администратором или руководителем проекта.","sessionId":"q80-1772443276"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q80-1772443276"}

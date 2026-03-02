@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Доступность slug проверяется при регистрации компании. Если вы уже зарегистрированы, то не сможете изменить slug.","sessionId":"q962-1772446245"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q962-1772446245"}

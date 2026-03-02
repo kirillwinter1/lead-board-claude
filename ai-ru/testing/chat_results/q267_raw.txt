@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, приоритет manual order выше AutoScore. Эпики планируются в порядке ручной сортировки.","sessionId":"q267-1772443896"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q267-1772443896"}

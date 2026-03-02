@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, комната Planning Poker работает в реальном времени через WebSocket.","sessionId":"q642-1772445132"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q642-1772445132"}

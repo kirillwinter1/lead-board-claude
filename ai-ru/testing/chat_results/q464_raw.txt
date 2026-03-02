@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AutoScore boost от RICE — это один из факторов, влияющих на общий AutoScore задачи. Он рассчитывается на основе нормализованного RICE-скоринга задачи и может добавить до 15 баллов к AutoScore. Формула: `(normalizedScore / 100) × 15`.","sessionId":"q464-1772444543"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q464-1772444543"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице **Projects** (`/projects`) вы можете увидеть кросс-командный прогресс. Здесь отображаются все проекты, их статус, прогресс и ожидаемая дата завершения.","sessionId":"q762-1772445545"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q762-1772445545"}

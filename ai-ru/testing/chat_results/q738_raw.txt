@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, симуляция не меняет реальные данные. Она использует снимки прогноза (forecast snapshots) для отображения исторических данных и прогнозов.","sessionId":"q738-1772445466"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q738-1772445466"}

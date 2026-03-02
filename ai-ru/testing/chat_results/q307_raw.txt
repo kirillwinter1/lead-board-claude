@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"DSR (Done Story Ratio) считается по эпикам.","sessionId":"q307-1772444029"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q307-1772444029"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу показать метрики только для одной команды. Уточните, пожалуйста, для какой команды вы бы хотели посмотреть средний Cycle Time?","sessionId":"q824-1772445751"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q824-1772445751"}

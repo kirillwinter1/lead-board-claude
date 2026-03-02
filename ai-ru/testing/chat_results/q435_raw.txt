@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, оценки нужны. Без оценок подзадач невозможно планировать стори, и система выдаст предупреждение `STORY_NO_SUBTASK_ESTIMATES`.","sessionId":"q435-1772444453"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q435-1772444453"}

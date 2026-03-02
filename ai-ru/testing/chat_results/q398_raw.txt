@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Система определяет рабочие дни на основе рабочего календаря, который учитывает выходные и праздники.","sessionId":"q398-1772444327"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q398-1772444327"}

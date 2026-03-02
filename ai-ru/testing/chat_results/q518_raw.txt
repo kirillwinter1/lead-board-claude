@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Историю производительности участника можно посмотреть на странице **Member Profile** (`/teams/:teamId/member/:memberId`). Там доступны персональные метрики за период, выполненные задачи, тренды по неделям и предстоящие задачи.\n","sessionId":"q518-1772444718"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q518-1772444718"}

@@ -1,0 +1,8 @@
+{
+    "num": 10,
+    "question": "Как добавить новый тип задачи?",
+    "currentPage": "Workflow Config",
+    "tools": "none",
+    "text": "Чтобы добавить новый тип задачи, вам нужно перейти в раздел **Workflow Config** (только для ADMIN) и там на вкладке **Issue Types** настроить маппинг Jira-типов задач на категории LeadBoard (PROJECT/EPIC/STORY/BUG/SUBTASK/IGNORE).\n",
+    "error": ""
+}

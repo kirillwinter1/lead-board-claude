@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Если данные устарели, запустите синхронизацию с Jira. Это можно сделать в разделе **Settings** или нажав кнопку **«Обновить»** на экране **Board**.","sessionId":"q30-1772443101"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q30-1772443101"}

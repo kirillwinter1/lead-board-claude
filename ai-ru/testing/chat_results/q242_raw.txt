@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я — AI-ассистент системы LeadBoard. Я не могу открывать задачи в Jira.","sessionId":"q242-1772443809"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q242-1772443809"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Эпики сортируются в порядке ручной сортировки (manual_order).","sessionId":"q364-1772444219"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q364-1772444219"}

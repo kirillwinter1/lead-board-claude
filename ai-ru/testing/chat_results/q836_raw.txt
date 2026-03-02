@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Time to Market показывают метрики **Lead Time** и **Cycle Time**.","sessionId":"q836-1772445792"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q836-1772445792"}

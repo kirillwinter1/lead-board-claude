@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, оценки Planning Poker сохраняются только в LeadBoard.","sessionId":"q629-1772445083"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q629-1772445083"}

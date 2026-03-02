@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу дать такую информацию. У меня нет данных о ценности проектов.","sessionId":"q780-1772445602"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q780-1772445602"}

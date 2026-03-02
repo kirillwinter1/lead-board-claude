@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу найти задачи-блокеры напрямую. Я могу искать задачи по названию, статусу, команде и типу.","sessionId":"q659-1772445185"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q659-1772445185"}

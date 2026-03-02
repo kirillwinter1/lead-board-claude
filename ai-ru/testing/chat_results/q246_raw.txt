@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, чат доступен на любой странице.","sessionId":"q246-1772443820"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q246-1772443820"}

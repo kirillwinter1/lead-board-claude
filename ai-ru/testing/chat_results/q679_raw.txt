@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для ответа на этот вопрос мне нужны дополнительные данные. Уточните, пожалуйста, какую команду вы имеете в виду.","sessionId":"q679-1772445250"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q679-1772445250"}

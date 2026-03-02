@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"board_summary","sessionId":"q31-1772443104"}
+
+event:text
+data:{"type":"text","content":"Борда показывает:\n*   **Эпики по статусам:**\n    *   В работе: 6\n    *   Новые: 7\n    *   Всего эпиков: 13\n*   **Стори по статусам:**\n    *   Завершенные: 8\n    *   В работе: 9\n    *   Новые: 16\n    *   Всего стори: 33","sessionId":"q31-1772443104"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q31-1772443104"}

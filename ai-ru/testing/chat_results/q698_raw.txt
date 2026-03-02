@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу отобразить burndown для спринта. Я могу показать только Epic Burndown.","sessionId":"q698-1772445324"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q698-1772445324"}

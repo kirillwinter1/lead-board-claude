@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Метрики команды можно посмотреть на странице \"Metrics\".","sessionId":"q103-1772443351"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q103-1772443351"}

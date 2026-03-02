@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Цветные бары на таймлайне отсутствий означают следующее:\n*   **Синий** — отпуск (VACATION)\n*   **Красный** — больничный (SICK\\_LEAVE)\n*   **Оранжевый** — отгул (DAY\\_OFF)\n*   **Серый** — другое (OTHER)","sessionId":"q557-1772444840"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q557-1772444840"}

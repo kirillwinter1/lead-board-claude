@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Загрузку участника можно посмотреть на странице **Member Profile**. Для этого нужно перейти на страницу **Teams**, выбрать нужную команду, а затем кликнуть по имени участника.\n","sessionId":"q526-1772444742"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q526-1772444742"}

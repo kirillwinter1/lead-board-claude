@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Confidence — это один из параметров RICE-скоринга, который используется для оценки проектов. Он отражает уверенность в оценках Reach, Impact и Effort.","sessionId":"q446-1772444487"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q446-1772444487"}

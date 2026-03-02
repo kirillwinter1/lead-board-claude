@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Симуляция находится на странице Simulation.","sessionId":"q722-1772445418"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q722-1772445418"}

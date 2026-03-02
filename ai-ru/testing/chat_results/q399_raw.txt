@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, нерабочие дни можно добавить. Это делается в разделе **\"Отсутствия\"** на странице конкретной команды.","sessionId":"q399-1772444331"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q399-1772444331"}

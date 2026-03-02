@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"VACATION — это тип отсутствия участника команды, который отображается на таймлайне отсутствий. Он обозначает отпуск.","sessionId":"q544-1772444799"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q544-1772444799"}

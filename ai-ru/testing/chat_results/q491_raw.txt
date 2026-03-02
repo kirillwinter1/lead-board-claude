@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"IGNORE означает, что данный тип связи будет игнорироваться системой LeadBoard и не будет учитываться при построении связей между задачами.","sessionId":"q491-1772444630"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q491-1772444630"}

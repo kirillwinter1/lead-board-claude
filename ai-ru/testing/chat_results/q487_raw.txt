@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Workflow Config, перейди на вкладку \"Statuses\". Там ты сможешь настроить маппинг Jira-статусов к категориям LeadBoard и выбрать цвет для каждого статуса.","sessionId":"q487-1772444616"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q487-1772444616"}

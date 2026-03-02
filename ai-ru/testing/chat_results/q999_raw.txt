@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, LeadBoard можно интегрировать со Slack.","sessionId":"q999-1772446384"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q999-1772446384"}

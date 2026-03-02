@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Цветные бейджи статусов отражают категорию статуса задачи (например, NEW, REQUIREMENTS, PLANNED, IN_PROGRESS, DONE). Цвет определяется в конфигурации Workflow.","sessionId":"q68-1772443231"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q68-1772443231"}

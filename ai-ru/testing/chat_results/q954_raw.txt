@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"ADMIN может управлять пользователями, ролями, синхронизацией с Jira, а также настраивать Workflow и Bug SLA. PROJECT_MANAGER не имеет доступа к этим функциям.","sessionId":"q954-1772446220"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q954-1772446220"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"DSR считается по формуле: `(рабочие_дни − дни_паузы) / оценка_в_днях`.","sessionId":"q301-1772444010"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q301-1772444010"}

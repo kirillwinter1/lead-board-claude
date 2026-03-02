@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Фактор \"Прогресс\" влияет на AutoScore следующим образом:\n\n*   **Прогресс (Progress)**: 10 баллов. Рассчитывается как `(залогированное время / оценка времени) × 10`.\n","sessionId":"q263-1772443884"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q263-1772443884"}

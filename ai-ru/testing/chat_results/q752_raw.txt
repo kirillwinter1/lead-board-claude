@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На этой странице я могу показать список проектов. Уточните, что вы имеете в виду под \"активными проектами\"?","sessionId":"q752-1772445510"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q752-1772445510"}

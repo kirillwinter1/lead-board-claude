@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило BUG_SLA_BREACH означает, что баг превысил установленный для него SLA (Service Level Agreement). Это значит, что время решения бага оказалось больше, чем допустимое для его приоритета.","sessionId":"q922-1772446115"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q922-1772446115"}

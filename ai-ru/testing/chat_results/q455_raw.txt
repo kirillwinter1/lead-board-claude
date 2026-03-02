@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Strategic weight — это коэффициент, который используется при расчете нормализованного RICE Score. Он позволяет придать больший или меньший вес стратегической важности проекта.","sessionId":"q455-1772444515"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q455-1772444515"}

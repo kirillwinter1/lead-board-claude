@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q62-1772443212"}
+
+event:text
+data:{"type":"text","content":"Задач, связанных с авторизацией, не найдено.","sessionId":"q62-1772443212"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q62-1772443212"}

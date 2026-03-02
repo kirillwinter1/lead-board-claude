@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"SICK_LEAVE — это тип отсутствия, который обозначает больничный. Он отображается красным цветом на таймлайне отсутствий.","sessionId":"q545-1772444802"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q545-1772444802"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Повторную синхронизацию можно запустить на странице **Settings** (Настройки), нажав кнопку **«Sync Now»**.","sessionId":"q948-1772446202"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q948-1772446202"}

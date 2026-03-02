@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Workflow Config есть вкладки для каждого проекта. Выберите нужную вкладку, чтобы переключиться между проектами.","sessionId":"q494-1772444639"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q494-1772444639"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"MEMBER может просматривать доску и участвовать в Planning Poker. VIEWER может только просматривать.","sessionId":"q957-1772446230"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q957-1772446230"}

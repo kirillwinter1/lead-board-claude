@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Список проектов можно посмотреть на странице \"Projects\" (`/projects`).","sessionId":"q208-1772443701"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q208-1772443701"}

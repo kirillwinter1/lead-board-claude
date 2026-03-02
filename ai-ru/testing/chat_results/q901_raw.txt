@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q901-1772446047"}
+
+event:text
+data:{"type":"text","content":"Сейчас в работе 1 баг.","sessionId":"q901-1772446047"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q901-1772446047"}

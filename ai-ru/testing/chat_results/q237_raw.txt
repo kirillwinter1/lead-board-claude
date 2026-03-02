@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу сбросить фильтры. У меня нет такой функции.","sessionId":"q237-1772443793"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q237-1772443793"}

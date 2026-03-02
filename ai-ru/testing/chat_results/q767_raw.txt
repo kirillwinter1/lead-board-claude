@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извини, я не могу показать рейтинг проектов по RICE. У меня нет доступа к этой информации.","sessionId":"q767-1772445560"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q767-1772445560"}

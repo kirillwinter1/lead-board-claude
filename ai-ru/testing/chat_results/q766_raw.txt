@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скоринг помогает приоритизировать проекты, предоставляя числовую оценку на основе четырех факторов: Reach (охват), Impact (влияние), Confidence (уверенность) и Effort (трудозатраты).\n\nФормула RICE: `(Reach × Impact × Confidence) / Effort`.\n\nЧем выше итоговый RICE-скор, тем выше приоритет проекта. В LeadBoard этот скор нормализуется и отображается в виде RICE Score Badge на карточке проекта.","sessionId":"q766-1772445557"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q766-1772445557"}

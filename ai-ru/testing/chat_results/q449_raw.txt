@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, Effort можно задать вручную.","sessionId":"q449-1772444495"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q449-1772444495"}

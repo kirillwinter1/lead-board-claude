@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Мне нужно знать ID проекта X, чтобы получить информацию о его прогрессе.","sessionId":"q211-1772443710"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q211-1772443710"}

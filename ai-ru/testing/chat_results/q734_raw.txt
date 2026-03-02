@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, запустить несколько симуляций параллельно нельзя.","sessionId":"q734-1772445454"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q734-1772445454"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Поиск на доске фильтрует эпики по подстроке в названии, регистр не учитывается.","sessionId":"q236-1772443790"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q236-1772443790"}

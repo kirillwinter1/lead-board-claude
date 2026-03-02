@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE-скоринг можно внедрить в процесс, используя экран \"Проекты\" (`/projects`). Там можно оценить проекты по параметрам Reach, Impact, Confidence и Effort, а затем использовать нормализованный RICE Score для приоритизации.\n","sessionId":"q986-1772446331"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q986-1772446331"}

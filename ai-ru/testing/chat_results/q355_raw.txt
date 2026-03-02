@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу показать метрики команды, но не могу анализировать причины изменений. Уточните, для какой команды вы хотите посмотреть throughput?","sessionId":"q355-1772444185"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q355-1772444185"}

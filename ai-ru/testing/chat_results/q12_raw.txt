@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, для входа в LeadBoard не нужен аккаунт Jira. LeadBoard синхронизируется с Jira, но имеет собственную систему аутентификации.","sessionId":"q12-1772443044"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q12-1772443044"}

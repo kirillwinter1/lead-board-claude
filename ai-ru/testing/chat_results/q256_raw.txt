@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Penalty за флаг — это снижение AutoScore на 100 баллов, если эпик приостановлен (flagged). Это сделано для того, чтобы приостановленные эпики не имели высокого приоритета.","sessionId":"q256-1772443862"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q256-1772443862"}

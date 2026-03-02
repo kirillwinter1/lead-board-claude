@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы присоединиться к сессии Planning Poker по коду, тебе нужно ввести этот код в соответствующем поле на странице Planning Poker.","sessionId":"q620-1772445055"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q620-1772445055"}

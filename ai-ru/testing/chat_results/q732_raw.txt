@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы запустить симуляцию, мне нужно знать ID команды. Пожалуйста, укажите его.","sessionId":"q732-1772445448"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q732-1772445448"}

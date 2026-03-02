@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker можно создать сессию для любого эпика. Выберите эпик, для которого хотите провести покер, и создайте новую сессию.","sessionId":"q615-1772445037"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q615-1772445037"}

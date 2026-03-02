@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу обновить кэш календаря. У меня нет таких функций.","sessionId":"q970-1772446269"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q970-1772446269"}

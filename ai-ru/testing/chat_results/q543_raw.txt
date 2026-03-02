@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Доступны следующие типы отсутствий:\n* **VACATION** (отпуск)\n* **SICK_LEAVE** (больничный)\n* **DAY_OFF** (отгул)\n* **OTHER** (другое)","sessionId":"q543-1772444796"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q543-1772444796"}

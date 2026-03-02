@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, ошибки (ERROR) блокируют планирование.","sessionId":"q426-1772444424"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q426-1772444424"}

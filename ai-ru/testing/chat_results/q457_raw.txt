@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE Boost даёт до 15 баллов в AutoScore.","sessionId":"q457-1772444521"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q457-1772444521"}

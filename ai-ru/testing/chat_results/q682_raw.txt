@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для здоровья команды критичны следующие метрики: DSR Actual, DSR Forecast, Throughput и On-Time Rate.","sessionId":"q682-1772445260"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q682-1772445260"}

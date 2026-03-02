@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Уточните, пожалуйста, для какой команды или функции вы хотите узнать параметры?","sessionId":"q727-1772445432"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q727-1772445432"}

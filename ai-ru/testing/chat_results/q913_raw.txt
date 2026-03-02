@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы изменить SLA для приоритета, перейдите в **Settings** (Настройки), затем на вкладку **Bug SLA**. Там вы сможете установить часы SLA для каждого приоритета.","sessionId":"q913-1772446085"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q913-1772446085"}

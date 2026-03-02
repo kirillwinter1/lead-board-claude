@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Настройки производственного календаря в LeadBoard не предусмотрены. Система автоматически учитывает рабочие дни и выходные.","sessionId":"q968-1772446263"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q968-1772446263"}

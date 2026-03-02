@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На какой странице вы находитесь?","sessionId":"q604-1772445003"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q604-1772445003"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, цвет роли можно изменить на странице Workflow Config во вкладке \"Roles\".","sessionId":"q476-1772444581"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q476-1772444581"}

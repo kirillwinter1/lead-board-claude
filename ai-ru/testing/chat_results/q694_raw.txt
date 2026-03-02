@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Role Load показывает загрузку по ролям (назначенные часы / ёмкость). Если какая-то роль постоянно перегружена (OVERLOAD), это указывает на **bottleneck** в этой роли.\n","sessionId":"q694-1772445310"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q694-1772445310"}

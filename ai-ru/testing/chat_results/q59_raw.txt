@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы найти задачу по ключу, используйте функцию `task_search` с параметром `query`.","sessionId":"q59-1772443202"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q59-1772443202"}

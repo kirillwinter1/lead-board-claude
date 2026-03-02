@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти на экран Data Quality, используйте путь `/data-quality`.","sessionId":"q229-1772443768"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q229-1772443768"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На диаграмме Ганта на странице таймлайна линия \"Сегодня\" отображается как синяя вертикальная линия.","sessionId":"q142-1772443485"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q142-1772443485"}

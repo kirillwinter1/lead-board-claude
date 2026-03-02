@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу автоматически отправлять отчеты.","sessionId":"q843-1772445820"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q843-1772445820"}

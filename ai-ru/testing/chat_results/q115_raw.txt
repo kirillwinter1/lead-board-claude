@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Красный DSR означает, что DSR > 1.5, то есть перерасход оценки более чем на 50%. Это может быть вызвано неточными оценками, блокировками или высоким WIP (Work In Progress).","sessionId":"q115-1772443389"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q115-1772443389"}

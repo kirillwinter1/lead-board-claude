@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы выбрать эпик для покер-сессии, перейди на страницу Planning Poker (`/poker`). Там ты сможешь **создать сессию**, и в процессе создания нужно будет **выбрать эпик**.","sessionId":"q617-1772445045"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q617-1772445045"}

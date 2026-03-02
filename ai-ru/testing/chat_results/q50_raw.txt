@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q50-1772443168"}
+
+event:text
+data:{"type":"text","content":"В статусе TODO нет задач.","sessionId":"q50-1772443168"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q50-1772443168"}

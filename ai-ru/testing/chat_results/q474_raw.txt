@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о цветах ролей. Эту информацию можно найти на странице Workflow Config.","sessionId":"q474-1772444575"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q474-1772444575"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"LeadBoard не интегрируется с Confluence.","sessionId":"q998-1772446381"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q998-1772446381"}

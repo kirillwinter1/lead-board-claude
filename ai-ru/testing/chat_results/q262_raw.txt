@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Фактор \"дедлайн\" влияет на AutoScore экспоненциальным ростом по мере приближения к дедлайну, максимально до 25 баллов.","sessionId":"q262-1772443881"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q262-1772443881"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу ответить на этот вопрос, так как у меня нет информации о \"dry-run\" и \"полном запуске\" в контексте системы LeadBoard.","sessionId":"q725-1772445426"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q725-1772445426"}

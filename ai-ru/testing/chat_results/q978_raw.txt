@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Синхронизация с Jira происходит автоматически каждые 5 минут. Также вы можете запустить её вручную в разделе \"Settings\" с помощью кнопки \"Sync Now\".","sessionId":"q978-1772446299"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q978-1772446299"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Pause days (дни паузы) в DSR — это дни, в течение которых работа над задачей была приостановлена. Они вычитаются из общего количества рабочих дней при расчете DSR.","sessionId":"q303-1772444015"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q303-1772444015"}

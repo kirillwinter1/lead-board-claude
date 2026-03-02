@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я могу искать задачи по их статусу в категориях \"TODO\", \"IN_PROGRESS\" и \"DONE\". Уточните, пожалуйста, к какой из этих категорий относится статус \"Testing\", чтобы я мог выполнить поиск.","sessionId":"q326-1772444087"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q326-1772444087"}

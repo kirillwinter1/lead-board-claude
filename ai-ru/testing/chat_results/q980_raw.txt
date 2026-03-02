@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, LeadBoard синхронизируется с Jira и использует данные оттуда.","sessionId":"q980-1772446305"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q980-1772446305"}

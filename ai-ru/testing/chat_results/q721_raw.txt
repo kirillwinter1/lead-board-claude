@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AI Simulation — это текущая страница пользователя. На этой странице нет доступных инструментов.\n","sessionId":"q721-1772445415"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q721-1772445415"}

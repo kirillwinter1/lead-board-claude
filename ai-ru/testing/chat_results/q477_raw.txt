@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Issue Type mapping — это настройка соответствия типов задач из Jira категориям в LeadBoard (PROJECT/EPIC/STORY/BUG/SUBTASK/IGNORE). Это позволяет системе правильно интерпретировать задачи из Jira.","sessionId":"q477-1772444584"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q477-1772444584"}

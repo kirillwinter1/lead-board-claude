@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Настройки подключения к Jira находятся на странице Settings. Там нужно указать URL Jira, email и API токен, а также ключ проекта. После этого можно будет запустить синхронизацию.","sessionId":"q936-1772446165"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q936-1772446165"}

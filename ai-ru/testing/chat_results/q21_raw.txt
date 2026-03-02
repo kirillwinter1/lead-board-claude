@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"У меня нет информации о названии вашей компании.","sessionId":"q21-1772443073"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q21-1772443073"}

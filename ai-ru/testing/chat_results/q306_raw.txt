@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"DSR (Done Story Ratio) — это метрика, которая показывает соотношение между рабочими днями (за вычетом дней пауз) и оценкой задачи в днях. Она не имеет понятия \"endpoint\" в своем расчете.\n","sessionId":"q306-1772444026"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q306-1772444026"}

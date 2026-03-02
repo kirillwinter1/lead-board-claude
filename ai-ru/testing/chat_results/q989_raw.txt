@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для настройки процесса нового проекта вам нужно перейти в раздел **Workflow Config** (`/workflow`). Там вы сможете настроить следующие параметры:\n*   **Roles (Роли pipeline)**: Определить последовательность ролей (SA, DEV, QA) и их цвета.\n*   **Issue Types (Типы задач)**: Сопоставить типы задач из Jira с категориями LeadBoard (PROJECT, EPIC, STORY, BUG, SUBTASK, IGNORE).\n*   **Statuses (Статусы)**: Сопоставить статусы из Jira с категориями LeadBoard (NEW, REQUIREMENTS, PLANNED, IN_PROGRESS, DONE).\n*   **Link Types (Типы связей)**: Настроить типы связей между задачами (BLOCKS, RELATED, IGNORE).\n\nЕсли у вас есть несколько проектов, вы можете настроить конфигурацию для каждого проекта отдельно.","sessionId":"q989-1772446340"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q989-1772446340"}

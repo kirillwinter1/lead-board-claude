@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Throughput по умолчанию считается за последние 30 дней.","sessionId":"q312-1772444044"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q312-1772444044"}

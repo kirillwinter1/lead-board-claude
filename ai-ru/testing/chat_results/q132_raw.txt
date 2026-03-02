@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Таймлайн доступен на странице `/timeline`.","sessionId":"q132-1772443451"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q132-1772443451"}

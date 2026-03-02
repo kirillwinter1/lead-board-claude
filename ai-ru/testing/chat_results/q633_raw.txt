@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. На странице Planning Poker в комнате сессии стори-список находится слева. Вы можете управлять стори оттуда.","sessionId":"q633-1772445100"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q633-1772445100"}

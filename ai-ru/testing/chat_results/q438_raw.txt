@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. Однако, если у стори нет подзадач с оценками, то планирование будет неточным, и система выдаст предупреждение `STORY_NO_SUBTASK_ESTIMATES`.","sessionId":"q438-1772444463"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q438-1772444463"}

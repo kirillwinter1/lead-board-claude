@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу получить информацию о командах по их названию. Могу я чем-то еще помочь?","sessionId":"q89-1772443305"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q89-1772443305"}

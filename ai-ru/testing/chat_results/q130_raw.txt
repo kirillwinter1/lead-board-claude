@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице метрик есть следующие графики:\n* **Throughput Chart** (столбчатая диаграмма по неделям с 4-недельной скользящей средней)\n* **Time in Status** (двухосевой график с количеством переходов и медианой/P85/P99 часов)\n* **Velocity Chart** (ёмкость vs залогированные часы по неделям)\n* **Epic Burndown** (график сгорания эпиков)","sessionId":"q130-1772443445"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q130-1772443445"}

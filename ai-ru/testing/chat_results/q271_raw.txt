@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Rough estimates — это приблизительные оценки трудозатрат в днях для каждой роли (SA/DEV/QA) на уровне эпиков, находящихся в статусе \"TODO\". Они используются для планирования и отображаются в колонке \"ROLE-BASED PROGRESS\".","sessionId":"q271-1772443909"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q271-1772443909"}

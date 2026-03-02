@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правила уровня WARNING:\n*   TIME_LOGGED_WRONG_EPIC_STATUS — логирование при неверном статусе эпика\n*   EPIC_NO_ESTIMATE — нет оценки (ни rough, ни подзадач)\n*   EPIC_TEAM_NO_MEMBERS — команда без активных участников\n*   SUBTASK_NO_ESTIMATE — подзадача без оценки\n*   SUBTASK_OVERRUN — превышение оценки на 50%+ (порог 1.5×)\n*   EPIC_FORECAST_LATE — прогноз позже дедлайна\n*   EPIC_IN_PROGRESS_NO_STORIES — эпик в работе без стори\n*   STORY_IN_PROGRESS_NO_SUBTASKS — стори в работе без подзадач\n*   STORY_NO_SUBTASK_ESTIMATES — нет оценок подзадач (нельзя планировать)\n*   STORY_BLOCKED_NO_PROGRESS — заблокировано >30 дней без прогресса по блокеру\n*   RICE_MISSING_ASSESSMENT — нет RICE-оценки для Planned+ задачи\n*   BUG_STALE — баг без обновлений >14 дней\n*   STORY_FULLY_LOGGED_NOT_DONE — всё время списано, но не закрыта\n*   SUBTASK_DONE_NO_TIME_LOGGED — подзадача закрыта без логирования\n*   SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED — логирование при паузе эпика","sessionId":"q413-1772444379"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q413-1772444379"}

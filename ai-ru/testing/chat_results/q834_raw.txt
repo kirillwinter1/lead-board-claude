@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу выполнить эту операцию. У меня нет функции для перемещения эпиков между командами.","sessionId":"q834-1772445786"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q834-1772445786"}

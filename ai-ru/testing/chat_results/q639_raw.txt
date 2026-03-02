@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, завершённую сессию Planning Poker возобновить нельзя.","sessionId":"q639-1772445123"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q639-1772445123"}

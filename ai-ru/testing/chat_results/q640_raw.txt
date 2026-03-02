@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Покер-сессии может создавать любой пользователь, у которого есть доступ к странице Planning Poker.","sessionId":"q640-1772445126"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q640-1772445126"}

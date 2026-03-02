@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Синхронизация с Jira происходит каждые 5 минут.","sessionId":"q979-1772446302"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q979-1772446302"}

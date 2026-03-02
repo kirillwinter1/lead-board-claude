@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Slug компании — это уникальный, читаемый человеком идентификатор компании, который используется в URL.","sessionId":"q22-1772443076"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q22-1772443076"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"STORY и BUG обрабатываются как отдельные типы задач в системе LeadBoard, хотя BUG и обрабатывается как STORY, но с отдельными правилами SLA.\n\nВ маппинге Workflow Config:\n*   **STORY** маппится на категорию `STORY`.\n*   **BUG** маппится на категорию `BUG`.\n\nЭто позволяет системе применять к багам специфические правила, например, отслеживание SLA, которые настраиваются в разделе Bug SLA Settings.","sessionId":"q479-1772444591"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q479-1772444591"}

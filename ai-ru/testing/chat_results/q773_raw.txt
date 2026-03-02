@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу дать рекомендации по шаблонам RICE. Могу лишь сказать, что RICE-скоринг используется для оценки проектов и эпиков, а его формула: `(Reach × Impact × Confidence) / Effort`.","sessionId":"q773-1772445580"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q773-1772445580"}

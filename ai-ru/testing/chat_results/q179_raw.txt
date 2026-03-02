@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило **STORY_NO_SUBTASKS** означает, что у стори нет подзадач, хотя она находится в работе (статус IN_PROGRESS). Это предупреждение (WARNING), так как стори без подзадач не может быть спланирована.","sessionId":"q179-1772443610"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q179-1772443610"}

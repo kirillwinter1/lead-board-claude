@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, компетенции важны для планирования. Они влияют на выбор исполнителя и скорость выполнения задач.","sessionId":"q599-1772444986"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q599-1772444986"}

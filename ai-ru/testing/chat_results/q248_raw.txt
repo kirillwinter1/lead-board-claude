@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извините, у меня нет информации о горячих клавишах в системе LeadBoard.","sessionId":"q248-1772443833"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q248-1772443833"}

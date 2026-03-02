@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, я не могу искать баги по типу \"Blocker\". Я могу искать баги по их статусу, команде или общему запросу.","sessionId":"q908-1772446070"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q908-1772446070"}

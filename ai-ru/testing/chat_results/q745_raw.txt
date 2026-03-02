@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. Система LeadBoard позволяет использовать симуляцию для \"what-if\" анализа.","sessionId":"q745-1772445488"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q745-1772445488"}

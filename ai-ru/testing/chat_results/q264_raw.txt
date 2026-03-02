@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Приоритет Jira влияет на AutoScore следующим образом:\n*   Highest: 20 баллов\n*   High: 15 баллов\n*   Medium: 10 баллов\n*   Low: 5 баллов","sessionId":"q264-1772443887"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q264-1772443887"}

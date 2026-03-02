@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Фаза SA (Solution Architecture) — это один из этапов пайплайна разработки, который обычно предшествует разработке (DEV) и тестированию (QA). На этом этапе происходит проектирование архитектуры решения.","sessionId":"q153-1772443520"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q153-1772443520"}

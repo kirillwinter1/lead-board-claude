@@ -1,0 +1,11 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q916-1772446094"}
+
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q916-1772446094"}
+
+event:text
+data:{"type":"text","content":"Stale bug — это баг, который не обновлялся более 14 дней.\n\nНа данный момент у вас **1** такой баг в статусе \"IN_PROGRESS\" и **0** в статусе \"TODO\".","sessionId":"q916-1772446094"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q916-1772446094"}

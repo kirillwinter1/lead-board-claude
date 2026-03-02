@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"При регистрации первый пользователь автоматически становится ADMIN.","sessionId":"q963-1772446248"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q963-1772446248"}

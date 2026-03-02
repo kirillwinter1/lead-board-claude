@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Lead Time — это общее время от создания задачи до ее завершения.","sessionId":"q106-1772443360"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q106-1772443360"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило `EPIC_NO_DUE_DATE` означает, что у эпика отсутствует дата завершения (due date). Это информационное нарушение (INFO).","sessionId":"q178-1772443607"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q178-1772443607"}

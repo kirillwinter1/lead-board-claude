@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"SLA breach означает, что время решения бага превысило установленный лимит SLA (Service Level Agreement).","sessionId":"q195-1772443660"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q195-1772443660"}

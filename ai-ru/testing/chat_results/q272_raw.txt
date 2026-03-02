@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Rough estimates можно редактировать для эпиков в статусе TODO на странице Board.","sessionId":"q272-1772443912"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q272-1772443912"}

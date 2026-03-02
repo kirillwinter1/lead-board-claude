@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Team Members\" нет функции удаления участника. Вы можете изменить его роль или удалить его из системы через настройки.","sessionId":"q504-1772444670"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q504-1772444670"}

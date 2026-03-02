@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы перейти на проекты, используй экран **Projects** (`/projects`). Там ты увидишь карточки проектов с их ключами, названиями, менеджерами, RICE-скором, статусом, прогрессом и ожидаемой датой завершения.\n\nТакже есть **Project Timeline** (`/project-timeline`) для просмотра диаграммы Ганта по проектам.","sessionId":"q231-1772443774"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q231-1772443774"}

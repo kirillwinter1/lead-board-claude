@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Наведи курсор на числовое значение AutoScore в колонке \"PRIORITY\" на доске задач. Появится всплывающая подсказка с разбивкой по факторам AutoScore.","sessionId":"q284-1772443950"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q284-1772443950"}

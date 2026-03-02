@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker, после того как все стори будут оценены и финальные оценки введены ведущим, сессия будет считаться завершенной.","sessionId":"q638-1772445120"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q638-1772445120"}

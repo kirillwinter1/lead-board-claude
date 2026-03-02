@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE Score влияет на AutoScore через фактор \"RICE Boost\". Нормализованный RICE Score (от 0 до 100) умножается на 15, и этот результат добавляется к AutoScore.\n","sessionId":"q258-1772443868"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q258-1772443868"}

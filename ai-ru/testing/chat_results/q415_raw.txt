@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило **TIME_LOGGED_NOT_IN_SUBTASK** означает, что время было залогировано не на подзадаче. Это ошибка (ERROR), которая блокирует планирование.\n","sessionId":"q415-1772444390"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q415-1772444390"}

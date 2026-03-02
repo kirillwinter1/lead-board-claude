@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не нашел команду Frontend. Могу показать список всех команд.","sessionId":"q88-1772443302"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q88-1772443302"}

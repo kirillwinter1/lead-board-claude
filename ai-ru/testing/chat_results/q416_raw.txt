@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Правило STORY_CIRCULAR_DEPENDENCY означает, что в стори обнаружена циклическая зависимость. Это ошибка (ERROR), которая блокирует планирование.","sessionId":"q416-1772444393"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q416-1772444393"}

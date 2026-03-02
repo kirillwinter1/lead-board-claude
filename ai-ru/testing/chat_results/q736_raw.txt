@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Для сравнения разных запусков симуляции используй функцию \"Снимки прогноза\" (Forecast Snapshots). Она позволяет сохранять ежедневные снимки планирования и использовать их для исторического таймлайна, Forecast Accuracy и DSR Forecast.","sessionId":"q736-1772445459"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q736-1772445459"}

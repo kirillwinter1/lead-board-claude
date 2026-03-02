@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, скрыть конкретное нарушение нельзя. Вы можете отфильтровать нарушения по команде, серьезности или правилу.","sessionId":"q175-1772443597"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q175-1772443597"}

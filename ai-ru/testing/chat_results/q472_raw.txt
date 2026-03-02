@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Workflow Config, вкладка Roles, `sort_order` определяет порядок ролей в пайплайне (например, SA → DEV → QA).","sessionId":"q472-1772444569"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q472-1772444569"}

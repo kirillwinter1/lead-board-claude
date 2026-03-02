@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Жёлтый DSR (Done Story Ratio) означает, что задача выполнена с приемлемым перерасходом времени, но не совсем вовремя. Это происходит, когда значение DSR находится в диапазоне от 1.1 до 1.5.","sessionId":"q114-1772443386"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q114-1772443386"}

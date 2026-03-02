@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_count","sessionId":"q52-1772443175"}
+
+event:text
+data:{"type":"text","content":"Завершено 8 задач.","sessionId":"q52-1772443175"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q52-1772443175"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Полосатые бары на диаграмме Ганта означают **прогноз будущей работы**. Они показывают планируемые фазы (SA/DEV/QA) и их длительность.","sessionId":"q136-1772443465"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q136-1772443465"}

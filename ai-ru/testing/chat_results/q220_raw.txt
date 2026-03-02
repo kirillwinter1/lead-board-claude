@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Проекты\" нет фильтра по PM. Такой фильтр доступен на странице \"Таймлайн проектов\".","sessionId":"q220-1772443741"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q220-1772443741"}

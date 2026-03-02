@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Дата завершения эпика (Expected Done) рассчитывается как максимальная дата завершения всех незавершённых эпиков, входящих в проект.","sessionId":"q401-1772444337"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q401-1772444337"}

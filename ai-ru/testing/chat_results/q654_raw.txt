@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AutoScore применяется только к эпикам. У стори нет собственного AutoScore.","sessionId":"q654-1772445170"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q654-1772445170"}

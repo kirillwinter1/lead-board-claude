@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Импорт changelogs нужен для точных метрик DSR и Cycle Time.","sessionId":"q944-1772446190"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q944-1772446190"}

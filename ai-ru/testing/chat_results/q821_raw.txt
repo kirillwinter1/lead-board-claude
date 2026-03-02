@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"К сожалению, я не могу получить данные за месяц. Могу показать только общее количество завершенных стори.","sessionId":"q821-1772445742"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q821-1772445742"}

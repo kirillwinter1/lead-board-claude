@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Извини, у меня нет информации о нормальном или среднем Lead Time для стори. Я могу предоставить данные по метрикам команды, если тебе это интересно.","sessionId":"q320-1772444068"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q320-1772444068"}

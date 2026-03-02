@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы оценить эпик по RICE, перейди на страницу **Projects** (`/projects`). Там ты увидишь список проектов. Кликни на нужный проект, чтобы развернуть его карточку. Внутри карточки будет форма для RICE-оценки.","sessionId":"q459-1772444527"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q459-1772444527"}

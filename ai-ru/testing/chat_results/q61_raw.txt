@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q61-1772443208"}
+
+event:text
+data:{"type":"text","content":"Задача с ключом PROJ-123 не найдена.","sessionId":"q61-1772443208"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q61-1772443208"}

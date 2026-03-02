@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"`flag_changelog` влияет на DSR через параметр `дни_паузы`. Эти дни вычитаются из общего количества рабочих дней при расчете DSR, что может улучшить показатель DSR, если задача была приостановлена.","sessionId":"q671-1772445223"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q671-1772445223"}

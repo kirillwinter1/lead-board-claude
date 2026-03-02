@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Тип связи `RELATED` используется для обозначения связанных задач, которые не блокируют друг друга напрямую, но имеют отношение друг к другу.","sessionId":"q490-1772444626"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q490-1772444626"}

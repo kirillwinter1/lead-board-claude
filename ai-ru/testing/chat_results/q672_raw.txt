@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"`Pause flag` (флаг паузы) означает, что эпик приостановлен. Если эпик помечен таким флагом, его AutoScore будет снижен на 100 баллов.","sessionId":"q672-1772445226"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q672-1772445226"}

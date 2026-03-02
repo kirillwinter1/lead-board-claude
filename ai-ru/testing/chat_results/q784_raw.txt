@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Alignment boost +10 означает, что эпик отстает от среднего более чем на 2 дня.\n","sessionId":"q784-1772445614"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q784-1772445614"}

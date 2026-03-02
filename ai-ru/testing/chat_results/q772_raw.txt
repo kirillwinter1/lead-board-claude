@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу дать рекомендации по выбору шаблона RICE, так как у меня нет доступа к такой информации.","sessionId":"q772-1772445576"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q772-1772445576"}

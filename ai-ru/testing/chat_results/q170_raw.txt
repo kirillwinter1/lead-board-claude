@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"data_quality_summary","sessionId":"q170-1772443581"}
+
+event:text
+data:{"type":"text","content":"В первую очередь нужно исправить 11 эпиков, у которых не указан срок выполнения (due date). Это важно, так как отсутствие сроков может затруднить планирование и прогнозирование.","sessionId":"q170-1772443581"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q170-1772443581"}

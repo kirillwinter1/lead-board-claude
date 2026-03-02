@@ -35,16 +35,16 @@ BEGIN
     -- Sync state per project key (10 project keys)
     INSERT INTO jira_sync_state (project_key, last_sync_completed_at, last_sync_issues_count, sync_in_progress)
     VALUES
-        ('PERF-A', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-B', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-C', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-D', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-E', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-F', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-G', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-H', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-I', NOW() - INTERVAL '5 minutes', 6100, FALSE),
-        ('PERF-J', NOW() - INTERVAL '5 minutes', 6100, FALSE)
+        ('PERF-A', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-B', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-C', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-D', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-E', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-F', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-G', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-H', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-I', NOW() - INTERVAL '5 minutes', 61000, FALSE),
+        ('PERF-J', NOW() - INTERVAL '5 minutes', 61000, FALSE)
     ON CONFLICT (project_key) DO NOTHING;
 
     EXECUTE 'SET search_path TO public';

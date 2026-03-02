@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Если в Jira не заполнен Due Date, это будет отображено на странице Data Quality как информационное нарушение (INFO) с правилом **EPIC_NO_DUE_DATE**. Это означает, что для эпика не установлен срок выполнения.","sessionId":"q439-1772444466"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q439-1772444466"}

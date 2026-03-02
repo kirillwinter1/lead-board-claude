@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нет, такой функции нет.","sessionId":"q571-1772444893"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q571-1772444893"}

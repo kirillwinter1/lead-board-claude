@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу посмотреть зависимости между командами. Могу показать только общие метрики команды.","sessionId":"q812-1772445709"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q812-1772445709"}

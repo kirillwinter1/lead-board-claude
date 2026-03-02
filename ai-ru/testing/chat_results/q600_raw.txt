@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Редактировать компетенции может **ADMIN** или **TEAM_LEAD** (для своей команды).","sessionId":"q600-1772444989"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q600-1772444989"}

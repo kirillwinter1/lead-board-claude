@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker, \"reveal\" означает раскрытие голосов участников после того, как они проголосовали за оценку стори. После этого ведущий сессии вводит финальную оценку.","sessionId":"q626-1772445074"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q626-1772445074"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы открыть профиль участника, перейдите в раздел **Teams**, выберите нужную команду, а затем нажмите на имя участника в таблице.","sessionId":"q233-1772443780"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q233-1772443780"}

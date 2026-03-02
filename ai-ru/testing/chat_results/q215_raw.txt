@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Бейдж RICE показывает RICE Score проекта.\n* **Зелёный** означает RICE Score ≥ 70.\n* **Оранжевый** означает RICE Score ≥ 40.\n* **Серый** означает RICE Score < 40.","sessionId":"q215-1772443724"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q215-1772443724"}

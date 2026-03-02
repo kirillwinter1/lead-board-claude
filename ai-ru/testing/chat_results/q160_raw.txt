@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"data_quality_summary","sessionId":"q160-1772443544"}
+
+event:text
+data:{"type":"text","content":"На странице \"Качество данных\" у вас **11 предупреждений** (INFO) о том, что у эпиков нет даты выполнения.","sessionId":"q160-1772443544"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q160-1772443544"}

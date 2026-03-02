@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"LeadBoard не предназначен для онбординга. Это инструмент для управления командной разработкой.","sessionId":"q988-1772446338"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q988-1772446338"}

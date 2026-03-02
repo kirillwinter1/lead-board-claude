@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Категория IGNORE используется для типов задач или связей в Jira, которые вы не хотите импортировать или учитывать в LeadBoard.\n","sessionId":"q480-1772444594"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q480-1772444594"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Метрики — это показатели производительности команды, которые включают DSR, пропускную способность (throughput), время выполнения (lead time) и время цикла (cycle time). Они доступны на странице \"Метрики команды\".","sessionId":"q101-1772443343"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q101-1772443343"}

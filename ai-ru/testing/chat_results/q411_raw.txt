@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Data Quality отображаются ошибки, предупреждения и информационные сообщения. Всего существует 20 правил для ошибок (ERROR), 15 для предупреждений (WARNING) и 1 для информационных сообщений (INFO).","sessionId":"q411-1772444371"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q411-1772444371"}

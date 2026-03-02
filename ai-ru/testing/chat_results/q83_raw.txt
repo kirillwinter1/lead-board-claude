@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице \"Команды\" выберите нужную команду. Там будет раздел с участниками.","sessionId":"q83-1772443285"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q83-1772443285"}

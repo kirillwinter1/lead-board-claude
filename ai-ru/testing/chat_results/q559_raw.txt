@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Отсутствия конкретного человека можно посмотреть на странице его профиля.","sessionId":"q559-1772444848"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q559-1772444848"}

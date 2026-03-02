@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Чтобы узнать DSR Actual и DSR Forecast, мне нужно знать, для какой команды вы хотите получить эти метрики. Укажите, пожалуйста, ID команды.","sessionId":"q309-1772444035"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q309-1772444035"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Нарушения, блокирующие планирование (ERROR):\n*   EPIC_NO_TEAM — эпик без команды\n*   EPIC_OVERDUE — дедлайн в прошлом, не завершён\n*   TIME_LOGGED_NOT_IN_SUBTASK — время залогировано не на подзадаче\n*   CHILD_IN_PROGRESS_EPIC_NOT — ребёнок в работе, эпик нет\n*   SUBTASK_IN_PROGRESS_STORY_NOT — подзадача в работе, стори нет\n*   SUBTASK_WORK_NO_ESTIMATE — время залогировано без оценки\n*   EPIC_DONE_OPEN_CHILDREN — эпик закрыт, есть открытые стори\n*   STORY_DONE_OPEN_CHILDREN — стори закрыта, есть открытые подзадачи\n*   STORY_BLOCKED_BY_MISSING — заблокировано несуществующей задачей\n*   STORY_CIRCULAR_DEPENDENCY — циклическая зависимость\n*   BUG_SLA_BREACH — баг превысил SLA\n*   SUBTASK_TIME_LOGGED_BUT_TODO — время залогировано, но статус TODO","sessionId":"q425-1772444420"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q425-1772444420"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"На странице Planning Poker статус \"COMPLETED\" для сессии означает, что все стори в этой сессии были оценены и сессия завершена.","sessionId":"q637-1772445116"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q637-1772445116"}

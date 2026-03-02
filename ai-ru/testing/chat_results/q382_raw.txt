@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Да, можно. На странице Timeline есть элемент управления \"Дата снимка\", где можно выбрать \"Сегодня (live)\" или историческую дату из сохраненных прогнозов.","sessionId":"q382-1772444280"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q382-1772444280"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Jira Team Value — это значение, которое используется для привязки эпиков к команде. Оно настраивается для каждой команды.","sessionId":"q85-1772443292"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q85-1772443292"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Изменить роль участника может только ADMIN. Для этого нужно перейти в Settings (/settings), найти пользователя в таблице и изменить его роль через выпадающий список.","sessionId":"q505-1772444673"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q505-1772444673"}

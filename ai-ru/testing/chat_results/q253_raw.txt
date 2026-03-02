@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу раскрывать внутренние алгоритмы расчета AutoScore.","sessionId":"q253-1772443850"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q253-1772443850"}

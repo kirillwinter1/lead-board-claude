@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу показать состав команды, так как у меня нет информации о вашей команде. Уточните, пожалуйста, ID команды.","sessionId":"q502-1772444664"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q502-1772444664"}

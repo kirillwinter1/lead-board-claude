@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"RICE Score — это метод приоритизации задач, который рассчитывается по формуле:\n\n**RICE = (Reach × Impact × Confidence) / Effort**\n\nГде:\n*   **Reach (Охват)**: количество пользователей, которых затронет изменение.\n*   **Impact (Влияние)**: ценность изменения.\n*   **Confidence (Уверенность)**: степень уверенности в оценках Reach, Impact и Effort.\n*   **Effort (Трудозатраты)**: объем работы, необходимый для выполнения задачи.\n\nВ системе LeadBoard RICE Score также нормализуется и умножается на стратегический вес.","sessionId":"q213-1772443716"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q213-1772443716"}

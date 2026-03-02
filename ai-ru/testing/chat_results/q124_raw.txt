@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"MetricCard — это карточка с метриками команды, которая отображается на странице \"Метрики команды\".","sessionId":"q124-1772443417"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q124-1772443417"}

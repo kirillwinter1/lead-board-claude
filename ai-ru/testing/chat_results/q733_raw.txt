@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Статус \"simulation running\" означает, что в данный момент выполняется симуляция или моделирование.","sessionId":"q733-1772445451"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q733-1772445451"}

@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Recommendations (рекомендации) в проекте — это желтый блок с предложениями по улучшению проекта. Они могут включать:\n*   **EPIC\\_LAGGING**: эпик отстает от графика.\n*   **EPIC\\_NO\\_FORECAST**: для эпика нет прогноза.\n*   **RICE\\_NOT\\_FILLED**: не заполнена RICE-оценка.","sessionId":"q680-1772445253"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q680-1772445253"}

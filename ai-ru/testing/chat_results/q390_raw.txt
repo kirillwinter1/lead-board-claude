@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"AutoScore пересчитывается автоматически. Тебе не нужно делать это вручную.","sessionId":"q390-1772444304"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q390-1772444304"}

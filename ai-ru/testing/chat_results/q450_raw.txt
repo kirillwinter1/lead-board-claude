@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"T-shirt sizing — это метод оценки трудозатрат (Effort) в RICE-скоринге. Он использует размеры футболок (S, M, L, XL) вместо точных числовых значений для быстрой и приблизительной оценки.","sessionId":"q450-1772444499"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q450-1772444499"}

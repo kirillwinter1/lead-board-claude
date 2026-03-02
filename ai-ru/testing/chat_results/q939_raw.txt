@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Шаги в Setup Wizard:\n1.  **Jira**: Настройка подключения к Jira (URL, email, API token, project key).\n2.  **Period**: Выбор периода синхронизации (месяцы).\n3.  **Sync**: Прогресс-бар импорта данных.\n4.  **Workflow**: Встроенная конфигурация рабочего процесса.\n5.  **Done**: Завершение настройки и переход к доске.","sessionId":"q939-1772446175"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q939-1772446175"}

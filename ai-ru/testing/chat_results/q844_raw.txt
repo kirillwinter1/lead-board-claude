@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Я не могу настроить регулярные отчёты. Это действие не предусмотрено моими функциями.","sessionId":"q844-1772445824"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q844-1772445824"}

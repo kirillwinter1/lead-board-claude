@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q798-1772445660"}
+
+event:text
+data:{"type":"text","content":"В системе нет эпиков без команды.","sessionId":"q798-1772445660"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q798-1772445660"}

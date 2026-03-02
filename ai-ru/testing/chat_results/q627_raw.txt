@@ -1,0 +1,5 @@
+event:text
+data:{"type":"text","content":"Финальную оценку может выставить ведущий Planning Poker сессии. Для этого ему нужно ввести часы по ролям после раскрытия карточек голосования.","sessionId":"q627-1772445077"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q627-1772445077"}

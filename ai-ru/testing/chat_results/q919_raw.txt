@@ -1,0 +1,8 @@
+event:tool_call
+data:{"type":"tool_call","content":"task_search","sessionId":"q919-1772446105"}
+
+event:text
+data:{"type":"text","content":"На данный момент есть 1 баг в работе, который может нарушать SLA:\n*   **LB-7**: \"Неверный рассчет комиссии у клиента\" (статус: Analysis).\n\nДля точного определения нарушения SLA мне нужны данные о SLA для этого бага.","sessionId":"q919-1772446105"}
+
+event:done
+data:{"type":"done","content":null,"sessionId":"q919-1772446105"}
