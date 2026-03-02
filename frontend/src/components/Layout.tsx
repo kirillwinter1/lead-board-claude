@@ -87,6 +87,9 @@ export function Layout() {
               <NavLink to={`/project-timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Project Timeline
               </NavLink>
+              <NavLink to={`/quarterly-planning${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Planning
+              </NavLink>
               {auth.isAdmin() && (
                 <NavLink to="/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                   Settings

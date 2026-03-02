@@ -10,11 +10,14 @@ public class ChatProperties {
     private boolean enabled = false;
     private String provider = "openrouter";
     private String apiKey = "";
-    private String model = "google/gemini-2.5-flash";
+    private String model = "meta-llama/llama-3.3-70b-instruct:free";
     private String baseUrl = "https://openrouter.ai/api/v1";
     private int maxHistoryMessages = 20;
     private int timeoutSeconds = 30;
     private int maxToolCalls = 5;
+    private boolean embeddingEnabled = false;
+    private String embeddingModel = "openai/text-embedding-3-small";
+    private String embeddingBaseUrl = "";
 
     public boolean isEnabled() {
         return enabled;
@@ -78,5 +81,29 @@ public class ChatProperties {
 
     public void setMaxToolCalls(int maxToolCalls) {
         this.maxToolCalls = maxToolCalls;
+    }
+
+    public boolean isEmbeddingEnabled() {
+        return embeddingEnabled;
+    }
+
+    public void setEmbeddingEnabled(boolean embeddingEnabled) {
+        this.embeddingEnabled = embeddingEnabled;
+    }
+
+    public String getEmbeddingModel() {
+        return embeddingModel;
+    }
+
+    public void setEmbeddingModel(String embeddingModel) {
+        this.embeddingModel = embeddingModel;
+    }
+
+    public String getEmbeddingBaseUrl() {
+        return embeddingBaseUrl;
+    }
+
+    public void setEmbeddingBaseUrl(String embeddingBaseUrl) {
+        this.embeddingBaseUrl = embeddingBaseUrl;
     }
 }

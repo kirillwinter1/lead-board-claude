@@ -99,6 +99,9 @@ class SyncServiceTest {
     @Mock
     private com.leadboard.board.BoardService boardService;
 
+    @Mock
+    private com.leadboard.chat.embedding.EmbeddingService embeddingService;
+
     private SyncService syncService;
 
     @BeforeEach
@@ -124,7 +127,8 @@ class SyncServiceTest {
                 observabilityMetrics,
                 unifiedPlanningService,
                 boardService,
-                null // self (not needed for unit tests, @Async not invoked via proxy)
+                null, // self (not needed for unit tests, @Async not invoked via proxy)
+                embeddingService
         );
 
         // Common setup

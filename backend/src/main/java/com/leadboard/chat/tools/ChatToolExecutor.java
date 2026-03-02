@@ -4,6 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadboard.auth.AuthorizationService;
+import com.leadboard.board.BoardNode;
+import com.leadboard.board.BoardResponse;
+import com.leadboard.board.BoardService;
+import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.TeamMetricsSummary;
 import com.leadboard.metrics.service.BugMetricsService;
@@ -34,11 +38,13 @@ public class ChatToolExecutor {
     private final TeamMetricsService teamMetricsService;
     private final WorkflowConfigService workflowConfigService;
     private final AuthorizationService authorizationService;
+    private final BoardService boardService;
     private final BugMetricsService bugMetricsService;
     private final ProjectService projectService;
     private final RiceAssessmentService riceAssessmentService;
     private final AbsenceService absenceService;
     private final BugSlaService bugSlaService;
+    private final EmbeddingService embeddingService;
     private final ObjectMapper objectMapper;
 
     public ChatToolExecutor(
@@ -48,11 +54,13 @@ public class ChatToolExecutor {
             TeamMetricsService teamMetricsService,
             WorkflowConfigService workflowConfigService,
             AuthorizationService authorizationService,
+            BoardService boardService,
             BugMetricsService bugMetricsService,
             ProjectService projectService,
             RiceAssessmentService riceAssessmentService,
             AbsenceService absenceService,
             BugSlaService bugSlaService,
+            EmbeddingService embeddingService,
             ObjectMapper objectMapper
     ) {
         this.issueRepository = issueRepository;
@@ -61,11 +69,13 @@ public class ChatToolExecutor {
         this.teamMetricsService = teamMetricsService;
         this.workflowConfigService = workflowConfigService;
         this.authorizationService = authorizationService;
+        this.boardService = boardService;
         this.bugMetricsService = bugMetricsService;
         this.projectService = projectService;
         this.riceAssessmentService = riceAssessmentService;
         this.absenceService = absenceService;
         this.bugSlaService = bugSlaService;
+        this.embeddingService = embeddingService;
         this.objectMapper = objectMapper;
     }
 
@@ -89,6 +99,7 @@ public class ChatToolExecutor {
                 case "bug_sla_settings" -> bugSlaSettings();
                 case "task_details" -> taskDetails(args);
                 case "team_members" -> teamMembers(args);
+                case "epic_progress" -> epicProgress(args);
                 default -> toJson(Map.of("error", "Unknown tool: " + toolName));
             };
         } catch (Exception e) {
@@ -277,40 +288,70 @@ public class ChatToolExecutor {
             return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
         }
 
-        List<JiraIssueEntity> issues;
-        if (teamId != null && typeFilter != null) {
-            issues = issueRepository.findByBoardCategoryAndTeamId(typeFilter, teamId);
-        } else if (teamId != null) {
-            List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
-            List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryAndTeamId("STORY", teamId);
-            List<JiraIssueEntity> bugs = issueRepository.findByBoardCategoryAndTeamId("BUG", teamId);
-            issues = new ArrayList<>();
-            issues.addAll(epics);
-            issues.addAll(stories);
-            issues.addAll(bugs);
-        } else if (typeFilter != null) {
-            issues = issueRepository.findByBoardCategory(typeFilter);
-        } else {
-            issues = new ArrayList<>();
-            issues.addAll(issueRepository.findByBoardCategory("EPIC"));
-            issues.addAll(issueRepository.findByBoardCategory("STORY"));
-            issues.addAll(issueRepository.findByBoardCategory("BUG"));
-        }
+        // Try semantic search first if embedding is enabled and query is present
+        List<JiraIssueEntity> issues = null;
+        boolean usedSemantic = false;
 
-        // Filter by status category
-        if (statusFilter != null) {
-            issues = issues.stream()
-                    .filter(e -> statusFilter.equals(categorizeStatus(e.getIssueType(), e.getStatus())))
-                    .toList();
-        }
-
-        // Filter by query
         if (query != null && !query.isBlank()) {
-            String q = query.toLowerCase();
-            issues = issues.stream()
-                    .filter(e -> (e.getIssueKey() != null && e.getIssueKey().toLowerCase().contains(q))
-                            || (e.getSummary() != null && e.getSummary().toLowerCase().contains(q)))
-                    .toList();
+            List<JiraIssueEntity> semanticResults = embeddingService.search(query, teamId, 20);
+            if (!semanticResults.isEmpty()) {
+                issues = new ArrayList<>(semanticResults);
+                usedSemantic = true;
+
+                // Apply type filter on semantic results
+                if (typeFilter != null) {
+                    issues = issues.stream()
+                            .filter(e -> typeFilter.equals(e.getBoardCategory()))
+                            .toList();
+                }
+
+                // Apply status filter on semantic results
+                if (statusFilter != null) {
+                    issues = issues.stream()
+                            .filter(e -> statusFilter.equals(categorizeStatus(e.getIssueType(), e.getStatus())))
+                            .toList();
+                }
+            }
+        }
+
+        // Fallback to substring match
+        if (issues == null || issues.isEmpty()) {
+            if (teamId != null && typeFilter != null) {
+                issues = issueRepository.findByBoardCategoryAndTeamId(typeFilter, teamId);
+            } else if (teamId != null) {
+                List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
+                List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryAndTeamId("STORY", teamId);
+                List<JiraIssueEntity> bugs = issueRepository.findByBoardCategoryAndTeamId("BUG", teamId);
+                issues = new ArrayList<>();
+                issues.addAll(epics);
+                issues.addAll(stories);
+                issues.addAll(bugs);
+            } else if (typeFilter != null) {
+                issues = issueRepository.findByBoardCategory(typeFilter);
+            } else {
+                issues = new ArrayList<>();
+                issues.addAll(issueRepository.findByBoardCategory("EPIC"));
+                issues.addAll(issueRepository.findByBoardCategory("STORY"));
+                issues.addAll(issueRepository.findByBoardCategory("BUG"));
+            }
+
+            // Filter by status category
+            if (statusFilter != null) {
+                issues = issues.stream()
+                        .filter(e -> statusFilter.equals(categorizeStatus(e.getIssueType(), e.getStatus())))
+                        .toList();
+            }
+
+            // Filter by query (substring match with ё→е normalization for Russian)
+            if (query != null && !query.isBlank()) {
+                String q = normalizeRussian(query.toLowerCase());
+                issues = issues.stream()
+                        .filter(e -> (e.getIssueKey() != null && e.getIssueKey().toLowerCase().contains(q))
+                                || (e.getSummary() != null && normalizeRussian(e.getSummary().toLowerCase()).contains(q)))
+                        .toList();
+            }
+
+            usedSemantic = false;
         }
 
         // Limit to 20 results
@@ -332,6 +373,7 @@ public class ChatToolExecutor {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("totalFound", issues.size());
         result.put("showing", results.size());
+        result.put("searchMode", usedSemantic ? "semantic" : "substring");
         result.put("tasks", results);
         return toJson(result);
     }
@@ -560,6 +602,74 @@ public class ChatToolExecutor {
         return toJson(result);
     }
 
+    private String epicProgress(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        String query = args.has("query") ? args.get("query").asText() : null;
+
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+
+        try {
+            List<Long> teamIds = teamId != null ? List.of(teamId) : null;
+            BoardResponse board = boardService.getBoard(query, null, teamIds, 0, 20, false);
+
+            List<Map<String, Object>> epics = board.getItems().stream().map(epic -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("key", epic.getIssueKey());
+                m.put("title", epic.getTitle());
+                m.put("status", epic.getStatus());
+                m.put("progress", epic.getProgress());
+                if (epic.getTeamName() != null) m.put("team", epic.getTeamName());
+                if (epic.getAutoScore() != null) m.put("autoScore", epic.getAutoScore());
+
+                // Estimate in days (8h per day)
+                if (epic.getEstimateSeconds() != null && epic.getEstimateSeconds() > 0) {
+                    m.put("estimateDays", String.format("%.1f", epic.getEstimateSeconds() / 28800.0));
+                    m.put("loggedDays", String.format("%.1f", (epic.getLoggedSeconds() != null ? epic.getLoggedSeconds() : 0) / 28800.0));
+                }
+
+                // Role-based progress
+                if (epic.getRoleProgress() != null && !epic.getRoleProgress().isEmpty()) {
+                    Map<String, Object> roles = new LinkedHashMap<>();
+                    epic.getRoleProgress().forEach((roleCode, rm) -> {
+                        Map<String, Object> roleData = new LinkedHashMap<>();
+                        roleData.put("progress", rm.getProgress());
+                        if (rm.getEstimateSeconds() > 0) {
+                            roleData.put("estimateDays", String.format("%.1f", rm.getEstimateSeconds() / 28800.0));
+                            roleData.put("loggedDays", String.format("%.1f", rm.getLoggedSeconds() / 28800.0));
+                        }
+                        roles.put(roleCode, roleData);
+                    });
+                    m.put("roleProgress", roles);
+                }
+
+                // Story-level summary: count + expected done dates
+                if (!epic.getChildren().isEmpty()) {
+                    m.put("storyCount", epic.getChildren().size());
+                    long doneStories = epic.getChildren().stream()
+                            .filter(s -> {
+                                String cat = categorizeStatus(s.getIssueType(), s.getStatus());
+                                return "DONE".equals(cat);
+                            })
+                            .count();
+                    m.put("doneStories", doneStories);
+                }
+
+                return m;
+            }).toList();
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("epics", epics);
+            result.put("totalEpics", board.getTotal());
+            result.put("showing", epics.size());
+            return toJson(result);
+        } catch (Exception e) {
+            log.error("Failed to get epic progress: {}", e.getMessage());
+            return toJson(Map.of("error", "Failed to fetch epic progress: " + e.getMessage()));
+        }
+    }
+
     private String teamMembers(JsonNode args) {
         Long teamId = getTeamIdParam(args);
         if (teamId == null) {
@@ -609,6 +719,10 @@ public class ChatToolExecutor {
         }
         Set<Long> userTeamIds = authorizationService.getUserTeamIds();
         return userTeamIds.contains(teamId);
+    }
+
+    private static String normalizeRussian(String text) {
+        return text.replace('ё', 'е').replace('Ё', 'Е');
     }
 
     private String toJson(Object obj) {

@@ -64,6 +64,7 @@ public class JiraIssue {
         private List<Object> flagged; // Jira field for Impediment flag
         private List<JiraIssueLink> issuelinks;
         private List<JiraComponent> components;
+        private List<String> labels;
         private Map<String, Object> customFields = new HashMap<>();
 
         @JsonAnySetter
@@ -191,6 +192,14 @@ public class JiraIssue {
 
         public void setComponents(List<JiraComponent> components) {
             this.components = components;
+        }
+
+        public List<String> getLabels() {
+            return labels;
+        }
+
+        public void setLabels(List<String> labels) {
+            this.labels = labels;
         }
 
         public JiraUser getAssignee() {

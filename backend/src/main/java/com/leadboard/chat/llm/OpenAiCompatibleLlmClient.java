@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
@@ -18,7 +19,7 @@ import java.util.List;
 
 /**
  * Universal LLM client for any OpenAI-compatible API.
- * Works with: OpenRouter, Groq, OpenAI, Together, etc.
+ * Works with: OpenRouter, OpenAI, Together, etc.
  */
 @Component
 public class OpenAiCompatibleLlmClient implements LlmClient {
@@ -58,16 +59,25 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
             requestBody.set("tools", toolsArray);
         }
 
-        String responseBody = webClient.post()
-                .uri("/chat/completions")
-                .headers(h -> addAuthHeaders(h))
-                .bodyValue(requestBody.toString())
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(Duration.ofSeconds(chatProperties.getTimeoutSeconds()))
-                .block();
+        try {
+            String responseBody = webClient.post()
+                    .uri("/chat/completions")
+                    .headers(h -> addAuthHeaders(h))
+                    .bodyValue(requestBody.toString())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(chatProperties.getTimeoutSeconds()))
+                    .block();
 
-        return parseResponse(responseBody);
+            return parseResponse(responseBody);
+        } catch (WebClientResponseException e) {
+            String msg = toUserFriendlyError(e.getStatusCode().value(), e.getResponseBodyAsString());
+            log.warn("LLM API error {}: {}", e.getStatusCode(), e.getMessage());
+            return new LlmResponse(msg, null, "error");
+        } catch (Exception e) {
+            log.error("LLM call failed: {}", e.getMessage());
+            return new LlmResponse("Не удалось получить ответ от AI. Попробуйте позже.", null, "error");
+        }
     }
 
     @Override
@@ -81,6 +91,15 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
                 .retrieve()
                 .bodyToFlux(String.class)
                 .timeout(Duration.ofSeconds(chatProperties.getTimeoutSeconds()))
+                .onErrorResume(WebClientResponseException.class, e -> {
+                    String msg = toUserFriendlyError(e.getStatusCode().value(), e.getResponseBodyAsString());
+                    log.warn("LLM stream API error {}: {}", e.getStatusCode(), e.getMessage());
+                    return Flux.just(msg);
+                })
+                .onErrorResume(Exception.class, e -> {
+                    log.error("LLM stream failed: {}", e.getMessage());
+                    return Flux.just("Не удалось получить ответ от AI. Попробуйте позже.");
+                })
                 .filter(line -> !line.isBlank() && !line.equals("[DONE]"))
                 .map(line -> {
                     String data = line;
@@ -161,6 +180,16 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         body.set("messages", messagesArray);
 
         return body;
+    }
+
+    private String toUserFriendlyError(int status, String body) {
+        return switch (status) {
+            case 429 -> "Превышен лимит запросов к AI. Подождите минуту и попробуйте снова.";
+            case 401, 403 -> "Ошибка авторизации AI-сервиса. Обратитесь к администратору.";
+            case 500, 502, 503 -> "AI-сервис временно недоступен. Попробуйте позже.";
+            case 400 -> "Ошибка запроса к AI-сервису. Попробуйте переформулировать вопрос.";
+            default -> "Ошибка AI-сервиса (код " + status + "). Попробуйте позже.";
+        };
     }
 
     private LlmResponse parseResponse(String responseBody) {

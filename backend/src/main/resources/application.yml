@@ -102,11 +102,14 @@ chat:
   enabled: ${CHAT_ENABLED:false}
   provider: ${CHAT_PROVIDER:openrouter}
   api-key: ${CHAT_API_KEY:}
-  model: ${CHAT_MODEL:google/gemini-2.5-flash}
+  model: ${CHAT_MODEL:meta-llama/llama-3.3-70b-instruct:free}
   base-url: ${CHAT_BASE_URL:https://openrouter.ai/api/v1}
   max-history-messages: ${CHAT_MAX_HISTORY:20}
   timeout-seconds: ${CHAT_TIMEOUT:30}
   max-tool-calls: ${CHAT_MAX_TOOL_CALLS:5}
+  embedding-enabled: ${CHAT_EMBEDDING_ENABLED:false}
+  embedding-model: ${CHAT_EMBEDDING_MODEL:openai/text-embedding-3-small}
+  embedding-base-url: ${CHAT_EMBEDDING_BASE_URL:}
 
 simulation:
   enabled: ${SIMULATION_ENABLED:false}

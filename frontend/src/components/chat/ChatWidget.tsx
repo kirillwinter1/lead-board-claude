@@ -34,6 +34,61 @@ function getPageName(pathname: string): string {
   return pathname
 }
 
+function renderMarkdown(text: string) {
+  const lines = text.split('\n')
+  const elements: React.ReactNode[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i]
+
+    // List items: "- " or "* " or "1. " or "  - " (nested)
+    const listMatch = line.match(/^(\s*)(?:[*-]|\d+\.)\s+(.*)/)
+    const isListItem = !!listMatch
+
+    if (isListItem) {
+      const indent = listMatch![1].length
+      line = listMatch![2]
+      // Inline formatting: **bold** and *italic*
+      const formatted = formatInline(line)
+      elements.push(
+        <div key={i} style={{ paddingLeft: 8 + indent * 8, display: 'flex', gap: 4 }}>
+          <span>•</span>
+          <span>{formatted}</span>
+        </div>
+      )
+    } else if (line.trim() === '') {
+      elements.push(<div key={i} style={{ height: 4 }} />)
+    } else {
+      elements.push(<div key={i}>{formatInline(line)}</div>)
+    }
+  }
+
+  return <>{elements}</>
+}
+
+function formatInline(text: string): React.ReactNode {
+  // Split by **bold** patterns
+  const parts: React.ReactNode[] = []
+  let remaining = text
+  let key = 0
+
+  while (remaining.length > 0) {
+    // Match **bold** first (greedy)
+    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*(.*)/)
+    if (boldMatch) {
+      if (boldMatch[1]) parts.push(boldMatch[1])
+      parts.push(<strong key={key++}>{boldMatch[2]}</strong>)
+      remaining = boldMatch[3]
+      continue
+    }
+    // No more patterns
+    parts.push(remaining)
+    break
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>
+}
+
 export function ChatWidget() {
   const location = useLocation()
   const [isOpen, setIsOpen] = useState(false)
@@ -188,7 +243,7 @@ export function ChatWidget() {
 
         {messages.map((msg, i) => (
           <div key={i} className={`chat-message chat-message-${msg.role}`}>
-            {msg.content}
+            {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
           </div>
         ))}
 

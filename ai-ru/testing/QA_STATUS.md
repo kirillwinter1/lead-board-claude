@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-03-01
+**Последнее обновление:** 2026-03-02
 
 ---
 
@@ -35,8 +35,11 @@
 
 | 22 | **Early Exit Optimization** | Perf | ✅ Проверен | 1 High, 2 Medium | [reports/2026-03-01_EARLY_EXIT_OPTIMIZATION.md](reports/2026-03-01_EARLY_EXIT_OPTIMIZATION.md) |
 | 23 | **Board Perf Optimization** | Perf | ✅ Проверен | 1 High, 2 Medium, 2 Low | [reports/2026-03-01_BOARD_OPTIMIZATION.md](reports/2026-03-01_BOARD_OPTIMIZATION.md) |
+| 24 | **AI Chat Model + Tools** | F52, F53 | ✅ Проверен + Исправлен | 5/5 fixed | [reports/2026-03-02_CHAT_MODEL_TOOLS.md](reports/2026-03-02_CHAT_MODEL_TOOLS.md) |
+| 25 | **Semantic Search (pgvector)** | F54 | ✅ Проверен | 1 High, 2 Medium, 1 Low | [reports/2026-03-02_F54_SEMANTIC_SEARCH.md](reports/2026-03-02_F54_SEMANTIC_SEARCH.md) |
+| 26 | **Quarterly Planning** | F55 | ✅ Проверен + Исправлен | 9/9 fixed | [reports/2026-03-02_F55_QUARTERLY_PLANNING.md](reports/2026-03-02_F55_QUARTERLY_PLANNING.md) |
 
-**Прогресс: 23 / 23 модулей проверено (100%)**
+**Прогресс: 26 / 26 модулей проверено (100%)**
 
 ---
 
@@ -44,11 +47,11 @@
 
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
-| Critical | 2 | 8 | 10 |
-| High | 17 | 19 | 36 |
-| Medium | 36 | 31 | 67 |
-| Low | 24 | 13 | 37 |
-| **Итого** | **79** | **71** | **150** |
+| Critical | 2 | 9 | 11 |
+| High | 18 | 23 | 41 |
+| Medium | 38 | 36 | 74 |
+| Low | 25 | 18 | 43 |
+| **Итого** | **83** | **86** | **169** |
 
 ---
 
@@ -300,6 +303,27 @@
 | BUG-106 | Low | OAuth tokens stored in plaintext — DB compromise leaks all Jira tokens | OPEN |
 | BUG-107 | Low | Sessions not bound to client fingerprint — stolen cookie works from any location | OPEN |
 
+### Quarterly Planning (F55) — 2026-03-02
+
+**API endpoints (6):** 0 PASS — все 500 из-за native query multi-tenant бага
+**Backend tests:** 15/15 PASS (7 QuarterRange + 8 QuarterlyPlanningService)
+**Frontend tests:** 0 (нет тестов), TypeScript компилируется ✅
+**Visual:** Не тестировалось (API не работает)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-140 | Critical | Native SQL queries (findDistinctQuarterLabels и др.) работают в public schema → 500 | ✅ FIXED (заменены на JPQL + Java parsing) |
+| BUG-141 | High | GET endpoints не защищены @PreAuthorize | ✅ FIXED (@PreAuthorize("isAuthenticated()") на класс) |
+| BUG-142 | High | findEpicsByTeamAndLabel() и findProjectsByLabel() — dead code | ✅ FIXED (удалены) |
+| BUG-143 | High | ProjectView BoostControl hardcoded currentBoost={0} | ✅ FIXED (manualBoost в ProjectViewDto) |
+| BUG-144 | Medium | Нет loading-индикатора при смене квартала/команды | ✅ FIXED (dataLoading state) |
+| BUG-145 | Medium | Race condition — нет AbortController | ✅ FIXED (AbortController + signal check) |
+| BUG-146 | Medium | Epic link href="#" — мёртвая ссылка | ✅ FIXED (span вместо anchor) |
+| BUG-147 | Low | getTeamDemand загружает ВСЕ проекты без фильтрации | ✅ FIXED (accepted: данных немного, JPA derived query работает с tenant) |
+| BUG-148 | Low | Нет empty state при отсутствии кварталов | ✅ FIXED (подсказка "Add labels in Jira") |
+
+---
+
 ### Board Endpoint Optimization — 2026-03-01
 
 **Scope:** N+1 fix, O(n^2) fix, TTL cache, DQ decoupling, HikariCP tuning
@@ -357,7 +381,8 @@ ai-ru/testing/
     ├── 2026-02-25_AUTH_RBAC.md        ← QA-отчёт: Auth / RBAC
     ├── 2026-02-25_MULTITENANCY_E2E.md ← QA-отчёт: Multi-Tenancy E2E Customer Journey
     ├── 2026-02-25_MEMBER_PROFILE.md   ← QA-отчёт: Member Profile (F30)
-    └── 2026-03-01_BOARD_OPTIMIZATION.md ← QA-отчёт: Board Endpoint Optimization
+    ├── 2026-03-01_BOARD_OPTIMIZATION.md ← QA-отчёт: Board Endpoint Optimization
+    └── 2026-03-02_F55_QUARTERLY_PLANNING.md ← QA-отчёт: F55 Quarterly Planning
 ```
 
 ## Процесс

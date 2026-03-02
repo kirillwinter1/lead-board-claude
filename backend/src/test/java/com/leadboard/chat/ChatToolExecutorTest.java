@@ -2,6 +2,10 @@ package com.leadboard.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadboard.auth.AuthorizationService;
+import com.leadboard.board.BoardNode;
+import com.leadboard.board.BoardResponse;
+import com.leadboard.board.BoardService;
+import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.chat.tools.ChatToolExecutor;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.BugMetricsResponse;
@@ -31,6 +35,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -53,6 +58,8 @@ class ChatToolExecutorTest {
     @Mock private RiceAssessmentService riceAssessmentService;
     @Mock private AbsenceService absenceService;
     @Mock private BugSlaService bugSlaService;
+    @Mock private EmbeddingService embeddingService;
+    @Mock private BoardService boardService;
 
     private ChatToolExecutor executor;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -62,9 +69,9 @@ class ChatToolExecutorTest {
         executor = new ChatToolExecutor(
                 issueRepository, teamRepository, teamMemberRepository,
                 teamMetricsService, workflowConfigService,
-                authorizationService, bugMetricsService, projectService,
+                authorizationService, boardService, bugMetricsService, projectService,
                 riceAssessmentService, absenceService, bugSlaService,
-                objectMapper
+                embeddingService, objectMapper
         );
         when(authorizationService.isAdmin()).thenReturn(true);
     }
@@ -285,6 +292,39 @@ class ChatToolExecutorTest {
         assertTrue(result.contains("Bob"));
         assertTrue(result.contains("SENIOR"));
         assertTrue(result.contains("\"totalMembers\":1"));
+    }
+
+    @Test
+    @DisplayName("epic_progress returns board data with progress and role breakdown")
+    void epicProgressReturnsData() {
+        BoardNode epic = new BoardNode("LB-202", "Автоматизация отчётности", "DEVELOPING", "Epic", null);
+        epic.setProgress(52);
+        epic.setTeamName("Команда победителей");
+        epic.setEstimateSeconds(403200L); // 14 days
+        epic.setLoggedSeconds(213120L);   // 7.4 days
+        epic.setRoleProgress(Map.of(
+                "SA", new BoardNode.RoleMetrics(28800, 28800),
+                "DEV", new BoardNode.RoleMetrics(201600, 100800)
+        ));
+        BoardNode story = new BoardNode("LB-210", "Story 1", "Done", "Story", null);
+        epic.addChild(story);
+
+        BoardResponse response = new BoardResponse();
+        response.setItems(List.of(epic));
+        response.setTotal(1);
+
+        when(boardService.getBoard(eq("автоматизация"), isNull(), isNull(), eq(0), eq(20), eq(false)))
+                .thenReturn(response);
+        when(workflowConfigService.categorize("Done", "Story")).thenReturn(StatusCategory.DONE);
+
+        String result = executor.executeTool("epic_progress", "{\"query\":\"автоматизация\"}");
+
+        assertTrue(result.contains("LB-202"));
+        assertTrue(result.contains("\"progress\":52"));
+        assertTrue(result.contains("\"storyCount\":1"));
+        assertTrue(result.contains("\"doneStories\":1"));
+        assertTrue(result.contains("\"SA\""));
+        assertTrue(result.contains("\"DEV\""));
     }
 
     private JiraIssueEntity makeIssue(String key, String type, String boardCategory, String status) {

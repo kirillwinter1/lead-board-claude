@@ -4,12 +4,16 @@ import com.leadboard.auth.AppRole;
 import com.leadboard.auth.LeadBoardAuthentication;
 import com.leadboard.auth.UserEntity;
 import com.leadboard.auth.UserRepository;
+import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantUserEntity;
+import com.leadboard.tenant.TenantUserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -30,35 +34,48 @@ public class AdminController {
     private static final Logger log = LoggerFactory.getLogger(AdminController.class);
 
     private final UserRepository userRepository;
+    private final TenantUserRepository tenantUserRepository;
     private final JiraIssueRepository jiraIssueRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final WorkflowConfigService workflowConfigService;
     private final JiraClient jiraClient;
+    private final EmbeddingService embeddingService;
 
     public AdminController(UserRepository userRepository,
+                           TenantUserRepository tenantUserRepository,
                            JiraIssueRepository jiraIssueRepository,
                            TeamMemberRepository teamMemberRepository,
                            WorkflowConfigService workflowConfigService,
-                           JiraClient jiraClient) {
+                           JiraClient jiraClient,
+                           EmbeddingService embeddingService) {
         this.userRepository = userRepository;
+        this.tenantUserRepository = tenantUserRepository;
         this.jiraIssueRepository = jiraIssueRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.workflowConfigService = workflowConfigService;
         this.jiraClient = jiraClient;
+        this.embeddingService = embeddingService;
     }
 
     /**
-     * Get all users with their roles.
+     * Get all users with their per-tenant roles.
      */
     @GetMapping("/users")
     public List<UserDto> getAllUsers() {
+        Long tenantId = TenantContext.getCurrentTenantId();
+        if (tenantId != null) {
+            return tenantUserRepository.findByTenantId(tenantId).stream()
+                    .map(this::toTenantUserDto)
+                    .toList();
+        }
+        // Fallback for non-tenant mode (localhost dev)
         return userRepository.findAll().stream()
                 .map(this::toDto)
                 .toList();
     }
 
     /**
-     * Update user role.
+     * Update user role (per-tenant if tenant context is present).
      */
     @PatchMapping("/users/{id}/role")
     public ResponseEntity<UserDto> updateUserRole(
@@ -73,6 +90,23 @@ public class AdminController {
             }
         }
 
+        Long tenantId = TenantContext.getCurrentTenantId();
+        if (tenantId != null) {
+            // Multi-tenant: update role in tenant_users
+            TenantUserEntity tenantUser = tenantUserRepository.findByTenantIdAndUserId(tenantId, id)
+                    .orElseThrow(() -> new UserNotFoundException("User not found in this tenant: " + id));
+
+            try {
+                AppRole newRole = AppRole.valueOf(request.role());
+                tenantUser.setAppRole(newRole);
+                tenantUserRepository.save(tenantUser);
+                return ResponseEntity.ok(toTenantUserDto(tenantUser));
+            } catch (IllegalArgumentException e) {
+                throw new InvalidRoleException("Invalid role: " + request.role());
+            }
+        }
+
+        // Fallback for non-tenant mode (localhost dev)
         UserEntity user = userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found: " + id));
 
@@ -84,6 +118,18 @@ public class AdminController {
         } catch (IllegalArgumentException e) {
             throw new InvalidRoleException("Invalid role: " + request.role());
         }
+    }
+
+    private UserDto toTenantUserDto(TenantUserEntity tenantUser) {
+        UserEntity user = tenantUser.getUser();
+        return new UserDto(
+                user.getId(),
+                user.getAtlassianAccountId(),
+                user.getDisplayName(),
+                user.getEmail(),
+                user.getAvatarUrl(),
+                tenantUser.getAppRole().name()
+        );
     }
 
     private UserDto toDto(UserEntity user) {
@@ -167,6 +213,12 @@ public class AdminController {
             result.put("errors", errors);
         }
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/embedding/reindex")
+    public ResponseEntity<Map<String, Object>> reindexEmbeddings() {
+        int count = embeddingService.reindexAll();
+        return ResponseEntity.ok(Map.of("reindexed", count));
     }
 
     @ResponseStatus(org.springframework.http.HttpStatus.NOT_FOUND)

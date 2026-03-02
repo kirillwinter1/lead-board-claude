@@ -11,6 +11,7 @@ import com.leadboard.jira.JiraIssue;
 import com.leadboard.jira.JiraSearchResponse;
 import com.leadboard.metrics.service.FlagChangelogService;
 import com.leadboard.metrics.service.StatusChangelogService;
+import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.planning.AutoScoreService;
 import com.leadboard.planning.IssueOrderService;
 import com.leadboard.planning.StoryAutoScoreService;
@@ -69,6 +70,7 @@ public class SyncService {
     private final com.leadboard.planning.UnifiedPlanningService unifiedPlanningService;
     private final BoardService boardService;
     private final SyncService self;
+    private final EmbeddingService embeddingService;
 
     public SyncService(JiraClient jiraClient,
                        JiraConfigResolver jiraConfigResolver,
@@ -88,7 +90,8 @@ public class SyncService {
                        ObservabilityMetrics observabilityMetrics,
                        com.leadboard.planning.UnifiedPlanningService unifiedPlanningService,
                        BoardService boardService,
-                       @Lazy SyncService self) {
+                       @Lazy SyncService self,
+                       EmbeddingService embeddingService) {
         this.jiraClient = jiraClient;
         this.jiraConfigResolver = jiraConfigResolver;
         this.issueRepository = issueRepository;
@@ -108,6 +111,7 @@ public class SyncService {
         this.unifiedPlanningService = unifiedPlanningService;
         this.boardService = boardService;
         this.self = self;
+        this.embeddingService = embeddingService;
     }
 
     /**
@@ -433,6 +437,7 @@ public class SyncService {
         BigDecimal savedAutoScore = entity.getAutoScore();
         OffsetDateTime savedAutoScoreCalculatedAt = entity.getAutoScoreCalculatedAt();
         OffsetDateTime savedDoneAt = entity.getDoneAt();
+        Integer savedManualBoost = entity.getManualBoost();
 
         entity.setIssueKey(jiraIssue.getKey());
         entity.setIssueId(jiraIssue.getId());
@@ -501,6 +506,14 @@ public class SyncService {
                     .toArray(String[]::new));
         } else {
             entity.setComponents(null);
+        }
+
+        // Extract labels
+        List<String> jiraLabels = jiraIssue.getFields().getLabels();
+        if (jiraLabels != null && !jiraLabels.isEmpty()) {
+            entity.setLabels(jiraLabels.toArray(new String[0]));
+        } else {
+            entity.setLabels(null);
         }
 
         // Detect "In Progress" using WorkflowConfigService
@@ -578,10 +591,13 @@ public class SyncService {
         entity.setAutoScore(savedAutoScore);
         entity.setAutoScoreCalculatedAt(savedAutoScoreCalculatedAt);
         entity.setDoneAt(savedDoneAt);
+        entity.setManualBoost(savedManualBoost);
 
         statusChangelogService.updateDoneAtIfNeeded(entity);
 
         issueRepository.save(entity);
+
+        embeddingService.generateAndStoreAsync(entity);
 
         issueOrderService.assignOrderIfMissing(entity);
 

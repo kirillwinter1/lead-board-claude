@@ -52,6 +52,9 @@
 | F50 | Performance Testing Suite (k6) | 2026-03-01 | [features/F50](features/F50_PERFORMANCE_TESTING.md) |
 | F51 | Early Exit Planning Optimization | 2026-03-01 | [features/F51](features/F51_EARLY_EXIT_OPTIMIZATION.md) |
 | F52 | AI Chat Assistant | 2026-03-01 | [features/F52](features/F52_AI_CHAT_ASSISTANT.md) |
+| F53 | AI Chat Bot Tools Expansion | 2026-03-02 | [features/F53](features/F53_CHAT_TOOLS_EXPANSION.md) |
+| F54 | Semantic Search (pgvector) | 2026-03-02 | [features/F54](features/F54_SEMANTIC_SEARCH.md) |
+| F55 | Quarterly Capacity Planning | 2026-03-02 | [features/F55](features/F55_QUARTERLY_CAPACITY_PLANNING.md) |
 
 ## Бэклог (BF)
 
@@ -75,7 +78,7 @@
 | BF21 | Smart Hints & Onboarding | 📋 Planned | [LAUNCH_PLAN.md#L14](LAUNCH_PLAN.md#l14-подсказки--документация-для-пользователей) |
 | BF22 | UI Redesign (Sidebar Navigation) | 💡 Idea | — |
 | BF23 | Sprint Retrospective (Easy Retro) | 📋 Planned | [backlog/BF23](backlog/BF23_SPRINT_RETROSPECTIVE.md) |
-| BF24 | Quarterly Planning / OKR | 💡 Idea | — |
+| BF24 | Quarterly Planning / OKR | ✅ Done → [F55](features/F55_QUARTERLY_CAPACITY_PLANNING.md) | — |
 | BF25 | Quality Metrics & Bug Management | 💡 Idea | — |
 | BF26 | Team Lead Recommendations | 💡 Idea | — |
 

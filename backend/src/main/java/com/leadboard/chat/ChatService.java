@@ -206,6 +206,7 @@ public class ChatService {
                 case String p when p.contains("team-members") || p.contains("members") -> "\nПредпочитай tools team_members и member_absences для этой страницы.";
                 case String p when p.contains("data-quality") -> "\nПредпочитай tool data_quality_summary для этой страницы.";
                 case String p when p.contains("metrics") -> "\nПредпочитай tool team_metrics для этой страницы.";
+                case String p when p.contains("board") -> "\nПредпочитай tool epic_progress для этой страницы — он возвращает те же данные что видит пользователь.";
                 default -> "";
             };
             pageContext = """
@@ -239,6 +240,7 @@ public class ChatService {
                 13. Для SLA настроек багов — используй tool bug_sla_settings.
                 14. Для деталей конкретной задачи по ключу (PROJ-123) — используй tool task_details.
                 15. Для списка участников команды, состава команды — используй tool team_members.
+                16. Для прогресса эпика, оценок, role-based progress, сколько сделано — используй tool epic_progress. Если спрашивают про конкретный эпик — передай query с названием или ключом.
 
                 БАЗА ЗНАНИЙ:
                 %s

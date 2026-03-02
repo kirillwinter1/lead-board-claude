@@ -10,6 +10,7 @@ import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Entity
 @Table(name = "jira_issues")
@@ -131,6 +132,13 @@ public class JiraIssueEntity {
     @Column(name = "child_epic_keys", columnDefinition = "TEXT[]")
     @JdbcTypeCode(SqlTypes.ARRAY)
     private String[] childEpicKeys;
+
+    @Column(name = "labels", columnDefinition = "TEXT[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] labels;
+
+    @Column(name = "manual_boost")
+    private Integer manualBoost = 0;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
@@ -285,6 +293,29 @@ public class JiraIssueEntity {
 
     public String[] getChildEpicKeys() { return childEpicKeys; }
     public void setChildEpicKeys(String[] childEpicKeys) { this.childEpicKeys = childEpicKeys; }
+
+    public String[] getLabels() { return labels; }
+    public void setLabels(String[] labels) { this.labels = labels; }
+
+    public Integer getManualBoost() { return manualBoost; }
+    public void setManualBoost(Integer manualBoost) { this.manualBoost = manualBoost; }
+
+    // ==================== Quarter Label Helper ====================
+
+    private static final Pattern QUARTER_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
+
+    /**
+     * Finds the first label matching the quarter pattern (e.g., "2026Q2").
+     */
+    public String getQuarterLabel() {
+        if (labels == null) return null;
+        for (String label : labels) {
+            if (label != null && QUARTER_PATTERN.matcher(label).matches()) {
+                return label;
+            }
+        }
+        return null;
+    }
 
     // ==================== Derived/Computed Methods ====================
 

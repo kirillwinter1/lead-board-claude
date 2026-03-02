@@ -16,6 +16,7 @@ import { MemberProfilePage } from './pages/MemberProfilePage'
 import { TeamCompetencyPage } from './pages/TeamCompetencyPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { ProjectTimelinePage } from './pages/ProjectTimelinePage'
+import { QuarterlyPlanningPage } from './pages/QuarterlyPlanningPage'
 import { LandingPage } from './pages/landing/LandingPage'
 import RegistrationPage from './pages/RegistrationPage'
 import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
@@ -45,6 +46,7 @@ function App() {
           <Route path="poker/room/:roomCode" element={<PokerRoomPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="project-timeline" element={<ProjectTimelinePage />} />
+          <Route path="quarterly-planning" element={<QuarterlyPlanningPage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />
           <Route path="teams/:teamId/member/:memberId" element={<MemberProfilePage />} />

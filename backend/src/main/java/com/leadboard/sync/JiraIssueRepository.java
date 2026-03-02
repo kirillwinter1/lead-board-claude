@@ -261,6 +261,31 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
            nativeQuery = true)
     List<String> findDistinctComponentsByTeamId(@Param("teamId") Long teamId);
 
+    // ==================== Embedding (pgvector) ====================
+
+    @Modifying
+    @Transactional
+    @Query(value = "UPDATE jira_issues SET embedding = cast(:vec as vector) WHERE id = :id", nativeQuery = true)
+    void updateEmbedding(@Param("id") Long id, @Param("vec") String vectorString);
+
+    @Query(value = "SELECT * FROM jira_issues WHERE embedding IS NOT NULL " +
+           "ORDER BY embedding <=> cast(:vec as vector) LIMIT :lim", nativeQuery = true)
+    List<JiraIssueEntity> findByEmbeddingSimilarity(@Param("vec") String vec, @Param("lim") int lim);
+
+    @Query(value = "SELECT * FROM jira_issues WHERE embedding IS NOT NULL AND team_id = :teamId " +
+           "ORDER BY embedding <=> cast(:vec as vector) LIMIT :lim", nativeQuery = true)
+    List<JiraIssueEntity> findByEmbeddingSimilarityAndTeamId(
+            @Param("vec") String vec, @Param("teamId") Long teamId, @Param("lim") int lim);
+
+    @Query(value = "SELECT * FROM jira_issues WHERE embedding IS NULL AND summary IS NOT NULL", nativeQuery = true)
+    List<JiraIssueEntity> findWithoutEmbedding();
+
+    // ==================== Quarterly Planning ====================
+
+    List<JiraIssueEntity> findByLabelsIsNotNull();
+
+    List<JiraIssueEntity> findByBoardCategoryAndTeamIdOrderByManualOrderAsc(String boardCategory, Long teamId);
+
     // ==================== Simulation: stuck subtasks ====================
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +

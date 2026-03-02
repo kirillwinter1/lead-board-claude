@@ -11,8 +11,8 @@
 
 ### Backend (chat package)
 
-- **ChatProperties** — конфигурация: provider (groq), API key, model, лимиты
-- **LLM абстракция** — `LlmClient` интерфейс + `OpenAiCompatibleLlmClient` (работает с OpenRouter, Groq, OpenAI и др.)
+- **ChatProperties** — конфигурация: provider (openrouter), API key, model, лимиты
+- **LLM абстракция** — `LlmClient` интерфейс + `OpenAiCompatibleLlmClient` (работает с OpenRouter, OpenAI и др.)
   - `chat()` — синхронный вызов с tool calling
   - `streamChat()` — SSE-стриминг финального ответа
 - **ChatToolRegistry** — определения 5 инструментов
@@ -52,9 +52,9 @@
 ```yaml
 chat:
   enabled: ${CHAT_ENABLED:false}
-  provider: ${CHAT_PROVIDER:openrouter}        # openrouter | groq | openai
+  provider: ${CHAT_PROVIDER:openrouter}        # openrouter | openai
   api-key: ${CHAT_API_KEY:}                    # ключ от провайдера
-  model: ${CHAT_MODEL:google/gemini-2.5-flash} # бесплатная модель OpenRouter
+  model: ${CHAT_MODEL:meta-llama/llama-3.3-70b-instruct:free} # бесплатная модель OpenRouter
   base-url: ${CHAT_BASE_URL:https://openrouter.ai/api/v1}
 ```
 
@@ -62,8 +62,7 @@ chat:
 
 | Провайдер | Base URL | Бесплатные модели |
 |-----------|----------|-------------------|
-| OpenRouter | `https://openrouter.ai/api/v1` | Gemini 2.5 Flash, GPT-5 Nano, DeepSeek V3.2, Grok 4.1 Fast |
-| Groq | `https://api.groq.com/openai/v1` | Llama 3.3 70B (ограниченно) |
+| OpenRouter | `https://openrouter.ai/api/v1` | Llama 3.3 70B (:free), Gemma 3 27B (:free), Mistral Small 3.1 (:free) |
 | OpenAI | `https://api.openai.com/v1` | нет |
 
 Все используют OpenAI-совместимый формат API.

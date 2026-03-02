@@ -150,6 +150,18 @@ public class ChatToolRegistry {
                                 ),
                                 "required", List.of("teamId")
                         )
+                ),
+                new LlmToolDefinition(
+                        "epic_progress",
+                        "Get epic progress details from the board: overall progress %, role-based progress (SA/DEV/QA), estimate/logged days, story count, done stories. Use for questions about epic progress, estimates, completion. Supports search by name.",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "teamId", Map.of("type", "integer", "description", "Team ID to filter by"),
+                                        "query", Map.of("type", "string", "description", "Search by epic key or name (e.g. 'автоматизация' or 'LB-202')")
+                                ),
+                                "required", List.of()
+                        )
                 )
         );
     }
