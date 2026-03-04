@@ -107,6 +107,15 @@ F22 → F24
 
 ## Технические исправления (changelog)
 
+### 2026-03-04: Epic Burndown Rework — plan from snapshot, actual from worklogs
+- **План (пунктир):** из forecast snapshot ближайшего к `epic.startedAt` — ступенчатое сгорание по `PlannedStory.endDate`
+- **Факт (сплошная):** из `issue_worklogs` — кумулятивное списание по дням (ранее строилась по датам завершения сторей)
+- **planEstimateDays:** новое поле в API — оценка из снэпшота vs текущая (видно scope change)
+- **Fallback:** если нет снэпшота — линейная кривая (прежнее поведение)
+- **Bugfix:** worklogs до startDate теперь учитываются в начальном кумулятиве
+- `ForecastSnapshotRepository.findClosestOnOrBefore()`, `IssueWorklogRepository.findDailyTimeSpentByIssueKeys()`
+- Frontend: `stepAfter` chart type для плана из снэпшота, условный показ Plan/Current estimate
+
 ### 2026-03-01: Board + Reorder Performance Optimization (Runs 5-7)
 - **SQL-level team filtering:** BoardService two-path loading — при `teamIds` загружает ~400 issues вместо 12K
 - **Board response cache:** 15s TTL `ConcurrentHashMap`, инвалидация при reorder и sync
