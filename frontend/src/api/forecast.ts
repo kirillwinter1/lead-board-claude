@@ -332,6 +332,12 @@ export interface RetroPhase {
   active: boolean
 }
 
+export interface WorklogDay {
+  date: string
+  roleCode: string
+  timeSpentSeconds: number
+}
+
 export interface RetroStory {
   storyKey: string
   summary: string
@@ -341,6 +347,7 @@ export interface RetroStory {
   endDate: string | null
   progressPercent: number | null
   phases: Record<string, RetroPhase>
+  worklogDays: WorklogDay[] | null
 }
 
 export interface RetroEpic {

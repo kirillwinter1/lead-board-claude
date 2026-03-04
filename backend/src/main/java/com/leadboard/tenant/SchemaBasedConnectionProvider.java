@@ -5,6 +5,9 @@ import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomizer;
 import org.springframework.stereotype.Component;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -18,6 +21,7 @@ import java.util.Map;
 @Component
 public class SchemaBasedConnectionProvider implements MultiTenantConnectionProvider<String>, HibernatePropertiesCustomizer {
 
+    private static final Logger log = LoggerFactory.getLogger(SchemaBasedConnectionProvider.class);
     private final DataSource dataSource;
 
     public SchemaBasedConnectionProvider(DataSource dataSource) {
@@ -37,6 +41,7 @@ public class SchemaBasedConnectionProvider implements MultiTenantConnectionProvi
     @Override
     public Connection getConnection(String tenantIdentifier) throws SQLException {
         Connection connection = getAnyConnection();
+        log.debug("getConnection for tenant='{}', threadLocalSchema='{}'", tenantIdentifier, TenantContext.getCurrentSchema());
         setSchema(connection, tenantIdentifier);
         return connection;
     }

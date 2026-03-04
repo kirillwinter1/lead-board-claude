@@ -138,6 +138,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
               AND done_at BETWEEN ?2 AND ?3
               AND done_at IS NOT NULL
               AND assignee_account_id IS NOT NULL
+              AND (started_at IS NULL OR done_at >= started_at)
             GROUP BY assignee_account_id, assignee_display_name
         ),
         prev_period AS (

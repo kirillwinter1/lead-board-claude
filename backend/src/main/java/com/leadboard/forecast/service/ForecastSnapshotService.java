@@ -11,6 +11,9 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -32,6 +35,7 @@ public class ForecastSnapshotService {
 
     private final ForecastSnapshotRepository snapshotRepository;
     private final TeamRepository teamRepository;
+    private final TenantRepository tenantRepository;
     private final ForecastService forecastService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final ObjectMapper objectMapper;
@@ -39,11 +43,13 @@ public class ForecastSnapshotService {
     public ForecastSnapshotService(
             ForecastSnapshotRepository snapshotRepository,
             TeamRepository teamRepository,
+            TenantRepository tenantRepository,
             ForecastService forecastService,
             UnifiedPlanningService unifiedPlanningService
     ) {
         this.snapshotRepository = snapshotRepository;
         this.teamRepository = teamRepository;
+        this.tenantRepository = tenantRepository;
         this.forecastService = forecastService;
         this.unifiedPlanningService = unifiedPlanningService;
 
@@ -144,48 +150,69 @@ public class ForecastSnapshotService {
     }
 
     /**
-     * Scheduled job: creates daily snapshots for all active teams.
+     * Scheduled job: creates daily snapshots for all active teams across all tenants.
      * Runs every day at 3:00 AM.
+     * BUG-149: Must iterate tenants and set TenantContext — tables are in tenant schemas.
      */
     @Scheduled(cron = "0 0 3 * * *")
-    @Transactional
     public void createDailySnapshots() {
         log.info("Starting daily forecast snapshot creation");
+        int totalCreated = 0;
+        int totalFailed = 0;
 
-        List<TeamEntity> activeTeams = teamRepository.findByActiveTrue();
-        int created = 0;
-        int failed = 0;
-
-        for (TeamEntity team : activeTeams) {
+        for (TenantEntity tenant : tenantRepository.findAllActive()) {
             try {
-                createSnapshot(team.getId());
-                created++;
+                TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
+                List<TeamEntity> activeTeams = teamRepository.findByActiveTrue();
+
+                for (TeamEntity team : activeTeams) {
+                    try {
+                        createSnapshot(team.getId());
+                        totalCreated++;
+                    } catch (Exception e) {
+                        log.error("Failed to create forecast snapshot for tenant '{}' team {}: {}",
+                                tenant.getSlug(), team.getId(), e.getMessage());
+                        totalFailed++;
+                    }
+                }
             } catch (Exception e) {
-                log.error("Failed to create forecast snapshot for team {}: {}", team.getId(), e.getMessage());
-                failed++;
+                log.error("Failed to process forecast snapshots for tenant '{}': {}",
+                        tenant.getSlug(), e.getMessage());
+            } finally {
+                TenantContext.clear();
             }
         }
 
-        log.info("Completed daily forecast snapshots: {} created, {} failed for {} teams",
-                created, failed, activeTeams.size());
+        log.info("Completed daily forecast snapshots: {} created, {} failed", totalCreated, totalFailed);
     }
 
     /**
      * Scheduled job: cleans up old snapshots (older than 180 days).
      * Runs every Sunday at 4:00 AM.
+     * BUG-150: Must iterate tenants and set TenantContext.
      */
     @Scheduled(cron = "0 0 4 * * SUN")
-    @Transactional
     public void cleanupOldSnapshots() {
         LocalDate cutoff = LocalDate.now().minusDays(180);
         log.info("Cleaning up forecast snapshots older than {}", cutoff);
 
-        List<TeamEntity> teams = teamRepository.findAll();
-        for (TeamEntity team : teams) {
+        for (TenantEntity tenant : tenantRepository.findAllActive()) {
             try {
-                snapshotRepository.deleteOldSnapshots(team.getId(), cutoff);
+                TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
+                List<TeamEntity> teams = teamRepository.findAll();
+                for (TeamEntity team : teams) {
+                    try {
+                        snapshotRepository.deleteOldSnapshots(team.getId(), cutoff);
+                    } catch (Exception e) {
+                        log.error("Failed to cleanup snapshots for tenant '{}' team {}: {}",
+                                tenant.getSlug(), team.getId(), e.getMessage());
+                    }
+                }
             } catch (Exception e) {
-                log.error("Failed to cleanup snapshots for team {}: {}", team.getId(), e.getMessage());
+                log.error("Failed to cleanup forecast snapshots for tenant '{}': {}",
+                        tenant.getSlug(), e.getMessage());
+            } finally {
+                TenantContext.clear();
             }
         }
     }

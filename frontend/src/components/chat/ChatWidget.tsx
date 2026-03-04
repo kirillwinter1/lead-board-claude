@@ -37,43 +37,121 @@ function getPageName(pathname: string): string {
 function renderMarkdown(text: string) {
   const lines = text.split('\n')
   const elements: React.ReactNode[] = []
+  let i = 0
 
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i]
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Code block: ```
+    if (line.trim().startsWith('```')) {
+      const codeLines: string[] = []
+      i++ // skip opening ```
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i])
+        i++
+      }
+      i++ // skip closing ```
+      elements.push(
+        <pre key={`code-${i}`} style={{
+          background: '#1e2a3a',
+          color: '#e6e8eb',
+          padding: '8px 10px',
+          borderRadius: 6,
+          fontSize: 11,
+          lineHeight: 1.5,
+          overflowX: 'auto',
+          margin: '4px 0',
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word'
+        }}>
+          {codeLines.join('\n')}
+        </pre>
+      )
+      continue
+    }
+
+    // Heading: # ## ###
+    const headingMatch = line.match(/^(#{1,3})\s+(.*)/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      const size = level === 1 ? 15 : level === 2 ? 14 : 13
+      elements.push(
+        <div key={i} style={{ fontWeight: 700, fontSize: size, marginTop: 6, marginBottom: 2 }}>
+          {formatInline(headingMatch[2])}
+        </div>
+      )
+      i++
+      continue
+    }
 
     // List items: "- " or "* " or "1. " or "  - " (nested)
     const listMatch = line.match(/^(\s*)(?:[*-]|\d+\.)\s+(.*)/)
-    const isListItem = !!listMatch
-
-    if (isListItem) {
-      const indent = listMatch![1].length
-      line = listMatch![2]
-      // Inline formatting: **bold** and *italic*
-      const formatted = formatInline(line)
+    if (listMatch) {
+      const indent = listMatch[1].length
       elements.push(
         <div key={i} style={{ paddingLeft: 8 + indent * 8, display: 'flex', gap: 4 }}>
           <span>•</span>
-          <span>{formatted}</span>
+          <span>{formatInline(listMatch[2])}</span>
         </div>
       )
-    } else if (line.trim() === '') {
-      elements.push(<div key={i} style={{ height: 4 }} />)
-    } else {
-      elements.push(<div key={i}>{formatInline(line)}</div>)
+      i++
+      continue
     }
+
+    // Empty line
+    if (line.trim() === '') {
+      elements.push(<div key={i} style={{ height: 4 }} />)
+      i++
+      continue
+    }
+
+    // Regular text
+    elements.push(<div key={i}>{formatInline(line)}</div>)
+    i++
   }
 
   return <>{elements}</>
 }
 
 function formatInline(text: string): React.ReactNode {
-  // Split by **bold** patterns
   const parts: React.ReactNode[] = []
   let remaining = text
   let key = 0
 
   while (remaining.length > 0) {
-    // Match **bold** first (greedy)
+    // Inline code: `code`
+    const codeMatch = remaining.match(/^(.*?)`([^`]+)`(.*)/)
+    if (codeMatch) {
+      if (codeMatch[1]) parts.push(formatBoldItalic(codeMatch[1], key++))
+      parts.push(
+        <code key={`c${key++}`} style={{
+          background: '#f0f1f3',
+          padding: '1px 4px',
+          borderRadius: 3,
+          fontSize: '0.9em',
+          color: '#d63384'
+        }}>
+          {codeMatch[2]}
+        </code>
+      )
+      remaining = codeMatch[3]
+      continue
+    }
+    // No inline code left — handle bold/italic
+    parts.push(formatBoldItalic(remaining, key++))
+    break
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>
+}
+
+function formatBoldItalic(text: string, baseKey: number): React.ReactNode {
+  const parts: React.ReactNode[] = []
+  let remaining = text
+  let key = baseKey * 100
+
+  while (remaining.length > 0) {
+    // **bold**
     const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*(.*)/)
     if (boldMatch) {
       if (boldMatch[1]) parts.push(boldMatch[1])
@@ -81,7 +159,6 @@ function formatInline(text: string): React.ReactNode {
       remaining = boldMatch[3]
       continue
     }
-    // No more patterns
     parts.push(remaining)
     break
   }

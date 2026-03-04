@@ -55,6 +55,9 @@
 | F53 | AI Chat Bot Tools Expansion | 2026-03-02 | [features/F53](features/F53_CHAT_TOOLS_EXPANSION.md) |
 | F54 | Semantic Search (pgvector) | 2026-03-02 | [features/F54](features/F54_SEMANTIC_SEARCH.md) |
 | F55 | Quarterly Capacity Planning | 2026-03-02 | [features/F55](features/F55_QUARTERLY_CAPACITY_PLANNING.md) |
+| F56 | Metrics Hardening | 2026-03-03 | [features/F56](features/F56_METRICS_HARDENING.md) |
+| F57 | Jira Worklog Sync + Per-Day Timeline | 2026-03-04 | [features/F57](features/F57_WORKLOG_SYNC_TIMELINE.md) |
+| F58 | Семантический поиск на Board | 2026-03-04 | [features/F58](features/F58_BOARD_SEMANTIC_SEARCH.md) |
 
 ## Бэклог (BF)
 

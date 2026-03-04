@@ -1,6 +1,8 @@
 package com.leadboard.config;
 
 import com.leadboard.sync.JiraIssueRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
 import com.leadboard.tenant.TenantRepository;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -10,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
@@ -69,14 +72,23 @@ public class ObservabilityMetrics {
     @Scheduled(fixedDelay = 60_000)
     public void refreshGauges() {
         try {
-            issuesTotal.set(issueRepository.count());
+            List<TenantEntity> tenants = tenantRepository.findAllActive();
+            tenantsActive.set(tenants.size());
+
+            long totalIssues = 0;
+            for (TenantEntity tenant : tenants) {
+                try {
+                    TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
+                    totalIssues += issueRepository.count();
+                } catch (Exception e) {
+                    log.debug("Could not count issues for tenant '{}': {}", tenant.getSlug(), e.getMessage());
+                } finally {
+                    TenantContext.clear();
+                }
+            }
+            issuesTotal.set(totalIssues);
         } catch (Exception e) {
-            log.debug("Could not refresh issues gauge: {}", e.getMessage());
-        }
-        try {
-            tenantsActive.set(tenantRepository.findAllActive().size());
-        } catch (Exception e) {
-            log.debug("Could not refresh tenants gauge: {}", e.getMessage());
+            log.debug("Could not refresh gauges: {}", e.getMessage());
         }
     }
 }

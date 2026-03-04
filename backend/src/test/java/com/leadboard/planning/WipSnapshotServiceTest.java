@@ -5,6 +5,10 @@ import com.leadboard.planning.dto.ForecastResponse.RoleWipStatus;
 import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -40,13 +44,29 @@ class WipSnapshotServiceTest {
     private TeamRepository teamRepository;
 
     @Mock
+    private TenantRepository tenantRepository;
+
+    @Mock
     private ForecastService forecastService;
 
     private WipSnapshotService wipSnapshotService;
 
     @BeforeEach
     void setUp() {
-        wipSnapshotService = new WipSnapshotService(snapshotRepository, teamRepository, forecastService);
+        wipSnapshotService = new WipSnapshotService(snapshotRepository, teamRepository, tenantRepository, forecastService);
+    }
+
+    @AfterEach
+    void cleanup() {
+        TenantContext.clear();
+    }
+
+    private TenantEntity createTestTenant() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        tenant.setSlug("test");
+        tenant.setSchemaName("tenant_test");
+        return tenant;
     }
 
     // ==================== createSnapshot() Tests ====================
@@ -202,8 +222,10 @@ class WipSnapshotServiceTest {
     class CreateDailySnapshotsTests {
 
         @Test
-        @DisplayName("should create snapshots for all active teams")
+        @DisplayName("should create snapshots for all active teams across tenants")
         void shouldCreateSnapshotsForAllTeams() {
+            when(tenantRepository.findAllActive()).thenReturn(List.of(createTestTenant()));
+
             TeamEntity team1 = new TeamEntity();
             team1.setId(1L);
             team1.setActive(true);
@@ -229,6 +251,8 @@ class WipSnapshotServiceTest {
         @Test
         @DisplayName("should continue on error for one team")
         void shouldContinueOnError() {
+            when(tenantRepository.findAllActive()).thenReturn(List.of(createTestTenant()));
+
             TeamEntity team1 = new TeamEntity();
             team1.setId(1L);
 
@@ -259,8 +283,10 @@ class WipSnapshotServiceTest {
     class CleanupOldSnapshotsTests {
 
         @Test
-        @DisplayName("should delete snapshots older than 90 days")
+        @DisplayName("should delete snapshots older than 90 days for each tenant")
         void shouldDeleteOldSnapshots() {
+            when(tenantRepository.findAllActive()).thenReturn(List.of(createTestTenant()));
+
             wipSnapshotService.cleanupOldSnapshots();
 
             ArgumentCaptor<LocalDate> captor = ArgumentCaptor.forClass(LocalDate.class);

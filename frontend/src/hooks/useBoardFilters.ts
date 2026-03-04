@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { BoardNode } from '../components/board/types'
+import { searchBoard, type BoardSearchResult } from '../api/board'
 
 export function useBoardFilters(board: BoardNode[]) {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -8,6 +9,9 @@ export function useBoardFilters(board: BoardNode[]) {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
   const [urlTeamInitialized, setUrlTeamInitialized] = useState(false)
+  const [searchResult, setSearchResult] = useState<BoardSearchResult | null>(null)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Initialize team filter from URL after board loads
   useEffect(() => {
@@ -53,6 +57,38 @@ export function useBoardFilters(board: BoardNode[]) {
     return Array.from(ids)
   }, [board])
 
+  // Debounced semantic search for queries >= 3 chars
+  useEffect(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    if (searchKey.length < 3) {
+      setSearchResult(null)
+      setSearchLoading(false)
+      return
+    }
+
+    setSearchLoading(true)
+    debounceRef.current = setTimeout(() => {
+      searchBoard(searchKey, allTeamIds.length > 0 ? allTeamIds : undefined)
+        .then(result => {
+          setSearchResult(result)
+          setSearchLoading(false)
+        })
+        .catch(() => {
+          setSearchResult(null)
+          setSearchLoading(false)
+        })
+    }, 300)
+
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current)
+      }
+    }
+  }, [searchKey, allTeamIds])
+
   const availableStatuses = useMemo(() => {
     const statuses = new Set<string>()
     board.forEach(epic => statuses.add(epic.status))
@@ -82,9 +118,17 @@ export function useBoardFilters(board: BoardNode[]) {
   const filteredBoard = useMemo(() => {
     return board.filter(epic => {
       if (searchKey) {
-        const keyLower = searchKey.toLowerCase()
-        if (!epic.issueKey.toLowerCase().includes(keyLower)) {
-          return false
+        if (searchKey.length >= 3 && searchResult) {
+          // Server-side search result: filter by matched epic keys
+          if (!searchResult.matchedEpicKeys.includes(epic.issueKey)) {
+            return false
+          }
+        } else {
+          // Short query: local search by key
+          const keyLower = searchKey.toLowerCase()
+          if (!epic.issueKey.toLowerCase().includes(keyLower)) {
+            return false
+          }
         }
       }
       if (selectedStatuses.size > 0 && !selectedStatuses.has(epic.status)) {
@@ -95,7 +139,7 @@ export function useBoardFilters(board: BoardNode[]) {
       }
       return true
     })
-  }, [board, searchKey, selectedStatuses, selectedTeams])
+  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams])
 
   // Get selected team ID for forecast loading
   const selectedTeamId = useMemo(() => {
@@ -134,9 +178,12 @@ export function useBoardFilters(board: BoardNode[]) {
 
   const clearFilters = () => {
     setSearchKey('')
+    setSearchResult(null)
     setSelectedStatuses(new Set())
     setSelectedTeams(new Set())
   }
+
+  const searchMode = searchResult?.searchMode ?? null
 
   return {
     searchKey,
@@ -149,6 +196,8 @@ export function useBoardFilters(board: BoardNode[]) {
     filteredBoard,
     canReorder,
     allTeamIds,
+    searchMode,
+    searchLoading,
     handleStatusToggle,
     handleTeamToggle,
     clearFilters,

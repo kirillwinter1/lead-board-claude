@@ -4,7 +4,7 @@ import axios from 'axios'
 import logo from '../icons/logo.png'
 import { useAuth } from '../contexts/AuthContext'
 import { SetupWizardPage } from '../pages/SetupWizardPage'
-import { getTenantSlug } from '../utils/tenant'
+import { getTenantSlug, setTenantSlug } from '../utils/tenant'
 import { ChatWidget } from './chat/ChatWidget'
 import './Header.css'
 
@@ -27,6 +27,8 @@ export function Layout() {
   const teamId = searchParams.get('teamId')
   const queryString = teamId ? `?teamId=${teamId}` : ''
 
+  const [tenantError, setTenantError] = useState(false)
+
   // Check if initial setup is needed
   useEffect(() => {
     if (auth.authenticated) {
@@ -34,7 +36,11 @@ export function Layout() {
         .then(res => {
           setSetupRequired(!res.data.setupCompleted)
         })
-        .catch(() => {
+        .catch((err) => {
+          if (err?.response?.status === 404 && err?.response?.data?.error === 'Not Found') {
+            // Tenant not found - all API calls will fail
+            setTenantError(true)
+          }
           setSetupRequired(false)
         })
     }
@@ -119,7 +125,23 @@ export function Layout() {
         </div>
       </header>
       {auth.authenticated ? (
-        showWizard ? (
+        tenantError ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 56px)', gap: '16px', padding: '24px' }}>
+            <h2 style={{ margin: 0, color: '#333' }}>Tenant not found</h2>
+            <p style={{ margin: 0, color: '#666', textAlign: 'center' }}>
+              The tenant <strong>"{getTenantSlug()}"</strong> does not exist.
+              Please check your tenant slug or register a new workspace.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button className="btn btn-secondary" onClick={() => {
+                setTenantSlug(null)
+                window.location.href = '/landing'
+              }}>
+                Go to Landing Page
+              </button>
+            </div>
+          </div>
+        ) : showWizard ? (
           auth.isAdmin() ? (
             <SetupWizardPage onComplete={() => setSetupRequired(false)} />
           ) : (

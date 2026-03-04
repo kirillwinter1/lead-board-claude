@@ -18,6 +18,20 @@ export async function getScoreBreakdown(issueKey: string): Promise<ScoreBreakdow
   return response.data
 }
 
+export interface BoardSearchResult {
+  matchedEpicKeys: string[]
+  searchMode: 'semantic' | 'substring'
+}
+
+export async function searchBoard(query: string, teamIds?: number[]): Promise<BoardSearchResult> {
+  const params = new URLSearchParams({ q: query })
+  if (teamIds && teamIds.length > 0) {
+    teamIds.forEach(id => params.append('teamIds', String(id)))
+  }
+  const response = await axios.get(`/api/board/search?${params.toString()}`)
+  return response.data
+}
+
 export interface StatusStyle {
   color: string | null
   statusCategory: string

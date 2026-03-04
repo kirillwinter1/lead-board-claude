@@ -296,3 +296,40 @@
   font-size: 14px;
   font-weight: 500;
 }
+
+.sync-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sync-progress-text {
+  font-size: 13px;
+  color: #172B4D;
+  font-weight: 500;
+}
+
+.sync-progress-bar-track {
+  height: 6px;
+  background: #DFE1E6;
+  border-radius: 3px;
+  overflow: hidden;
+  max-width: 400px;
+}
+
+.sync-progress-bar-fill {
+  height: 100%;
+  background: #0052CC;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.sync-progress-bar-indeterminate {
+  width: 30% !important;
+  animation: indeterminate 1.5s infinite ease-in-out;
+}
+
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(433%); }
+}

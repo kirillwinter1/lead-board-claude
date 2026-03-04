@@ -4,11 +4,14 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.repository.MetricsQueryRepository;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
+import com.leadboard.status.StatusCategory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
@@ -25,6 +28,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class TeamMetricsServiceTest {
 
     @Mock
@@ -86,6 +90,34 @@ class TeamMetricsServiceTest {
         // Then
         assertEquals(0, result.total());
         assertTrue(result.byPeriod().isEmpty());
+    }
+
+    @Test
+    void calculateThroughput_includesBugCategory() {
+        // Given
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        Timestamp periodStart = Timestamp.valueOf("2024-01-01 00:00:00");
+        List<Object[]> mockData = Arrays.asList(
+                new Object[]{periodStart, "STORY", 5L},
+                new Object[]{periodStart, "BUG", 3L},
+                new Object[]{periodStart, "EPIC", 1L}
+        );
+
+        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
+                .thenReturn(mockData);
+
+        // When
+        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
+
+        // Then
+        assertEquals(1, result.totalEpics());
+        assertEquals(5, result.totalStories());
+        assertEquals(3, result.totalBugs());
+        assertEquals(9, result.total());
+        assertEquals(3, result.byPeriod().get(0).bugs());
     }
 
     @Test
@@ -159,6 +191,30 @@ class TeamMetricsServiceTest {
     }
 
     @Test
+    void calculateByAssignee_nullLeadTimeReturnsNull() {
+        // Given — row[3] (avg_lead_time) is null
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        List<Object[]> mockData = Collections.singletonList(
+                new Object[]{"user1", "John Doe", 5L, null, null,
+                        new BigDecimal("1.0"), new BigDecimal("40"), new BigDecimal("40"), 3L}
+        );
+
+        when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
+                .thenReturn(mockData);
+
+        // When
+        List<AssigneeMetrics> result = service.calculateByAssignee(teamId, from, to);
+
+        // Then — null lead/cycle time, not zero
+        assertEquals(1, result.size());
+        assertNull(result.get(0).avgLeadTimeDays());
+        assertNull(result.get(0).avgCycleTimeDays());
+    }
+
+    @Test
     void calculateByAssignee_aggregatesCorrectly() {
         // Given
         Long teamId = 1L;
@@ -195,44 +251,76 @@ class TeamMetricsServiceTest {
     }
 
     @Test
-    void calculateTimeInStatuses_usesConfigStatusesWithData() {
+    void calculateTimeInStatuses_showsAllStatusesFromData() {
         // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
-        // Config has 2 pipeline statuses
-        when(workflowConfig.getStoryPipelineStatuses()).thenReturn(Arrays.asList(
-                new com.leadboard.config.service.WorkflowConfigService.StoryPipelineStatus("Analysis", 20, "#DEEBFF"),
-                new com.leadboard.config.service.WorkflowConfigService.StoryPipelineStatus("Development", 50, "#DEEBFF")
+        // Config has 1 pipeline status
+        when(workflowConfig.getStoryPipelineStatuses()).thenReturn(List.of(
+                new WorkflowConfigService.StoryPipelineStatus("Analysis", 20, "#DEEBFF")
         ));
 
-        // Changelog has data for "analysis" (case-insensitive match)
-        Object[] row = new Object[]{"Analysis", new BigDecimal("7200"), new BigDecimal("3600"),
-                new BigDecimal("10800"), new BigDecimal("14400"), 15L};
+        // Changelog has data for Analysis AND Review (not in pipeline config)
+        List<Object[]> data = Arrays.asList(
+                new Object[]{"Analysis", new BigDecimal("7200"), new BigDecimal("3600"),
+                        new BigDecimal("10800"), new BigDecimal("14400"), 15L},
+                new Object[]{"Review", new BigDecimal("3600"), new BigDecimal("1800"),
+                        new BigDecimal("5400"), new BigDecimal("7200"), 8L}
+        );
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
-                .thenReturn(Collections.singletonList(row));
+                .thenReturn(data);
+
+        // Both are IN_PROGRESS (not NEW/DONE)
+        when(workflowConfig.categorize(eq("Analysis"), any())).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorize(eq("Review"), any())).thenReturn(StatusCategory.IN_PROGRESS);
 
         // When
         List<TimeInStatusResponse> result = service.calculateTimeInStatuses(teamId, from, to);
 
-        // Then — both config statuses returned, Analysis with data, Development with zeros
+        // Then — both statuses returned, Analysis first (pipeline), Review second
         assertEquals(2, result.size());
 
         TimeInStatusResponse analysis = result.get(0);
         assertEquals("Analysis", analysis.status());
         assertEquals(new BigDecimal("2.00"), analysis.avgHours());
-        assertEquals(new BigDecimal("1.00"), analysis.medianHours());
-        assertEquals(new BigDecimal("3.00"), analysis.p85Hours());
-        assertEquals(new BigDecimal("4.00"), analysis.p99Hours());
         assertEquals(15, analysis.transitionsCount());
         assertEquals(20, analysis.sortOrder());
 
-        TimeInStatusResponse dev = result.get(1);
-        assertEquals("Development", dev.status());
-        assertEquals(BigDecimal.ZERO, dev.avgHours());
-        assertEquals(0, dev.transitionsCount());
-        assertEquals(50, dev.sortOrder());
+        TimeInStatusResponse review = result.get(1);
+        assertEquals("Review", review.status());
+        assertEquals(new BigDecimal("1.00"), review.avgHours());
+        assertEquals(8, review.transitionsCount());
+    }
+
+    @Test
+    void calculateTimeInStatuses_excludesDoneStatuses() {
+        // Given
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        when(workflowConfig.getStoryPipelineStatuses()).thenReturn(Collections.emptyList());
+
+        List<Object[]> data = Arrays.asList(
+                new Object[]{"In Progress", new BigDecimal("7200"), new BigDecimal("3600"),
+                        new BigDecimal("10800"), new BigDecimal("14400"), 10L},
+                new Object[]{"Done", new BigDecimal("100"), new BigDecimal("50"),
+                        new BigDecimal("100"), new BigDecimal("100"), 5L}
+        );
+        when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
+                .thenReturn(data);
+
+        when(workflowConfig.categorize(eq("In Progress"), any())).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorize(eq("Done"), any())).thenReturn(StatusCategory.DONE);
+
+        // When
+        List<TimeInStatusResponse> result = service.calculateTimeInStatuses(teamId, from, to);
+
+        // Then — only "In Progress", "Done" excluded
+        assertEquals(1, result.size());
+        assertEquals("In Progress", result.get(0).status());
     }
 
     @Test

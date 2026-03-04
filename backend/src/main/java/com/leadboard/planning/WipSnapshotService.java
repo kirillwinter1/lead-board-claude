@@ -4,6 +4,9 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.ForecastResponse.WipStatus;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,15 +37,18 @@ public class WipSnapshotService {
 
     private final WipSnapshotRepository snapshotRepository;
     private final TeamRepository teamRepository;
+    private final TenantRepository tenantRepository;
     private final ForecastService forecastService;
 
     public WipSnapshotService(
             WipSnapshotRepository snapshotRepository,
             TeamRepository teamRepository,
+            TenantRepository tenantRepository,
             ForecastService forecastService
     ) {
         this.snapshotRepository = snapshotRepository;
         this.teamRepository = teamRepository;
+        this.tenantRepository = tenantRepository;
         this.forecastService = forecastService;
     }
 
@@ -107,38 +113,61 @@ public class WipSnapshotService {
     }
 
     /**
-     * Scheduled job: создаёт ежедневные снапшоты для всех активных команд.
+     * Scheduled job: создаёт ежедневные снапшоты для всех активных команд во всех тенантах.
      * Запускается каждый день в 9:00.
+     * BUG-151: Must iterate tenants and set TenantContext — tables are in tenant schemas.
      */
     @Scheduled(cron = "0 0 9 * * *")
-    @Transactional
     public void createDailySnapshots() {
         log.info("Starting daily WIP snapshot creation");
+        int totalCreated = 0;
 
-        List<TeamEntity> activeTeams = teamRepository.findByActiveTrue();
-        int created = 0;
-
-        for (TeamEntity team : activeTeams) {
+        for (TenantEntity tenant : tenantRepository.findAllActive()) {
             try {
-                createSnapshot(team.getId());
-                created++;
+                TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
+                List<TeamEntity> activeTeams = teamRepository.findByActiveTrue();
+
+                for (TeamEntity team : activeTeams) {
+                    try {
+                        createSnapshot(team.getId());
+                        totalCreated++;
+                    } catch (Exception e) {
+                        log.error("Failed to create WIP snapshot for tenant '{}' team {}: {}",
+                                tenant.getSlug(), team.getId(), e.getMessage());
+                    }
+                }
             } catch (Exception e) {
-                log.error("Failed to create snapshot for team {}: {}", team.getId(), e.getMessage());
+                log.error("Failed to process WIP snapshots for tenant '{}': {}",
+                        tenant.getSlug(), e.getMessage());
+            } finally {
+                TenantContext.clear();
             }
         }
 
-        log.info("Completed daily WIP snapshots: {} created for {} teams", created, activeTeams.size());
+        log.info("Completed daily WIP snapshots: {} created", totalCreated);
     }
 
     /**
      * Scheduled job: удаляет старые снапшоты (старше 90 дней).
      * Запускается каждое воскресенье в 3:00.
+     * BUG-152: Must iterate tenants and set TenantContext.
      */
     @Scheduled(cron = "0 0 3 * * SUN")
-    @Transactional
     public void cleanupOldSnapshots() {
         LocalDate cutoff = LocalDate.now().minusDays(90);
-        snapshotRepository.deleteBySnapshotDateBefore(cutoff);
+
+        for (TenantEntity tenant : tenantRepository.findAllActive()) {
+            try {
+                TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
+                snapshotRepository.deleteBySnapshotDateBefore(cutoff);
+            } catch (Exception e) {
+                log.error("Failed to cleanup WIP snapshots for tenant '{}': {}",
+                        tenant.getSlug(), e.getMessage());
+            } finally {
+                TenantContext.clear();
+            }
+        }
+
         log.info("Cleaned up WIP snapshots older than {}", cutoff);
     }
 }

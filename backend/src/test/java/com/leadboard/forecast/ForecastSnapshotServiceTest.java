@@ -11,6 +11,10 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamRepository;
+import com.leadboard.tenant.TenantContext;
+import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +44,9 @@ class ForecastSnapshotServiceTest {
     private TeamRepository teamRepository;
 
     @Mock
+    private TenantRepository tenantRepository;
+
+    @Mock
     private ForecastService forecastService;
 
     @Mock
@@ -53,6 +60,7 @@ class ForecastSnapshotServiceTest {
         service = new ForecastSnapshotService(
                 snapshotRepository,
                 teamRepository,
+                tenantRepository,
                 forecastService,
                 unifiedPlanningService
         );
@@ -176,9 +184,20 @@ class ForecastSnapshotServiceTest {
         assertEquals(teamId, result.get().teamId());
     }
 
+    @AfterEach
+    void cleanup() {
+        TenantContext.clear();
+    }
+
     @Test
     void createDailySnapshots_createsForAllActiveTeams() {
-        // Arrange
+        // Arrange — tenant-aware: must mock tenantRepository
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        tenant.setSlug("test");
+        tenant.setSchemaName("tenant_test");
+        when(tenantRepository.findAllActive()).thenReturn(List.of(tenant));
+
         TeamEntity team1 = new TeamEntity();
         team1.setId(1L);
         team1.setName("Team 1");

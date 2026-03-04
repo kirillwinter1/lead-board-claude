@@ -65,7 +65,7 @@ class TeamMetricsControllerTest {
                 LocalDate.of(2024, 1, 1),
                 LocalDate.of(2024, 1, 31),
                 1L,
-                new ThroughputResponse(2, 10, 5, 17, Collections.emptyList(), Collections.emptyList()),
+                new ThroughputResponse(2, 10, 5, 0, 17, Collections.emptyList(), Collections.emptyList()),
                 new LeadTimeResponse(
                         new BigDecimal("5.5"),
                         new BigDecimal("4.0"),
@@ -105,12 +105,12 @@ class TeamMetricsControllerTest {
     void getThroughput_filtersByTeamAndPeriod() throws Exception {
         // Given
         ThroughputResponse response = new ThroughputResponse(
-                1, 5, 3, 9,
+                1, 5, 3, 0, 9,
                 Arrays.asList(
                         new PeriodThroughput(
                                 LocalDate.of(2024, 1, 1),
                                 LocalDate.of(2024, 1, 7),
-                                1, 3, 2, 6
+                                1, 3, 2, 0, 6
                         )
                 ),
                 Arrays.asList(new BigDecimal("6.0"))

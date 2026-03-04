@@ -15,6 +15,8 @@ interface FilterPanelProps {
   syncing: boolean
   onSync: () => void
   teamColorMap?: Map<string, string>
+  searchMode?: 'semantic' | 'substring' | null
+  searchLoading?: boolean
 }
 
 function formatSyncTime(isoString: string | null): string {
@@ -43,6 +45,8 @@ export function FilterPanel({
   syncing,
   onSync,
   teamColorMap,
+  searchMode,
+  searchLoading,
 }: FilterPanelProps) {
   const hasActiveFilters = searchKey || selectedStatuses.size > 0 || selectedTeams.size > 0
 
@@ -73,11 +77,19 @@ export function FilterPanel({
         </svg>
         <input
           type="text"
-          placeholder="Search by key..."
+          placeholder="Search by key or content..."
           value={searchKey}
           onChange={(e) => onSearchKeyChange(e.target.value)}
           className="filter-input"
         />
+        {searchLoading && (
+          <span className="search-loading">...</span>
+        )}
+        {!searchLoading && searchMode && (
+          <span className={`search-mode-badge ${searchMode === 'semantic' ? 'badge-ai' : 'badge-txt'}`}>
+            {searchMode === 'semantic' ? 'AI' : 'TXT'}
+          </span>
+        )}
       </div>
 
       <MultiSelectDropdown

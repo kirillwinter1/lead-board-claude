@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { BugSlaSettingsPage } from './BugSlaSettingsPage'
@@ -13,6 +13,23 @@ interface User {
   role: string
 }
 
+interface WorklogProgress {
+  inProgress: boolean
+  processed: number
+  total: number
+  imported: number
+}
+
+interface SyncStatusResponse {
+  syncInProgress: boolean
+  lastSyncStartedAt: string | null
+  lastSyncCompletedAt: string | null
+  issuesCount: number
+  error: string | null
+  setupCompleted: boolean
+  worklogProgress: WorklogProgress | null
+}
+
 const ROLES = ['ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD', 'MEMBER', 'VIEWER'] as const
 
 export function SettingsPage() {
@@ -21,16 +38,49 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [updating, setUpdating] = useState<number | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<SyncStatusResponse | null>(null)
   const [syncResult, setSyncResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [changelogMonths, setChangelogMonths] = useState(6)
   const [changelogCount, setChangelogCount] = useState<{ issueCount: number; totalIssues: number } | null>(null)
   const [countingChangelogs, setCountingChangelogs] = useState(false)
   const [importingChangelogs, setImportingChangelogs] = useState(false)
   const [changelogResult, setChangelogResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [])
+
+  const startPolling = useCallback(() => {
+    stopPolling()
+    const poll = async () => {
+      try {
+        const res = await axios.get<SyncStatusResponse>('/api/sync/status')
+        setSyncStatus(res.data)
+        const wp = res.data.worklogProgress
+        const busy = res.data.syncInProgress || (wp?.inProgress ?? false)
+        if (!busy) {
+          stopPolling()
+          setSyncing(false)
+          const msg = `Sync completed. ${res.data.issuesCount} issues synced` +
+            (wp && wp.imported > 0 ? `, ${wp.imported} worklogs imported.` : '.')
+          setSyncResult({ type: 'success', message: msg })
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }
+    poll()
+    pollRef.current = setInterval(poll, 2000)
+  }, [stopPolling])
+
   useEffect(() => {
     fetchUsers()
-  }, [])
+    return () => stopPolling()
+  }, [stopPolling])
 
   const fetchUsers = async () => {
     try {
@@ -187,30 +237,65 @@ export function SettingsPage() {
         <p className="settings-section-description">
           Sync issues from Jira. Runs automatically on schedule, but you can trigger manually.
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            className="changelog-check-btn"
-            disabled={syncing}
-            onClick={async () => {
-              try {
-                setSyncing(true)
-                setSyncResult(null)
-                await axios.post('/api/sync/trigger')
-                setSyncResult({ type: 'success', message: 'Sync started successfully. It will run in the background.' })
-              } catch {
-                setSyncResult({ type: 'error', message: 'Failed to start sync' })
-              } finally {
-                setSyncing(false)
-              }
-            }}
-          >
-            {syncing ? 'Starting...' : 'Sync Now'}
-          </button>
-          {syncResult && (
-            <span className={syncResult.type === 'success' ? 'changelog-result-success' : 'changelog-result-error'}>
-              {syncResult.message}
-            </span>
-          )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              className="changelog-check-btn"
+              disabled={syncing}
+              onClick={async () => {
+                try {
+                  setSyncing(true)
+                  setSyncResult(null)
+                  setSyncStatus(null)
+                  await axios.post('/api/sync/trigger')
+                  startPolling()
+                } catch {
+                  setSyncResult({ type: 'error', message: 'Failed to start sync' })
+                  setSyncing(false)
+                }
+              }}
+            >
+              {syncing ? 'Syncing...' : 'Sync Now'}
+            </button>
+            {!syncing && syncResult && (
+              <span className={syncResult.type === 'success' ? 'changelog-result-success' : 'changelog-result-error'}>
+                {syncResult.message}
+              </span>
+            )}
+          </div>
+          {syncing && syncStatus && (() => {
+            const wp = syncStatus.worklogProgress
+            const worklogActive = wp?.inProgress && wp.total > 0
+            return (
+              <div className="sync-progress-container">
+                {syncStatus.syncInProgress && !worklogActive && (
+                  <div className="sync-progress-text">Syncing issues...</div>
+                )}
+                {!syncStatus.syncInProgress && worklogActive && (
+                  <div className="sync-progress-text">Issues synced: {syncStatus.issuesCount}</div>
+                )}
+                {worklogActive && wp && (
+                  <>
+                    <div className="sync-progress-text">
+                      Importing worklogs: {wp.processed}/{wp.total}
+                      {wp.total > 0 && ` (${Math.round(wp.processed / wp.total * 100)}%)`}
+                    </div>
+                    <div className="sync-progress-bar-track">
+                      <div
+                        className="sync-progress-bar-fill"
+                        style={{ width: `${wp.total > 0 ? (wp.processed / wp.total * 100) : 0}%` }}
+                      />
+                    </div>
+                  </>
+                )}
+                {syncStatus.syncInProgress && !worklogActive && (
+                  <div className="sync-progress-bar-track">
+                    <div className="sync-progress-bar-fill sync-progress-bar-indeterminate" />
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
       </section>
 

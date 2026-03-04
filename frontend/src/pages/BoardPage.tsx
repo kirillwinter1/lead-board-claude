@@ -39,6 +39,8 @@ export function BoardPage() {
     filteredBoard,
     canReorder,
     allTeamIds,
+    searchMode,
+    searchLoading,
     handleStatusToggle,
     handleTeamToggle,
     clearFilters,
@@ -145,6 +147,8 @@ export function BoardPage() {
         syncing={syncing}
         onSync={handleSync}
         teamColorMap={teamColorMap}
+        searchMode={searchMode}
+        searchLoading={searchLoading}
       />
 
       <main className="main-content">

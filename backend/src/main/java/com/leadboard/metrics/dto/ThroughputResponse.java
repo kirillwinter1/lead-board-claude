@@ -7,6 +7,7 @@ public record ThroughputResponse(
     int totalEpics,
     int totalStories,
     int totalSubtasks,
+    int totalBugs,
     int total,
     List<PeriodThroughput> byPeriod,
     List<BigDecimal> movingAverage

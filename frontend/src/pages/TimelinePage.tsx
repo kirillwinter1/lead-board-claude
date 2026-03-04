@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay } from '../api/forecast'
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
@@ -638,11 +638,59 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
 
   // Determine story source for visual styling
   const storySource: PhaseSource = (story as PlannedStory & { _source?: PhaseSource })._source || 'forecast'
+  const worklogDays: WorklogDay[] | null = (story as PlannedStory & { _worklogDays?: WorklogDay[] | null })._worklogDays || null
 
   const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.65)
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
+  // Render per-day worklog segments when worklog data is available
+  const renderWorklogSegments = () => {
+    if (!worklogDays || worklogDays.length === 0) return null
+
+    // Build a map: date string -> dominant role (by most seconds)
+    const dayRoleMap = new Map<string, { roleCode: string; totalSeconds: number }>()
+    for (const wl of worklogDays) {
+      const existing = dayRoleMap.get(wl.date)
+      if (!existing || wl.timeSpentSeconds > existing.totalSeconds) {
+        dayRoleMap.set(wl.date, { roleCode: wl.roleCode, totalSeconds: wl.timeSpentSeconds })
+      }
+    }
+
+    const segments: React.ReactNode[] = []
+    // Iterate over each day in the story range
+    const current = new Date(startDate)
+    let dayIndex = 0
+    while (current <= endDate) {
+      const dateStr = current.toISOString().split('T')[0]
+      const dayData = dayRoleMap.get(dateStr)
+
+      if (dayData) {
+        const dayLeftPercent = (dayIndex / duration) * 100
+        const dayWidthPercent = Math.max(1 / duration * 100, 1) // At least 1% width for visibility
+
+        segments.push(
+          <div
+            key={dateStr}
+            style={{
+              position: 'absolute',
+              left: `${dayLeftPercent}%`,
+              width: `${dayWidthPercent}%`,
+              height: '100%',
+              backgroundColor: getPhaseColor(dayData.roleCode),
+              opacity: 1
+            }}
+          />
+        )
+      }
+
+      current.setDate(current.getDate() + 1)
+      dayIndex++
+    }
+
+    return segments
+  }
 
   const renderPhaseSegment = (
     phase: UnifiedPhaseSchedule | null,
@@ -741,9 +789,13 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => onHover(null)}
     >
-      {story.phases && Object.entries(story.phases).map(([role, phase]) =>
-        renderPhaseSegment(phase, role)
-      )}
+      {/* Per-day worklog rendering for retro/hybrid stories with worklog data */}
+      {(storySource === 'retro' || storySource === 'hybrid') && worklogDays && worklogDays.length > 0
+        ? renderWorklogSegments()
+        : story.phases && Object.entries(story.phases).map(([role, phase]) =>
+            renderPhaseSegment(phase, role)
+          )
+      }
 
       <span
         style={{
@@ -1211,7 +1263,7 @@ function mergeHybridEpics(
     return planEpics.map(epic => ({
       ...epic,
       stories: epic.stories.map(s => {
-        const tagged = { ...s, _source: 'forecast' as PhaseSource }
+        const tagged = { ...s, _source: 'forecast' as PhaseSource, _worklogDays: null }
         return tagged
       })
     }))
@@ -1220,7 +1272,7 @@ function mergeHybridEpics(
   const today = new Date().toISOString().split('T')[0]
 
   // Build retro lookup: epicKey -> { storyKey -> RetroStory }
-  const retroEpicMap = new Map<string, Map<string, { storyKey: string; startDate: string | null; endDate: string | null; phases: Record<string, { startDate: string | null; endDate: string | null; durationDays: number; active: boolean }>; completed: boolean }>>()
+  const retroEpicMap = new Map<string, Map<string, RetroStory>>()
   for (const retroEpic of retroResult.epics) {
     const storyMap = new Map<string, typeof retroEpic.stories[0]>()
     for (const story of retroEpic.stories) {
@@ -1239,7 +1291,7 @@ function mergeHybridEpics(
 
       if (!retroStory) {
         // No retro data — pure forecast
-        return { ...story, _source: 'forecast' as PhaseSource }
+        return { ...story, _source: 'forecast' as PhaseSource, _worklogDays: null }
       }
 
       // Has retro data — merge phases
@@ -1321,7 +1373,8 @@ function mergeHybridEpics(
         startDate: mergedStart,
         endDate: mergedEnd,
         phases: mergedPhases,
-        _source: source
+        _source: source,
+        _worklogDays: retroStory.worklogDays || null
       }
     })
 
@@ -1383,7 +1436,8 @@ function mergeHybridEpics(
         totalLoggedSeconds: null,
         progressPercent: rs.completed ? 100 : null,
         roleProgress: null,
-        _source: 'retro' as PhaseSource
+        _source: 'retro' as PhaseSource,
+        _worklogDays: rs.worklogDays || null
       } as PlannedStory
     })
 

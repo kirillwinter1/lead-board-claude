@@ -683,9 +683,16 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
           workflowRoleCode: null,
         } as IssueTypeMappingDto))
       setIssueTypes([...data.issueTypes, ...missing])
-    } catch (err) {
+    } catch (err: unknown) {
       if (signal?.aborted) return
-      setError('Failed to load workflow configuration')
+      const axiosErr = err as { response?: { status?: number }; isTenantNotFound?: boolean }
+      if (axiosErr.isTenantNotFound || axiosErr.response?.status === 404) {
+        setError('Tenant not found. Please check your tenant configuration or re-register.')
+      } else if (axiosErr.response?.status === 401 || axiosErr.response?.status === 403) {
+        setError('Access denied. You need admin privileges to access workflow configuration.')
+      } else {
+        setError('Failed to load workflow configuration')
+      }
       console.error('Failed to load config:', err)
     } finally {
       if (!signal?.aborted) setLoading(false)

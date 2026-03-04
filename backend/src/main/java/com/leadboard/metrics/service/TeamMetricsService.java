@@ -68,11 +68,12 @@ public class TeamMetricsService {
                     int epics = counts.getOrDefault("EPIC", 0);
                     int stories = counts.getOrDefault("STORY", 0);
                     int subtasks = counts.getOrDefault("SUBTASK", 0);
+                    int bugs = counts.getOrDefault("BUG", 0);
                     return new PeriodThroughput(
                             e.getKey(),
                             e.getKey().plusDays(6),
-                            epics, stories, subtasks,
-                            epics + stories + subtasks
+                            epics, stories, subtasks, bugs,
+                            epics + stories + subtasks + bugs
                     );
                 })
                 .collect(Collectors.toList());
@@ -81,13 +82,14 @@ public class TeamMetricsService {
         int totalEpics = byPeriod.stream().mapToInt(PeriodThroughput::epics).sum();
         int totalStories = byPeriod.stream().mapToInt(PeriodThroughput::stories).sum();
         int totalSubtasks = byPeriod.stream().mapToInt(PeriodThroughput::subtasks).sum();
+        int totalBugs = byPeriod.stream().mapToInt(PeriodThroughput::bugs).sum();
 
         // Calculate moving average (4-week window)
         List<BigDecimal> movingAverage = calculateMovingAverage(byPeriod, 4);
 
         return new ThroughputResponse(
-                totalEpics, totalStories, totalSubtasks,
-                totalEpics + totalStories + totalSubtasks,
+                totalEpics, totalStories, totalSubtasks, totalBugs,
+                totalEpics + totalStories + totalSubtasks + totalBugs,
                 byPeriod,
                 movingAverage
         );
@@ -141,59 +143,75 @@ public class TeamMetricsService {
 
     /**
      * Calculate time spent in each status.
-     * Uses STORY pipeline statuses from config as fixed X-axis.
-     * Shows 0 for statuses with no data.
+     * Shows ALL statuses from changelog data, excluding NEW/DONE.
+     * Pipeline statuses are sorted by sortOrder first, others by transition count.
      */
     public List<TimeInStatusResponse> calculateTimeInStatuses(Long teamId, LocalDate from, LocalDate to) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
-        // 1. Get STORY pipeline statuses from config (excluding NEW/DONE)
+        // 1. Get pipeline statuses for color/sortOrder lookup
         var pipelineStatuses = workflowConfig.getStoryPipelineStatuses();
+        Map<String, Integer> sortOrderMap = new HashMap<>();
+        Map<String, String> colorMap = new HashMap<>();
+        for (var ps : pipelineStatuses) {
+            sortOrderMap.put(ps.statusName().toLowerCase(), ps.sortOrder());
+            colorMap.put(ps.statusName().toLowerCase(), ps.color());
+        }
 
         // 2. Query actual data from changelog (grouped by from_status)
         List<Object[]> data = changelogRepository.getTimeInStatusStats(teamId, fromDt, toDt);
 
-        // 3. Build lookup: status name (lowercase) -> parsed row
-        Map<String, Object[]> dataMap = new HashMap<>();
-        for (Object[] row : data) {
-            String status = (String) row[0];
-            if (status != null) {
-                dataMap.put(status.toLowerCase(), row);
-            }
-        }
-
-        // 4. For each config status, match data or fill zeros
+        // 3. Build results from ALL statuses in data, excluding NEW/DONE
         BigDecimal divisor = BigDecimal.valueOf(3600);
         List<TimeInStatusResponse> result = new ArrayList<>();
 
-        for (var ps : pipelineStatuses) {
-            Object[] row = dataMap.get(ps.statusName().toLowerCase());
+        for (Object[] row : data) {
+            String status = (String) row[0];
+            if (status == null) continue;
 
-            BigDecimal avgHours = BigDecimal.ZERO;
-            BigDecimal medianHours = BigDecimal.ZERO;
-            BigDecimal p85Hours = BigDecimal.ZERO;
-            BigDecimal p99Hours = BigDecimal.ZERO;
-            int transitionsCount = 0;
-
-            if (row != null) {
-                BigDecimal avgSec = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
-                BigDecimal medSec = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
-                BigDecimal p85Sec = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
-                BigDecimal p99Sec = row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO;
-                transitionsCount = ((Number) row[5]).intValue();
-
-                avgHours = avgSec.divide(divisor, 2, RoundingMode.HALF_UP);
-                medianHours = medSec.divide(divisor, 2, RoundingMode.HALF_UP);
-                p85Hours = p85Sec.divide(divisor, 2, RoundingMode.HALF_UP);
-                p99Hours = p99Sec.divide(divisor, 2, RoundingMode.HALF_UP);
+            // Exclude NEW and DONE statuses
+            try {
+                var cat = workflowConfig.categorize(status, null);
+                if (cat == com.leadboard.status.StatusCategory.NEW
+                        || cat == com.leadboard.status.StatusCategory.DONE
+                        || cat == com.leadboard.status.StatusCategory.TODO) {
+                    continue;
+                }
+            } catch (Exception e) {
+                // Safe fallback — include if categorization fails
             }
 
+            BigDecimal avgSec = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
+            BigDecimal medSec = row[2] != null ? new BigDecimal(row[2].toString()) : BigDecimal.ZERO;
+            BigDecimal p85Sec = row[3] != null ? new BigDecimal(row[3].toString()) : BigDecimal.ZERO;
+            BigDecimal p99Sec = row[4] != null ? new BigDecimal(row[4].toString()) : BigDecimal.ZERO;
+            int transitionsCount = ((Number) row[5]).intValue();
+
+            BigDecimal avgHours = avgSec.divide(divisor, 2, RoundingMode.HALF_UP);
+            BigDecimal medianHours = medSec.divide(divisor, 2, RoundingMode.HALF_UP);
+            BigDecimal p85Hours = p85Sec.divide(divisor, 2, RoundingMode.HALF_UP);
+            BigDecimal p99Hours = p99Sec.divide(divisor, 2, RoundingMode.HALF_UP);
+
+            String lowerStatus = status.toLowerCase();
+            int sortOrder = sortOrderMap.getOrDefault(lowerStatus, Integer.MAX_VALUE);
+            String color = colorMap.getOrDefault(lowerStatus, null);
+
             result.add(new TimeInStatusResponse(
-                    ps.statusName(), avgHours, medianHours,
+                    status, avgHours, medianHours,
                     p85Hours, p99Hours, transitionsCount,
-                    ps.sortOrder(), ps.color()));
+                    sortOrder, color));
         }
+
+        // 4. Sort: pipeline statuses first (by sortOrder), then remaining by transition count desc
+        result.sort((a, b) -> {
+            boolean aPipeline = a.sortOrder() < Integer.MAX_VALUE;
+            boolean bPipeline = b.sortOrder() < Integer.MAX_VALUE;
+            if (aPipeline && !bPipeline) return -1;
+            if (!aPipeline && bPipeline) return 1;
+            if (aPipeline) return Integer.compare(a.sortOrder(), b.sortOrder());
+            return Integer.compare(b.transitionsCount(), a.transitionsCount());
+        });
 
         return result;
     }
@@ -219,10 +237,10 @@ public class TeamMetricsService {
                     int issuesClosed = ((Number) row[2]).intValue();
                     BigDecimal avgLeadTime = row[3] != null
                             ? new BigDecimal(row[3].toString()).setScale(1, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
+                            : null;
                     BigDecimal avgCycleTime = row[4] != null
                             ? new BigDecimal(row[4].toString()).setScale(1, RoundingMode.HALF_UP)
-                            : BigDecimal.ZERO;
+                            : null;
 
                     // Personal DSR (time_spent / original_estimate)
                     BigDecimal personalDsr = row[5] != null

@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
+import com.leadboard.metrics.repository.IssueWorklogRepository;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.planning.dto.RetrospectiveResult;
 import com.leadboard.planning.dto.RetrospectiveResult.*;
@@ -36,13 +37,16 @@ class RetrospectiveTimelineServiceTest {
     private StatusChangelogRepository changelogRepository;
 
     @Mock
+    private IssueWorklogRepository worklogRepository;
+
+    @Mock
     private WorkflowConfigService workflowConfigService;
 
     private RetrospectiveTimelineService service;
 
     @BeforeEach
     void setUp() {
-        service = new RetrospectiveTimelineService(issueRepository, changelogRepository, workflowConfigService);
+        service = new RetrospectiveTimelineService(issueRepository, changelogRepository, worklogRepository, workflowConfigService);
 
         // Default role determination: status-based
         when(workflowConfigService.determinePhase(eq("In Analysis"), isNull())).thenReturn("SA");
@@ -346,6 +350,76 @@ class RetrospectiveTimelineServiceTest {
             assertNotNull(epicResult200);
             assertEquals(2, epicResult100.stories().size());
             assertEquals(1, epicResult200.stories().size());
+        }
+    }
+
+    @Nested
+    class WorklogDays {
+        @Test
+        void shouldPopulateWorklogDaysFromSubtasks() {
+            JiraIssueEntity story = createStory("PROJ-1", "Done", "PROJ-100");
+            JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
+            epic.setBoardCategory("EPIC");
+
+            JiraIssueEntity subtask = new JiraIssueEntity();
+            subtask.setIssueKey("PROJ-10");
+            subtask.setParentKey("PROJ-1");
+            subtask.setBoardCategory("SUBTASK");
+
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
+                    .thenReturn(List.of(story));
+            when(issueRepository.findByIssueKey("PROJ-100"))
+                    .thenReturn(Optional.of(epic));
+            when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
+                    .thenReturn(List.of(subtask));
+            when(worklogRepository.findAggregatedWorklogsByIssueKeys(List.of("PROJ-10")))
+                    .thenReturn(List.of(
+                            new Object[]{"PROJ-10", java.time.LocalDate.of(2025, 1, 11), "DEV", 14400L},
+                            new Object[]{"PROJ-10", java.time.LocalDate.of(2025, 1, 12), "DEV", 28800L}
+                    ));
+
+            OffsetDateTime base = OffsetDateTime.of(2025, 1, 10, 10, 0, 0, 0, ZoneOffset.UTC);
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", base),
+                    createTransition("PROJ-1", "In Development", "Done", base.plusDays(5))
+            );
+            when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-1")))
+                    .thenReturn(transitions);
+
+            RetrospectiveResult result = service.calculateRetrospective(1L);
+
+            RetroStory retroStory = result.epics().get(0).stories().get(0);
+            assertNotNull(retroStory.worklogDays());
+            assertEquals(2, retroStory.worklogDays().size());
+            assertEquals("DEV", retroStory.worklogDays().get(0).roleCode());
+            assertEquals(14400L, retroStory.worklogDays().get(0).timeSpentSeconds());
+        }
+
+        @Test
+        void shouldReturnNullWorklogDaysWhenNoWorklogs() {
+            JiraIssueEntity story = createStory("PROJ-1", "Done", "PROJ-100");
+            JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
+            epic.setBoardCategory("EPIC");
+
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
+                    .thenReturn(List.of(story));
+            when(issueRepository.findByIssueKey("PROJ-100"))
+                    .thenReturn(Optional.of(epic));
+            when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
+                    .thenReturn(List.of());
+
+            OffsetDateTime base = OffsetDateTime.of(2025, 1, 10, 10, 0, 0, 0, ZoneOffset.UTC);
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", base),
+                    createTransition("PROJ-1", "In Development", "Done", base.plusDays(5))
+            );
+            when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-1")))
+                    .thenReturn(transitions);
+
+            RetrospectiveResult result = service.calculateRetrospective(1L);
+
+            RetroStory retroStory = result.epics().get(0).stories().get(0);
+            assertNull(retroStory.worklogDays());
         }
     }
 }

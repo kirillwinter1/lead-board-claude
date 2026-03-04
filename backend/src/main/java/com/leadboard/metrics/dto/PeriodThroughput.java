@@ -8,5 +8,6 @@ public record PeriodThroughput(
     int epics,
     int stories,
     int subtasks,
+    int bugs,
     int total
 ) {}

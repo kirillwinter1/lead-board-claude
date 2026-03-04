@@ -582,6 +582,67 @@ public class JiraClient {
     }
 
     /**
+     * Fetch worklogs for an issue. Uses /rest/api/3/issue/{key}/worklog with pagination.
+     */
+    public List<JiraWorklogResponse.WorklogEntry> fetchIssueWorklogs(String issueKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        if (accessToken != null && cloudId != null) {
+            return fetchWorklogsWithOAuth(issueKey, accessToken, cloudId);
+        }
+        return fetchWorklogsWithBasicAuth(issueKey);
+    }
+
+    private List<JiraWorklogResponse.WorklogEntry> fetchWorklogsWithOAuth(
+            String issueKey, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+        return fetchWorklogsPaginated(issueKey,
+                baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog",
+                "Bearer " + accessToken);
+    }
+
+    private List<JiraWorklogResponse.WorklogEntry> fetchWorklogsWithBasicAuth(String issueKey) {
+        if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
+            throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
+        }
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+        return fetchWorklogsPaginated(issueKey,
+                configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog",
+                "Basic " + encodedAuth);
+    }
+
+    private List<JiraWorklogResponse.WorklogEntry> fetchWorklogsPaginated(
+            String issueKey, String url, String authHeader) {
+        List<JiraWorklogResponse.WorklogEntry> allEntries = new java.util.ArrayList<>();
+        int startAt = 0;
+
+        while (true) {
+            String paginatedUrl = url + "?startAt=" + startAt + "&maxResults=1000";
+            JiraWorklogResponse response = webClient.get()
+                    .uri(paginatedUrl)
+                    .header(HttpHeaders.AUTHORIZATION, authHeader)
+                    .retrieve()
+                    .bodyToMono(JiraWorklogResponse.class)
+                    .block();
+
+            if (response == null || response.getWorklogs() == null || response.getWorklogs().isEmpty()) {
+                break;
+            }
+
+            allEntries.addAll(response.getWorklogs());
+
+            if (startAt + response.getMaxResults() >= response.getTotal()) {
+                break;
+            }
+            startAt += response.getMaxResults();
+        }
+
+        return allEntries;
+    }
+
+    /**
      * Get project components from Jira.
      */
     @SuppressWarnings("unchecked")

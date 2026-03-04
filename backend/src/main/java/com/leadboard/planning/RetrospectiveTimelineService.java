@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.entity.StatusChangelogEntity;
+import com.leadboard.metrics.repository.IssueWorklogRepository;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.planning.dto.RetrospectiveResult;
 import com.leadboard.planning.dto.RetrospectiveResult.*;
@@ -12,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -28,15 +30,18 @@ public class RetrospectiveTimelineService {
 
     private final JiraIssueRepository issueRepository;
     private final StatusChangelogRepository changelogRepository;
+    private final IssueWorklogRepository worklogRepository;
     private final WorkflowConfigService workflowConfigService;
 
     public RetrospectiveTimelineService(
             JiraIssueRepository issueRepository,
             StatusChangelogRepository changelogRepository,
+            IssueWorklogRepository worklogRepository,
             WorkflowConfigService workflowConfigService
     ) {
         this.issueRepository = issueRepository;
         this.changelogRepository = changelogRepository;
+        this.worklogRepository = worklogRepository;
         this.workflowConfigService = workflowConfigService;
     }
 
@@ -68,13 +73,17 @@ public class RetrospectiveTimelineService {
         Map<String, List<StatusChangelogEntity>> transitionsByKey = allTransitions.stream()
                 .collect(Collectors.groupingBy(StatusChangelogEntity::getIssueKey));
 
+        // Batch-load worklogs: find subtasks for all stories, then aggregate worklogs by parent story
+        Map<String, List<WorklogDay>> worklogsByStory = loadWorklogsByStory(storyKeys);
+
         // Build RetroStory for each story
         Map<String, RetroStory> retroStoryMap = new LinkedHashMap<>();
         for (JiraIssueEntity story : startedStories) {
             List<StatusChangelogEntity> transitions = transitionsByKey.getOrDefault(
                     story.getIssueKey(), List.of());
 
-            RetroStory retroStory = buildRetroStory(story, transitions);
+            RetroStory retroStory = buildRetroStory(story, transitions,
+                    worklogsByStory.getOrDefault(story.getIssueKey(), List.of()));
             if (retroStory != null) {
                 retroStoryMap.put(story.getIssueKey(), retroStory);
             }
@@ -139,7 +148,8 @@ public class RetrospectiveTimelineService {
         return new RetrospectiveResult(teamId, OffsetDateTime.now(), retroEpics);
     }
 
-    RetroStory buildRetroStory(JiraIssueEntity story, List<StatusChangelogEntity> transitions) {
+    RetroStory buildRetroStory(JiraIssueEntity story, List<StatusChangelogEntity> transitions,
+                               List<WorklogDay> worklogDays) {
         if (transitions.isEmpty()) {
             return null;
         }
@@ -249,7 +259,71 @@ public class RetrospectiveTimelineService {
                 storyStart,
                 storyEnd,
                 progressPercent,
-                phases
+                phases,
+                worklogDays != null && !worklogDays.isEmpty() ? worklogDays : null
         );
+    }
+
+    /**
+     * Load worklogs for stories by finding their subtasks and aggregating.
+     * Worklogs are logged on subtasks, so we need to:
+     * 1. Find all subtasks for the given story keys
+     * 2. Load worklogs for those subtask keys
+     * 3. Aggregate by parent story -> date -> role
+     */
+    private Map<String, List<WorklogDay>> loadWorklogsByStory(List<String> storyKeys) {
+        if (storyKeys.isEmpty()) return Map.of();
+
+        // Find subtasks for these stories
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+        if (subtasks.isEmpty()) return Map.of();
+
+        // Build subtask key -> parent story key mapping
+        Map<String, String> subtaskToParent = new HashMap<>();
+        List<String> subtaskKeys = new ArrayList<>();
+        for (JiraIssueEntity subtask : subtasks) {
+            subtaskToParent.put(subtask.getIssueKey(), subtask.getParentKey());
+            subtaskKeys.add(subtask.getIssueKey());
+        }
+
+        // Load aggregated worklogs for all subtask keys
+        List<Object[]> rawWorklogs = worklogRepository.findAggregatedWorklogsByIssueKeys(subtaskKeys);
+        if (rawWorklogs.isEmpty()) return Map.of();
+
+        // Aggregate by parent story
+        Map<String, Map<String, Map<String, Long>>> storyDateRole = new HashMap<>();
+        // storyKey -> date -> roleCode -> totalSeconds
+
+        for (Object[] row : rawWorklogs) {
+            String issueKey = (String) row[0];
+            LocalDate startedDate = row[1] instanceof Date
+                    ? ((Date) row[1]).toLocalDate()
+                    : (LocalDate) row[1];
+            String roleCode = (String) row[2];
+            long totalSeconds = ((Number) row[3]).longValue();
+
+            String parentKey = subtaskToParent.get(issueKey);
+            if (parentKey == null) continue;
+
+            storyDateRole
+                    .computeIfAbsent(parentKey, k -> new TreeMap<>())
+                    .computeIfAbsent(startedDate.toString(), k -> new HashMap<>())
+                    .merge(roleCode, totalSeconds, Long::sum);
+        }
+
+        // Convert to WorklogDay lists
+        Map<String, List<WorklogDay>> result = new HashMap<>();
+        for (var storyEntry : storyDateRole.entrySet()) {
+            List<WorklogDay> days = new ArrayList<>();
+            for (var dateEntry : storyEntry.getValue().entrySet()) {
+                LocalDate date = LocalDate.parse(dateEntry.getKey());
+                for (var roleEntry : dateEntry.getValue().entrySet()) {
+                    days.add(new WorklogDay(date, roleEntry.getKey(), roleEntry.getValue()));
+                }
+            }
+            result.put(storyEntry.getKey(), days);
+        }
+
+        return result;
     }
 }

@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -47,10 +46,6 @@ import java.util.stream.Collectors;
 public class SyncService {
 
     private static final Logger log = LoggerFactory.getLogger(SyncService.class);
-    private static final int RECONCILE_EVERY_N_SYNCS = 12;
-
-    private int scheduledSyncCount = 0;
-
     private final JiraClient jiraClient;
     private final JiraConfigResolver jiraConfigResolver;
     private final JiraIssueRepository issueRepository;
@@ -71,6 +66,7 @@ public class SyncService {
     private final BoardService boardService;
     private final SyncService self;
     private final EmbeddingService embeddingService;
+    private final WorklogImportService worklogImportService;
 
     public SyncService(JiraClient jiraClient,
                        JiraConfigResolver jiraConfigResolver,
@@ -91,7 +87,8 @@ public class SyncService {
                        com.leadboard.planning.UnifiedPlanningService unifiedPlanningService,
                        BoardService boardService,
                        @Lazy SyncService self,
-                       EmbeddingService embeddingService) {
+                       EmbeddingService embeddingService,
+                       WorklogImportService worklogImportService) {
         this.jiraClient = jiraClient;
         this.jiraConfigResolver = jiraConfigResolver;
         this.issueRepository = issueRepository;
@@ -112,6 +109,7 @@ public class SyncService {
         this.boardService = boardService;
         this.self = self;
         this.embeddingService = embeddingService;
+        this.worklogImportService = worklogImportService;
     }
 
     /**
@@ -139,29 +137,7 @@ public class SyncService {
         }
     }
 
-    @Scheduled(fixedRateString = "${jira.sync-interval-seconds:300}000")
-    public void scheduledSync() {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
-            return;
-        }
-
-        // Skip scheduled sync if initial setup hasn't been done yet (wizard not completed)
-        JiraSyncStateEntity existingState = syncStateRepository.findByProjectKey(projectKey).orElse(null);
-        if (existingState == null || existingState.getLastSyncCompletedAt() == null) {
-            log.debug("Skipping scheduled sync — initial setup not completed yet");
-            return;
-        }
-
-        autoDetectIfNeeded(projectKey);
-        log.info("Starting scheduled sync for project: {}", projectKey);
-        self.syncProject(projectKey);
-
-        scheduledSyncCount++;
-        if (scheduledSyncCount % RECONCILE_EVERY_N_SYNCS == 0) {
-            self.reconcileDeletedIssues(projectKey);
-        }
-    }
+    // BUG-153: Legacy scheduledSync() removed — TenantSyncScheduler handles all per-tenant syncs.
 
     public SyncStatus triggerSync() {
         return triggerSync(null);
@@ -216,8 +192,10 @@ public class SyncService {
             // tenant_jira_config may not exist in public schema
         }
 
+        WorklogImportService.ImportProgress worklogProgress = worklogImportService.getProgress();
+
         if (state == null) {
-            return new SyncStatus(false, null, null, 0, null, setupCompleted);
+            return new SyncStatus(false, null, null, 0, null, setupCompleted, worklogProgress);
         }
 
         return new SyncStatus(
@@ -226,7 +204,8 @@ public class SyncService {
                 state.getLastSyncCompletedAt(),
                 state.getLastSyncIssuesCount(),
                 state.getLastError(),
-                setupCompleted
+                setupCompleted,
+                worklogProgress
         );
     }
 
@@ -369,6 +348,13 @@ public class SyncService {
             if (!statusChangedKeys.isEmpty()) {
                 log.info("Scheduling async changelog import for {} issues with status changes", statusChangedKeys.size());
                 changelogImportService.importChangelogsForIssuesAsync(statusChangedKeys);
+            }
+
+            // Import worklogs: full import if table empty, otherwise incremental for changed subtasks
+            try {
+                worklogImportService.importWorklogsAfterSync(projectKey, statusChangedKeys);
+            } catch (Exception e) {
+                log.error("Failed to import worklogs after sync", e);
             }
 
             // Invalidate planning and board caches after sync
@@ -804,12 +790,19 @@ public class SyncService {
             OffsetDateTime lastSyncCompletedAt,
             int issuesCount,
             String error,
-            boolean setupCompleted
+            boolean setupCompleted,
+            WorklogImportService.ImportProgress worklogProgress
     ) {
         /** Backwards-compatible constructor (setupCompleted defaults to false). */
         public SyncStatus(boolean syncInProgress, OffsetDateTime lastSyncStartedAt,
                           OffsetDateTime lastSyncCompletedAt, int issuesCount, String error) {
-            this(syncInProgress, lastSyncStartedAt, lastSyncCompletedAt, issuesCount, error, false);
+            this(syncInProgress, lastSyncStartedAt, lastSyncCompletedAt, issuesCount, error, false, null);
+        }
+
+        public SyncStatus(boolean syncInProgress, OffsetDateTime lastSyncStartedAt,
+                          OffsetDateTime lastSyncCompletedAt, int issuesCount, String error,
+                          boolean setupCompleted) {
+            this(syncInProgress, lastSyncStartedAt, lastSyncCompletedAt, issuesCount, error, setupCompleted, null);
         }
     }
 }

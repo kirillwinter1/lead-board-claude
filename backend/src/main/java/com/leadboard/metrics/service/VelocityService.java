@@ -12,10 +12,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -103,32 +102,64 @@ public class VelocityService {
     }
 
     /**
-     * Get logged hours (time_spent) grouped by week for a team.
+     * Get logged hours distributed proportionally across weeks for completed issues.
+     * Each issue's time_spent is spread from started_at (or done_at) to done_at.
      */
     private Map<LocalDate, BigDecimal> getLoggedHoursByWeek(Long teamId, LocalDate from, LocalDate to) {
         String sql = """
             SELECT
-                DATE_TRUNC('week', COALESCE(done_at, updated_at))::date as week_start,
-                COALESCE(SUM(time_spent_seconds), 0) / 3600.0 as hours
+                COALESCE(time_spent_seconds, 0) as time_spent,
+                started_at::date as started,
+                done_at::date as done
             FROM jira_issues
             WHERE team_id = ?
-              AND (
-                (done_at BETWEEN ? AND ?)
-                OR (done_at IS NULL AND updated_at BETWEEN ? AND ? AND time_spent_seconds > 0)
-              )
-            GROUP BY DATE_TRUNC('week', COALESCE(done_at, updated_at))
-            ORDER BY week_start
+              AND done_at IS NOT NULL
+              AND done_at BETWEEN ? AND ?
+              AND COALESCE(time_spent_seconds, 0) > 0
             """;
 
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                sql, teamId, from, to.plusDays(1), from, to.plusDays(1));
+                sql, teamId, from, to.plusDays(1));
 
-        return rows.stream()
-                .filter(row -> row.get("week_start") != null)
-                .collect(Collectors.toMap(
-                        row -> ((java.sql.Date) row.get("week_start")).toLocalDate(),
-                        row -> new BigDecimal(row.get("hours").toString()),
-                        (a, b) -> a.add(b)
-                ));
+        Map<LocalDate, BigDecimal> result = new LinkedHashMap<>();
+
+        for (Map<String, Object> row : rows) {
+            long timeSpentSeconds = ((Number) row.get("time_spent")).longValue();
+            BigDecimal hours = BigDecimal.valueOf(timeSpentSeconds).divide(BigDecimal.valueOf(3600), 4, RoundingMode.HALF_UP);
+
+            LocalDate doneDate = row.get("done") != null ? ((java.sql.Date) row.get("done")).toLocalDate() : null;
+            LocalDate startedDate = row.get("started") != null ? ((java.sql.Date) row.get("started")).toLocalDate() : null;
+
+            if (doneDate == null) continue;
+
+            // If no started_at, attribute all to done_at week (fallback)
+            if (startedDate == null || !startedDate.isBefore(doneDate)) {
+                LocalDate weekStart = doneDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+                result.merge(weekStart, hours, BigDecimal::add);
+                continue;
+            }
+
+            // Distribute proportionally across weeks from startedDate to doneDate
+            long totalDays = ChronoUnit.DAYS.between(startedDate, doneDate);
+            if (totalDays <= 0) totalDays = 1;
+
+            LocalDate weekStart = startedDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            while (!weekStart.isAfter(doneDate)) {
+                LocalDate weekEnd = weekStart.plusDays(6);
+                LocalDate overlapStart = startedDate.isAfter(weekStart) ? startedDate : weekStart;
+                LocalDate overlapEnd = doneDate.isBefore(weekEnd) ? doneDate : weekEnd;
+
+                long overlapDays = ChronoUnit.DAYS.between(overlapStart, overlapEnd);
+                if (overlapDays > 0) {
+                    BigDecimal fraction = BigDecimal.valueOf(overlapDays).divide(BigDecimal.valueOf(totalDays), 6, RoundingMode.HALF_UP);
+                    BigDecimal weekHours = hours.multiply(fraction).setScale(4, RoundingMode.HALF_UP);
+                    result.merge(weekStart, weekHours, BigDecimal::add);
+                }
+
+                weekStart = weekStart.plusWeeks(1);
+            }
+        }
+
+        return result;
     }
 }

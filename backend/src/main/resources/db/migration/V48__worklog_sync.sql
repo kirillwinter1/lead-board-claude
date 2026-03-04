@@ -1,0 +1,3 @@
+-- F57: Jira Worklog Sync — per-day role coloring on Timeline
+-- Business table created in tenant schemas only (T8 migration).
+-- Public schema: no-op (jira_issues was moved to tenant schemas in V45).

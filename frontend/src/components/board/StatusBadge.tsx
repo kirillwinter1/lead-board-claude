@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import { useStatusStyles } from './StatusStylesContext'
 
 function getContrastColor(hex: string): string {
@@ -7,6 +8,18 @@ function getContrastColor(hex: string): string {
   const b = parseInt(c.substring(4, 6), 16)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return luminance > 0.6 ? '#172b4d' : '#ffffff'
+}
+
+const badgeBaseStyle: CSSProperties = {
+  display: 'inline-block',
+  padding: '4px 10px',
+  borderRadius: 4,
+  fontWeight: 700,
+  fontSize: 11,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+  lineHeight: 1,
+  whiteSpace: 'nowrap',
 }
 
 export function StatusBadge({ status, color }: { status: string; color?: string | null }) {
@@ -19,12 +32,12 @@ export function StatusBadge({ status, color }: { status: string; color?: string 
     return (
       <span
         className="status-badge"
-        style={{ backgroundColor: effectiveColor, color: getContrastColor(effectiveColor) }}
+        style={{ ...badgeBaseStyle, backgroundColor: effectiveColor, color: getContrastColor(effectiveColor) }}
       >
         {status}
       </span>
     )
   }
 
-  return <span className={`status-badge ${statusClass}`}>{status}</span>
+  return <span className={`status-badge ${statusClass}`} style={badgeBaseStyle}>{status}</span>
 }

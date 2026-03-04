@@ -33,7 +33,14 @@ public record RetrospectiveResult(
             LocalDate startDate,
             LocalDate endDate,
             Integer progressPercent,
-            Map<String, RetroPhase> phases
+            Map<String, RetroPhase> phases,
+            List<WorklogDay> worklogDays
+    ) {}
+
+    public record WorklogDay(
+            LocalDate date,
+            String roleCode,
+            long timeSpentSeconds
     ) {}
 
     public record RetroPhase(

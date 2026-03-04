@@ -1,6 +1,7 @@
 package com.leadboard.controller;
 
 import com.leadboard.board.BoardResponse;
+import com.leadboard.board.BoardSearchResponse;
 import com.leadboard.board.BoardService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.planning.AutoScoreService;
@@ -61,6 +62,17 @@ public class BoardController {
      * @param issueKey Issue key (e.g., LB-123)
      * @return Map of factor names to their numeric values
      */
+    @GetMapping("/search")
+    public ResponseEntity<BoardSearchResponse> searchBoard(
+            @RequestParam String q,
+            @RequestParam(required = false) List<Long> teamIds) {
+        if (q == null || q.length() < 2) {
+            return ResponseEntity.badRequest().build();
+        }
+        BoardSearchResponse result = boardService.searchForBoard(q, teamIds);
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping("/{issueKey}/score-breakdown")
     public ResponseEntity<Map<String, Object>> getScoreBreakdown(@PathVariable String issueKey) {
         Optional<JiraIssueEntity> issueOpt = issueRepository.findByIssueKey(issueKey);

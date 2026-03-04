@@ -27,6 +27,7 @@ public class TenantAwareAsyncConfig implements AsyncConfigurer {
         executor.setQueueCapacity(100);
         executor.setThreadNamePrefix("tenant-async-");
         executor.setTaskDecorator(new TenantContextTaskDecorator());
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;
     }
@@ -48,6 +49,10 @@ public class TenantAwareAsyncConfig implements AsyncConfigurer {
             String schema = TenantContext.getCurrentSchema();
 
             return () -> {
+                // Check if we're running in the caller's thread (CallerRunsPolicy)
+                // If the caller already has TenantContext set, don't clear it in finally
+                Long existingTenantId = TenantContext.getCurrentTenantId();
+                boolean callerThread = (existingTenantId != null && existingTenantId.equals(tenantId));
                 try {
                     // Restore context in the async thread
                     if (tenantId != null) {
@@ -55,7 +60,10 @@ public class TenantAwareAsyncConfig implements AsyncConfigurer {
                     }
                     runnable.run();
                 } finally {
-                    TenantContext.clear();
+                    // Only clear if running in a separate async thread, not the caller's thread
+                    if (!callerThread) {
+                        TenantContext.clear();
+                    }
                 }
             };
         }

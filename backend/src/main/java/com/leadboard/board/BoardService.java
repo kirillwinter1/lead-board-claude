@@ -1,5 +1,6 @@
 package com.leadboard.board;
 
+import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.RoughEstimateProperties;
 import com.leadboard.config.service.WorkflowConfigService;
@@ -14,6 +15,7 @@ import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -37,6 +39,9 @@ public class BoardService {
     private final DataQualityService dataQualityService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final WorkflowConfigService workflowConfigService;
+
+    @Autowired(required = false)
+    private EmbeddingService embeddingService;
 
     private final ConcurrentHashMap<String, CachedBoard> boardCache = new ConcurrentHashMap<>();
 
@@ -629,5 +634,99 @@ public class BoardService {
                 }
             }
         }
+    }
+
+    public BoardSearchResponse searchForBoard(String query, List<Long> teamIds) {
+        String projectKey = jiraConfigResolver.getProjectKey();
+        if (projectKey == null || projectKey.isEmpty()) {
+            return new BoardSearchResponse(List.of(), "substring");
+        }
+
+        // Try semantic search first
+        if (embeddingService != null) {
+            try {
+                Long teamId = (teamIds != null && teamIds.size() == 1) ? teamIds.get(0) : null;
+                List<JiraIssueEntity> semanticResults = embeddingService.search(query, teamId, 30);
+                if (!semanticResults.isEmpty()) {
+                    Set<String> epicKeys = resolveToEpicKeys(semanticResults, teamIds);
+                    if (!epicKeys.isEmpty()) {
+                        return new BoardSearchResponse(new ArrayList<>(epicKeys), "semantic");
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Semantic search failed, falling back to substring: {}", e.getMessage());
+            }
+        }
+
+        // Fallback: substring search
+        Set<String> epicKeys = substringSearch(query, projectKey, teamIds);
+        return new BoardSearchResponse(new ArrayList<>(epicKeys), "substring");
+    }
+
+    private Set<String> resolveToEpicKeys(List<JiraIssueEntity> issues, List<Long> teamIds) {
+        Set<String> epicKeys = new LinkedHashSet<>();
+        Set<Long> teamIdSet = teamIds != null ? new HashSet<>(teamIds) : null;
+
+        for (JiraIssueEntity issue : issues) {
+            // Filter by teams if specified
+            if (teamIdSet != null && !teamIdSet.isEmpty() && issue.getTeamId() != null
+                    && !teamIdSet.contains(issue.getTeamId())) {
+                continue;
+            }
+
+            if (workflowConfigService.isEpic(issue.getIssueType())) {
+                epicKeys.add(issue.getIssueKey());
+            } else if (workflowConfigService.isStoryOrBug(issue.getIssueType())) {
+                // Story/Bug → parent epic key
+                if (issue.getParentKey() != null) {
+                    epicKeys.add(issue.getParentKey());
+                }
+            } else if (issue.isSubtask()) {
+                // Subtask → grandparent epic key
+                if (issue.getParentKey() != null) {
+                    Optional<JiraIssueEntity> parent = issueRepository.findByIssueKey(issue.getParentKey());
+                    if (parent.isPresent() && parent.get().getParentKey() != null) {
+                        epicKeys.add(parent.get().getParentKey());
+                    }
+                }
+            }
+        }
+        return epicKeys;
+    }
+
+    private Set<String> substringSearch(String query, String projectKey, List<Long> teamIds) {
+        Set<String> epicKeys = new LinkedHashSet<>();
+        String q = query.toLowerCase();
+
+        List<JiraIssueEntity> epics;
+        if (teamIds != null && !teamIds.isEmpty()) {
+            epics = issueRepository.findByBoardCategoryAndTeamIdIn("EPIC", teamIds);
+        } else {
+            epics = issueRepository.findByProjectKeyAndBoardCategory(projectKey, "EPIC");
+        }
+
+        // Search in epics by key + summary
+        for (JiraIssueEntity epic : epics) {
+            if (epic.getIssueKey().toLowerCase().contains(q)
+                    || (epic.getSummary() != null && epic.getSummary().toLowerCase().contains(q))) {
+                epicKeys.add(epic.getIssueKey());
+            }
+        }
+
+        // Search in stories/bugs — match parent epic
+        List<String> allEpicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
+        if (!allEpicKeys.isEmpty()) {
+            List<JiraIssueEntity> stories = issueRepository.findByParentKeyIn(allEpicKeys);
+            for (JiraIssueEntity story : stories) {
+                if (story.getIssueKey().toLowerCase().contains(q)
+                        || (story.getSummary() != null && story.getSummary().toLowerCase().contains(q))) {
+                    if (story.getParentKey() != null) {
+                        epicKeys.add(story.getParentKey());
+                    }
+                }
+            }
+        }
+
+        return epicKeys;
     }
 }

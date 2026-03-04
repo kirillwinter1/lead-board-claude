@@ -13,13 +13,16 @@ public class SyncController {
 
     private final SyncService syncService;
     private final ChangelogImportService changelogImportService;
+    private final WorklogImportService worklogImportService;
     private final JiraConfigResolver jiraConfigResolver;
 
     public SyncController(SyncService syncService,
                           ChangelogImportService changelogImportService,
+                          WorklogImportService worklogImportService,
                           JiraConfigResolver jiraConfigResolver) {
         this.syncService = syncService;
         this.changelogImportService = changelogImportService;
+        this.worklogImportService = worklogImportService;
         this.jiraConfigResolver = jiraConfigResolver;
     }
 
@@ -85,6 +88,22 @@ public class SyncController {
         return ResponseEntity.ok(Map.of(
                 "status", "started",
                 "message", "Changelog import started for project " + projectKey + " (" + period + ")"
+        ));
+    }
+
+    @PostMapping("/import-worklogs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> importWorklogs() {
+        String projectKey = jiraConfigResolver.getProjectKey();
+        if (projectKey == null || projectKey.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Project key not configured"));
+        }
+
+        worklogImportService.importAllWorklogsAsync(projectKey);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "started",
+                "message", "Worklog import started for project " + projectKey
         ));
     }
 }

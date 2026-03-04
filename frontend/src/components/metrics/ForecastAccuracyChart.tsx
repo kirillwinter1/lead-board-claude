@@ -76,7 +76,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
           </div>
           <div className="accuracy-label">
             Accuracy Ratio
-            <span className="accuracy-hint">плановые дни / фактические дни</span>
+            <span className="accuracy-hint">плановые дни / фактические дни (&gt; 1 = быстрее плана)</span>
           </div>
         </div>
 
@@ -213,7 +213,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
                 <li><span style={{ color: '#FFAB00' }}>0.80–1.20</span> — приемлемое отклонение</li>
                 <li><span style={{ color: '#FF5630' }}>&lt;0.80 или &gt;1.20</span> — требует внимания</li>
               </ul>
-              <p>Ratio &gt; 1 — сделали быстрее плана. Ratio &lt; 1 — медленнее.</p>
+              <p>Ratio &gt; 1 — сделали быстрее плана. Ratio &lt; 1 — медленнее. <em>Обратите внимание: направление противоположно DSR, где &gt; 1 = медленнее.</em></p>
             </div>
             <div className="howto-block">
               <strong>Отклонение (Schedule Variance)</strong>
