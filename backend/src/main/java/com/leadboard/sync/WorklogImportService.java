@@ -16,6 +16,7 @@ import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,15 +26,31 @@ public class WorklogImportService {
     private static final Logger log = LoggerFactory.getLogger(WorklogImportService.class);
     private static final long RATE_LIMIT_MS = 100;
 
-    private final AtomicBoolean importInProgress = new AtomicBoolean(false);
-    private final AtomicInteger processedCount = new AtomicInteger(0);
-    private final AtomicInteger totalCount = new AtomicInteger(0);
-    private final AtomicInteger importedCount = new AtomicInteger(0);
+    private static class ProgressState {
+        final AtomicBoolean inProgress = new AtomicBoolean(false);
+        final AtomicInteger processed = new AtomicInteger(0);
+        final AtomicInteger total = new AtomicInteger(0);
+        final AtomicInteger imported = new AtomicInteger(0);
+
+        void reset() {
+            processed.set(0);
+            total.set(0);
+            imported.set(0);
+        }
+    }
+
+    private final ConcurrentHashMap<String, ProgressState> progressByTenant = new ConcurrentHashMap<>();
+
+    private ProgressState getState() {
+        String schema = com.leadboard.tenant.TenantContext.getCurrentSchema();
+        return progressByTenant.computeIfAbsent(schema, k -> new ProgressState());
+    }
 
     public record ImportProgress(boolean inProgress, int processed, int total, int imported) {}
 
     public ImportProgress getProgress() {
-        return new ImportProgress(importInProgress.get(), processedCount.get(), totalCount.get(), importedCount.get());
+        ProgressState state = getState();
+        return new ImportProgress(state.inProgress.get(), state.processed.get(), state.total.get(), state.imported.get());
     }
 
     private final JiraClient jiraClient;
@@ -83,14 +100,14 @@ public class WorklogImportService {
     public void importWorklogsForIssuesAsync(List<String> issueKeys) {
         if (issueKeys == null || issueKeys.isEmpty()) return;
 
-        if (!importInProgress.compareAndSet(false, true)) {
+        ProgressState state = getState();
+        if (!state.inProgress.compareAndSet(false, true)) {
             log.warn("Worklog import already in progress, skipping incremental import");
             return;
         }
 
-        processedCount.set(0);
-        totalCount.set(issueKeys.size());
-        importedCount.set(0);
+        state.reset();
+        state.total.set(issueKeys.size());
 
         try {
             log.info("Starting worklog import for {} issues", issueKeys.size());
@@ -99,8 +116,8 @@ public class WorklogImportService {
             for (String issueKey : issueKeys) {
                 try {
                     int count = importWorklogsForIssue(issueKey);
-                    if (count > 0) importedCount.incrementAndGet();
-                    processedCount.incrementAndGet();
+                    if (count > 0) state.imported.incrementAndGet();
+                    state.processed.incrementAndGet();
 
                     Thread.sleep(RATE_LIMIT_MS);
                 } catch (InterruptedException e) {
@@ -108,15 +125,15 @@ public class WorklogImportService {
                     break;
                 } catch (Exception e) {
                     failed++;
-                    processedCount.incrementAndGet();
+                    state.processed.incrementAndGet();
                     log.warn("Failed to import worklogs for {}: {}", issueKey, e.getMessage());
                 }
             }
 
             log.info("Worklog import completed: {} imported, {} failed out of {}",
-                    importedCount.get(), failed, issueKeys.size());
+                    state.imported.get(), failed, issueKeys.size());
         } finally {
-            importInProgress.set(false);
+            state.inProgress.set(false);
         }
     }
 
@@ -125,43 +142,42 @@ public class WorklogImportService {
      */
     @Async
     public void importAllWorklogsAsync(String projectKey) {
-        if (!importInProgress.compareAndSet(false, true)) {
+        ProgressState state = getState();
+        if (!state.inProgress.compareAndSet(false, true)) {
             log.warn("Worklog import already in progress, skipping");
             return;
         }
-        processedCount.set(0);
-        totalCount.set(0);
-        importedCount.set(0);
+        state.reset();
 
         try {
             List<JiraIssueEntity> subtasks = issueRepository.findByProjectKey(projectKey).stream()
                     .filter(i -> workflowConfigService.isSubtask(i.getIssueType()))
                     .toList();
 
-            totalCount.set(subtasks.size());
+            state.total.set(subtasks.size());
             log.info("Starting worklog import for {} subtasks in project {}", subtasks.size(), projectKey);
             int failed = 0;
 
             for (JiraIssueEntity subtask : subtasks) {
                 try {
                     int count = importWorklogsForIssue(subtask.getIssueKey());
-                    if (count > 0) importedCount.incrementAndGet();
-                    processedCount.incrementAndGet();
+                    if (count > 0) state.imported.incrementAndGet();
+                    state.processed.incrementAndGet();
                     Thread.sleep(RATE_LIMIT_MS);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     break;
                 } catch (Exception e) {
                     failed++;
-                    processedCount.incrementAndGet();
+                    state.processed.incrementAndGet();
                     log.warn("Failed to import worklogs for {}: {}", subtask.getIssueKey(), e.getMessage());
                 }
             }
 
             log.info("Worklog import completed for {}: {} imported, {} failed out of {}",
-                    projectKey, importedCount.get(), failed, subtasks.size());
+                    projectKey, state.imported.get(), failed, subtasks.size());
         } finally {
-            importInProgress.set(false);
+            state.inProgress.set(false);
         }
     }
 

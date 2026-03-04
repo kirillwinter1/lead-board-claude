@@ -9,8 +9,10 @@ public record EpicBurndownResponse(
     LocalDate startDate,
     LocalDate endDate,
     int totalStories,
+    double totalEstimateDays,
+    Double planEstimateDays,
     List<BurndownPoint> idealLine,
     List<BurndownPoint> actualLine
 ) {
-    public record BurndownPoint(LocalDate date, int remaining) {}
+    public record BurndownPoint(LocalDate date, double remaining) {}
 }

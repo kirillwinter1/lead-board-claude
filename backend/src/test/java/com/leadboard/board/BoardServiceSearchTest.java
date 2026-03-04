@@ -102,7 +102,7 @@ class BoardServiceSearchTest {
     @DisplayName("Semantic search returns epic → epic key in result")
     void semanticSearchReturnsEpicDirectly() {
         JiraIssueEntity epic = createIssue("LB-1", "Epic", "User authentication", null, 1L);
-        when(embeddingService.search(eq("authentication"), isNull(), eq(30)))
+        when(embeddingService.search(eq("authentication"), isNull(), eq(15)))
                 .thenReturn(List.of(epic));
 
         BoardSearchResponse result = boardService.searchForBoard("authentication", null);
@@ -115,7 +115,7 @@ class BoardServiceSearchTest {
     @DisplayName("Semantic search returns story → parent epic key in result")
     void semanticSearchReturnsStoryResolvesToParent() {
         JiraIssueEntity story = createIssue("LB-10", "Story", "Login form", "LB-1", 1L);
-        when(embeddingService.search(eq("login form"), isNull(), eq(30)))
+        when(embeddingService.search(eq("login form"), isNull(), eq(15)))
                 .thenReturn(List.of(story));
 
         BoardSearchResponse result = boardService.searchForBoard("login form", null);
@@ -130,7 +130,7 @@ class BoardServiceSearchTest {
         JiraIssueEntity subtask = createIssue("LB-100", "Sub-task", "Write tests", "LB-10", 1L);
         JiraIssueEntity parentStory = createIssue("LB-10", "Story", "Login form", "LB-1", 1L);
 
-        when(embeddingService.search(eq("write tests"), isNull(), eq(30)))
+        when(embeddingService.search(eq("write tests"), isNull(), eq(15)))
                 .thenReturn(List.of(subtask));
         when(issueRepository.findByIssueKey("LB-10")).thenReturn(Optional.of(parentStory));
 
@@ -143,7 +143,7 @@ class BoardServiceSearchTest {
     @Test
     @DisplayName("Semantic search empty → fallback to substring")
     void fallbackToSubstringWhenSemanticEmpty() {
-        when(embeddingService.search(anyString(), isNull(), eq(30)))
+        when(embeddingService.search(anyString(), isNull(), eq(15)))
                 .thenReturn(Collections.emptyList());
 
         JiraIssueEntity epic = createIssue("LB-1", "Epic", "Payment integration", null, 1L);
@@ -161,7 +161,7 @@ class BoardServiceSearchTest {
     @Test
     @DisplayName("Substring search matches story summary → returns parent epic")
     void substringSearchMatchesStory() {
-        when(embeddingService.search(anyString(), isNull(), eq(30)))
+        when(embeddingService.search(anyString(), isNull(), eq(15)))
                 .thenReturn(Collections.emptyList());
 
         JiraIssueEntity epic = createIssue("LB-1", "Epic", "Auth module", null, 1L);
@@ -184,7 +184,7 @@ class BoardServiceSearchTest {
         JiraIssueEntity epic1 = createIssue("LB-1", "Epic", "Feature A", null, 1L);
         JiraIssueEntity epic2 = createIssue("LB-2", "Epic", "Feature B", null, 2L);
 
-        when(embeddingService.search(eq("feature"), eq(1L), eq(30)))
+        when(embeddingService.search(eq("feature"), eq(1L), eq(15)))
                 .thenReturn(List.of(epic1, epic2));
 
         BoardSearchResponse result = boardService.searchForBoard("feature", List.of(1L));

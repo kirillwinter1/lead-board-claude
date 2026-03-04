@@ -67,7 +67,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
     )
 
     return burndownData.idealLine.map(point => ({
-      date: new Date(point.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      date: new Date(point.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }),
       fullDate: point.date,
       ideal: point.remaining,
       actual: actualMap.get(point.date) ?? null
@@ -76,7 +76,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
   if (epicsLoading) {
@@ -101,7 +101,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
     <div className="burndown-section">
       <h3>Epic Burndown</h3>
       <p className="burndown-description">
-        Track story completion progress. Ideal line shows linear completion, actual line shows real progress.
+        Оставшийся объём работ в человекоднях. Пунктир — план, сплошная — факт.
       </p>
 
       {/* Epic Selector */}
@@ -132,6 +132,20 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
               <span className="burndown-epic-info-label">Stories:</span>
               <span className="burndown-epic-info-value">{burndownData.totalStories}</span>
             </div>
+            <div className="burndown-epic-info-item">
+              <span className="burndown-epic-info-label">
+                {burndownData.planEstimateDays != null && burndownData.planEstimateDays !== burndownData.totalEstimateDays
+                  ? 'Current:'
+                  : 'Estimate:'}
+              </span>
+              <span className="burndown-epic-info-value">{burndownData.totalEstimateDays} чел-дн</span>
+            </div>
+            {burndownData.planEstimateDays != null && burndownData.planEstimateDays !== burndownData.totalEstimateDays && (
+              <div className="burndown-epic-info-item">
+                <span className="burndown-epic-info-label">Plan:</span>
+                <span className="burndown-epic-info-value">{burndownData.planEstimateDays} чел-дн</span>
+              </div>
+            )}
             {burndownData.startDate && (
               <div className="burndown-epic-info-item">
                 <span className="burndown-epic-info-label">Start:</span>
@@ -140,7 +154,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
             )}
             {burndownData.endDate && (
               <div className="burndown-epic-info-item">
-                <span className="burndown-epic-info-label">{burndownData.totalStories > 0 && epics.find(e => e.key === selectedEpicKey)?.completed ? 'End:' : 'Today:'}</span>
+                <span className="burndown-epic-info-label">{epics.find(e => e.key === selectedEpicKey)?.completed ? 'End:' : 'Today:'}</span>
                 <span className="burndown-epic-info-value">{formatDate(burndownData.endDate)}</span>
               </div>
             )}
@@ -163,6 +177,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
                     tickLine={false}
                     axisLine={{ stroke: '#dfe1e6' }}
                     allowDecimals={false}
+                    label={{ value: 'чел-дн', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#6b778c' } }}
                   />
                   <Tooltip
                     contentStyle={{
@@ -173,25 +188,25 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
                       fontSize: 12
                     }}
                     labelStyle={{ color: 'white', fontWeight: 600 }}
-                    formatter={(value) => [`${value} stories`]}
+                    formatter={(value) => [`${value} чел-дн`]}
                   />
                   <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
                   <Line
-                    type="monotone"
+                    type={burndownData.planEstimateDays != null ? 'stepAfter' : 'monotone'}
                     dataKey="ideal"
                     stroke="#97a0af"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
-                    name="Ideal"
+                    name="План"
                   />
                   <Line
                     type="monotone"
                     dataKey="actual"
                     stroke="#0065ff"
-                    strokeWidth={2}
+                    strokeWidth={3}
                     dot={false}
-                    name="Actual"
+                    name="Факт"
                     connectNulls
                   />
                 </LineChart>
@@ -202,7 +217,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
               No burndown data available for this epic.
               <br />
               <small style={{ color: '#6b778c' }}>
-                Burndown requires stories assigned to this epic.
+                Burndown requires stories with estimates assigned to this epic.
               </small>
             </div>
           )}

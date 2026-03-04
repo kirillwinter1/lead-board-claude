@@ -25,6 +25,7 @@ public class BoardNode {
     private Integer progress; // 0-100
     private Map<String, RoleMetrics> roleProgress; // dynamic role progress by role code
     private boolean epicInTodo; // true if Epic is in Backlog/To Do status (for UI styling)
+    private boolean epicDone; // true if Epic is in Done status
     private Map<String, BigDecimal> roughEstimates; // dynamic rough estimates by role code
     private BigDecimal autoScore; // AutoScore for prioritization (Epic and Story)
     private Integer manualOrder; // Manual order position (1 = first)
@@ -159,6 +160,14 @@ public class BoardNode {
 
     public void setEpicInTodo(boolean epicInTodo) {
         this.epicInTodo = epicInTodo;
+    }
+
+    public boolean isEpicDone() {
+        return epicDone;
+    }
+
+    public void setEpicDone(boolean epicDone) {
+        this.epicDone = epicDone;
     }
 
     public Map<String, BigDecimal> getRoughEstimates() {

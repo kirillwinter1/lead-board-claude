@@ -17,6 +17,10 @@ interface FilterPanelProps {
   teamColorMap?: Map<string, string>
   searchMode?: 'semantic' | 'substring' | null
   searchLoading?: boolean
+  hideNew?: boolean
+  hideDone?: boolean
+  onHideNewToggle?: () => void
+  onHideDoneToggle?: () => void
 }
 
 function formatSyncTime(isoString: string | null): string {
@@ -47,8 +51,12 @@ export function FilterPanel({
   teamColorMap,
   searchMode,
   searchLoading,
+  hideNew,
+  hideDone,
+  onHideNewToggle,
+  onHideDoneToggle,
 }: FilterPanelProps) {
-  const hasActiveFilters = searchKey || selectedStatuses.size > 0 || selectedTeams.size > 0
+  const hasActiveFilters = searchKey || selectedStatuses.size > 0 || selectedTeams.size > 0 || hideNew || hideDone
 
   return (
     <div className="filter-panel">
@@ -108,6 +116,23 @@ export function FilterPanel({
         onToggle={onStatusToggle}
         placeholder="All statuses"
       />
+
+      {onHideNewToggle && (
+        <button
+          className={`btn btn-sm btn-toggle ${hideNew ? 'btn-toggle-active' : ''}`}
+          onClick={onHideNewToggle}
+        >
+          Hide NEW
+        </button>
+      )}
+      {onHideDoneToggle && (
+        <button
+          className={`btn btn-sm btn-toggle ${hideDone ? 'btn-toggle-active' : ''}`}
+          onClick={onHideDoneToggle}
+        >
+          Hide DONE
+        </button>
+      )}
 
       {hasActiveFilters && (
         <button className="btn btn-secondary btn-clear" onClick={onClearFilters}>

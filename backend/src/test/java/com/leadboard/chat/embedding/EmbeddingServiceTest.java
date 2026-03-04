@@ -116,7 +116,7 @@ class EmbeddingServiceTest {
         found.setIssueKey("LB-42");
         found.setSummary("Автоматизация отчётности");
 
-        when(issueRepository.findByEmbeddingSimilarity(anyString(), eq(10))).thenReturn(List.of(found));
+        when(issueRepository.findByEmbeddingSimilarity(anyString(), eq(10), anyDouble())).thenReturn(List.of(found));
 
         List<JiraIssueEntity> results = embeddingService.search("отчётность", null, 10);
 
@@ -133,14 +133,14 @@ class EmbeddingServiceTest {
         float[] queryEmbedding = new float[]{0.1f, 0.2f};
         when(embeddingClient.generateEmbedding("security")).thenReturn(queryEmbedding);
 
-        when(issueRepository.findByEmbeddingSimilarityAndTeamId(anyString(), eq(5L), eq(10)))
+        when(issueRepository.findByEmbeddingSimilarityAndTeamId(anyString(), eq(5L), eq(10), anyDouble()))
                 .thenReturn(List.of());
 
         List<JiraIssueEntity> results = embeddingService.search("security", 5L, 10);
 
         assertTrue(results.isEmpty());
-        verify(issueRepository).findByEmbeddingSimilarityAndTeamId(anyString(), eq(5L), eq(10));
-        verify(issueRepository, never()).findByEmbeddingSimilarity(anyString(), anyInt());
+        verify(issueRepository).findByEmbeddingSimilarityAndTeamId(anyString(), eq(5L), eq(10), anyDouble());
+        verify(issueRepository, never()).findByEmbeddingSimilarity(anyString(), anyInt(), anyDouble());
     }
 
     @Test

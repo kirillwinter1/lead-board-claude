@@ -230,3 +230,34 @@
   color: #6b778c;
 }
 
+/* Quick filter toggle buttons */
+.btn-toggle {
+  align-self: center;
+  padding: 6px 12px;
+  border: 1px solid #dfe1e6;
+  border-radius: 4px;
+  background: white;
+  color: #6b778c;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-toggle:hover {
+  border-color: #0052cc;
+  color: #0052cc;
+}
+
+.btn-toggle-active {
+  background: #0052cc;
+  border-color: #0052cc;
+  color: white;
+}
+
+.btn-toggle-active:hover {
+  background: #0747a6;
+  border-color: #0747a6;
+  color: white;
+}
+

@@ -33,6 +33,7 @@ export interface BoardNode {
   progress: number | null
   roleProgress: RoleProgress | null
   epicInTodo: boolean
+  epicDone: boolean
   roughEstimates: Record<string, number> | null
   alerts: DataQualityViolation[]
   autoScore: number | null

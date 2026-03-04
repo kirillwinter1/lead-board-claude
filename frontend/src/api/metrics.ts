@@ -272,6 +272,8 @@ export interface EpicBurndownResponse {
   startDate: string | null
   endDate: string | null
   totalStories: number
+  totalEstimateDays: number
+  planEstimateDays: number | null
   idealLine: BurndownPoint[]
   actualLine: BurndownPoint[]
 }

@@ -41,6 +41,10 @@ export function BoardPage() {
     allTeamIds,
     searchMode,
     searchLoading,
+    hideNew,
+    hideDone,
+    setHideNew,
+    setHideDone,
     handleStatusToggle,
     handleTeamToggle,
     clearFilters,
@@ -149,6 +153,10 @@ export function BoardPage() {
         teamColorMap={teamColorMap}
         searchMode={searchMode}
         searchLoading={searchLoading}
+        hideNew={hideNew}
+        hideDone={hideDone}
+        onHideNewToggle={() => setHideNew(v => !v)}
+        onHideDoneToggle={() => setHideDone(v => !v)}
       />
 
       <main className="main-content">

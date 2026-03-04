@@ -28,4 +28,17 @@ public interface IssueWorklogRepository extends JpaRepository<IssueWorklogEntity
             ORDER BY w.started_date
             """, nativeQuery = true)
     List<Object[]> findAggregatedWorklogsByIssueKeys(@Param("keys") List<String> keys);
+
+    /**
+     * Aggregate daily total time spent across a set of issue keys.
+     * Used by Epic Burndown to build the actual (worklog-based) burndown line.
+     */
+    @Query(value = """
+            SELECT w.started_date, SUM(w.time_spent_seconds) as total_seconds
+            FROM issue_worklogs w
+            WHERE w.issue_key IN :keys
+            GROUP BY w.started_date
+            ORDER BY w.started_date
+            """, nativeQuery = true)
+    List<Object[]> findDailyTimeSpentByIssueKeys(@Param("keys") List<String> keys);
 }

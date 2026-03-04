@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 public class EmbeddingService {
 
     private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
+    private static final double DEFAULT_MAX_DISTANCE = 0.75;
 
     private final ChatProperties chatProperties;
     private final JiraIssueRepository issueRepository;
@@ -60,6 +61,10 @@ public class EmbeddingService {
     }
 
     public List<JiraIssueEntity> search(String query, Long teamId, int limit) {
+        return search(query, teamId, limit, DEFAULT_MAX_DISTANCE);
+    }
+
+    public List<JiraIssueEntity> search(String query, Long teamId, int limit, double maxDistance) {
         if (!chatProperties.isEmbeddingEnabled() || embeddingClient == null) {
             return Collections.emptyList();
         }
@@ -73,9 +78,9 @@ public class EmbeddingService {
             String vectorString = toVectorString(queryEmbedding);
 
             if (teamId != null) {
-                return issueRepository.findByEmbeddingSimilarityAndTeamId(vectorString, teamId, limit);
+                return issueRepository.findByEmbeddingSimilarityAndTeamId(vectorString, teamId, limit, maxDistance);
             }
-            return issueRepository.findByEmbeddingSimilarity(vectorString, limit);
+            return issueRepository.findByEmbeddingSimilarity(vectorString, limit, maxDistance);
         } catch (Exception e) {
             log.warn("Embedding search failed: {}", e.getMessage());
             return Collections.emptyList();

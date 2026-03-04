@@ -47,6 +47,17 @@ public interface ForecastSnapshotRepository extends JpaRepository<ForecastSnapsh
     boolean existsByTeamIdAndSnapshotDate(Long teamId, LocalDate snapshotDate);
 
     /**
+     * Find the closest snapshot on or before a given date for a team.
+     * Used by Epic Burndown to get the plan snapshot at epic start time.
+     */
+    @Query("SELECT s FROM ForecastSnapshotEntity s WHERE s.teamId = :teamId " +
+           "AND s.snapshotDate <= :date ORDER BY s.snapshotDate DESC LIMIT 1")
+    Optional<ForecastSnapshotEntity> findClosestOnOrBefore(
+            @Param("teamId") Long teamId,
+            @Param("date") LocalDate date
+    );
+
+    /**
      * Delete old snapshots (for cleanup).
      */
     @Modifying

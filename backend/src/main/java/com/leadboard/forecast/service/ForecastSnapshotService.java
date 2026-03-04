@@ -121,6 +121,22 @@ public class ForecastSnapshotService {
     }
 
     /**
+     * Gets the unified planning result from the closest snapshot on or before a given date.
+     * Used by Epic Burndown to find the plan at epic start time.
+     */
+    public Optional<UnifiedPlanningResult> getUnifiedPlanningFromClosestSnapshot(Long teamId, LocalDate date) {
+        return snapshotRepository.findClosestOnOrBefore(teamId, date)
+                .map(snapshot -> {
+                    try {
+                        return objectMapper.readValue(snapshot.getUnifiedPlanningJson(), UnifiedPlanningResult.class);
+                    } catch (JsonProcessingException e) {
+                        log.error("Failed to deserialize unified planning from snapshot: {}", e.getMessage());
+                        return null;
+                    }
+                });
+    }
+
+    /**
      * Gets the forecast response from a snapshot.
      */
     public Optional<ForecastResponse> getForecastFromSnapshot(Long teamId, LocalDate date) {

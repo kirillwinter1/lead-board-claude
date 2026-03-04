@@ -323,6 +323,7 @@ public class BoardService {
         if (workflowConfigService.isEpic(entity.getIssueType())) {
             boolean epicInTodo = workflowConfigService.isAllowedForRoughEstimate(entity.getStatus());
             node.setEpicInTodo(epicInTodo);
+            node.setEpicDone(workflowConfigService.isDone(entity.getStatus(), entity.getIssueType()));
 
             // Dynamic rough estimates
             node.setRoughEstimates(entity.getRoughEstimates());
@@ -646,7 +647,7 @@ public class BoardService {
         if (embeddingService != null) {
             try {
                 Long teamId = (teamIds != null && teamIds.size() == 1) ? teamIds.get(0) : null;
-                List<JiraIssueEntity> semanticResults = embeddingService.search(query, teamId, 30);
+                List<JiraIssueEntity> semanticResults = embeddingService.search(query, teamId, 15);
                 if (!semanticResults.isEmpty()) {
                     Set<String> epicKeys = resolveToEpicKeys(semanticResults, teamIds);
                     if (!epicKeys.isEmpty()) {

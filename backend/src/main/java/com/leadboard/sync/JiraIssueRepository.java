@@ -268,13 +268,17 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     void updateEmbedding(@Param("id") Long id, @Param("vec") String vectorString);
 
     @Query(value = "SELECT * FROM jira_issues WHERE embedding IS NOT NULL " +
+           "AND embedding <=> cast(:vec as vector) < :maxDist " +
            "ORDER BY embedding <=> cast(:vec as vector) LIMIT :lim", nativeQuery = true)
-    List<JiraIssueEntity> findByEmbeddingSimilarity(@Param("vec") String vec, @Param("lim") int lim);
+    List<JiraIssueEntity> findByEmbeddingSimilarity(@Param("vec") String vec, @Param("lim") int lim,
+            @Param("maxDist") double maxDist);
 
     @Query(value = "SELECT * FROM jira_issues WHERE embedding IS NOT NULL AND team_id = :teamId " +
+           "AND embedding <=> cast(:vec as vector) < :maxDist " +
            "ORDER BY embedding <=> cast(:vec as vector) LIMIT :lim", nativeQuery = true)
     List<JiraIssueEntity> findByEmbeddingSimilarityAndTeamId(
-            @Param("vec") String vec, @Param("teamId") Long teamId, @Param("lim") int lim);
+            @Param("vec") String vec, @Param("teamId") Long teamId, @Param("lim") int lim,
+            @Param("maxDist") double maxDist);
 
     @Query(value = "SELECT * FROM jira_issues WHERE embedding IS NULL AND summary IS NOT NULL", nativeQuery = true)
     List<JiraIssueEntity> findWithoutEmbedding();
@@ -284,6 +288,15 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
     List<JiraIssueEntity> findByLabelsIsNotNull();
 
     List<JiraIssueEntity> findByBoardCategoryAndTeamIdOrderByManualOrderAsc(String boardCategory, Long teamId);
+
+    // ==================== Epic Burndown ====================
+
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
+           "AND e.boardCategory = 'EPIC' " +
+           "AND e.startedAt IS NOT NULL " +
+           "ORDER BY CASE WHEN e.doneAt IS NULL THEN 0 ELSE 1 END, " +
+           "COALESCE(e.doneAt, e.startedAt) DESC")
+    List<JiraIssueEntity> findEpicsForBurndown(@Param("teamId") Long teamId);
 
     // ==================== Simulation: stuck subtasks ====================
 
