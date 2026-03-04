@@ -8,22 +8,22 @@
 
 ## Решение
 
-### Новая формула DSR
+### Формула DSR (v3 — status-based)
 
 ```
-DSR = (working_days - flagged_days) / estimate_days
+DSR = (дни_в_работе − дни_паузы) / оценка_в_днях
 ```
 
-- `working_days` — рабочие дни от `epic.started_at` до `endDate`
-- `endDate`: завершённые эпики = `max(subtask.done_at)`, in-progress = `today`
-- `flagged_days` — рабочие дни под флагом (паузы)
-- `estimate_days` = `sum(subtask.original_estimate_seconds) / (8 * 3600)`
+- `дни_в_работе` — сумма рабочих дней во всех периодах IN_PROGRESS (из `status_changelog`)
+- `дни_паузы` — рабочие дни под флагом Jira, только внутри периодов IN_PROGRESS
+- `оценка` = `sum(subtask.original_estimate_seconds) / (8 * 3600)`, fallback: rough estimates
+- Fallback для эпиков без changelog: `startedAt` → `doneAt` (историческая совместимость)
 
 ### Ключевые изменения
 
 1. **Pause Flag** — флаг на эпике останавливает таймер DSR. Каждое включение/выключение записывается в `flag_changelog`.
-2. **Subtask End Point** — для завершённых эпиков конечная точка = `max(subtask.done_at)`, а не `epic.done_at`. Это исключает E2E/приёмку.
-3. **Live DSR** — DSR считается для in-progress эпиков (endDate = today). Если DSR > 1.0 — команда отстаёт.
+2. **Status-based подсчёт** — дни в работе считаются из status_changelog (периоды IN_PROGRESS), а не от startedAt. Это корректно обрабатывает откаты статуса (epic возвращён в Planned → дни в Planned не считаются).
+3. **Множественные периоды** — epic может несколько раз входить/выходить из IN_PROGRESS, все периоды суммируются.
 4. **AutoScore штраф** — flagged эпик получает -100 к AutoScore, что опускает его ниже активных эпиков на Board.
 
 ## Файлы
@@ -40,9 +40,9 @@ DSR = (working_days - flagged_days) / estimate_days
 ### Изменённые
 | Файл | Изменение |
 |------|-----------|
-| `EpicDsr.java` | +3 поля: `inProgress`, `calendarWorkingDays`, `flaggedDays`, `effectiveWorkingDays` |
-| `DsrService.java` | Новая формула, in-progress эпики, subtask endpoint, flagged days |
-| `JiraIssueRepository.java` | +query `findEpicsForDsr()` (startedAt != null, completed OR in-progress) |
+| `EpicDsr.java` | Поля: `inProgressWorkdays`, `flaggedDays`, `effectiveWorkingDays` (status-based) |
+| `DsrService.java` | Status-based формула: changelog IN_PROGRESS периоды + fallback на startedAt |
+| `JiraIssueRepository.java` | `findEpicsForDsr()` без фильтра startedAt, сортировка по issueKey |
 | `SyncService.java` | +FlagChangelogService, детекция изменения флага при sync |
 | `DataQualityRule.java` | +`SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED` |
 | `DataQualityService.java` | Проверка time logged при flagged epic |

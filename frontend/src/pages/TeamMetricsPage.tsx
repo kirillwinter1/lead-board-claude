@@ -3,8 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getWipHistory, createWipSnapshot, WipHistoryResponse } from '../api/forecast'
 import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getDsr, DsrResponse } from '../api/metrics'
+import { getStatusStyles, type StatusStyle } from '../api/board'
 import { getConfig } from '../api/config'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import './TeamMetricsPage.css'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { DsrGauge } from '../components/metrics/DsrGauge'
@@ -15,6 +17,7 @@ import { ForecastAccuracyChart } from '../components/metrics/ForecastAccuracyCha
 import { VelocityChart } from '../components/metrics/VelocityChart'
 import { EpicBurndownChart } from '../components/metrics/EpicBurndownChart'
 import { RoleLoadBlock } from '../components/metrics/RoleLoadBlock'
+import { DsrBreakdownChart } from '../components/metrics/DsrBreakdownChart'
 
 // --- WIP History Chart Component ---
 
@@ -212,6 +215,7 @@ export function TeamMetricsPage() {
   const { issueTypeCategories } = useWorkflowConfig()
   const [teams, setTeams] = useState<Team[]>([])
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
 
   // Sync teamId with URL (validate to avoid NaN)
   const rawTeamId = searchParams.get('teamId')
@@ -259,11 +263,12 @@ export function TeamMetricsPage() {
     return options
   }, [issueTypeCategories])
 
-  // Load config for Jira URL
+  // Load config for Jira URL + status styles
   useEffect(() => {
     getConfig()
       .then(config => setJiraBaseUrl(config.jiraBaseUrl))
       .catch(err => console.error('Failed to load config:', err))
+    getStatusStyles().then(setStatusStyles).catch(() => {})
   }, [])
 
   // Load teams (once on mount)
@@ -325,6 +330,7 @@ export function TeamMetricsPage() {
   }, [selectedTeamId, dateRange.from, dateRange.to, issueType])
 
   return (
+    <StatusStylesProvider value={statusStyles}>
     <main className="main-content">
       <div className="page-header">
         <h2>Team Metrics</h2>
@@ -399,76 +405,26 @@ export function TeamMetricsPage() {
                 <MetricCard
                   title="Throughput"
                   value={metrics.throughput.total}
-                  subtitle={`${metrics.throughput.totalStories} stories, ${metrics.throughput.totalEpics} epics`}
+                  subtitle={`${metrics.throughput.totalStories} stories, ${metrics.throughput.totalEpics} epics${metrics.throughput.totalBugs > 0 ? `, ${metrics.throughput.totalBugs} bugs` : ''}`}
                   tooltip="Количество завершённых задач за выбранный период."
                 />
                 <MetricCard
-                  title="On-Time Rate"
+                  title="Within Estimate"
                   value={dsr && dsr.totalEpics > 0 ? `${dsr.onTimeRate.toFixed(0)}%` : '—'}
-                  subtitle={dsr && dsr.totalEpics > 0 ? `${dsr.onTimeCount} из ${dsr.totalEpics} вовремя` : 'нет данных'}
+                  subtitle={dsr && dsr.totalEpics > 0 ? `${dsr.onTimeCount} из ${dsr.totalEpics} в рамках оценки` : 'нет данных'}
                   trend={dsr && dsr.totalEpics > 0
                     ? (dsr.onTimeRate >= 80 ? 'up' : dsr.onTimeRate < 50 ? 'down' : 'neutral')
                     : undefined}
-                  tooltip="Процент эпиков с DSR ≤ 1.1 — завершённых в рамках оценки."
+                  tooltip="Процент эпиков с DSR ≤ 1.1 — уложившихся в оценку трудозатрат (не про дедлайны)."
                 />
               </div>
 
               {/* Role Load Block */}
               <RoleLoadBlock teamId={selectedTeamId} />
 
-              {/* DSR Epic Breakdown Table */}
+              {/* DSR Epic Breakdown Chart */}
               {dsr && dsr.epics.length > 0 && (
-                <div className="metrics-section">
-                  <h3>DSR by Epic</h3>
-                  <div className="table-container">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Epic</th>
-                          <th>Status</th>
-                          <th title="Оценка (дни)">Est.</th>
-                          <th title="Календарные рабочие дни">Cal.</th>
-                          <th title="Дни под флагом (пауза)">Pause</th>
-                          <th title="Эффективные рабочие дни">Eff.</th>
-                          <th>DSR</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dsr.epics.map(epic => (
-                          <tr key={epic.epicKey}>
-                            <td>
-                              {jiraBaseUrl ? (
-                                <a href={`${jiraBaseUrl}/browse/${epic.epicKey}`} target="_blank" rel="noreferrer" className="issue-link">
-                                  {epic.epicKey}
-                                </a>
-                              ) : epic.epicKey}
-                              {' '}
-                              <span className="text-secondary">{epic.summary}</span>
-                            </td>
-                            <td>
-                              {epic.inProgress ? (
-                                <span className="badge badge-live">Live</span>
-                              ) : (
-                                <span className="badge badge-done">Done</span>
-                              )}
-                            </td>
-                            <td>{epic.estimateDays != null ? epic.estimateDays.toFixed(1) : '—'}</td>
-                            <td>{epic.calendarWorkingDays}</td>
-                            <td>{epic.flaggedDays > 0 ? epic.flaggedDays : '—'}</td>
-                            <td>{epic.effectiveWorkingDays}</td>
-                            <td>
-                              {epic.dsrActual != null ? (
-                                <span style={{ color: epic.dsrActual <= 1.1 ? '#00875a' : epic.dsrActual <= 1.5 ? '#ff991f' : '#de350b', fontWeight: 600 }}>
-                                  {epic.dsrActual.toFixed(2)}
-                                </span>
-                              ) : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <DsrBreakdownChart epics={dsr.epics} jiraBaseUrl={jiraBaseUrl} />
               )}
 
               {/* Forecast Accuracy */}
@@ -510,5 +466,6 @@ export function TeamMetricsPage() {
         <div className="empty">No active teams found. Create a team in the Teams section first.</div>
       )}
     </main>
+    </StatusStylesProvider>
   )
 }

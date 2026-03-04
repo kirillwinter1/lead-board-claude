@@ -54,7 +54,7 @@ public interface StatusChangelogRepository extends JpaRepository<StatusChangelog
         WHERE ji.team_id = :teamId
           AND sc.transitioned_at BETWEEN :from AND :to
           AND sc.time_in_previous_status_seconds IS NOT NULL
-          AND sc.time_in_previous_status_seconds > 300
+          AND sc.time_in_previous_status_seconds > 60
           AND sc.from_status IS NOT NULL
         GROUP BY from_status
         """, nativeQuery = true)

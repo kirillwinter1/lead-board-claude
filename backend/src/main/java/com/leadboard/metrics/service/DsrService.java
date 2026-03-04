@@ -10,6 +10,8 @@ import com.leadboard.forecast.entity.ForecastSnapshotEntity;
 import com.leadboard.forecast.repository.ForecastSnapshotRepository;
 import com.leadboard.metrics.dto.EpicDsr;
 import com.leadboard.metrics.dto.DsrResponse;
+import com.leadboard.metrics.entity.StatusChangelogEntity;
+import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -20,21 +22,21 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 
 /**
  * Delivery Speed Ratio (DSR) Service.
  *
- * DSR = (working_days - flagged_days) / estimate_days
+ * DSR = (in_progress_workdays - flagged_days) / estimate_days
+ *
+ * Uses status changelog to calculate actual time spent in IN_PROGRESS statuses,
+ * instead of calendar-based startedAt approach.
  *
  * Interpretation:
  * - 1.0 = baseline speed
  * - < 1.0 = completed faster than estimated
  * - > 1.0 = completed slower than estimated
- *
- * Supports both completed and in-progress epics (live DSR).
  */
 @Service
 public class DsrService {
@@ -47,6 +49,7 @@ public class DsrService {
     private final ForecastSnapshotRepository snapshotRepository;
     private final WorkflowConfigService workflowConfigService;
     private final FlagChangelogService flagChangelogService;
+    private final StatusChangelogRepository statusChangelogRepository;
     private final ObjectMapper objectMapper;
 
     public DsrService(
@@ -54,13 +57,15 @@ public class DsrService {
             WorkCalendarService workCalendarService,
             ForecastSnapshotRepository snapshotRepository,
             WorkflowConfigService workflowConfigService,
-            FlagChangelogService flagChangelogService
+            FlagChangelogService flagChangelogService,
+            StatusChangelogRepository statusChangelogRepository
     ) {
         this.issueRepository = issueRepository;
         this.workCalendarService = workCalendarService;
         this.snapshotRepository = snapshotRepository;
         this.workflowConfigService = workflowConfigService;
         this.flagChangelogService = flagChangelogService;
+        this.statusChangelogRepository = statusChangelogRepository;
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
     }
@@ -72,7 +77,7 @@ public class DsrService {
                 to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)
         );
 
-        log.info("DSR: Found {} epics (completed + in-progress) for team {} between {} and {}",
+        log.info("DSR: Found {} epics for team {} between {} and {}",
                 epics.size(), teamId, from, to);
 
         if (epics.isEmpty()) {
@@ -124,32 +129,16 @@ public class DsrService {
     }
 
     private EpicDsr calculateEpicDsr(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate) {
-        boolean inProgress = epic.getDoneAt() == null;
+        InProgressResult inProgressResult = calculateInProgressWorkdays(epic.getIssueKey(), epic);
 
-        LocalDate startDate = epic.getStartedAt() != null
-                ? epic.getStartedAt().toLocalDate()
-                : (epic.getJiraCreatedAt() != null ? epic.getJiraCreatedAt().toLocalDate() : null);
-
-        if (startDate == null) return null;
-
-        // Determine end date
-        LocalDate endDate;
-        if (inProgress) {
-            endDate = LocalDate.now();
-        } else {
-            endDate = calculateEndDateFromSubtasks(epic);
+        if (inProgressResult.totalWorkdays <= 0) {
+            return null; // No time in IN_PROGRESS → exclude
         }
 
-        int calendarWorkingDays = workCalendarService.countWorkdays(startDate, endDate);
-        if (calendarWorkingDays <= 0) calendarWorkingDays = 1;
+        int flaggedDays = calculateFlaggedDaysInPeriods(epic.getIssueKey(), inProgressResult.periods);
+        int effectiveWorkingDays = Math.max(inProgressResult.totalWorkdays - flaggedDays, 1);
 
-        int flaggedDays = flagChangelogService.calculateFlaggedWorkdays(epic.getIssueKey(), startDate, endDate);
-        int effectiveWorkingDays = Math.max(calendarWorkingDays - flaggedDays, 1);
-
-        // Calculate estimateDays from subtasks
         BigDecimal estimateDays = calculateEstimateDays(epic);
-
-        // Calculate forecastDays from snapshots
         BigDecimal forecastDays = calculateForecastDays(epic, snapshotsByDate);
 
         BigDecimal dsrActual = estimateDays != null && estimateDays.compareTo(BigDecimal.ZERO) > 0
@@ -163,8 +152,9 @@ public class DsrService {
         return new EpicDsr(
                 epic.getIssueKey(),
                 epic.getSummary(),
-                inProgress,
-                calendarWorkingDays,
+                epic.getStatus(),
+                epic.getIssueType(),
+                inProgressResult.totalWorkdays,
                 flaggedDays,
                 effectiveWorkingDays,
                 estimateDays,
@@ -175,27 +165,63 @@ public class DsrService {
     }
 
     /**
-     * For completed epics, endDate = max(subtask.doneAt), fallback to epic.doneAt.
+     * Calculates total workdays spent in IN_PROGRESS statuses by analyzing status changelog.
+     * Falls back to startedAt→doneAt for epics with no changelog (historical data).
      */
-    private LocalDate calculateEndDateFromSubtasks(JiraIssueEntity epic) {
-        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epic.getIssueKey());
-        if (!stories.isEmpty()) {
-            List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
-            List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+    InProgressResult calculateInProgressWorkdays(String issueKey, JiraIssueEntity epic) {
+        List<StatusChangelogEntity> changelog = statusChangelogRepository
+                .findByIssueKeyOrderByTransitionedAtAsc(issueKey);
 
-            OffsetDateTime maxDoneAt = subtasks.stream()
-                    .map(JiraIssueEntity::getDoneAt)
-                    .filter(Objects::nonNull)
-                    .max(Comparator.naturalOrder())
-                    .orElse(null);
+        List<DatePeriod> periods = new ArrayList<>();
 
-            if (maxDoneAt != null) {
-                return maxDoneAt.toLocalDate();
+        if (changelog.isEmpty()) {
+            // Fallback for historical epics without changelog
+            LocalDate start = epic.getStartedAt() != null
+                    ? epic.getStartedAt().toLocalDate()
+                    : (epic.getJiraCreatedAt() != null ? epic.getJiraCreatedAt().toLocalDate() : null);
+            if (start != null) {
+                LocalDate end = epic.getDoneAt() != null ? epic.getDoneAt().toLocalDate() : LocalDate.now();
+                periods.add(new DatePeriod(start, end));
+            }
+        } else {
+            LocalDate periodStart = null;
+            for (StatusChangelogEntity entry : changelog) {
+                boolean toInProgress = workflowConfigService.isEpicInProgress(entry.getToStatus());
+                boolean fromInProgress = entry.getFromStatus() != null
+                        && workflowConfigService.isEpicInProgress(entry.getFromStatus());
+
+                if (toInProgress && periodStart == null) {
+                    periodStart = entry.getTransitionedAt().toLocalDate();
+                } else if (fromInProgress && !toInProgress && periodStart != null) {
+                    LocalDate periodEnd = entry.getTransitionedAt().toLocalDate();
+                    periods.add(new DatePeriod(periodStart, periodEnd));
+                    periodStart = null;
+                }
+            }
+
+            // Open period (still in progress) → end = today
+            if (periodStart != null) {
+                periods.add(new DatePeriod(periodStart, LocalDate.now()));
             }
         }
 
-        // Fallback to epic's own doneAt
-        return epic.getDoneAt() != null ? epic.getDoneAt().toLocalDate() : LocalDate.now();
+        int totalWorkdays = 0;
+        for (DatePeriod period : periods) {
+            totalWorkdays += workCalendarService.countWorkdays(period.from, period.to);
+        }
+
+        return new InProgressResult(totalWorkdays, periods);
+    }
+
+    /**
+     * Calculates flagged workdays only within IN_PROGRESS periods.
+     */
+    int calculateFlaggedDaysInPeriods(String issueKey, List<DatePeriod> periods) {
+        int total = 0;
+        for (DatePeriod period : periods) {
+            total += flagChangelogService.calculateFlaggedWorkdays(issueKey, period.from, period.to);
+        }
+        return total;
     }
 
     private BigDecimal calculateEstimateDays(JiraIssueEntity epic) {
@@ -263,4 +289,9 @@ public class DsrService {
         }
         return result;
     }
+
+    // Internal data structures
+    record DatePeriod(LocalDate from, LocalDate to) {}
+
+    record InProgressResult(int totalWorkdays, List<DatePeriod> periods) {}
 }

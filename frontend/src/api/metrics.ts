@@ -6,6 +6,7 @@ export interface PeriodThroughput {
   epics: number
   stories: number
   subtasks: number
+  bugs: number
   total: number
 }
 
@@ -13,6 +14,7 @@ export interface ThroughputResponse {
   totalEpics: number
   totalStories: number
   totalSubtasks: number
+  totalBugs: number
   total: number
   byPeriod: PeriodThroughput[]
   movingAverage: number[]
@@ -51,8 +53,8 @@ export interface AssigneeMetrics {
   accountId: string
   displayName: string
   issuesClosed: number
-  avgLeadTimeDays: number
-  avgCycleTimeDays: number
+  avgLeadTimeDays: number | null
+  avgCycleTimeDays: number | null
   personalDsr: number | null
   velocityPercent: number | null
   trend: 'UP' | 'DOWN' | 'STABLE' | null
@@ -156,8 +158,9 @@ export async function getByAssignee(
 export interface EpicDsr {
   epicKey: string
   summary: string
-  inProgress: boolean
-  calendarWorkingDays: number
+  status: string
+  issueType: string
+  inProgressWorkdays: number
   flaggedDays: number
   effectiveWorkingDays: number
   estimateDays: number | null

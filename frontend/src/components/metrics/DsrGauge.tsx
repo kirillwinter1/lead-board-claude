@@ -9,9 +9,9 @@ interface DsrGaugeProps {
 }
 
 function getValueColor(v: number): string {
-  if (v <= 1.1) return '#00875a'
-  if (v <= 1.5) return '#ff991f'
-  return '#de350b'
+  if (v <= 1.1) return '#36B37E'
+  if (v <= 1.5) return '#FFAB00'
+  return '#FF5630'
 }
 
 const DEFAULT_TOOLTIP = `DSR — относительная скорость доставки эпика.
@@ -35,7 +35,7 @@ export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: 
             <GaugeComponent
               type="semicircle"
               arc={{
-                colorArray: ['#00875a', '#ff991f', '#de350b'],
+                colorArray: ['#36B37E', '#FFAB00', '#FF5630'],
                 subArcs: [
                   { limit: 1.1 },
                   { limit: 1.5 },

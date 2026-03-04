@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-03-02
+**Последнее обновление:** 2026-03-04
 
 ---
 
@@ -38,8 +38,11 @@
 | 24 | **AI Chat Model + Tools** | F52, F53 | ✅ Проверен + Исправлен | 5/5 fixed | [reports/2026-03-02_CHAT_MODEL_TOOLS.md](reports/2026-03-02_CHAT_MODEL_TOOLS.md) |
 | 25 | **Semantic Search (pgvector)** | F54 | ✅ Проверен | 1 High, 2 Medium, 1 Low | [reports/2026-03-02_F54_SEMANTIC_SEARCH.md](reports/2026-03-02_F54_SEMANTIC_SEARCH.md) |
 | 26 | **Quarterly Planning** | F55 | ✅ Проверен + Исправлен | 9/9 fixed | [reports/2026-03-02_F55_QUARTERLY_PLANNING.md](reports/2026-03-02_F55_QUARTERLY_PLANNING.md) |
+| 27 | **Sync & Multi-Tenant Fixes** | BUG-108, Sync | ✅ Проверен | 3 High, 2 Medium, 4 Low | [reports/2026-03-04_SYNC_MULTITENANT_FIXES.md](reports/2026-03-04_SYNC_MULTITENANT_FIXES.md) |
+| 28 | **DSR Status-Based** | DSR refactor | ✅ Проверен | 1 High, 3 Medium, 1 Low | [reports/2026-03-04_DSR_STATUS_BASED.md](reports/2026-03-04_DSR_STATUS_BASED.md) |
+| 29 | **Board Semantic Search** | F58 | ✅ Проверен | 1 Medium, 4 Low | [reports/2026-03-04_F58_BOARD_SEMANTIC_SEARCH.md](reports/2026-03-04_F58_BOARD_SEMANTIC_SEARCH.md) |
 
-**Прогресс: 26 / 26 модулей проверено (100%)**
+**Прогресс: 29 / 29 модулей проверено (100%)**
 
 ---
 
@@ -48,10 +51,10 @@
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
 | Critical | 2 | 9 | 11 |
-| High | 18 | 23 | 41 |
-| Medium | 38 | 36 | 74 |
-| Low | 25 | 18 | 43 |
-| **Итого** | **83** | **86** | **169** |
+| High | 22 | 23 | 45 |
+| Medium | 44 | 36 | 80 |
+| Low | 34 | 18 | 52 |
+| **Итого** | **102** | **86** | **188** |
 
 ---
 
@@ -359,6 +362,56 @@
 | BUG-115 | Low | TypeScript `catch (e: any)` instead of `unknown` | OPEN |
 | BUG-116 | Low | N+1 query in resolveEpicInfo (findByIssueKey per parent/grandparent) | OPEN |
 
+### Sync & Multi-Tenant Fixes — 2026-03-04
+
+**Scope:** BUG-108 CallerRunsPolicy, ObservabilityMetrics, SyncService guard, SchemaBasedConnectionProvider logging
+**API tests:** 7 проверок — 6 PASS, 1 NOTE (pre-existing)
+**Backend tests:** 770 unit tests PASS, 73 integration FAIL (pre-existing)
+**Code review:** 4 файла, найдено 9 багов (3 High, 2 Medium, 4 Low)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-149 | High | ForecastSnapshotService.createDailySnapshots() не tenant-aware → ERROR каждый день в 3:00 AM | OPEN |
+| BUG-150 | High | ForecastSnapshotService.cleanupOldSnapshots() не tenant-aware → снапшоты не удаляются | OPEN |
+| BUG-151 | High | WipSnapshotService.createDailySnapshots() не tenant-aware → ERROR каждый день в 9:00 AM | OPEN |
+| BUG-152 | Medium | WipSnapshotService.cleanupOldSnapshots() не tenant-aware → WIP-снапшоты не удаляются | OPEN |
+| BUG-153 | Low | SyncService.scheduledSync() dead code — TenantContext guard блокирует всегда | OPEN |
+| BUG-154 | Medium | 0 тестов для TenantContextTaskDecorator (критический компонент) | OPEN |
+| BUG-155 | Low | 0 тестов для ObservabilityMetrics.refreshGauges() | OPEN |
+| BUG-156 | Low | ObservabilityMetrics.refreshGauges() дважды вызывает findAllActive() | OPEN |
+| BUG-157 | Low | Thread pool sizing (4/8/100) недостаточен для embedding-heavy syncs | OPEN |
+
+### DSR Status-Based Refactor — 2026-03-04
+
+**Scope:** DSR formula from calendar-based (startedAt) to status changelog-based (IN_PROGRESS periods)
+**Unit tests:** 10/10 PASS (DsrServiceTest), related tests ALL PASS
+**API tests:** Skipped (backend running old code)
+**Code review:** 6 files changed, 5 bugs found
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-158 | High | Historical data regression — completed epics without changelog silently excluded from DSR | OPEN |
+| BUG-159 | Medium | knowledge_base.md stale DSR documentation (still describes calendar-based approach) | OPEN |
+| BUG-160 | Medium | F32 feature spec outdated (describes old startedAt-based formula) | OPEN |
+| BUG-161 | Medium | Unused `issueType` parameter in calculateInProgressWorkdays() | OPEN |
+| BUG-162 | Low | N+1 query in changelog loading (one query per epic) | OPEN |
+
+### Board Semantic Search (F58) — 2026-03-04
+
+**Scope:** Semantic search integration (pgvector) with Board filtering
+**Unit tests:** 8/8 PASS (BoardServiceSearchTest)
+**API tests:** Skipped (backend running old version 0.57.0)
+**Frontend:** TypeScript compiles ✅, 0 frontend tests
+**Code review:** 8 files (2 new, 6 modified)
+
+| Bug ID | Severity | Описание | Статус |
+|--------|----------|----------|--------|
+| BUG-163 | Medium | Race condition — stale search results при быстром вводе (нет AbortController) | OPEN |
+| BUG-164 | Low | Javadoc от score-breakdown привязан к search endpoint | OPEN |
+| BUG-165 | Low | teamIds всегда передаются как ALL team IDs вместо selected teams | OPEN |
+| BUG-166 | Low | Нет ограничения длины query на backend (max length) | OPEN |
+| BUG-167 | Low | N+1 queries при резолвинге subtask → grandparent (findByIssueKey per subtask) | OPEN |
+
 ---
 
 ## Артефакты
@@ -382,7 +435,8 @@ ai-ru/testing/
     ├── 2026-02-25_MULTITENANCY_E2E.md ← QA-отчёт: Multi-Tenancy E2E Customer Journey
     ├── 2026-02-25_MEMBER_PROFILE.md   ← QA-отчёт: Member Profile (F30)
     ├── 2026-03-01_BOARD_OPTIMIZATION.md ← QA-отчёт: Board Endpoint Optimization
-    └── 2026-03-02_F55_QUARTERLY_PLANNING.md ← QA-отчёт: F55 Quarterly Planning
+    ├── 2026-03-02_F55_QUARTERLY_PLANNING.md ← QA-отчёт: F55 Quarterly Planning
+    └── 2026-03-04_SYNC_MULTITENANT_FIXES.md ← QA-отчёт: Sync & Multi-Tenant Fixes
 ```
 
 ## Процесс
