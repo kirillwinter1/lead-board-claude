@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import { ProjectTimelineDto, EpicTimelineDto } from '../api/projects'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { StatusBadge } from './board/StatusBadge'
-import { TeamBadge } from './TeamBadge'
 import { getIssueIcon } from './board/helpers'
 import '../pages/ProjectTimelinePage.css'
 
@@ -442,7 +441,15 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                     alt={p.issueType || 'Project'}
                     style={{ width: 16, height: 16, flexShrink: 0 }}
                   />
-                  <span className="pt-project-key">{p.issueKey}</span>
+                  <a
+                    href={jiraBaseUrl ? `${jiraBaseUrl}${p.issueKey}` : '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="pt-project-key"
+                    onClick={ev => ev.stopPropagation()}
+                  >
+                    {p.issueKey}
+                  </a>
                   <span className="pt-project-summary" title={p.summary}>{p.summary}</span>
                   <div className="pt-project-progress">
                     <div className="pt-progress-bar-bg">
@@ -477,14 +484,13 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                     {e.epicKey}
                   </a>
                   <span className="pt-epic-summary" title={e.summary}>{e.summary}</span>
-                  {e.teamName && (
-                    <span style={{ flexShrink: 0 }}>
-                      <TeamBadge name={e.teamName} color={e.teamColor} />
-                    </span>
+                  {e.teamName && e.teamColor && (
+                    <span
+                      className="pt-epic-team-dot"
+                      style={{ backgroundColor: e.teamColor }}
+                      title={e.teamName}
+                    />
                   )}
-                  <span style={{ flexShrink: 0 }}>
-                    <StatusBadge status={e.status || 'Unknown'} />
-                  </span>
                 </div>
               )
             }
@@ -720,9 +726,27 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{hoveredProject.issueKey}</span>
-            <span style={{ color: '#8993A4', fontSize: 11 }}>{hoveredProject.epics.length} epics</span>
+            <StatusBadge status={hoveredProject.status} />
           </div>
           <div style={{ color: '#B3BAC5', marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>{hoveredProject.summary}</div>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12 }}>
+            <div>
+              <span style={{ color: '#8993A4' }}>Epics: </span>
+              <span style={{ color: '#B3BAC5' }}>{hoveredProject.epics.length}</span>
+            </div>
+            {hoveredProject.riceNormalizedScore != null && (
+              <div>
+                <span style={{ color: '#8993A4' }}>RICE: </span>
+                <span style={{ color: '#FFD700', fontWeight: 600 }}>{hoveredProject.riceNormalizedScore}</span>
+              </div>
+            )}
+            {hoveredProject.quarterLabel && (
+              <div>
+                <span style={{ color: '#8993A4' }}>Quarter: </span>
+                <span style={{ color: '#B3BAC5' }}>{hoveredProject.quarterLabel}</span>
+              </div>
+            )}
+          </div>
           <div style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ color: '#8993A4', fontSize: 11 }}>Progress</span>

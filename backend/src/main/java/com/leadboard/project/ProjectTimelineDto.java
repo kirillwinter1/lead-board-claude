@@ -11,5 +11,6 @@ public record ProjectTimelineDto(
         int progressPercent,
         BigDecimal riceNormalizedScore,
         String assigneeDisplayName,
+        String quarterLabel,
         List<EpicTimelineDto> epics
 ) {}

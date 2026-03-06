@@ -96,6 +96,7 @@ export interface ProjectTimelineDto {
   progressPercent: number
   riceNormalizedScore: number | null
   assigneeDisplayName: string | null
+  quarterLabel: string | null
   epics: EpicTimelineDto[]
 }
 

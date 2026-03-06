@@ -192,6 +192,7 @@ public class ProjectService {
                     progressPct,
                     rice != null ? rice.normalizedScore() : null,
                     p.getAssigneeDisplayName(),
+                    p.getQuarterLabel(),
                     epicDtos
             );
         }).toList();
