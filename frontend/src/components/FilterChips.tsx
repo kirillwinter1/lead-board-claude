@@ -22,9 +22,8 @@ export function FilterChips({ chips, onClearAll }: FilterChipsProps) {
           key={`${chip.category}-${chip.value}-${i}`}
           className="filter-chip"
           style={chip.color ? {
-            backgroundColor: chip.color + '18',
-            borderColor: chip.color + '40',
-            color: chip.color,
+            backgroundColor: chip.color + '20',
+            borderColor: chip.color + '50',
           } : undefined}
         >
           {chip.color && (
@@ -37,7 +36,6 @@ export function FilterChips({ chips, onClearAll }: FilterChipsProps) {
           <button
             className="filter-chip-remove"
             onClick={chip.onRemove}
-            style={chip.color ? { color: chip.color } : undefined}
           >
             &times;
           </button>

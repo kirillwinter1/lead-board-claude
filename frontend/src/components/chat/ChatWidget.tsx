@@ -14,7 +14,6 @@ const PAGE_NAMES: Record<string, string> = {
   '/data-quality': 'Data Quality (Качество данных)',
   '/bug-metrics': 'Bug Metrics (Метрики багов)',
   '/projects': 'Projects (Проекты)',
-  '/project-timeline': 'Project Timeline (Таймлайн проектов)',
   '/teams': 'Teams (Команды)',
   '/poker': 'Planning Poker',
   '/settings': 'Settings (Настройки)',
