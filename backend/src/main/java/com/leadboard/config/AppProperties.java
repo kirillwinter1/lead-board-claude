@@ -7,6 +7,7 @@ public class AppProperties {
 
     private String frontendUrl = "http://localhost:5173";
     private Session session = new Session();
+    private Encryption encryption = new Encryption();
 
     public String getFrontendUrl() {
         return frontendUrl;
@@ -22,6 +23,14 @@ public class AppProperties {
 
     public void setSession(Session session) {
         this.session = session;
+    }
+
+    public Encryption getEncryption() {
+        return encryption;
+    }
+
+    public void setEncryption(Encryption encryption) {
+        this.encryption = encryption;
     }
 
     public static class Session {
@@ -60,6 +69,18 @@ public class AppProperties {
 
         public void setCookieSecure(boolean cookieSecure) {
             this.cookieSecure = cookieSecure;
+        }
+    }
+
+    public static class Encryption {
+        private String tokenKey = "";
+
+        public String getTokenKey() {
+            return tokenKey;
+        }
+
+        public void setTokenKey(String tokenKey) {
+            this.tokenKey = tokenKey;
         }
     }
 }

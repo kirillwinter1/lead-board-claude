@@ -5,6 +5,8 @@ app:
   frontend-url: ${APP_FRONTEND_URL:http://localhost:5173}
   rate-limit:
     general: ${APP_RATE_LIMIT_GENERAL:200}
+  encryption:
+    token-key: ${TOKEN_ENCRYPTION_KEY:}
   session:
     cookie-name: LEAD_SESSION
     max-age-days: 30

@@ -1,5 +1,6 @@
 package com.leadboard.tenant;
 
+import com.leadboard.config.EncryptedStringConverter;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
@@ -32,6 +33,7 @@ public class TenantJiraConfigEntity {
     @Column(name = "jira_email", length = 255)
     private String jiraEmail;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "jira_api_token", length = 500)
     private String jiraApiToken;
 

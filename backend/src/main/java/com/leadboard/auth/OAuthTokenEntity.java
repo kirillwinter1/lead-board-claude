@@ -1,5 +1,6 @@
 package com.leadboard.auth;
 
+import com.leadboard.config.EncryptedStringConverter;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
@@ -15,9 +16,11 @@ public class OAuthTokenEntity {
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private UserEntity user;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "access_token", nullable = false, columnDefinition = "TEXT")
     private String accessToken;
 
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "refresh_token", columnDefinition = "TEXT")
     private String refreshToken;
 
