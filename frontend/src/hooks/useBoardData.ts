@@ -77,7 +77,12 @@ export function useBoardData() {
     const patchNode = (nodes: BoardNode[]): BoardNode[] =>
       nodes.map(node => {
         if (node.issueKey === epicKey) {
-          return { ...node, roughEstimates: cleaned }
+          // Patch both roughEstimates and roleProgress so the UI updates immediately
+          const patchedRoleProgress = node.roleProgress ? { ...node.roleProgress } : null
+          if (patchedRoleProgress && patchedRoleProgress[role]) {
+            patchedRoleProgress[role] = { ...patchedRoleProgress[role], roughEstimateDays: days }
+          }
+          return { ...node, roughEstimates: cleaned, ...(patchedRoleProgress && { roleProgress: patchedRoleProgress }) }
         }
         if (node.children?.length) {
           const patched = patchNode(node.children)
