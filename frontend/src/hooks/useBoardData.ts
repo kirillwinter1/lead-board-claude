@@ -69,15 +69,23 @@ export function useBoardData() {
 
   const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: string, days: number | null) => {
     const response = await updateRoughEstimate(epicKey, role, { days })
-    // Optimistic update: patch the specific epic node instead of reloading entire board
+    // Optimistic update: patch the specific epic node in the tree instead of reloading entire board
     const cleaned: Record<string, number> = {}
     for (const [k, v] of Object.entries(response.roughEstimates)) {
       if (v !== null) cleaned[k] = v
     }
-    setBoard(prev => prev.map(node => {
-      if (node.issueKey !== epicKey) return node
-      return { ...node, roughEstimates: cleaned }
-    }))
+    const patchNode = (nodes: BoardNode[]): BoardNode[] =>
+      nodes.map(node => {
+        if (node.issueKey === epicKey) {
+          return { ...node, roughEstimates: cleaned }
+        }
+        if (node.children?.length) {
+          const patched = patchNode(node.children)
+          return patched !== node.children ? { ...node, children: patched } : node
+        }
+        return node
+      })
+    setBoard(patchNode)
   }, [])
 
   return {
