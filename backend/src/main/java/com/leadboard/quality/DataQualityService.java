@@ -75,6 +75,7 @@ public class DataQualityService {
         StatusCategory epicCategory = workflowConfigService.categorizeEpic(epic.getStatus());
         boolean epicPastTodo = epicCategory == StatusCategory.PLANNED
                 || epicCategory == StatusCategory.IN_PROGRESS
+                || epicCategory == StatusCategory.DEV_DONE
                 || epicCategory == StatusCategory.DONE;
         if (epicPastTodo && epic.getDueDate() == null) {
             violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_DUE_DATE));

@@ -3,7 +3,7 @@ package com.leadboard.status;
 /**
  * Категория статуса задачи.
  *
- * Для Epic: NEW → REQUIREMENTS → PLANNED → IN_PROGRESS → DONE
+ * Для Epic: NEW → REQUIREMENTS → PLANNED → IN_PROGRESS → DEV_DONE → DONE
  * Для Story/Subtask: NEW → IN_PROGRESS → DONE
  *
  * TODO is kept as an alias for NEW for backward compatibility.
@@ -13,6 +13,7 @@ public enum StatusCategory {
     REQUIREMENTS,  // Epic only: сбор требований, rough estimate разрешён
     PLANNED,       // Epic only: forecast/планирование активно
     IN_PROGRESS,
+    DEV_DONE,      // Epic only: разработка завершена, ждёт E2E/UAT/приёмки
     DONE,
 
     /** @deprecated Use NEW instead. Kept for backward compatibility. */

@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { projectsApi, ProjectDto, ProjectDetailDto, ProjectRecommendation } from '../api/projects'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { getConfig } from '../api/config'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
+import { SearchInput } from '../components/SearchInput'
+import { FilterBar } from '../components/FilterBar'
+import { FilterChip } from '../components/FilterChips'
 import { TeamBadge } from '../components/TeamBadge'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../components/board/helpers'
@@ -157,15 +160,6 @@ function RecommendationsBlock({ recommendations }: { recommendations: ProjectRec
   )
 }
 
-function SearchIcon() {
-  return (
-    <svg className="search-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M14 14L10.5 10.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 export function ProjectsPage() {
   const [projects, setProjects] = useState<ProjectDto[]>([])
   const [loading, setLoading] = useState(true)
@@ -221,6 +215,14 @@ export function ProjectsPage() {
   )).sort()
   const availableStatuses = Array.from(new Set(projects.map(p => p.status))).sort()
 
+  const statusColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const [status, style] of Object.entries(statusStyles)) {
+      if (style.color) map.set(status, style.color)
+    }
+    return map
+  }, [statusStyles])
+
   const handlePMToggle = (pm: string) => {
     setSelectedPMs(prev => {
       const next = new Set(prev)
@@ -240,7 +242,25 @@ export function ProjectsPage() {
     setSelectedPMs(new Set())
     setSelectedStatuses(new Set())
   }
-  const hasActiveFilters = search || selectedPMs.size > 0 || selectedStatuses.size > 0
+
+  const chips = useMemo(() => {
+    const result: FilterChip[] = []
+    for (const pm of selectedPMs) {
+      result.push({ category: 'PM', value: pm, onRemove: () => handlePMToggle(pm) })
+    }
+    for (const status of selectedStatuses) {
+      result.push({
+        category: 'Status',
+        value: status,
+        color: statusColorMap.get(status),
+        onRemove: () => handleStatusToggle(status),
+      })
+    }
+    if (search) {
+      result.push({ category: 'Search', value: `"${search}"`, onRemove: () => setSearch('') })
+    }
+    return result
+  }, [selectedPMs, selectedStatuses, search, statusColorMap])
 
   const filteredProjects = projects.filter(p => {
     if (selectedPMs.size > 0 && (!p.assigneeDisplayName || !selectedPMs.has(p.assigneeDisplayName))) return false
@@ -291,17 +311,12 @@ export function ProjectsPage() {
             <h2>Projects ({filteredProjects.length})</h2>
           </div>
 
-          <div className="filter-panel">
-            <div className="filter-group filter-search">
-              <SearchIcon />
-              <input
-                type="text"
-                placeholder="Search by key..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="filter-input"
-              />
-            </div>
+          <FilterBar chips={chips} onClearAll={clearFilters}>
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by key..."
+            />
 
             <MultiSelectDropdown
               label="PM"
@@ -317,14 +332,9 @@ export function ProjectsPage() {
               selected={selectedStatuses}
               onToggle={handleStatusToggle}
               placeholder="All statuses"
+              colorMap={statusColorMap}
             />
-
-            {hasActiveFilters && (
-              <button className="btn btn-secondary btn-clear" onClick={clearFilters}>
-                Clear
-              </button>
-            )}
-          </div>
+          </FilterBar>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {filteredProjects.map(p => (

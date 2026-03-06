@@ -6,6 +6,7 @@ import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { getConfig } from '../api/config'
 import { getIssueIcon } from '../components/board/helpers'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import './ProjectTimelinePage.css'
 
 type ZoomLevel = 'day' | 'week' | 'month'
@@ -545,30 +546,29 @@ export function ProjectTimelinePage() {
         {pmNames.length > 0 && (
           <div className="filter-group">
             <label className="filter-label">PM</label>
-            <select
-              className="filter-input"
-              value={pmFilter}
-              onChange={e => setPmFilter(e.target.value)}
-            >
-              <option value="">Все</option>
-              {pmNames.map(name => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
+            <SingleSelectDropdown
+              label="PM"
+              options={pmNames.map(name => ({ value: name, label: name }))}
+              selected={pmFilter || null}
+              onChange={v => setPmFilter(v ?? '')}
+              placeholder="Все"
+            />
           </div>
         )}
 
         <div className="filter-group">
           <label className="filter-label">Масштаб</label>
-          <select
-            className="filter-input"
-            value={zoom}
-            onChange={e => setZoom(e.target.value as ZoomLevel)}
-          >
-            <option value="day">День</option>
-            <option value="week">Неделя</option>
-            <option value="month">Месяц</option>
-          </select>
+          <SingleSelectDropdown
+            label="Масштаб"
+            options={[
+              { value: 'day', label: 'День' },
+              { value: 'week', label: 'Неделя' },
+              { value: 'month', label: 'Месяц' },
+            ]}
+            selected={zoom}
+            onChange={v => v && setZoom(v as ZoomLevel)}
+            allowClear={false}
+          />
         </div>
 
         <button

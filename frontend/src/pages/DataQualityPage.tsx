@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../components/board/helpers'
+import { FilterBar } from '../components/FilterBar'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { FilterChip } from '../components/FilterChips'
 import './DataQualityPage.css'
 
 interface ViolationDto {
@@ -39,6 +42,7 @@ interface DataQualityResponse {
 interface Team {
   id: number
   name: string
+  color: string | null
 }
 
 // Human-readable Russian names for rules
@@ -265,57 +269,99 @@ export function DataQualityPage() {
     })
   }
 
+  const teamOptions = useMemo(() =>
+    teams.map(t => ({ value: String(t.id), label: t.name, color: t.color || undefined })),
+    [teams]
+  )
+
+  const ruleOptions = useMemo(() =>
+    allRules.map(r => ({ value: r, label: getRuleLabel(r) })),
+    [allRules]
+  )
+
+  const chips = useMemo(() => {
+    const result: FilterChip[] = []
+    if (selectedTeamId) {
+      const team = teams.find(t => t.id === selectedTeamId)
+      if (team) {
+        result.push({
+          category: 'Team',
+          value: team.name,
+          color: team.color || undefined,
+          onRemove: () => setSelectedTeamId(null),
+        })
+      }
+    }
+    if (ruleFilter) {
+      result.push({
+        category: 'Rule',
+        value: getRuleLabel(ruleFilter),
+        onRemove: () => setRuleFilter(null),
+      })
+    }
+    for (const s of ['ERROR', 'WARNING', 'INFO']) {
+      if (!severityFilter.has(s)) {
+        result.push({
+          category: 'Hidden',
+          value: `Hide ${s}`,
+          color: severityColors[s]?.text,
+          onRemove: () => toggleSeverity(s),
+        })
+      }
+    }
+    return result
+  }, [selectedTeamId, ruleFilter, severityFilter, teams])
+
+  const clearAllFilters = () => {
+    setSelectedTeamId(null)
+    setRuleFilter(null)
+    setSeverityFilter(new Set(['ERROR', 'WARNING', 'INFO']))
+  }
+
   return (
     <div className="data-quality-page">
-      <div className="filter-panel">
-        <div className="filter-group">
-          <label className="filter-label">Команда</label>
-          <select
-            value={selectedTeamId || ''}
-            onChange={e => setSelectedTeamId(e.target.value ? Number(e.target.value) : null)}
-            className="filter-select"
-          >
-            <option value="">Все команды</option>
-            {teams.map(team => (
-              <option key={team.id} value={team.id}>{team.name}</option>
-            ))}
-          </select>
+      <FilterBar
+        chips={chips}
+        onClearAll={clearAllFilters}
+        trailing={
+          <button className="btn btn-primary btn-refresh" onClick={fetchData} disabled={loading}>
+            {loading ? 'Загрузка...' : 'Обновить'}
+          </button>
+        }
+      >
+        <SingleSelectDropdown
+          label="Команда"
+          options={teamOptions}
+          selected={selectedTeamId ? String(selectedTeamId) : null}
+          onChange={v => setSelectedTeamId(v ? Number(v) : null)}
+          placeholder="Все команды"
+        />
+
+        <div className="filter-checkboxes" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {['ERROR', 'WARNING', 'INFO'].map(severity => (
+            <button
+              key={severity}
+              className={`btn btn-sm btn-toggle ${severityFilter.has(severity) ? 'btn-toggle-active' : ''}`}
+              onClick={() => toggleSeverity(severity)}
+              style={severityFilter.has(severity) ? {
+                backgroundColor: severityColors[severity]?.bg,
+                borderColor: severityColors[severity]?.border,
+                color: severityColors[severity]?.text,
+              } : undefined}
+            >
+              {severity}
+            </button>
+          ))}
         </div>
 
-        <div className="filter-group">
-          <label className="filter-label">Критичность</label>
-          <div className="filter-checkboxes">
-            {['ERROR', 'WARNING', 'INFO'].map(severity => (
-              <label key={severity} className="filter-checkbox">
-                <input
-                  type="checkbox"
-                  checked={severityFilter.has(severity)}
-                  onChange={() => toggleSeverity(severity)}
-                />
-                <SeverityBadge severity={severity} />
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="filter-group">
-          <label className="filter-label">Правило</label>
-          <select
-            value={ruleFilter || ''}
-            onChange={e => setRuleFilter(e.target.value || null)}
-            className="filter-select"
-          >
-            <option value="">Все правила</option>
-            {allRules.map(rule => (
-              <option key={rule} value={rule}>{getRuleLabel(rule)}</option>
-            ))}
-          </select>
-        </div>
-
-        <button className="btn btn-primary btn-refresh" onClick={fetchData} disabled={loading}>
-          {loading ? 'Загрузка...' : 'Обновить'}
-        </button>
-      </div>
+        <SingleSelectDropdown
+          label="Правило"
+          options={ruleOptions}
+          selected={ruleFilter}
+          onChange={v => setRuleFilter(v)}
+          placeholder="Все правила"
+        />
+      </FilterBar>
 
       <main className="main-content">
         {loading && <div className="loading">Загрузка отчёта...</div>}

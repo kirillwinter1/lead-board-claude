@@ -15,6 +15,7 @@ import {
   EpicBurndownResponse,
   EpicInfo
 } from '../../api/metrics'
+import { SingleSelectDropdown } from '../SingleSelectDropdown'
 import './EpicBurndownChart.css'
 
 interface EpicBurndownChartProps {
@@ -106,18 +107,17 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
 
       {/* Epic Selector */}
       <div className="burndown-selector">
-        <select
-          value={selectedEpicKey}
-          onChange={e => setSelectedEpicKey(e.target.value)}
-        >
-          <option value="" disabled>Select an epic...</option>
-          {epics.map(epic => (
-            <option key={epic.key} value={epic.key}>
-              {epic.key} - {epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}
-              {epic.completed ? ' (Done)' : ''}
-            </option>
-          ))}
-        </select>
+        <SingleSelectDropdown
+          label="Epic"
+          options={epics.map(epic => ({
+            value: epic.key,
+            label: `${epic.key} - ${epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}${epic.completed ? ' (Done)' : ''}`,
+          }))}
+          selected={selectedEpicKey || null}
+          onChange={v => v && setSelectedEpicKey(v)}
+          placeholder="Select an epic..."
+          allowClear={false}
+        />
       </div>
 
       {loading && <div className="burndown-loading">Loading burndown data...</div>}

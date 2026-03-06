@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { updateEpicOrder, updateStoryOrder } from '../api/epics'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { FilterPanel, BoardTable } from '../components/board'
@@ -157,6 +157,7 @@ export function BoardPage() {
         hideDone={hideDone}
         onHideNewToggle={() => setHideNew(v => !v)}
         onHideDoneToggle={() => setHideDone(v => !v)}
+        epicTitles={useMemo(() => board.map(e => e.title), [board])}
       />
 
       <main className="main-content">

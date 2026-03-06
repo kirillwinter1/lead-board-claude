@@ -1,10 +1,13 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { fetchBugMetrics, BugMetricsResponse } from '../api/metrics'
 import { getPriorityColor } from '../helpers/priorityColors'
+import { FilterBar } from '../components/FilterBar'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { FilterChip } from '../components/FilterChips'
 import './BugMetricsPage.css'
 
 interface Team {
@@ -54,14 +57,26 @@ export function BugMetricsPage() {
   useEffect(() => { fetchTeams() }, [fetchTeams])
   useEffect(() => { fetchData() }, [fetchData])
 
-  const handleTeamChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
-    if (value) {
-      setSearchParams({ teamId: value })
-    } else {
-      setSearchParams({})
+  const teamOptions = useMemo(() =>
+    teams.map(t => ({ value: String(t.id), label: t.name, color: t.color || undefined })),
+    [teams]
+  )
+
+  const chips = useMemo(() => {
+    const result: FilterChip[] = []
+    if (selectedTeamId) {
+      const team = teams.find(t => t.id === selectedTeamId)
+      if (team) {
+        result.push({
+          category: 'Team',
+          value: team.name,
+          color: team.color || undefined,
+          onRemove: () => setSearchParams({}),
+        })
+      }
     }
-  }
+    return result
+  }, [selectedTeamId, teams, setSearchParams])
 
   if (loading) {
     return <div className="bug-metrics-page"><div className="loading">Loading bug metrics...</div></div>
@@ -77,17 +92,23 @@ export function BugMetricsPage() {
     <div className="bug-metrics-page">
       <div className="bug-metrics-header">
         <h2>Bug Metrics</h2>
-        <select
-          className="team-filter-select"
-          value={selectedTeamId || ''}
-          onChange={handleTeamChange}
-        >
-          <option value="">All Teams</option>
-          {teams.map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
       </div>
+
+      <FilterBar
+        chips={chips}
+        onClearAll={() => setSearchParams({})}
+      >
+        <SingleSelectDropdown
+          label="Team"
+          options={teamOptions}
+          selected={selectedTeamId ? String(selectedTeamId) : null}
+          onChange={v => {
+            if (v) setSearchParams({ teamId: v })
+            else setSearchParams({})
+          }}
+          placeholder="All Teams"
+        />
+      </FilterBar>
 
       <div className="metrics-summary-cards">
         <MetricCard

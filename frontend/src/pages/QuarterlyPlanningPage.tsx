@@ -6,6 +6,7 @@ import { MetricCard } from '../components/metrics/MetricCard'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { TeamBadge } from '../components/TeamBadge'
 import { RiceScoreBadge } from '../components/rice/RiceScoreBadge'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import {
   quarterlyPlanningApi,
@@ -133,16 +134,14 @@ export function QuarterlyPlanningPage() {
 
   // ==================== Handlers ====================
 
-  const handleTeamChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
+  const handleTeamChange = (value: string | null) => {
     const params: Record<string, string> = {}
     if (value) params.teamId = value
     if (selectedProjectKey) params.projectKey = selectedProjectKey
     setSearchParams(params)
   }
 
-  const handleProjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = e.target.value
+  const handleProjectChange = (value: string | null) => {
     const params: Record<string, string> = {}
     if (selectedTeamId) params.teamId = String(selectedTeamId)
     if (value) params.projectKey = value
@@ -185,15 +184,13 @@ export function QuarterlyPlanningPage() {
           >
             &larr;
           </button>
-          <select
-            className="qp-quarter-select"
-            value={quarter}
-            onChange={e => setQuarter(e.target.value)}
-          >
-            {availableQuarters.map(q => (
-              <option key={q} value={q}>{q}</option>
-            ))}
-          </select>
+          <SingleSelectDropdown
+            label="Quarter"
+            options={availableQuarters.map(q => ({ value: q, label: q }))}
+            selected={quarter}
+            onChange={v => v && setQuarter(v)}
+            allowClear={false}
+          />
           <button
             className="qp-nav-btn"
             onClick={() => navigateQuarter(1)}
@@ -259,7 +256,7 @@ function TeamView({
 }: {
   teams: Team[]
   selectedTeamId: number | null
-  onTeamChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onTeamChange: (value: string | null) => void
   teamDemand: QuarterlyDemandDto | null
   summary: QuarterlySummaryDto | null
   quarter: string
@@ -313,12 +310,13 @@ function TeamView({
   return (
     <div className="qp-team-view">
       <div className="qp-filter-row">
-        <select className="qp-team-select" value={selectedTeamId ?? ''} onChange={onTeamChange}>
-          <option value="">Select team...</option>
-          {teams.map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+        <SingleSelectDropdown
+          label="Team"
+          options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color || undefined }))}
+          selected={selectedTeamId ? String(selectedTeamId) : null}
+          onChange={onTeamChange}
+          placeholder="Select team..."
+        />
       </div>
 
       {selectedTeamId && teamDemand && (
@@ -411,7 +409,7 @@ function ProjectView({
 }: {
   projects: ProjectOption[]
   selectedProjectKey: string | null
-  onProjectChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onProjectChange: (value: string | null) => void
   projectView: ProjectViewDto | null
   quarter: string
   getRoleColor: (code: string) => string
@@ -420,12 +418,13 @@ function ProjectView({
   return (
     <div className="qp-project-view">
       <div className="qp-filter-row">
-        <select className="qp-team-select" value={selectedProjectKey ?? ''} onChange={onProjectChange}>
-          <option value="">Select project...</option>
-          {projects.map(p => (
-            <option key={p.issueKey} value={p.issueKey}>{p.summary || p.issueKey}</option>
-          ))}
-        </select>
+        <SingleSelectDropdown
+          label="Project"
+          options={projects.map(p => ({ value: p.issueKey, label: p.summary || p.issueKey }))}
+          selected={selectedProjectKey}
+          onChange={onProjectChange}
+          placeholder="Select project..."
+        />
       </div>
 
       {projectView && (

@@ -21,7 +21,7 @@ type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
 
 const BOARD_CATEGORIES = ['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK', 'IGNORE'] as const
 const BOARD_CATEGORIES_WITH_UNMAPPED = ['', 'PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK', 'IGNORE'] as const
-const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DONE'] as const
+const STATUS_CATEGORIES = ['NEW', 'REQUIREMENTS', 'PLANNED', 'IN_PROGRESS', 'DEV_DONE', 'DONE'] as const
 const LINK_CATEGORIES = ['BLOCKS', 'RELATED', 'IGNORE'] as const
 
 const WIZARD_STEPS = ['Fetch', 'Roles', 'Issue Types', 'Statuses', 'Link Types', 'Review & Save']
@@ -59,6 +59,7 @@ const STATUS_CATEGORY_DEFAULT_COLORS: Record<string, string> = {
   REQUIREMENTS: '#E6FCFF',
   PLANNED: '#EAE6FF',
   IN_PROGRESS: '#DEEBFF',
+  DEV_DONE: '#FFF0B3',
   DONE: '#E3FCEF',
 }
 
@@ -299,6 +300,12 @@ function suggestStatuses(
               statusCategory = 'REQUIREMENTS'
             } else if (lower.includes('plan') || lower.includes('заплан')) {
               statusCategory = 'PLANNED'
+            } else if (lower.includes('dev done') || lower.includes('development done')
+              || lower.includes('разработка завершена') || lower.includes('готов к')
+              || lower.includes('e2e') || lower.includes('acceptance')
+              || lower.includes('приёмк') || lower.includes('приемк')
+              || lower.includes('uat') || lower.includes('review')) {
+              statusCategory = 'DEV_DONE'
             } else {
               statusCategory = 'IN_PROGRESS'
             }
@@ -376,11 +383,11 @@ function suggestStatuses(
         id: null,
         jiraStatusName: src.jiraStatusName,
         issueCategory: 'STORY',
-        statusCategory: src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' ? 'IN_PROGRESS' : src.statusCategory,
+        statusCategory: src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' || src.statusCategory === 'DEV_DONE' ? 'IN_PROGRESS' : src.statusCategory,
         workflowRoleCode: src.workflowRoleCode,
         sortOrder: categoryCounter['STORY'],
         scoreWeight: 0,
-        color: STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' ? 'IN_PROGRESS' : src.statusCategory] || '#DFE1E6',
+        color: STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' || src.statusCategory === 'DEV_DONE' ? 'IN_PROGRESS' : src.statusCategory] || '#DFE1E6',
       })
     }
   }
@@ -1579,7 +1586,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                                 value={st.statusCategory}
                                 onChange={e => updateWizardStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.filter(c => wizardStatusFilter === 'EPIC' || wizardStatusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => wizardStatusFilter === 'EPIC' || wizardStatusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED' && c !== 'DEV_DONE')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">
@@ -2013,7 +2020,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                                 value={st.statusCategory}
                                 onChange={e => updateStatus(realIdx, 'statusCategory', e.target.value)}
                               >
-                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || statusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED')).map(c => <option key={c} value={c}>{c}</option>)}
+                                {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || statusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED' && c !== 'DEV_DONE')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
                             <label className="pipeline-field">

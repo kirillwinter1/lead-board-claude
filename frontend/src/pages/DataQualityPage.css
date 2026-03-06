@@ -18,28 +18,6 @@
   width: 100%;
 }
 
-.data-quality-page .filter-panel {
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
-}
-
-.filter-select {
-  padding: 6px 12px;
-  border: 1px solid #dfe1e6;
-  border-radius: 3px;
-  font-size: 14px;
-  background: white;
-  min-width: 150px;
-}
-
-.filter-select:focus {
-  outline: none;
-  border-color: #0052cc;
-}
-
 /* Summary Cards */
 .summary-cards {
   display: flex;

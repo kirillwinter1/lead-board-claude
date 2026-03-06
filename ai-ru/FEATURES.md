@@ -58,6 +58,7 @@
 | F56 | Metrics Hardening | 2026-03-03 | [features/F56](features/F56_METRICS_HARDENING.md) |
 | F57 | Jira Worklog Sync + Per-Day Timeline | 2026-03-04 | [features/F57](features/F57_WORKLOG_SYNC_TIMELINE.md) |
 | F58 | Семантический поиск на Board | 2026-03-04 | [features/F58](features/F58_BOARD_SEMANTIC_SEARCH.md) |
+| F59 | Filter UX Redesign | 2026-03-06 | [features/F59](features/F59_FILTER_UX_REDESIGN.md) |
 
 ## Бэклог (BF)
 

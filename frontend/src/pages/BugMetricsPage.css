@@ -17,22 +17,6 @@
   color: #172b4d;
 }
 
-.team-filter-select {
-  padding: 6px 12px;
-  border: 1px solid #dfe1e6;
-  border-radius: 4px;
-  font-size: 14px;
-  color: #172b4d;
-  background: white;
-  cursor: pointer;
-  min-width: 160px;
-}
-
-.team-filter-select:focus {
-  outline: none;
-  border-color: #4c9aff;
-}
-
 .bug-metrics-section {
   margin-top: 24px;
 }

@@ -80,7 +80,7 @@ public class MemberProfileService {
             if (issue.getDoneAt() != null) continue; // skip completed
 
             StatusCategory statusCat = workflowConfigService.categorize(issue.getStatus(), issue.getIssueType());
-            if (statusCat == StatusCategory.IN_PROGRESS || statusCat == StatusCategory.PLANNED) {
+            if (statusCat == StatusCategory.IN_PROGRESS || statusCat == StatusCategory.PLANNED || statusCat == StatusCategory.DEV_DONE) {
                 activeTasks.add(buildActiveTask(issue, issueCache));
             } else if (statusCat.isNotStarted()) {
                 upcomingTasks.add(buildActiveTask(issue, issueCache));

@@ -1,0 +1,85 @@
+.filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px 5px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #e9ecef;
+  border: none;
+  color: #495057;
+  animation: filterChipAppear 0.15s ease-out;
+  white-space: nowrap;
+}
+
+@keyframes filterChipAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.filter-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.filter-chip-text {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: #6b778c;
+  border-radius: 50%;
+  padding: 0;
+  transition: background-color 0.1s;
+}
+
+.filter-chip-remove:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.filter-chips-clear {
+  border: none;
+  background: none;
+  color: #6b778c;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-decoration: underline;
+  transition: color 0.1s, background-color 0.1s;
+}
+
+.filter-chips-clear:hover {
+  color: #de350b;
+  background: #ffebe6;
+}

@@ -8,6 +8,7 @@ interface MultiSelectDropdownProps {
   onToggle: (value: string) => void
   placeholder?: string
   colorMap?: Map<string, string>
+  countMap?: Map<string, number>
 }
 
 export function MultiSelectDropdown({
@@ -17,6 +18,7 @@ export function MultiSelectDropdown({
   onToggle,
   placeholder = 'All',
   colorMap,
+  countMap,
 }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -38,7 +40,7 @@ export function MultiSelectDropdown({
     <div className="filter-dropdown" ref={dropdownRef}>
       <button
         type="button"
-        className={`filter-dropdown-trigger ${isOpen ? 'active' : ''}`}
+        className={`filter-dropdown-trigger ${isOpen ? 'active' : ''} ${selected.size > 0 ? 'has-selection' : ''}`}
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="filter-dropdown-label">{displayText}</span>
@@ -63,31 +65,41 @@ export function MultiSelectDropdown({
       </button>
 
       {isOpen && (
-        <div className="filter-dropdown-menu">
+        <div className="filter-dropdown-menu filter-dropdown-menu-animated">
           {options.length === 0 ? (
             <div className="filter-dropdown-empty">No options</div>
           ) : (
             options.map(option => (
-              <label key={option} className="filter-dropdown-item">
-                <input
-                  type="checkbox"
-                  checked={selected.has(option)}
-                  onChange={() => onToggle(option)}
-                />
+              <div
+                key={option}
+                className={`filter-dropdown-item ${selected.has(option) ? 'filter-dropdown-item-selected' : ''}`}
+                style={selected.has(option) && colorMap?.get(option) ? {
+                  backgroundColor: colorMap.get(option)! + '25',
+                } : undefined}
+                onClick={() => onToggle(option)}
+              >
                 {colorMap?.get(option) && (
                   <span
                     style={{
                       display: 'inline-block',
-                      width: 8,
-                      height: 8,
+                      width: 10,
+                      height: 10,
                       borderRadius: '50%',
                       backgroundColor: colorMap.get(option),
                       flexShrink: 0,
                     }}
                   />
                 )}
-                <span>{option}</span>
-              </label>
+                <span className="filter-dropdown-item-label">{option}</span>
+                {countMap?.has(option) && (
+                  <span className="filter-dropdown-item-count">{countMap.get(option)}</span>
+                )}
+                {selected.has(option) && (
+                  <svg className="filter-dropdown-checkmark" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
             ))
           )}
         </div>

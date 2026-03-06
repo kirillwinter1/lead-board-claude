@@ -8,6 +8,7 @@ import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { useStatusStyles } from '../components/board/StatusStylesContext'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import './TimelinePage.css'
 
 import { getIssueIcon } from '../components/board/helpers'
@@ -384,17 +385,11 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
   const labelRef = useRef<HTMLDivElement>(null)
 
   const handleMouseEnter = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const tooltipWidth = 350
-    const tooltipHeight = 300
-    const x = rect.right + 8 + tooltipWidth > window.innerWidth
-      ? Math.max(8, rect.left - tooltipWidth - 8)
-      : rect.right + 8
-    const y = rect.top + tooltipHeight > window.innerHeight
-      ? Math.max(8, window.innerHeight - tooltipHeight - 8)
-      : rect.top
-    setTooltipPos({ x, y })
+    setTooltipPos({ x: e.clientX + 12, y: e.clientY + 12 })
     setShowTooltip(true)
+  }
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setTooltipPos({ x: e.clientX + 12, y: e.clientY + 12 })
   }
 
   const statusColor = getStatusColor(epic.status, statusStyles)
@@ -425,6 +420,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
         className="gantt-label-row"
         style={{ height: `${rowHeight}px` }}
         onMouseEnter={handleMouseEnter}
+        onMouseMove={handleMouseMove}
         onMouseLeave={() => setShowTooltip(false)}
       >
         {/* Row 1: Icon + Key + Status badge + Progress */}
@@ -765,8 +761,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   }
 
   const handleMouseEnter = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    onHover(story, { x: rect.left + rect.width / 2, y: rect.top - 8 })
+    onHover(story, { x: e.clientX, y: e.clientY - 12 })
   }
 
   return (
@@ -787,6 +782,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
       }}
       onMouseEnter={handleMouseEnter}
+      onMouseMove={e => onHover(story, { x: e.clientX, y: e.clientY - 12 })}
       onMouseLeave={() => onHover(null)}
     >
       {/* Per-day worklog rendering for retro/hybrid stories with worklog data */}
@@ -876,9 +872,8 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           className="timeline-tooltip"
           style={{
             position: 'fixed',
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            transform: 'translate(-50%, -100%)',
+            left: tooltipPos.x + 12,
+            top: tooltipPos.y + 12,
             zIndex: 10000,
             pointerEvents: 'none',
             background: 'rgba(0,0,0,0.92)',
@@ -1082,8 +1077,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
   }
 
   const handleMouseEnter = (e: React.MouseEvent) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    onHover(epic, { x: rect.left + rect.width / 2, y: rect.top - 8 })
+    onHover(epic, { x: e.clientX, y: e.clientY - 12 })
   }
 
   return (
@@ -1103,6 +1097,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
         cursor: 'pointer',
       }}
       onMouseEnter={handleMouseEnter}
+      onMouseMove={e => onHover(epic, { x: e.clientX, y: e.clientY - 12 })}
       onMouseLeave={() => onHover(null)}
       onClick={() => window.open(`${jiraBaseUrl}${epic.epicKey}`, '_blank')}
     >
@@ -1168,9 +1163,8 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
           className="timeline-tooltip"
           style={{
             position: 'fixed',
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            transform: 'translate(-50%, -100%)',
+            left: tooltipPos.x + 12,
+            top: tooltipPos.y + 12,
             zIndex: 10000,
             pointerEvents: 'none',
             background: 'rgba(0,0,0,0.92)',
@@ -1765,54 +1759,48 @@ export function TimelinePage() {
       <div className="timeline-controls">
         <div className="filter-group">
           <label className="filter-label">Команда</label>
-          <select
-            className="filter-input"
-            aria-label="Выбор команды"
-            value={selectedTeamId ?? ''}
-            onChange={e => setSelectedTeamId(Number(e.target.value))}
-          >
-            <option value="" disabled>Выберите команду...</option>
-            {teams.map(team => (
-              <option key={team.id} value={team.id}>{team.name}</option>
-            ))}
-          </select>
+          <SingleSelectDropdown
+            label="Команда"
+            options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color ?? undefined }))}
+            selected={selectedTeamId !== null ? String(selectedTeamId) : null}
+            onChange={v => setSelectedTeamId(v ? Number(v) : null)}
+            placeholder="Выберите команду..."
+            allowClear={false}
+          />
         </div>
 
         <div className="filter-group">
           <label className="filter-label">Масштаб</label>
-          <select
-            className="filter-input"
-            aria-label="Масштаб таймлайна"
-            value={zoom}
-            onChange={e => setZoom(e.target.value as ZoomLevel)}
-          >
-            <option value="day">День</option>
-            <option value="week">Неделя</option>
-            <option value="month">Месяц</option>
-          </select>
+          <SingleSelectDropdown
+            label="Масштаб"
+            options={[
+              { value: 'day', label: 'День' },
+              { value: 'week', label: 'Неделя' },
+              { value: 'month', label: 'Месяц' },
+            ]}
+            selected={zoom}
+            onChange={v => v && setZoom(v as ZoomLevel)}
+            allowClear={false}
+          />
         </div>
 
         <div className="filter-group">
           <label className="filter-label">
             Дата
             {isHistoricalMode && (
-              <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>📜 Исторические данные</span>
+              <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>Исторические данные</span>
             )}
           </label>
-          <select
-            className="filter-input"
-            aria-label="Выбор даты снэпшота"
-            value={selectedHistoricalDate}
-            onChange={e => handleHistoricalDateChange(e.target.value)}
-            style={{ minWidth: 140 }}
-          >
-            <option value="">Сегодня (live)</option>
-            {availableDates.map(date => (
-              <option key={date} value={date}>
-                {new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </option>
-            ))}
-          </select>
+          <SingleSelectDropdown
+            label="Дата"
+            options={availableDates.map(date => ({
+              value: date,
+              label: new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+            }))}
+            selected={selectedHistoricalDate || null}
+            onChange={v => handleHistoricalDateChange(v ?? '')}
+            placeholder="Сегодня (live)"
+          />
         </div>
 
         <div className="timeline-legend">

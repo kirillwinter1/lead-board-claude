@@ -7,6 +7,8 @@ import { getStatusStyles, type StatusStyle } from '../api/board'
 import { getConfig } from '../api/config'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { FilterBar } from '../components/FilterBar'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import './TeamMetricsPage.css'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { DsrGauge } from '../components/metrics/DsrGauge'
@@ -101,17 +103,19 @@ export function WipHistoryChart({ teamId }: WipHistoryChartProps) {
       <div className="wip-history-header">
         <h3>WIP History (Last {days} Days)</h3>
         <div className="wip-history-controls">
-          <select
-            className="filter-input"
-            value={days}
-            onChange={e => setDays(Number(e.target.value))}
-          >
-            <option value={7}>7 days</option>
-            <option value={14}>14 days</option>
-            <option value={30}>30 days</option>
-            <option value={60}>60 days</option>
-            <option value={90}>90 days</option>
-          </select>
+          <SingleSelectDropdown
+            label="Period"
+            options={[
+              { value: '7', label: '7 days' },
+              { value: '14', label: '14 days' },
+              { value: '30', label: '30 days' },
+              { value: '60', label: '60 days' },
+              { value: '90', label: '90 days' },
+            ]}
+            selected={String(days)}
+            onChange={v => v && setDays(Number(v))}
+            allowClear={false}
+          />
           <button
             className="btn btn-secondary"
             onClick={handleCreateSnapshot}
@@ -336,48 +340,37 @@ export function TeamMetricsPage() {
         <h2>Team Metrics</h2>
       </div>
 
-      <div className="metrics-controls">
-        <div className="filter-group">
-          <label className="filter-label">Team</label>
-          <select
-            className="filter-input"
-            value={selectedTeamId ?? ''}
-            onChange={e => setSelectedTeamId(Number(e.target.value))}
-          >
-            <option value="" disabled>Select team...</option>
-            {teams.map(team => (
-              <option key={team.id} value={team.id}>{team.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="filter-group">
-          <label className="filter-label">Period</label>
-          <select
-            className="filter-input"
-            value={period}
-            onChange={e => setPeriod(Number(e.target.value))}
-          >
-            <option value={7}>Last 7 days</option>
-            <option value={14}>Last 14 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={60}>Last 60 days</option>
-            <option value={90}>Last 90 days</option>
-          </select>
-        </div>
-        <div className="filter-group">
-          <label className="filter-label">Issue Type</label>
-          <select
-            className="filter-input"
-            value={issueType}
-            onChange={e => setIssueType(e.target.value)}
-          >
-            <option value="">All</option>
-            {issueTypeOptions.map(opt => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+      <FilterBar>
+        <SingleSelectDropdown
+          label="Team"
+          options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color || undefined }))}
+          selected={selectedTeamId ? String(selectedTeamId) : null}
+          onChange={v => setSelectedTeamId(v ? Number(v) : null)}
+          placeholder="Select team..."
+          allowClear={false}
+        />
+        <SingleSelectDropdown
+          label="Period"
+          options={[
+            { value: '7', label: 'Last 7 days' },
+            { value: '14', label: 'Last 14 days' },
+            { value: '30', label: 'Last 30 days' },
+            { value: '60', label: 'Last 60 days' },
+            { value: '90', label: 'Last 90 days' },
+          ]}
+          selected={String(period)}
+          onChange={v => v && setPeriod(Number(v))}
+          placeholder="Period"
+          allowClear={false}
+        />
+        <SingleSelectDropdown
+          label="Issue Type"
+          options={issueTypeOptions.map(o => ({ value: o.value, label: o.label }))}
+          selected={issueType || null}
+          onChange={v => setIssueType(v || '')}
+          placeholder="All"
+        />
+      </FilterBar>
 
       {loading && <div className="loading">Loading...</div>}
       {error && <div className="error">{error}</div>}

@@ -20,7 +20,7 @@ export interface StatusMappingDto {
   id: number | null
   jiraStatusName: string
   issueCategory: 'PROJECT' | 'EPIC' | 'STORY' | 'BUG' | 'SUBTASK' | 'IGNORE'
-  statusCategory: 'NEW' | 'REQUIREMENTS' | 'PLANNED' | 'IN_PROGRESS' | 'DONE'
+  statusCategory: 'NEW' | 'REQUIREMENTS' | 'PLANNED' | 'IN_PROGRESS' | 'DEV_DONE' | 'DONE'
   workflowRoleCode: string | null
   sortOrder: number
   scoreWeight: number

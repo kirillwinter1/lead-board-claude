@@ -1,4 +1,9 @@
+import { useMemo } from 'react'
 import { MultiSelectDropdown } from '../MultiSelectDropdown'
+import { SearchInput } from '../SearchInput'
+import { FilterBar } from '../FilterBar'
+import { FilterChip } from '../FilterChips'
+import { useStatusStyles } from './StatusStylesContext'
 import { SyncStatus } from './types'
 
 interface FilterPanelProps {
@@ -21,6 +26,7 @@ interface FilterPanelProps {
   hideDone?: boolean
   onHideNewToggle?: () => void
   onHideDoneToggle?: () => void
+  epicTitles?: string[]
 }
 
 function formatSyncTime(isoString: string | null): string {
@@ -55,50 +61,89 @@ export function FilterPanel({
   hideDone,
   onHideNewToggle,
   onHideDoneToggle,
+  epicTitles,
 }: FilterPanelProps) {
-  const hasActiveFilters = searchKey || selectedStatuses.size > 0 || selectedTeams.size > 0 || hideNew || hideDone
+  const statusStyles = useStatusStyles()
+
+  const statusColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const [status, style] of Object.entries(statusStyles)) {
+      if (style.color) map.set(status, style.color)
+    }
+    return map
+  }, [statusStyles])
+
+  const chips = useMemo(() => {
+    const result: FilterChip[] = []
+    for (const team of selectedTeams) {
+      result.push({
+        category: 'Team',
+        value: team,
+        color: teamColorMap?.get(team),
+        onRemove: () => onTeamToggle(team),
+      })
+    }
+    for (const status of selectedStatuses) {
+      result.push({
+        category: 'Status',
+        value: status,
+        color: statusColorMap.get(status),
+        onRemove: () => onStatusToggle(status),
+      })
+    }
+    if (hideNew) {
+      result.push({ category: 'Filter', value: 'Hide NEW', onRemove: () => onHideNewToggle?.() })
+    }
+    if (hideDone) {
+      result.push({ category: 'Filter', value: 'Hide DONE', onRemove: () => onHideDoneToggle?.() })
+    }
+    if (searchKey) {
+      result.push({ category: 'Search', value: `"${searchKey}"`, onRemove: () => onSearchKeyChange('') })
+    }
+    return result
+  }, [selectedTeams, selectedStatuses, hideNew, hideDone, searchKey, teamColorMap, statusColorMap, onTeamToggle, onStatusToggle, onHideNewToggle, onHideDoneToggle, onSearchKeyChange])
+
+  const searchBadge = searchMode
+    ? { label: searchMode === 'semantic' ? 'AI' : 'TXT', variant: (searchMode === 'semantic' ? 'ai' : 'text') as 'ai' | 'text' }
+    : undefined
+
+  const searchHints = useMemo(() => {
+    if (!epicTitles || epicTitles.length === 0) return undefined
+    // Pick up to 4 short epic titles as search hints
+    return epicTitles
+      .filter(t => t.length >= 5 && t.length <= 50)
+      .slice(0, 4)
+  }, [epicTitles])
 
   return (
-    <div className="filter-panel">
-      <div className="filter-group filter-search">
-        <svg
-          className="search-icon"
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path
-            d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M14 14L10.5 10.5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        <input
-          type="text"
-          placeholder="Search by key or content..."
-          value={searchKey}
-          onChange={(e) => onSearchKeyChange(e.target.value)}
-          className="filter-input"
-        />
-        {searchLoading && (
-          <span className="search-loading">...</span>
-        )}
-        {!searchLoading && searchMode && (
-          <span className={`search-mode-badge ${searchMode === 'semantic' ? 'badge-ai' : 'badge-txt'}`}>
-            {searchMode === 'semantic' ? 'AI' : 'TXT'}
-          </span>
-        )}
-      </div>
+    <FilterBar
+      chips={chips}
+      onClearAll={onClearFilters}
+      trailing={
+        <div className="sync-status" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {syncStatus && (
+            <span className="sync-info">
+              Last sync: {formatSyncTime(syncStatus.lastSyncCompletedAt)}
+            </span>
+          )}
+          <button
+            className={`btn btn-primary btn-refresh ${syncing ? 'syncing' : ''}`}
+            onClick={onSync}
+            disabled={syncing}
+          >
+            {syncing ? 'Syncing...' : 'Refresh'}
+          </button>
+        </div>
+      }
+    >
+      <SearchInput
+        value={searchKey}
+        onChange={onSearchKeyChange}
+        placeholder="AI search: key, text, or meaning..."
+        loading={searchLoading}
+        badge={searchBadge}
+        hints={searchHints}
+      />
 
       <MultiSelectDropdown
         label="Team"
@@ -115,6 +160,7 @@ export function FilterPanel({
         selected={selectedStatuses}
         onToggle={onStatusToggle}
         placeholder="All statuses"
+        colorMap={statusColorMap}
       />
 
       {onHideNewToggle && (
@@ -133,27 +179,6 @@ export function FilterPanel({
           Hide DONE
         </button>
       )}
-
-      {hasActiveFilters && (
-        <button className="btn btn-secondary btn-clear" onClick={onClearFilters}>
-          Clear
-        </button>
-      )}
-
-      <div className="sync-status filter-group-right">
-        {syncStatus && (
-          <span className="sync-info">
-            Last sync: {formatSyncTime(syncStatus.lastSyncCompletedAt)}
-          </span>
-        )}
-        <button
-          className={`btn btn-primary btn-refresh ${syncing ? 'syncing' : ''}`}
-          onClick={onSync}
-          disabled={syncing}
-        >
-          {syncing ? 'Syncing...' : 'Refresh'}
-        </button>
-      </div>
-    </div>
+    </FilterBar>
   )
 }

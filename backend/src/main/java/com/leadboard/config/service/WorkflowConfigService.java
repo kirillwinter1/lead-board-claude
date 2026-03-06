@@ -591,6 +591,7 @@ public class WorkflowConfigService {
                 case REQUIREMENTS -> 8;
                 case PLANNED -> 15;
                 case IN_PROGRESS -> 25;
+                case DEV_DONE -> 5;
                 case DONE -> 0;
                 default -> 0;
             };
@@ -602,6 +603,7 @@ public class WorkflowConfigService {
             case REQUIREMENTS -> 20;
             case PLANNED -> 30;
             case IN_PROGRESS -> 50;
+            case DEV_DONE -> 10;
             case DONE -> 0;
             default -> 0;
         };
@@ -661,6 +663,7 @@ public class WorkflowConfigService {
         // Hardcoded last resort for common status names
         return switch (target) {
             case DONE -> "Done";
+            case DEV_DONE -> "Dev Done";
             case IN_PROGRESS -> "In Progress";
             case NEW -> "New";
             default -> null;

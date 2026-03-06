@@ -498,7 +498,8 @@ public class MappingAutoDetectService {
             case NEW -> 0;
             case REQUIREMENTS, PLANNED -> 1;
             case IN_PROGRESS -> 2;
-            case DONE -> 3;
+            case DEV_DONE -> 3;
+            case DONE -> 4;
             default -> 2;
         };
     }
@@ -569,6 +570,13 @@ public class MappingAutoDetectService {
             if (lower.contains("plan") || lower.contains("заплан")) {
                 return StatusCategory.PLANNED;
             }
+            if (lower.contains("dev done") || lower.contains("development done")
+                    || lower.contains("разработка завершена") || lower.contains("готов к")
+                    || lower.contains("e2e") || lower.contains("acceptance")
+                    || lower.contains("приёмк") || lower.contains("приемк")
+                    || lower.contains("uat") || lower.contains("review")) {
+                return StatusCategory.DEV_DONE;
+            }
         }
         return StatusCategory.IN_PROGRESS;
     }
@@ -617,6 +625,7 @@ public class MappingAutoDetectService {
                 if (lower.contains("develop") || lower.contains("разработ")) yield 25;
                 yield 20;
             }
+            case DEV_DONE -> 5;
             default -> 0;
         };
     }
@@ -650,6 +659,7 @@ public class MappingAutoDetectService {
             case REQUIREMENTS -> "#E6FCFF";
             case PLANNED -> "#EAE6FF";
             case IN_PROGRESS -> "#DEEBFF";
+            case DEV_DONE -> "#FFF0B3";
             case DONE -> "#E3FCEF";
         };
     }
