@@ -1,5 +1,7 @@
 package com.leadboard.config;
 
+import com.leadboard.config.entity.JiraProjectEntity;
+import com.leadboard.config.repository.JiraProjectRepository;
 import com.leadboard.tenant.TenantContext;
 import com.leadboard.tenant.TenantJiraConfigEntity;
 import com.leadboard.tenant.TenantJiraConfigRepository;
@@ -25,11 +27,14 @@ public class JiraConfigResolver {
 
     private final JiraProperties jiraProperties;
     private final TenantJiraConfigRepository tenantJiraConfigRepository;
+    private final JiraProjectRepository jiraProjectRepository;
 
     public JiraConfigResolver(JiraProperties jiraProperties,
-                              TenantJiraConfigRepository tenantJiraConfigRepository) {
+                              TenantJiraConfigRepository tenantJiraConfigRepository,
+                              JiraProjectRepository jiraProjectRepository) {
         this.jiraProperties = jiraProperties;
         this.tenantJiraConfigRepository = tenantJiraConfigRepository;
+        this.jiraProjectRepository = jiraProjectRepository;
     }
 
     public String getBaseUrl() {
@@ -84,6 +89,22 @@ public class JiraConfigResolver {
                     .toList();
         }
         return List.of();
+    }
+
+    /**
+     * Returns active project keys from DB (jira_projects table with active=true, sync_enabled=true).
+     * Falls back to getAllProjectKeys() if DB table is empty or not available.
+     */
+    public List<String> getActiveProjectKeys() {
+        try {
+            List<JiraProjectEntity> active = jiraProjectRepository.findByActiveTrueAndSyncEnabledTrue();
+            if (!active.isEmpty()) {
+                return active.stream().map(JiraProjectEntity::getProjectKey).toList();
+            }
+        } catch (Exception e) {
+            log.debug("Could not read jira_projects table: {}", e.getMessage());
+        }
+        return getAllProjectKeys();
     }
 
     public String getTeamFieldId() {

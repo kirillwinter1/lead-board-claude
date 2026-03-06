@@ -35,6 +35,7 @@ public class WorkflowConfigService {
     // Cached lookups (for current tenant — reloaded when tenant changes)
     private volatile Long defaultConfigId;
     private volatile List<Long> allConfigIds = List.of();
+    // Global (merged) lookups — used when projectKey is unknown
     private final ConcurrentHashMap<String, BoardCategory> typeToCategory = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> typeToRoleCode = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, StatusCategory> statusLookup = new ConcurrentHashMap<>();
@@ -43,6 +44,14 @@ public class WorkflowConfigService {
     private final ConcurrentHashMap<String, Integer> statusScoreWeight = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, LinkCategory> linkTypeLookup = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, String> statusColor = new ConcurrentHashMap<>();
+    // Per-project lookups — used when projectKey is known (key = "PROJECT_KEY:value")
+    private final ConcurrentHashMap<String, BoardCategory> projectTypeToCategory = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> projectTypeToRoleCode = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, StatusCategory> projectStatusLookup = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> projectStatusToRoleCode = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> projectStatusSortOrder = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> projectStatusScoreWeight = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> projectStatusColor = new ConcurrentHashMap<>();
     private volatile List<WorkflowRoleEntity> cachedRoles = List.of();
     private volatile Map<String, Integer> scoreWeightsMap = Map.of();
 
@@ -159,7 +168,7 @@ public class WorkflowConfigService {
             allConfigIds = configs.stream().map(ProjectConfigurationEntity::getId).toList();
             projectKey = defaultConfig.getProjectKey();
 
-            // ==== Merged loading: union all configs, first-wins ====
+            // ==== Merged loading: union all configs (global first-wins) + per-project maps ====
 
             // Clear all caches
             typeToCategory.clear();
@@ -170,6 +179,13 @@ public class WorkflowConfigService {
             statusScoreWeight.clear();
             statusColor.clear();
             linkTypeLookup.clear();
+            projectTypeToCategory.clear();
+            projectTypeToRoleCode.clear();
+            projectStatusLookup.clear();
+            projectStatusToRoleCode.clear();
+            projectStatusSortOrder.clear();
+            projectStatusScoreWeight.clear();
+            projectStatusColor.clear();
 
             Set<String> projectNames = new HashSet<>();
             Set<String> epicNames = new HashSet<>();
@@ -184,6 +200,7 @@ public class WorkflowConfigService {
 
             for (ProjectConfigurationEntity config : configs) {
                 Long configId = config.getId();
+                String cfgProjectKey = config.getProjectKey(); // may be null for default
 
                 // Merge roles: union by code (first-wins)
                 for (WorkflowRoleEntity role : roleRepo.findByConfigIdOrderBySortOrderAsc(configId)) {
@@ -192,13 +209,22 @@ public class WorkflowConfigService {
                     }
                 }
 
-                // Merge issue type mappings: union by jiraTypeName.toLowerCase() (first-wins)
+                // Merge issue type mappings: global (first-wins) + per-project
                 for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(configId)) {
                     if (m.getBoardCategory() == null) continue;
                     String typeKey = m.getJiraTypeName().toLowerCase();
+                    // Global (first-wins)
                     typeToCategory.putIfAbsent(typeKey, m.getBoardCategory());
                     if (m.getWorkflowRoleCode() != null) {
                         typeToRoleCode.putIfAbsent(typeKey, m.getWorkflowRoleCode());
+                    }
+                    // Per-project (always set — last config for this project wins, but typically 1 config per project)
+                    if (cfgProjectKey != null) {
+                        String pKey = cfgProjectKey + ":" + typeKey;
+                        projectTypeToCategory.put(pKey, m.getBoardCategory());
+                        if (m.getWorkflowRoleCode() != null) {
+                            projectTypeToRoleCode.put(pKey, m.getWorkflowRoleCode());
+                        }
                     }
                     switch (m.getBoardCategory()) {
                         case PROJECT -> projectNames.add(m.getJiraTypeName());
@@ -211,9 +237,10 @@ public class WorkflowConfigService {
                     totalTypeMappings++;
                 }
 
-                // Merge status mappings: union by boardCategory:statusName (first-wins)
+                // Merge status mappings: global (first-wins) + per-project
                 for (StatusMappingEntity sm : statusMappingRepo.findByConfigId(configId)) {
                     String key = buildStatusKey(sm.getIssueCategory().name(), sm.getJiraStatusName());
+                    // Global (first-wins)
                     statusLookup.putIfAbsent(key, sm.getStatusCategory());
                     if (sm.getWorkflowRoleCode() != null) {
                         statusToRoleCode.putIfAbsent(key, sm.getWorkflowRoleCode());
@@ -222,6 +249,19 @@ public class WorkflowConfigService {
                     statusScoreWeight.putIfAbsent(key, sm.getScoreWeight());
                     if (sm.getColor() != null) {
                         statusColor.putIfAbsent(key, sm.getColor());
+                    }
+                    // Per-project
+                    if (cfgProjectKey != null) {
+                        String pKey = cfgProjectKey + ":" + key;
+                        projectStatusLookup.put(pKey, sm.getStatusCategory());
+                        if (sm.getWorkflowRoleCode() != null) {
+                            projectStatusToRoleCode.put(pKey, sm.getWorkflowRoleCode());
+                        }
+                        projectStatusSortOrder.put(pKey, sm.getSortOrder());
+                        projectStatusScoreWeight.put(pKey, sm.getScoreWeight());
+                        if (sm.getColor() != null) {
+                            projectStatusColor.put(pKey, sm.getColor());
+                        }
                     }
                     totalStatusMappings++;
                 }
@@ -268,10 +308,27 @@ public class WorkflowConfigService {
 
     // ==================== Issue Type Categorization ====================
 
+    /**
+     * Categorize issue type using global merged config (backward compat).
+     */
     public BoardCategory categorizeIssueType(String jiraTypeName) {
+        return categorizeIssueType(jiraTypeName, null);
+    }
+
+    /**
+     * Categorize issue type with project-specific resolution.
+     * Tries per-project config first, falls back to global merged config.
+     */
+    public BoardCategory categorizeIssueType(String jiraTypeName, String projectKey) {
         ensureLoaded();
         if (jiraTypeName == null) return null;
-        return typeToCategory.get(jiraTypeName.toLowerCase());
+        String typeKey = jiraTypeName.toLowerCase();
+        // Per-project lookup first
+        if (projectKey != null) {
+            BoardCategory cat = projectTypeToCategory.get(projectKey + ":" + typeKey);
+            if (cat != null) return cat;
+        }
+        return typeToCategory.get(typeKey);
     }
 
     public boolean isProject(String jiraTypeName) {
@@ -280,6 +337,10 @@ public class WorkflowConfigService {
 
     public boolean isEpic(String jiraTypeName) {
         return categorizeIssueType(jiraTypeName) == BoardCategory.EPIC;
+    }
+
+    public boolean isEpic(String jiraTypeName, String projectKey) {
+        return categorizeIssueType(jiraTypeName, projectKey) == BoardCategory.EPIC;
     }
 
     public boolean isStory(String jiraTypeName) {
@@ -295,7 +356,11 @@ public class WorkflowConfigService {
     }
 
     public boolean isStoryOrBug(String jiraTypeName) {
-        BoardCategory cat = categorizeIssueType(jiraTypeName);
+        return isStoryOrBug(jiraTypeName, null);
+    }
+
+    public boolean isStoryOrBug(String jiraTypeName, String projectKey) {
+        BoardCategory cat = categorizeIssueType(jiraTypeName, projectKey);
         return cat == BoardCategory.STORY || cat == BoardCategory.BUG;
     }
 
@@ -322,8 +387,17 @@ public class WorkflowConfigService {
     // ==================== Roles ====================
 
     public String getSubtaskRole(String jiraTypeName) {
+        return getSubtaskRole(jiraTypeName, null);
+    }
+
+    public String getSubtaskRole(String jiraTypeName, String projectKey) {
         if (jiraTypeName == null) return getDefaultRoleCode();
-        String role = typeToRoleCode.get(jiraTypeName.toLowerCase());
+        String typeKey = jiraTypeName.toLowerCase();
+        if (projectKey != null) {
+            String role = projectTypeToRoleCode.get(projectKey + ":" + typeKey);
+            if (role != null) return role;
+        }
+        String role = typeToRoleCode.get(typeKey);
         return role != null ? role : getDefaultRoleCode();
     }
 
@@ -347,31 +421,59 @@ public class WorkflowConfigService {
     // ==================== Status Categorization ====================
 
     public StatusCategory categorize(String status, String issueType) {
+        return categorize(status, issueType, null);
+    }
+
+    public StatusCategory categorize(String status, String issueType, String projectKey) {
         ensureLoaded();
         if (status == null) return StatusCategory.NEW;
 
-        BoardCategory cat = categorizeIssueType(issueType);
+        BoardCategory cat = categorizeIssueType(issueType, projectKey);
         if (cat == null) return StatusCategory.NEW; // Unmapped type
-        return categorizeByBoardCategory(status, cat);
+        return categorizeByBoardCategory(status, cat, projectKey);
     }
 
     public StatusCategory categorizeEpic(String status) {
-        return categorizeByBoardCategory(status, BoardCategory.EPIC);
+        return categorizeByBoardCategory(status, BoardCategory.EPIC, null);
+    }
+
+    public StatusCategory categorizeEpic(String status, String projectKey) {
+        return categorizeByBoardCategory(status, BoardCategory.EPIC, projectKey);
     }
 
     public StatusCategory categorizeStory(String status) {
-        return categorizeByBoardCategory(status, BoardCategory.STORY);
+        return categorizeByBoardCategory(status, BoardCategory.STORY, null);
+    }
+
+    public StatusCategory categorizeStory(String status, String projectKey) {
+        return categorizeByBoardCategory(status, BoardCategory.STORY, projectKey);
     }
 
     public StatusCategory categorizeSubtask(String status) {
-        return categorizeByBoardCategory(status, BoardCategory.SUBTASK);
+        return categorizeByBoardCategory(status, BoardCategory.SUBTASK, null);
+    }
+
+    public StatusCategory categorizeSubtask(String status, String projectKey) {
+        return categorizeByBoardCategory(status, BoardCategory.SUBTASK, projectKey);
     }
 
     private StatusCategory categorizeByBoardCategory(String status, BoardCategory boardCat) {
+        return categorizeByBoardCategory(status, boardCat, null);
+    }
+
+    private StatusCategory categorizeByBoardCategory(String status, BoardCategory boardCat, String projectKey) {
         if (status == null) return StatusCategory.NEW;
 
-        // Try exact match in DB mapping
         String key = buildStatusKey(boardCat.name(), status);
+
+        // Per-project lookup first
+        if (projectKey != null) {
+            String pKey = projectKey + ":" + key;
+            StatusCategory pCat = projectStatusLookup.get(pKey);
+            if (pCat != null) return pCat;
+        }
+
+        // Global lookup
         StatusCategory cat = statusLookup.get(key);
         if (cat != null) return cat;
 
@@ -416,11 +518,19 @@ public class WorkflowConfigService {
     }
 
     public boolean isDone(String status, String issueType) {
-        return categorize(status, issueType) == StatusCategory.DONE;
+        return isDone(status, issueType, null);
+    }
+
+    public boolean isDone(String status, String issueType, String projectKey) {
+        return categorize(status, issueType, projectKey) == StatusCategory.DONE;
     }
 
     public boolean isInProgress(String status, String issueType) {
-        StatusCategory cat = categorize(status, issueType);
+        return isInProgress(status, issueType, null);
+    }
+
+    public boolean isInProgress(String status, String issueType, String projectKey) {
+        StatusCategory cat = categorize(status, issueType, projectKey);
         return cat == StatusCategory.IN_PROGRESS || cat == StatusCategory.PLANNED;
     }
 
@@ -707,7 +817,11 @@ public class WorkflowConfigService {
     // ==================== Sync helpers ====================
 
     public String computeBoardCategory(String issueType, boolean isSubtask) {
-        BoardCategory cat = categorizeIssueType(issueType);
+        return computeBoardCategory(issueType, isSubtask, null);
+    }
+
+    public String computeBoardCategory(String issueType, boolean isSubtask, String projectKey) {
+        BoardCategory cat = categorizeIssueType(issueType, projectKey);
         if (cat == null) return null; // Unmapped type
         if (isSubtask && cat != BoardCategory.SUBTASK) {
             return BoardCategory.SUBTASK.name();
@@ -716,9 +830,13 @@ public class WorkflowConfigService {
     }
 
     public String computeWorkflowRole(String issueType) {
-        BoardCategory cat = categorizeIssueType(issueType);
+        return computeWorkflowRole(issueType, null);
+    }
+
+    public String computeWorkflowRole(String issueType, String projectKey) {
+        BoardCategory cat = categorizeIssueType(issueType, projectKey);
         if (cat == BoardCategory.SUBTASK) {
-            return getSubtaskRole(issueType);
+            return getSubtaskRole(issueType, projectKey);
         }
         return null;
     }

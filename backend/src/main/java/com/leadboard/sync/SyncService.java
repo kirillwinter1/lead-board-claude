@@ -144,21 +144,41 @@ public class SyncService {
     }
 
     public SyncStatus triggerSync(Integer months) {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allKeys.isEmpty()) {
             return new SyncStatus(false, null, null, 0, "Project key not configured");
         }
 
-        JiraSyncStateEntity state = getOrCreateSyncState(projectKey);
-        if (state.isSyncInProgress()) {
-            return new SyncStatus(true, state.getLastSyncStartedAt(), state.getLastSyncCompletedAt(),
-                    state.getLastSyncIssuesCount(), "Sync already in progress");
+        boolean anyInProgress = false;
+        for (String key : allKeys) {
+            JiraSyncStateEntity state = getOrCreateSyncState(key);
+            if (state.isSyncInProgress()) {
+                anyInProgress = true;
+            }
+        }
+        if (anyInProgress) {
+            return new SyncStatus(true, null, null, 0, "Sync already in progress");
         }
 
-        self.runSyncAsync(projectKey, months);
+        self.runSyncAllAsync(allKeys, months);
 
-        return new SyncStatus(true, OffsetDateTime.now(), state.getLastSyncCompletedAt(),
-                state.getLastSyncIssuesCount(), null);
+        return new SyncStatus(true, OffsetDateTime.now(), null, 0, null);
+    }
+
+    /**
+     * Run sync for all project keys sequentially in one async thread.
+     */
+    @Async
+    public void runSyncAllAsync(List<String> projectKeys, Integer months) {
+        for (String key : projectKeys) {
+            try {
+                autoDetectIfNeeded(key);
+                syncProject(key, months);
+                reconcileDeletedIssues(key);
+            } catch (Exception e) {
+                log.error("Async sync failed for project: {}", key, e);
+            }
+        }
     }
 
     /**
@@ -176,12 +196,32 @@ public class SyncService {
     }
 
     public SyncStatus getSyncStatus() {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allKeys.isEmpty()) {
             return new SyncStatus(false, null, null, 0, "Project key not configured");
         }
 
-        JiraSyncStateEntity state = syncStateRepository.findByProjectKey(projectKey).orElse(null);
+        boolean anyInProgress = false;
+        OffsetDateTime latestStarted = null;
+        OffsetDateTime latestCompleted = null;
+        int totalIssues = 0;
+        String lastError = null;
+
+        for (String key : allKeys) {
+            JiraSyncStateEntity state = syncStateRepository.findByProjectKey(key).orElse(null);
+            if (state == null) continue;
+            if (state.isSyncInProgress()) anyInProgress = true;
+            if (state.getLastSyncStartedAt() != null &&
+                    (latestStarted == null || state.getLastSyncStartedAt().isAfter(latestStarted))) {
+                latestStarted = state.getLastSyncStartedAt();
+            }
+            if (state.getLastSyncCompletedAt() != null &&
+                    (latestCompleted == null || state.getLastSyncCompletedAt().isAfter(latestCompleted))) {
+                latestCompleted = state.getLastSyncCompletedAt();
+            }
+            totalIssues += state.getLastSyncIssuesCount() != null ? state.getLastSyncIssuesCount() : 0;
+            if (state.getLastError() != null) lastError = state.getLastError();
+        }
 
         boolean setupCompleted = false;
         try {
@@ -194,20 +234,46 @@ public class SyncService {
 
         WorklogImportService.ImportProgress worklogProgress = worklogImportService.getProgress();
 
-        if (state == null) {
-            return new SyncStatus(false, null, null, 0, null, setupCompleted, worklogProgress);
-        }
-
         return new SyncStatus(
-                state.isSyncInProgress(),
-                state.getLastSyncStartedAt(),
-                state.getLastSyncCompletedAt(),
-                state.getLastSyncIssuesCount(),
-                state.getLastError(),
+                anyInProgress,
+                latestStarted,
+                latestCompleted,
+                totalIssues,
+                lastError,
                 setupCompleted,
                 worklogProgress
         );
     }
+
+    /**
+     * Per-project sync status for admin UI.
+     */
+    public List<ProjectSyncStatus> getPerProjectSyncStatus() {
+        List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        return allKeys.stream().map(key -> {
+            JiraSyncStateEntity state = syncStateRepository.findByProjectKey(key).orElse(null);
+            if (state == null) {
+                return new ProjectSyncStatus(key, false, null, null, 0, null);
+            }
+            return new ProjectSyncStatus(
+                    key,
+                    state.isSyncInProgress(),
+                    state.getLastSyncStartedAt(),
+                    state.getLastSyncCompletedAt(),
+                    state.getLastSyncIssuesCount() != null ? state.getLastSyncIssuesCount() : 0,
+                    state.getLastError()
+            );
+        }).toList();
+    }
+
+    public record ProjectSyncStatus(
+            String projectKey,
+            boolean syncInProgress,
+            OffsetDateTime lastSyncStartedAt,
+            OffsetDateTime lastSyncCompletedAt,
+            int issuesCount,
+            String error
+    ) {}
 
     /**
      * Called by TenantSyncScheduler in tenant context.
@@ -240,6 +306,8 @@ public class SyncService {
 
         try {
             int totalSynced = 0;
+            int createdCount = 0;
+            int updatedCount = 0;
 
             OffsetDateTime lastSync = state.getLastSyncCompletedAt();
             String jql;
@@ -268,9 +336,14 @@ public class SyncService {
                 }
 
                 for (JiraIssue issue : issues) {
-                    boolean statusChanged = saveOrUpdateIssue(issue, projectKey);
-                    if (statusChanged) {
+                    SyncResult result = saveOrUpdateIssue(issue, projectKey);
+                    if (result.statusChanged) {
                         statusChangedKeys.add(issue.getKey());
+                    }
+                    if (result.created) {
+                        createdCount++;
+                    } else {
+                        updatedCount++;
                     }
                     totalSynced++;
                 }
@@ -288,8 +361,11 @@ public class SyncService {
 
             observabilityMetrics.stopSyncTimer(syncTimer);
             observabilityMetrics.recordIssuesSynced(totalSynced);
+            observabilityMetrics.recordSyncDetails(createdCount, updatedCount);
+            observabilityMetrics.recordSyncSuccess();
 
-            log.info("Sync completed for project: {}. Issues synced: {} ({})", projectKey, totalSynced,
+            log.info("Sync completed for project: {}. Issues synced: {} (created: {}, updated: {}, {})",
+                    projectKey, totalSynced, createdCount, updatedCount,
                     lastSync != null ? "incremental" : "full");
 
             // Normalize manual_order
@@ -405,12 +481,12 @@ public class SyncService {
         }
     }
 
-    /**
-     * @return true if the issue's status changed during this sync
-     */
-    private boolean saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
+    private record SyncResult(boolean statusChanged, boolean created) {}
+
+    private SyncResult saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
         JiraIssueEntity existing = issueRepository.findByIssueKey(jiraIssue.getKey())
                 .orElse(null);
+        boolean isNew = existing == null;
         JiraIssueEntity entity = existing != null ? existing : new JiraIssueEntity();
 
         String previousStatus = existing != null ? existing.getStatus() : null;
@@ -437,7 +513,7 @@ public class SyncService {
         // Compute board_category and workflow_role from workflow config
         String issueTypeName = jiraIssue.getFields().getIssuetype().getName();
         boolean isSubtaskFlag = jiraIssue.getFields().getIssuetype().isSubtask();
-        entity.setBoardCategory(workflowConfigService.computeBoardCategory(issueTypeName, isSubtaskFlag));
+        entity.setBoardCategory(workflowConfigService.computeBoardCategory(issueTypeName, isSubtaskFlag, projectKey));
         // Register unknown type if not yet mapped (per-project)
         if (entity.getBoardCategory() == null) {
             try {
@@ -446,7 +522,7 @@ public class SyncService {
                 log.warn("Failed to register unknown type '{}': {}", issueTypeName, e.getMessage());
             }
         }
-        entity.setWorkflowRole(workflowConfigService.computeWorkflowRole(issueTypeName));
+        entity.setWorkflowRole(workflowConfigService.computeWorkflowRole(issueTypeName, projectKey));
 
         if (jiraIssue.getFields().getParent() != null) {
             entity.setParentKey(jiraIssue.getFields().getParent().getKey());
@@ -505,7 +581,7 @@ public class SyncService {
         // Detect "In Progress" using WorkflowConfigService
         // started_at will be corrected to real Jira timestamp by changelog import
         String status = jiraIssue.getFields().getStatus().getName();
-        if (workflowConfigService.isInProgress(status, issueTypeName) && entity.getStartedAt() == null) {
+        if (workflowConfigService.isInProgress(status, issueTypeName, projectKey) && entity.getStartedAt() == null) {
             entity.setStartedAt(OffsetDateTime.now()); // Temporary fallback, will be fixed by changelog import
         }
 
@@ -611,7 +687,7 @@ public class SyncService {
             flagChangelogService.detectAndRecordFlagChange(prevEntity, entity);
         }
 
-        return statusChanged;
+        return new SyncResult(statusChanged, isNew);
     }
 
     private LocalDate parseLocalDate(String dateStr) {
@@ -754,22 +830,23 @@ public class SyncService {
     }
 
     public Map<String, Object> countIssuesInJira(Integer months) {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allKeys.isEmpty()) {
             return Map.of("total", 0, "months", 0, "error", "Project key not configured");
         }
 
-        String jql;
-        if (months != null && months > 0) {
-            int days = months * 30;
-            jql = String.format("project = %s AND updated >= -%dd", projectKey, days);
-        } else {
-            jql = String.format("project = %s", projectKey);
-        }
-
-        // BUG-46: Wrap in try-catch to avoid 500 on Jira API errors
         try {
-            int total = jiraClient.countByJql(jql);
+            int total = 0;
+            for (String projectKey : allKeys) {
+                String jql;
+                if (months != null && months > 0) {
+                    int days = months * 30;
+                    jql = String.format("project = %s AND updated >= -%dd", projectKey, days);
+                } else {
+                    jql = String.format("project = %s", projectKey);
+                }
+                total += jiraClient.countByJql(jql);
+            }
             return Map.of(
                     "total", total,
                     "months", months != null ? months : 0

@@ -111,12 +111,15 @@ public class QuarterlyPlanningService {
         // Load all team epics
         List<JiraIssueEntity> allEpics = issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", teamId);
 
-        // Load all projects that have this quarter label
+        // Load all projects
         Map<String, JiraIssueEntity> projectsByKey = new HashMap<>();
         List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
         for (JiraIssueEntity project : allProjects) {
             projectsByKey.put(project.getIssueKey(), project);
         }
+
+        // Build reverse index: epicKey -> projectKey (from parentKey and childEpicKeys)
+        Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
 
         // Resolve quarter labels: direct label or inherited from parent project
         List<JiraIssueEntity> quarterEpics = new ArrayList<>();
@@ -124,7 +127,7 @@ public class QuarterlyPlanningService {
             if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
                 continue; // Skip completed epics
             }
-            String epicQuarter = resolveQuarterLabel(epic, projectsByKey);
+            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
             if (quarterLabel.equals(epicQuarter)) {
                 quarterEpics.add(epic);
             }
@@ -133,8 +136,9 @@ public class QuarterlyPlanningService {
         // Get RICE scores for projects
         Set<String> projectKeys = new HashSet<>();
         for (JiraIssueEntity epic : quarterEpics) {
-            if (epic.getParentKey() != null) {
-                projectKeys.add(epic.getParentKey());
+            String projKey = epicToProjectKey.get(epic.getIssueKey());
+            if (projKey != null) {
+                projectKeys.add(projKey);
             }
         }
         Map<String, RiceAssessmentEntity> riceByKey = loadRiceScores(projectKeys);
@@ -144,9 +148,9 @@ public class QuarterlyPlanningService {
         List<JiraIssueEntity> unassigned = new ArrayList<>();
 
         for (JiraIssueEntity epic : quarterEpics) {
-            String parentKey = epic.getParentKey();
-            if (parentKey != null && projectsByKey.containsKey(parentKey)) {
-                epicsByProject.computeIfAbsent(parentKey, k -> new ArrayList<>()).add(epic);
+            String projKey = epicToProjectKey.get(epic.getIssueKey());
+            if (projKey != null && projectsByKey.containsKey(projKey)) {
+                epicsByProject.computeIfAbsent(projKey, k -> new ArrayList<>()).add(epic);
             } else {
                 unassigned.add(epic);
             }
@@ -247,10 +251,15 @@ public class QuarterlyPlanningService {
                 : List.of();
 
         // Filter by quarter (direct or inherited from project)
+        // All child epics belong to this project
+        Map<String, String> epicToProj = new HashMap<>();
+        for (JiraIssueEntity epic : childEpics) {
+            epicToProj.put(epic.getIssueKey(), projectKey);
+        }
         Map<String, JiraIssueEntity> projectMap = Map.of(projectKey, project);
         List<JiraIssueEntity> quarterEpics = childEpics.stream()
                 .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
-                .filter(e -> quarterLabel.equals(resolveQuarterLabel(e, projectMap)))
+                .filter(e -> quarterLabel.equals(resolveQuarterLabel(e, epicToProj, projectMap)))
                 .toList();
 
         // Group by team
@@ -332,20 +341,50 @@ public class QuarterlyPlanningService {
 
     // ==================== Private Helpers ====================
 
-    private String resolveQuarterLabel(JiraIssueEntity epic, Map<String, JiraIssueEntity> projectsByKey) {
+    private String resolveQuarterLabel(JiraIssueEntity epic,
+                                       Map<String, String> epicToProjectKey,
+                                       Map<String, JiraIssueEntity> projectsByKey) {
         // Direct label on epic takes priority
         String directLabel = epic.getQuarterLabel();
         if (directLabel != null) {
             return directLabel;
         }
-        // Inherit from parent project
-        if (epic.getParentKey() != null) {
-            JiraIssueEntity parent = projectsByKey.get(epic.getParentKey());
+        // Inherit from parent project (via reverse index: parentKey or childEpicKeys)
+        String projKey = epicToProjectKey.get(epic.getIssueKey());
+        if (projKey != null) {
+            JiraIssueEntity parent = projectsByKey.get(projKey);
             if (parent != null) {
                 return parent.getQuarterLabel();
             }
         }
         return null;
+    }
+
+    private Map<String, String> buildEpicToProjectIndex(
+            List<JiraIssueEntity> projects, List<JiraIssueEntity> epics) {
+        Map<String, String> epicToProject = new HashMap<>();
+        Set<String> epicKeys = new HashSet<>();
+        for (JiraIssueEntity epic : epics) {
+            epicKeys.add(epic.getIssueKey());
+        }
+        for (JiraIssueEntity project : projects) {
+            // parentKey mode
+            for (JiraIssueEntity epic : epics) {
+                if (project.getIssueKey().equals(epic.getParentKey())) {
+                    epicToProject.putIfAbsent(epic.getIssueKey(), project.getIssueKey());
+                }
+            }
+            // childEpicKeys mode (issue links)
+            String[] linkedKeys = project.getChildEpicKeys();
+            if (linkedKeys != null) {
+                for (String lk : linkedKeys) {
+                    if (epicKeys.contains(lk)) {
+                        epicToProject.putIfAbsent(lk, project.getIssueKey());
+                    }
+                }
+            }
+        }
+        return epicToProject;
     }
 
     private Map<String, BigDecimal> computeEpicDemand(JiraIssueEntity epic, BigDecimal riskBuffer) {

@@ -15,6 +15,9 @@ interface FilterPanelProps {
   availableTeams: string[]
   selectedTeams: Set<string>
   onTeamToggle: (team: string) => void
+  availableProjects?: string[]
+  selectedProjects?: Set<string>
+  onProjectToggle?: (project: string) => void
   onClearFilters: () => void
   syncStatus: SyncStatus | null
   syncing: boolean
@@ -51,6 +54,9 @@ export function FilterPanel({
   selectedTeams,
   onTeamToggle,
   onClearFilters,
+  availableProjects,
+  selectedProjects,
+  onProjectToggle,
   syncStatus,
   syncing,
   onSync,
@@ -75,6 +81,15 @@ export function FilterPanel({
 
   const chips = useMemo(() => {
     const result: FilterChip[] = []
+    if (selectedProjects) {
+      for (const project of selectedProjects) {
+        result.push({
+          category: 'Project',
+          value: project,
+          onRemove: () => onProjectToggle?.(project),
+        })
+      }
+    }
     for (const team of selectedTeams) {
       result.push({
         category: 'Team',
@@ -101,7 +116,7 @@ export function FilterPanel({
       result.push({ category: 'Search', value: `"${searchKey}"`, onRemove: () => onSearchKeyChange('') })
     }
     return result
-  }, [selectedTeams, selectedStatuses, hideNew, hideDone, searchKey, teamColorMap, statusColorMap, onTeamToggle, onStatusToggle, onHideNewToggle, onHideDoneToggle, onSearchKeyChange])
+  }, [selectedProjects, selectedTeams, selectedStatuses, hideNew, hideDone, searchKey, teamColorMap, statusColorMap, onProjectToggle, onTeamToggle, onStatusToggle, onHideNewToggle, onHideDoneToggle, onSearchKeyChange])
 
   const searchBadge = searchMode
     ? { label: searchMode === 'semantic' ? 'AI' : 'TXT', variant: (searchMode === 'semantic' ? 'ai' : 'text') as 'ai' | 'text' }
@@ -144,6 +159,16 @@ export function FilterPanel({
         badge={searchBadge}
         hints={searchHints}
       />
+
+      {availableProjects && availableProjects.length > 1 && onProjectToggle && selectedProjects && (
+        <MultiSelectDropdown
+          label="Project"
+          options={availableProjects}
+          selected={selectedProjects}
+          onToggle={onProjectToggle}
+          placeholder="All projects"
+        />
+      )}
 
       <MultiSelectDropdown
         label="Team"

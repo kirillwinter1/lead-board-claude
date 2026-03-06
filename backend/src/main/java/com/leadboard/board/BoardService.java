@@ -70,15 +70,15 @@ public class BoardService {
     }
 
     public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size, boolean includeDQ) {
-        String projectKey = jiraConfigResolver.getProjectKey();
+        List<String> allProjectKeys = jiraConfigResolver.getActiveProjectKeys();
         String baseUrl = jiraConfigResolver.getBaseUrl();
 
-        if (projectKey == null || projectKey.isEmpty() || baseUrl == null || baseUrl.isEmpty()) {
+        if (allProjectKeys.isEmpty() || baseUrl == null || baseUrl.isEmpty()) {
             return new BoardResponse(Collections.emptyList(), 0);
         }
 
         // Check board response cache
-        String cacheKey = buildCacheKey(projectKey, query, statuses, teamIds, page, size, includeDQ);
+        String cacheKey = buildCacheKey(String.join(",", allProjectKeys), query, statuses, teamIds, page, size, includeDQ);
         CachedBoard cached = boardCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
             return cached.response();
@@ -107,7 +107,7 @@ public class BoardService {
                 List<String> epicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
                 stories = epicKeys.isEmpty() ? List.of() :
                         issueRepository.findByParentKeyIn(epicKeys).stream()
-                                .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
+                                .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType(), e.getProjectKey()))
                                 .toList();
 
                 List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
@@ -116,7 +116,7 @@ public class BoardService {
                                 .filter(JiraIssueEntity::isSubtask)
                                 .toList();
 
-                projectIssues = issueRepository.findByProjectKeyAndBoardCategory(projectKey, "PROJECT");
+                projectIssues = issueRepository.findByProjectKeyInAndBoardCategory(allProjectKeys, "PROJECT");
 
                 // Build issueMap from loaded sets
                 issueMap = new HashMap<>();
@@ -125,11 +125,11 @@ public class BoardService {
                 subtasks.forEach(e -> issueMap.put(e.getIssueKey(), e));
                 projectIssues.forEach(e -> issueMap.put(e.getIssueKey(), e));
             } else {
-                // FULL PATH: load all issues (existing behavior)
-                List<JiraIssueEntity> allIssues = issueRepository.findByProjectKey(projectKey);
+                // FULL PATH: load all issues from all project keys
+                List<JiraIssueEntity> allIssues = issueRepository.findByProjectKeyIn(allProjectKeys);
 
                 if (allIssues.isEmpty()) {
-                    log.warn("No cached issues found for project: {}. Run sync first.", projectKey);
+                    log.warn("No cached issues found for projects: {}. Run sync first.", allProjectKeys);
                     return new BoardResponse(Collections.emptyList(), 0);
                 }
 
@@ -137,11 +137,11 @@ public class BoardService {
                         .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, e -> e));
 
                 epics = allIssues.stream()
-                        .filter(e -> workflowConfigService.isEpic(e.getIssueType()))
+                        .filter(e -> workflowConfigService.isEpic(e.getIssueType(), e.getProjectKey()))
                         .collect(Collectors.toList());
 
                 stories = allIssues.stream()
-                        .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType()))
+                        .filter(e -> workflowConfigService.isStoryOrBug(e.getIssueType(), e.getProjectKey()))
                         .collect(Collectors.toList());
 
                 subtasks = allIssues.stream()
@@ -306,6 +306,7 @@ public class BoardService {
                 entity.getIssueType(),
                 jiraUrl
         );
+        node.setProjectKey(entity.getProjectKey());
 
         if (entity.isSubtask()) {
             node.setEstimateSeconds(entity.getEffectiveEstimateSeconds());
@@ -320,10 +321,11 @@ public class BoardService {
             node.setTeamName(entity.getTeamFieldValue());
         }
 
-        if (workflowConfigService.isEpic(entity.getIssueType())) {
+        String pk = entity.getProjectKey();
+        if (workflowConfigService.isEpic(entity.getIssueType(), pk)) {
             boolean epicInTodo = workflowConfigService.isAllowedForRoughEstimate(entity.getStatus());
             node.setEpicInTodo(epicInTodo);
-            node.setEpicDone(workflowConfigService.isDone(entity.getStatus(), entity.getIssueType()));
+            node.setEpicDone(workflowConfigService.isDone(entity.getStatus(), entity.getIssueType(), pk));
 
             // Dynamic rough estimates
             node.setRoughEstimates(entity.getRoughEstimates());
@@ -348,7 +350,7 @@ public class BoardService {
             node.setFlagged(entity.getFlagged());
             node.setAutoScore(entity.getAutoScore());
             node.setManualOrder(entity.getManualOrder());
-        } else if (workflowConfigService.isStoryOrBug(entity.getIssueType())) {
+        } else if (workflowConfigService.isStoryOrBug(entity.getIssueType(), pk)) {
             node.setAutoScore(entity.getAutoScore());
             node.setManualOrder(entity.getManualOrder());
             node.setFlagged(entity.getFlagged());
@@ -379,7 +381,7 @@ public class BoardService {
     }
 
     private void aggregateProgress(BoardNode node) {
-        boolean isEpic = workflowConfigService.isEpic(node.getIssueType());
+        boolean isEpic = workflowConfigService.isEpic(node.getIssueType(), node.getProjectKey());
 
         if (node.getChildren().isEmpty()) {
             if (isEpic) {
@@ -412,7 +414,7 @@ public class BoardService {
             aggregateProgress(child);
 
             if (child.getRoleProgress() != null && !child.getRoleProgress().isEmpty()
-                    && !workflowConfigService.isEpic(child.getIssueType())) {
+                    && !workflowConfigService.isEpic(child.getIssueType(), child.getProjectKey())) {
                 // Aggregate from child's dynamic roleProgressMap
                 for (Map.Entry<String, BoardNode.RoleMetrics> entry : child.getRoleProgress().entrySet()) {
                     addToRoleMetrics(roleMetrics, entry.getKey(), entry.getValue());
@@ -638,8 +640,8 @@ public class BoardService {
     }
 
     public BoardSearchResponse searchForBoard(String query, List<Long> teamIds) {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        List<String> allProjectKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allProjectKeys.isEmpty()) {
             return new BoardSearchResponse(List.of(), "substring");
         }
 
@@ -659,8 +661,11 @@ public class BoardService {
             }
         }
 
-        // Fallback: substring search
-        Set<String> epicKeys = substringSearch(query, projectKey, teamIds);
+        // Fallback: substring search across all projects
+        Set<String> epicKeys = new LinkedHashSet<>();
+        for (String projectKey : allProjectKeys) {
+            epicKeys.addAll(substringSearch(query, projectKey, teamIds));
+        }
         return new BoardSearchResponse(new ArrayList<>(epicKeys), "substring");
     }
 
@@ -675,9 +680,9 @@ public class BoardService {
                 continue;
             }
 
-            if (workflowConfigService.isEpic(issue.getIssueType())) {
+            if (workflowConfigService.isEpic(issue.getIssueType(), issue.getProjectKey())) {
                 epicKeys.add(issue.getIssueKey());
-            } else if (workflowConfigService.isStoryOrBug(issue.getIssueType())) {
+            } else if (workflowConfigService.isStoryOrBug(issue.getIssueType(), issue.getProjectKey())) {
                 // Story/Bug → parent epic key
                 if (issue.getParentKey() != null) {
                     epicKeys.add(issue.getParentKey());

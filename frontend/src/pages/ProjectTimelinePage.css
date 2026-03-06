@@ -448,3 +448,104 @@
 .pt-tooltip {
   transition: opacity 0.15s ease;
 }
+
+/* ========== EPIC GRID (Projects List View) ========== */
+
+.proj-epic-grid {
+  width: 100%;
+  border-top: 1px solid #dfe1e6;
+}
+
+.proj-epic-header {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(160px, 2fr) 150px 130px 80px 200px 160px;
+  gap: 0;
+  background: #f4f5f7;
+  border-bottom: 1px solid #dfe1e6;
+}
+
+.proj-epic-header .proj-epic-cell {
+  padding: 12px 24px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.proj-epic-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(160px, 2fr) 150px 130px 80px 200px 160px;
+  gap: 0;
+  border-bottom: 1px solid #ebecf0;
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s;
+}
+
+.proj-epic-row:hover {
+  background: #f4f5f7;
+  border-left-color: #0052cc;
+}
+
+.proj-epic-row:last-child {
+  border-bottom: none;
+}
+
+.proj-epic-cell {
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.proj-epic-cell .issue-type-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.proj-epic-cell .issue-key {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0052cc;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.proj-epic-cell .issue-key:hover {
+  text-decoration: underline;
+}
+
+.proj-epic-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #172b4d;
+}
+
+.proj-epic-cell .progress-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.proj-epic-cell .progress-percent {
+  font-size: 12px;
+  color: #42526e;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.proj-epic-cell .progress-hours {
+  font-size: 11px;
+  color: #97a0af;
+  white-space: nowrap;
+}
+
+.proj-epic-cell .empty-placeholder {
+  color: #a5adba;
+  font-size: 12px;
+}

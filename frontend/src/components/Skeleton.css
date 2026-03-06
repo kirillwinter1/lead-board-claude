@@ -1,0 +1,13 @@
+@keyframes skeletonPulse {
+  0%, 100% { background-color: #DFE1E6; }
+  50% { background-color: #EBECF0; }
+}
+
+.skeleton {
+  display: inline-block;
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}

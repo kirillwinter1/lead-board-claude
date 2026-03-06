@@ -10,18 +10,25 @@ import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { SearchInput } from '../components/SearchInput'
 import { FilterBar } from '../components/FilterBar'
 import { FilterChip } from '../components/FilterChips'
-import { TeamBadge } from '../components/TeamBadge'
 import { ViewToggle } from '../components/ViewToggle'
 import { ProjectGanttView, ZoomLevel, lightenColor } from '../components/ProjectGanttView'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../components/board/helpers'
+import { BoardRow } from '../components/board/BoardRow'
+import type { BoardNode } from '../components/board/types'
+import type { EpicForecast } from '../api/forecast'
+import { ChildEpicDto } from '../api/projects'
 import { RiceForm } from '../components/rice/RiceForm'
 import { RiceScoreBadge } from '../components/rice/RiceScoreBadge'
 import { Modal } from '../components/Modal'
+import { ProjectListSkeleton, GanttSkeleton } from '../components/skeletons'
+import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import './ProjectTimelinePage.css'
+import './BoardPage.css'
 
 type ViewMode = 'list' | 'gantt'
 type SortOption = 'default' | 'progress-asc' | 'progress-desc' | 'rice-desc' | 'expected-done' | 'epics-desc'
+type ProjectsCache = { list: ProjectDto[]; timeline: ProjectTimelineDto[]; styles: Record<string, StatusStyle>; baseUrl: string }
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '\u2014'
@@ -59,27 +66,6 @@ function ProgressBar({ percent, width = 100 }: { percent: number; width?: number
         }} />
       )}
     </div>
-  )
-}
-
-function AlignmentBadge({ delayDays }: { delayDays: number | null }) {
-  if (delayDays == null) {
-    return <span style={{ color: '#97A0AF' }}>{'\u2014'}</span>
-  }
-  if (delayDays > 2) {
-    return (
-      <span title={`${delayDays}d behind average`} style={{
-        display: 'inline-flex', alignItems: 'center', gap: 3,
-        color: '#FF8B00', fontWeight: 600, fontSize: 12,
-      }}>
-        {'\u26A0'} +{delayDays}d
-      </span>
-    )
-  }
-  return (
-    <span title="On track" style={{ color: '#36B37E', fontWeight: 600, fontSize: 12 }}>
-      {'\u2713'}
-    </span>
   )
 }
 
@@ -167,6 +153,59 @@ function RecommendationsBlock({ recommendations }: { recommendations: ProjectRec
   )
 }
 
+function childEpicToBoardNode(e: ChildEpicDto, jiraBaseUrl: string): BoardNode {
+  return {
+    issueKey: e.issueKey,
+    title: e.summary,
+    status: e.status,
+    issueType: e.issueType,
+    jiraUrl: jiraBaseUrl ? `${jiraBaseUrl}${e.issueKey}` : '',
+    role: null,
+    teamId: null,
+    teamName: e.teamName,
+    teamColor: e.teamColor,
+    estimateSeconds: e.estimateSeconds,
+    loggedSeconds: e.loggedSeconds,
+    progress: e.progressPercent,
+    roleProgress: null,
+    epicInTodo: false,
+    epicDone: false,
+    roughEstimates: null,
+    alerts: [],
+    autoScore: null,
+    manualOrder: null,
+    flagged: null,
+    blockedBy: null,
+    blocks: null,
+    expectedDone: e.expectedDone || e.dueDate,
+    assigneeAccountId: null,
+    assigneeDisplayName: null,
+    projectKey: null,
+    parentProjectKey: null,
+    children: [],
+  }
+}
+
+function childEpicToForecast(e: ChildEpicDto): EpicForecast | null {
+  const date = e.expectedDone || e.dueDate
+  if (!date) return null
+  return {
+    epicKey: e.issueKey,
+    summary: e.summary,
+    autoScore: 0,
+    expectedDone: date,
+    confidence: 'MEDIUM' as const,
+    dueDateDeltaDays: e.delayDays,
+    dueDate: e.dueDate,
+    remainingByRole: {},
+    phaseSchedule: {},
+    queuePosition: null,
+    queuedUntil: null,
+    isWithinWip: true,
+    phaseWaitInfo: null,
+  }
+}
+
 export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
@@ -174,13 +213,16 @@ export function ProjectsPage() {
   // View mode
   const view: ViewMode = searchParams.get('view') === 'gantt' ? 'gantt' : 'list'
 
+  // SWR: restore from cache on mount to avoid loading flash on revisit
+  const cachedProjects = getApiCache<ProjectsCache>('projects-data')
+
   // Shared data
-  const [listProjects, setListProjects] = useState<ProjectDto[]>([])
-  const [timelineProjects, setTimelineProjects] = useState<ProjectTimelineDto[]>([])
-  const [loading, setLoading] = useState(true)
+  const [listProjects, setListProjects] = useState<ProjectDto[]>(cachedProjects?.list ?? [])
+  const [timelineProjects, setTimelineProjects] = useState<ProjectTimelineDto[]>(cachedProjects?.timeline ?? [])
+  const [loading, setLoading] = useState(!cachedProjects)
   const [error, setError] = useState<string | null>(null)
-  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
-  const [jiraBaseUrl, setJiraBaseUrl] = useState('')
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>(cachedProjects?.styles ?? {})
+  const [jiraBaseUrl, setJiraBaseUrl] = useState(cachedProjects?.baseUrl ?? '')
 
   // Shared filter state from URL
   const search = searchParams.get('search') || ''
@@ -214,9 +256,9 @@ export function ProjectsPage() {
     }, { replace: true })
   }, [setSearchParams])
 
-  // Load both datasets
+  // Load both datasets (SWR: skip loading state if cached)
   useEffect(() => {
-    setLoading(true)
+    if (!cachedProjects) setLoading(true)
     Promise.all([
       projectsApi.list(),
       projectsApi.getTimeline(),
@@ -227,6 +269,7 @@ export function ProjectsPage() {
       setTimelineProjects(timeline)
       setStatusStyles(styles)
       setJiraBaseUrl(baseUrl)
+      setApiCache('projects-data', { list, timeline, styles, baseUrl })
       const exp: Record<string, boolean> = {}
       timeline.forEach(p => { exp[p.issueKey] = true })
       setGanttExpanded(exp)
@@ -235,6 +278,7 @@ export function ProjectsPage() {
     }).finally(() => {
       setLoading(false)
     })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Debounced smart search (semantic/substring via board search API)
@@ -572,7 +616,9 @@ export function ProjectsPage() {
   if (loading) {
     return (
       <main className="main-content">
-        <div style={{ padding: 32, textAlign: 'center', color: '#6B778C' }}>Loading projects...</div>
+        <div style={{ padding: '16px 0' }}>
+          {view === 'gantt' ? <GanttSkeleton /> : <ProjectListSkeleton />}
+        </div>
       </main>
     )
   }
@@ -805,70 +851,38 @@ export function ProjectsPage() {
                           Loading epics...
                         </div>
                       ) : det && det.epics.length > 0 ? (
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, tableLayout: 'fixed' }}>
-                          <colgroup>
-                            <col style={{ width: 100 }} />
-                            <col />
-                            <col style={{ width: 130 }} />
-                            <col style={{ width: 120 }} />
-                            <col style={{ width: 160 }} />
-                            <col style={{ width: 90 }} />
-                            <col style={{ width: 70 }} />
-                          </colgroup>
-                          <thead>
-                            <tr style={{ borderBottom: '2px solid #DFE1E6' }}>
-                              <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Key</th>
-                              <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Summary</th>
-                              <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Status</th>
-                              <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Team</th>
-                              <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Progress</th>
-                              <th style={{ textAlign: 'left', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Done by</th>
-                              <th style={{ textAlign: 'center', padding: '6px 8px', color: '#6B778C', fontWeight: 500, fontSize: 11, textTransform: 'uppercase' }}>Align</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {det.epics.map(e => (
-                              <tr key={e.issueKey} style={{ borderBottom: '1px solid #EBECF0' }}>
-                                <td style={{ padding: '8px' }}>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                    <img src={getIssueIcon(e.issueType, getIssueTypeIconUrl(e.issueType))} alt={e.issueType} style={{ width: 16, height: 16, flexShrink: 0 }} />
-                                    <JiraLink issueKey={e.issueKey} jiraBaseUrl={jiraBaseUrl} />
-                                  </div>
-                                </td>
-                                <td style={{ padding: '8px', color: '#172B4D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.summary}</td>
-                                <td style={{ padding: '8px' }}>
-                                  <StatusBadge status={e.status} />
-                                </td>
-                                <td style={{ padding: '8px' }}>
-                                  <TeamBadge name={e.teamName} color={e.teamColor} />
-                                </td>
-                                <td style={{ padding: '8px' }}>
-                                  {e.progressPercent != null ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                      <ProgressBar percent={e.progressPercent} width={60} />
-                                      <span style={{ fontSize: 11, color: '#42526E', whiteSpace: 'nowrap' }}>
-                                        {e.progressPercent}%
-                                      </span>
-                                      {e.estimateSeconds != null && e.estimateSeconds > 0 && (
-                                        <span style={{ fontSize: 10, color: '#97A0AF', whiteSpace: 'nowrap' }}>
-                                          {formatHours(e.loggedSeconds)}/{formatHours(e.estimateSeconds)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span style={{ color: '#97A0AF' }}>{'\u2014'}</span>
-                                  )}
-                                </td>
-                                <td style={{ padding: '8px', fontSize: 12, color: '#42526E', whiteSpace: 'nowrap' }}>
-                                  {formatDate(e.expectedDone || e.dueDate)}
-                                </td>
-                                <td style={{ padding: '8px', textAlign: 'center' }}>
-                                  <AlignmentBadge delayDays={e.delayDays} />
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <div className="board-table-container" style={{ border: 'none' }}>
+                          <div className="board-grid">
+                            <div className="board-header">
+                              <div className="cell th-expander"></div>
+                              <div className="cell th-name">NAME</div>
+                              <div className="cell th-team">TEAM</div>
+                              <div className="cell th-priority">PRIORITY</div>
+                              <div className="cell th-expected-done">EXPECTED DONE</div>
+                              <div className="cell th-progress">PROGRESS</div>
+                              <div className="cell th-roles">ROLE-BASED PROGRESS</div>
+                              <div className="cell th-status">STATUS</div>
+                              <div className="cell th-alerts"></div>
+                            </div>
+                            <div className="board-body">
+                              {det.epics.map(e => (
+                                <BoardRow
+                                  key={e.issueKey}
+                                  node={childEpicToBoardNode(e, jiraBaseUrl)}
+                                  level={0}
+                                  expanded={false}
+                                  onToggle={() => {}}
+                                  hasChildren={false}
+                                  roughEstimateConfig={null}
+                                  onRoughEstimateUpdate={async () => {}}
+                                  forecast={childEpicToForecast(e)}
+                                  canReorder={false}
+                                  isJustDropped={false}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <div style={{ padding: 16, textAlign: 'center', color: '#6B778C', fontSize: 13 }}>
                           No child epics found

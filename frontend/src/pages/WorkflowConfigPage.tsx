@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
   workflowConfigApi,
@@ -603,8 +604,10 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const [epicLinkName, setEpicLinkName] = useState<string>('')
 
   // --- Per-project state ---
+  const [searchParams] = useSearchParams()
+  const urlProjectKey = searchParams.get('project')
   const [projectConfigs, setProjectConfigs] = useState<ProjectConfigInfo[]>([])
-  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null)
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(urlProjectKey)
 
   // --- Wizard state ---
   const [wizardMode, setWizardMode] = useState(false)
@@ -631,10 +634,14 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       .then(configs => {
         if (abortController.signal.aborted) return
         setProjectConfigs(configs)
-        // If multiple projects and none selected, select the default one
-        if (configs.length > 1 && !selectedProjectKey) {
-          const defaultConf = configs.find(c => c.isDefault) || configs[0]
-          setSelectedProjectKey(defaultConf.projectKey)
+        // If URL has ?project=KEY, select it; otherwise select default
+        if (configs.length > 0 && !selectedProjectKey) {
+          if (urlProjectKey && configs.some(c => c.projectKey === urlProjectKey)) {
+            setSelectedProjectKey(urlProjectKey)
+          } else if (configs.length > 1) {
+            const defaultConf = configs.find(c => c.isDefault) || configs[0]
+            setSelectedProjectKey(defaultConf.projectKey)
+          }
         }
       })
       .catch(() => {})

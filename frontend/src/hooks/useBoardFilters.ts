@@ -8,9 +8,11 @@ export function useBoardFilters(board: BoardNode[]) {
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
+  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
   const [hideNew, setHideNew] = useState(false)
   const [hideDone, setHideDone] = useState(false)
   const [urlTeamInitialized, setUrlTeamInitialized] = useState(false)
+  const [urlProjectInitialized, setUrlProjectInitialized] = useState(false)
   const [searchResult, setSearchResult] = useState<BoardSearchResult | null>(null)
   const [searchLoading, setSearchLoading] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -29,6 +31,19 @@ export function useBoardFilters(board: BoardNode[]) {
     }
     setUrlTeamInitialized(true)
   }, [board, searchParams, urlTeamInitialized])
+
+  // Initialize project filter from URL
+  useEffect(() => {
+    if (board.length === 0 || urlProjectInitialized) return
+    const urlProject = searchParams.get('project')
+    if (urlProject) {
+      const keys = urlProject.split(',').map(k => k.trim()).filter(Boolean)
+      if (keys.length > 0) {
+        setSelectedProjects(new Set(keys))
+      }
+    }
+    setUrlProjectInitialized(true)
+  }, [board, searchParams, urlProjectInitialized])
 
   // Sync selectedTeams to URL (when exactly one team selected)
   useEffect(() => {
@@ -107,6 +122,16 @@ export function useBoardFilters(board: BoardNode[]) {
     return Array.from(teams).sort()
   }, [board])
 
+  const availableProjects = useMemo(() => {
+    const projects = new Set<string>()
+    board.forEach(epic => {
+      if (epic.projectKey) {
+        projects.add(epic.projectKey)
+      }
+    })
+    return Array.from(projects).sort()
+  }, [board])
+
   const teamColorMap = useMemo(() => {
     const map = new Map<string, string>()
     board.forEach(epic => {
@@ -145,9 +170,12 @@ export function useBoardFilters(board: BoardNode[]) {
       if (selectedTeams.size > 0 && (!epic.teamName || !selectedTeams.has(epic.teamName))) {
         return false
       }
+      if (selectedProjects.size > 0 && (!epic.projectKey || !selectedProjects.has(epic.projectKey))) {
+        return false
+      }
       return true
     })
-  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams, hideNew, hideDone])
+  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams, selectedProjects, hideNew, hideDone])
 
   // Get selected team ID for forecast loading
   const selectedTeamId = useMemo(() => {
@@ -184,11 +212,24 @@ export function useBoardFilters(board: BoardNode[]) {
     })
   }
 
+  const handleProjectToggle = (project: string) => {
+    setSelectedProjects(prev => {
+      const next = new Set(prev)
+      if (next.has(project)) {
+        next.delete(project)
+      } else {
+        next.add(project)
+      }
+      return next
+    })
+  }
+
   const clearFilters = () => {
     setSearchKey('')
     setSearchResult(null)
     setSelectedStatuses(new Set())
     setSelectedTeams(new Set())
+    setSelectedProjects(new Set())
     setHideNew(false)
     setHideDone(false)
   }
@@ -200,8 +241,10 @@ export function useBoardFilters(board: BoardNode[]) {
     setSearchKey,
     selectedStatuses,
     selectedTeams,
+    selectedProjects,
     availableStatuses,
     availableTeams,
+    availableProjects,
     teamColorMap,
     filteredBoard,
     canReorder,
@@ -214,6 +257,7 @@ export function useBoardFilters(board: BoardNode[]) {
     setHideDone,
     handleStatusToggle,
     handleTeamToggle,
+    handleProjectToggle,
     clearFilters,
   }
 }

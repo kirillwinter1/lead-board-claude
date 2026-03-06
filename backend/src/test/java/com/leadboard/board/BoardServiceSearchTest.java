@@ -74,13 +74,20 @@ class BoardServiceSearchTest {
         field.setAccessible(true);
         field.set(boardService, embeddingService);
 
-        when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
+        when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of("LB"));
         when(workflowConfigService.isEpic("Epic")).thenReturn(true);
         when(workflowConfigService.isStoryOrBug("Story")).thenReturn(true);
         when(workflowConfigService.isEpic("Story")).thenReturn(false);
         when(workflowConfigService.isStoryOrBug("Epic")).thenReturn(false);
         when(workflowConfigService.isEpic("Sub-task")).thenReturn(false);
         when(workflowConfigService.isStoryOrBug("Sub-task")).thenReturn(false);
+        // Project-aware overloads
+        when(workflowConfigService.isEpic(eq("Epic"), any())).thenReturn(true);
+        when(workflowConfigService.isStoryOrBug(eq("Story"), any())).thenReturn(true);
+        when(workflowConfigService.isEpic(eq("Story"), any())).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug(eq("Epic"), any())).thenReturn(false);
+        when(workflowConfigService.isEpic(eq("Sub-task"), any())).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug(eq("Sub-task"), any())).thenReturn(false);
     }
 
     private JiraIssueEntity createIssue(String key, String type, String summary, String parentKey, Long teamId) {
@@ -217,7 +224,7 @@ class BoardServiceSearchTest {
     @Test
     @DisplayName("Empty project key returns empty result")
     void emptyProjectKeyReturnsEmpty() {
-        when(jiraConfigResolver.getProjectKey()).thenReturn("");
+        when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of());
 
         BoardSearchResponse result = boardService.searchForBoard("test", null);
 

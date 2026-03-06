@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -24,5 +25,10 @@ public class ConfigController {
             ? baseUrl + "/browse/"
             : "";
         return Map.of("jiraBaseUrl", jiraBrowseUrl);
+    }
+
+    @GetMapping("/config/projects")
+    public Map<String, List<String>> getActiveProjects() {
+        return Map.of("projects", jiraConfigResolver.getActiveProjectKeys());
     }
 }

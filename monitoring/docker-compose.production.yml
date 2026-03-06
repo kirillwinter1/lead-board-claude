@@ -1,0 +1,82 @@
+# Production monitoring stack for Lead Board
+# Deploy to /opt/leadboard/monitoring/ on the production server
+# Usage: docker compose -f docker-compose.production.yml up -d
+#
+# Prometheus scrapes backend at backend:8080 (same Docker network as main app).
+# Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in environment before starting.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: leadboard-prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=14d'
+      - '--storage.tsdb.retention.size=2GB'
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - monitoring
+      - onelane-net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: leadboard-grafana
+    ports:
+      - "127.0.0.1:3030:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=https://onelane.ru/grafana/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: leadboard-alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  monitoring:
+    driver: bridge
+  onelane-net:
+    external: true
+    name: leadboard_onelane-net

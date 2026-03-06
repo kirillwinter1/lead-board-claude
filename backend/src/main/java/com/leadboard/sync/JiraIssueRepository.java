@@ -19,6 +19,16 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     List<JiraIssueEntity> findByProjectKey(String projectKey);
 
+    List<JiraIssueEntity> findByProjectKeyIn(Collection<String> projectKeys);
+
+    List<JiraIssueEntity> findByProjectKeyInAndBoardCategory(Collection<String> projectKeys, String boardCategory);
+
+    @Query("SELECT e.issueKey FROM JiraIssueEntity e WHERE e.projectKey IN :projectKeys")
+    List<String> findAllIssueKeysByProjectKeyIn(@Param("projectKeys") Collection<String> projectKeys);
+
+    @Query("SELECT COUNT(e) FROM JiraIssueEntity e WHERE e.projectKey IN :projectKeys")
+    long countByProjectKeyIn(@Param("projectKeys") Collection<String> projectKeys);
+
     List<JiraIssueEntity> findByProjectKeyAndIssueType(String projectKey, String issueType);
 
     List<JiraIssueEntity> findByProjectKeyAndSubtask(String projectKey, boolean subtask);

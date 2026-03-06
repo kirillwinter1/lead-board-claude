@@ -72,14 +72,14 @@ class BoardServiceTest {
         );
 
         // Common setup
-        when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
+        when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of("LB"));
         when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
         when(teamRepository.findByActiveTrue()).thenReturn(Collections.emptyList());
         when(dataQualityService.checkEpic(any(), anyList())).thenReturn(Collections.emptyList());
         when(dataQualityService.checkStory(any(), any(), anyList())).thenReturn(Collections.emptyList());
         when(dataQualityService.checkSubtask(any(), any(), any())).thenReturn(Collections.emptyList());
 
-        // WorkflowConfigService stubs
+        // WorkflowConfigService stubs — one-arg (backward compat) + two-arg (project-aware)
         when(workflowConfigService.isEpic("Эпик")).thenReturn(true);
         when(workflowConfigService.isEpic("Epic")).thenReturn(true);
         when(workflowConfigService.isEpic("История")).thenReturn(false);
@@ -87,6 +87,13 @@ class BoardServiceTest {
         when(workflowConfigService.isEpic("Аналитика")).thenReturn(false);
         when(workflowConfigService.isEpic("Разработка")).thenReturn(false);
         when(workflowConfigService.isEpic("Тестирование")).thenReturn(false);
+        when(workflowConfigService.isEpic(eq("Эпик"), any())).thenReturn(true);
+        when(workflowConfigService.isEpic(eq("Epic"), any())).thenReturn(true);
+        when(workflowConfigService.isEpic(eq("История"), any())).thenReturn(false);
+        when(workflowConfigService.isEpic(eq("Баг"), any())).thenReturn(false);
+        when(workflowConfigService.isEpic(eq("Аналитика"), any())).thenReturn(false);
+        when(workflowConfigService.isEpic(eq("Разработка"), any())).thenReturn(false);
+        when(workflowConfigService.isEpic(eq("Тестирование"), any())).thenReturn(false);
         when(workflowConfigService.isStory("История")).thenReturn(true);
         when(workflowConfigService.isStory("Баг")).thenReturn(false);
         when(workflowConfigService.isBug("Баг")).thenReturn(true);
@@ -97,6 +104,12 @@ class BoardServiceTest {
         when(workflowConfigService.isStoryOrBug("Аналитика")).thenReturn(false);
         when(workflowConfigService.isStoryOrBug("Разработка")).thenReturn(false);
         when(workflowConfigService.isStoryOrBug("Тестирование")).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug(eq("История"), any())).thenReturn(true);
+        when(workflowConfigService.isStoryOrBug(eq("Баг"), any())).thenReturn(true);
+        when(workflowConfigService.isStoryOrBug(eq("Эпик"), any())).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug(eq("Аналитика"), any())).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug(eq("Разработка"), any())).thenReturn(false);
+        when(workflowConfigService.isStoryOrBug(eq("Тестирование"), any())).thenReturn(false);
         when(workflowConfigService.getSubtaskRole("Аналитика")).thenReturn("SA");
         when(workflowConfigService.getSubtaskRole("Разработка")).thenReturn("DEV");
         when(workflowConfigService.getSubtaskRole("Тестирование")).thenReturn("QA");
@@ -115,7 +128,7 @@ class BoardServiceTest {
         @Test
         @DisplayName("should return empty board when no project key configured")
         void shouldReturnEmptyWhenNoProjectKey() {
-            when(jiraConfigResolver.getProjectKey()).thenReturn(null);
+            when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of());
 
             BoardResponse response = boardService.getBoard();
 
@@ -137,7 +150,7 @@ class BoardServiceTest {
         @Test
         @DisplayName("should return empty board when no issues in repository")
         void shouldReturnEmptyWhenNoIssues() {
-            when(issueRepository.findByProjectKey("LB")).thenReturn(Collections.emptyList());
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(Collections.emptyList());
 
             BoardResponse response = boardService.getBoard();
 
@@ -149,7 +162,7 @@ class BoardServiceTest {
         @DisplayName("should return epics from repository")
         void shouldReturnEpicsFromRepository() {
             JiraIssueEntity epic = createEpic("LB-1", "Test Epic", "Новое", 1L);
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic));
 
             BoardResponse response = boardService.getBoard();
 
@@ -172,7 +185,7 @@ class BoardServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Epic", "Developing", 1L);
             JiraIssueEntity story = createStory("LB-2", "Story", "Development", "LB-1");
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic, story));
 
             BoardResponse response = boardService.getBoard();
 
@@ -189,7 +202,7 @@ class BoardServiceTest {
             JiraIssueEntity story = createStory("LB-2", "Story", "Development", "LB-1");
             JiraIssueEntity subtask = createSubtask("LB-3", "Subtask", "В работе", "LB-2", "Разработка");
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, subtask));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic, story, subtask));
 
             BoardResponse response = boardService.getBoard();
 
@@ -205,7 +218,7 @@ class BoardServiceTest {
             JiraIssueEntity epic = createEpic("LB-1", "Epic", "Developing", 1L);
             JiraIssueEntity bug = createBug("LB-2", "Bug", "Open", "LB-1");
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, bug));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic, bug));
 
             BoardResponse response = boardService.getBoard();
 
@@ -230,7 +243,7 @@ class BoardServiceTest {
             JiraIssueEntity subtask = createSubtaskWithTime("LB-3", "Dev", "LB-2", "Разработка",
                     3600L * 8, 3600L * 4); // 8h estimate, 4h logged = 50%
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, subtask));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic, story, subtask));
 
             BoardResponse response = boardService.getBoard();
 
@@ -248,7 +261,7 @@ class BoardServiceTest {
             JiraIssueEntity devTask = createSubtaskWithTime("LB-4", "DEV", "LB-2", "Разработка", 3600L * 16, 3600L * 8);
             JiraIssueEntity qaTask = createSubtaskWithTime("LB-5", "QA", "LB-2", "Тестирование", 3600L * 8, 0L);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, saTask, devTask, qaTask));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic, story, saTask, devTask, qaTask));
 
             BoardResponse response = boardService.getBoard();
 
@@ -275,7 +288,7 @@ class BoardServiceTest {
             JiraIssueEntity story = createStory("LB-2", "Story", "Development", "LB-1");
             JiraIssueEntity subtask = createSubtaskWithTime("LB-3", "Dev", "LB-2", "Разработка", 0L, 0L);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic, story, subtask));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic, story, subtask));
 
             BoardResponse response = boardService.getBoard();
 
@@ -312,7 +325,7 @@ class BoardServiceTest {
             JiraIssueEntity epic1 = createEpic("LB-1", "Epic New", "Новое", 1L);
             JiraIssueEntity epic2 = createEpic("LB-2", "Epic Done", "Готово", 1L);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic1, epic2));
 
             BoardResponse response = boardService.getBoard(null, List.of("Новое"), null, 0, 50, false);
 
@@ -326,7 +339,7 @@ class BoardServiceTest {
             JiraIssueEntity epic1 = createEpic("LB-100", "First Epic", "Новое", 1L);
             JiraIssueEntity epic2 = createEpic("LB-200", "Second Epic", "Новое", 1L);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic1, epic2));
 
             BoardResponse response = boardService.getBoard("LB-100", null, null, 0, 50, false);
 
@@ -340,7 +353,7 @@ class BoardServiceTest {
             JiraIssueEntity epic1 = createEpic("LB-1", "Authentication Feature", "Новое", 1L);
             JiraIssueEntity epic2 = createEpic("LB-2", "Payment Integration", "Новое", 1L);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic1, epic2));
 
             BoardResponse response = boardService.getBoard("payment", null, null, 0, 50, false);
 
@@ -378,7 +391,7 @@ class BoardServiceTest {
             JiraIssueEntity epic2 = createEpicWithOrder("LB-2", "Epic 2", "Новое", 1L, 1);
             JiraIssueEntity epic3 = createEpicWithOrder("LB-3", "Epic 3", "Новое", 1L, 3);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2, epic3));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic1, epic2, epic3));
 
             BoardResponse response = boardService.getBoard();
 
@@ -395,7 +408,7 @@ class BoardServiceTest {
             JiraIssueEntity epic2 = createEpicWithScore("LB-2", "Epic 2", "Новое", 1L, BigDecimal.valueOf(80));
             JiraIssueEntity epic3 = createEpicWithScore("LB-3", "Epic 3", "Новое", 1L, BigDecimal.valueOf(30));
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2, epic3));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic1, epic2, epic3));
 
             BoardResponse response = boardService.getBoard();
 
@@ -415,7 +428,7 @@ class BoardServiceTest {
             JiraIssueEntity epic2 = createEpic("LB-2", "Epic 2", "Новое", 1L);
             epic2.setAutoScore(BigDecimal.valueOf(90)); // high score but no order
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic1, epic2));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic1, epic2));
 
             BoardResponse response = boardService.getBoard();
 
@@ -440,7 +453,7 @@ class BoardServiceTest {
                     createEpicWithOrder("LB-5", "Epic 5", "Новое", 1L, 5)
             );
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(epics);
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(epics);
 
             // Page 0, size 2
             BoardResponse page0 = boardService.getBoard(null, null, null, 0, 2, false);
@@ -477,7 +490,7 @@ class BoardServiceTest {
 
             DataQualityViolation violation = DataQualityViolation.of(DataQualityRule.EPIC_NO_DUE_DATE);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic));
             when(dataQualityService.checkEpic(any(), anyList())).thenReturn(List.of(violation));
 
             BoardResponse response = boardService.getBoard(null, null, null, 0, 50, true);
@@ -504,7 +517,7 @@ class BoardServiceTest {
             team.setName("Alpha Team");
             team.setActive(true);
 
-            when(issueRepository.findByProjectKey("LB")).thenReturn(List.of(epic));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic));
             when(teamRepository.findByActiveTrue()).thenReturn(List.of(team));
 
             BoardResponse response = boardService.getBoard();
@@ -522,7 +535,7 @@ class BoardServiceTest {
         @Test
         @DisplayName("should return empty board on repository exception")
         void shouldReturnEmptyOnException() {
-            when(issueRepository.findByProjectKey("LB")).thenThrow(new RuntimeException("DB error"));
+            when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenThrow(new RuntimeException("DB error"));
 
             BoardResponse response = boardService.getBoard();
 

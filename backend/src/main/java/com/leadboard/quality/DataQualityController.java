@@ -44,15 +44,15 @@ public class DataQualityController {
     public ResponseEntity<DataQualityResponse> getReport(
             @RequestParam(required = false) Long teamId
     ) {
-        String projectKey = jiraConfigResolver.getProjectKey();
+        List<String> allProjectKeys = jiraConfigResolver.getActiveProjectKeys();
         String baseUrl = jiraConfigResolver.getBaseUrl();
 
-        if (projectKey == null || projectKey.isEmpty()) {
+        if (allProjectKeys.isEmpty()) {
             return ResponseEntity.ok(emptyResponse(teamId));
         }
 
-        // Load all issues
-        List<JiraIssueEntity> allIssues = issueRepository.findByProjectKey(projectKey);
+        // Load all issues from all projects
+        List<JiraIssueEntity> allIssues = issueRepository.findByProjectKeyIn(allProjectKeys);
 
         // Build maps for quick lookup
         Map<String, JiraIssueEntity> issueMap = allIssues.stream()

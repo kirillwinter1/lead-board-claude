@@ -138,7 +138,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
                   <td>
                     <div className="epic-cell">
                       <a
-                        href={`${jiraBaseUrl}/browse/${epic.epicKey}`}
+                        href={`${jiraBaseUrl}${epic.epicKey}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="issue-key"

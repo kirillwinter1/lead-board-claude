@@ -63,47 +63,65 @@ public class SyncController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> countIssuesForImport(
             @RequestParam(required = false) Integer months) {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        java.util.List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allKeys.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Project key not configured"));
         }
 
-        return ResponseEntity.ok(changelogImportService.countIssuesForImport(projectKey, months));
+        // Sum counts across all projects
+        int totalIssueCount = 0;
+        int totalIssues = 0;
+        for (String key : allKeys) {
+            Map<String, Object> counts = changelogImportService.countIssuesForImport(key, months);
+            totalIssueCount += ((Number) counts.getOrDefault("issueCount", 0)).intValue();
+            totalIssues += ((Number) counts.getOrDefault("totalIssues", 0)).intValue();
+        }
+        return ResponseEntity.ok(Map.of("issueCount", totalIssueCount, "totalIssues", totalIssues));
     }
 
     @PostMapping("/import-changelogs")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> importChangelogs(
             @RequestParam(required = false) Integer months) {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        java.util.List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allKeys.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Project key not configured"));
         }
 
-        changelogImportService.importAllChangelogsAsync(projectKey, months);
+        for (String key : allKeys) {
+            changelogImportService.importAllChangelogsAsync(key, months);
+        }
 
         String period = months != null && months > 0
                 ? "updated in last " + months + " months"
                 : "all issues";
         return ResponseEntity.ok(Map.of(
                 "status", "started",
-                "message", "Changelog import started for project " + projectKey + " (" + period + ")"
+                "message", "Changelog import started for projects " + allKeys + " (" + period + ")"
         ));
     }
 
     @PostMapping("/import-worklogs")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> importWorklogs() {
-        String projectKey = jiraConfigResolver.getProjectKey();
-        if (projectKey == null || projectKey.isEmpty()) {
+        java.util.List<String> allKeys = jiraConfigResolver.getActiveProjectKeys();
+        if (allKeys.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Project key not configured"));
         }
 
-        worklogImportService.importAllWorklogsAsync(projectKey);
+        for (String key : allKeys) {
+            worklogImportService.importAllWorklogsAsync(key);
+        }
 
         return ResponseEntity.ok(Map.of(
                 "status", "started",
-                "message", "Worklog import started for project " + projectKey
+                "message", "Worklog import started for projects " + allKeys
         ));
+    }
+
+    @GetMapping("/projects")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.List<SyncService.ProjectSyncStatus>> getPerProjectSyncStatus() {
+        return ResponseEntity.ok(syncService.getPerProjectSyncStatus());
     }
 }

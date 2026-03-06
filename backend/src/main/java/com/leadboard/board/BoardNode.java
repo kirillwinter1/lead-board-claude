@@ -35,6 +35,7 @@ public class BoardNode {
     private LocalDate expectedDone; // Expected completion date (Story only, calculated)
     private String assigneeAccountId; // Assignee Jira account ID (Story only)
     private String assigneeDisplayName; // Assignee display name (Story only)
+    private String projectKey; // Jira project key (e.g. "LB", "PROJ2")
     private String parentProjectKey; // Parent PROJECT issue key (Epic only)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
@@ -240,6 +241,14 @@ public class BoardNode {
 
     public void setAssigneeDisplayName(String assigneeDisplayName) {
         this.assigneeDisplayName = assigneeDisplayName;
+    }
+
+    public String getProjectKey() {
+        return projectKey;
+    }
+
+    public void setProjectKey(String projectKey) {
+        this.projectKey = projectKey;
     }
 
     public String getParentProjectKey() {

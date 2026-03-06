@@ -2,10 +2,14 @@ import { useState, useCallback, useEffect } from 'react'
 import axios from 'axios'
 import { getRoughEstimateConfig, updateRoughEstimate } from '../api/epics'
 import type { BoardNode, BoardResponse, SyncStatus, RoughEstimateConfig } from '../components/board/types'
+import { getApiCache, setApiCache } from './useApiCache'
+
+const BOARD_CACHE_KEY = 'board-data'
 
 export function useBoardData() {
-  const [board, setBoard] = useState<BoardNode[]>([])
-  const [loading, setLoading] = useState(true)
+  const cached = getApiCache<BoardNode[]>(BOARD_CACHE_KEY)
+  const [board, setBoard] = useState<BoardNode[]>(cached ?? [])
+  const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
@@ -16,6 +20,7 @@ export function useBoardData() {
     try {
       const response = await axios.get<BoardResponse>('/api/board', { params: { includeDQ: true } })
       setBoard(response.data.items)
+      setApiCache(BOARD_CACHE_KEY, response.data.items)
     } catch (err: unknown) {
       if (!silent) setError(err instanceof Error ? err.message : 'Failed to load board')
     } finally {
@@ -62,9 +67,10 @@ export function useBoardData() {
   }
 
   useEffect(() => {
-    fetchBoard()
+    fetchBoard(!!cached)
     fetchSyncStatus()
     fetchRoughEstimateConfig()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchBoard, fetchSyncStatus, fetchRoughEstimateConfig])
 
   const handleRoughEstimateUpdate = useCallback(async (epicKey: string, role: string, days: number | null) => {

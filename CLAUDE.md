@@ -110,44 +110,32 @@ lead-board-claude/
 
 Подробные инструкции: **[DEPLOY.md](DEPLOY.md)** (сервер 79.174.94.70, Docker, nginx, troubleshooting)
 
-## Нумерация фич
+## Нумерация фич и требования
 
-- **F-номера присваиваются только реализованным фичам**, строго по порядку (F1, F2, ... F28, F29, ...)
-- Номера из ROADMAP_V2 и бэклога **не резервируются** заранее. Следующий номер = последний реализованный + 1
-- Реализованная фича перемещается из `ai-ru/backlog/` в `ai-ru/features/` с новым F-номером
-- В FEATURES.md: добавить в таблицу реализованных, пометить в бэклоге как `✅ Done → F{N}`
+См. `.claude/rules/versioning.md` — загружается автоматически.
 
-## Обязательные требования к фичам
+## Design System, Database, Jira, Versioning Rules
 
-- Тесты: JUnit5 для backend, покрывать основные сценарии
-- Запускать `./gradlew test` перед коммитом, не коммитить с падающими тестами
-- Обновлять документацию в ai-ru/
-- Коммитить документацию вместе с кодом
+Вынесены в `.claude/rules/` — автоматически подгружаются Claude Code:
+- `.claude/rules/design-system.md` — иконки, цвета, компоненты
+- `.claude/rules/database.md` — миграции, продакшн БД, multi-tenancy
+- `.claude/rules/jira-integration.md` — JiraConfigResolver, no hardcoding
+- `.claude/rules/versioning.md` — F-номера, версии, требования к фичам
 
-## Design System (обязательные правила)
+## Commands & Skills
 
-**Эти правила действуют для ВСЕХ фич без исключений.**
-
-### Визуальные данные — только из конфигурации
-1. **Иконки типов задач** — `getIssueIcon(type, getIssueTypeIconUrl(type))`. ЗАПРЕЩЕНО импортировать локальные иконки напрямую.
-2. **Цвета статусов** — из `StatusStylesContext` / `StatusBadge`. ЗАПРЕЩЕНЫ hardcoded палитры `STATUS_COLORS`.
-3. **Цвета команд** — `TeamBadge` или `team.color`. Никогда не показывать team name без цвета.
-4. **Цвета фаз (ролей)** — `getRoleColor(code)` из `WorkflowConfigContext`. ЗАПРЕЩЕНЫ hardcoded цвета SA/DEV/QA.
-
-### Переиспользование компонентов — не дублировать код
-5. **Готовые компоненты**: `StatusBadge`, `TeamBadge`, `RiceScoreBadge`, `Modal`, `MultiSelectDropdown` — использовать как есть. Не создавать аналоги.
-6. **Готовые хелперы**: `getIssueIcon()`, `getStatusStyles()`, `getIssueTypeIconUrl()`, `getRoleColor()` — не писать свои версии, расширять существующие.
-7. **Перед созданием нового компонента** — проверить `components/`. Если есть похожий — расширить, а не создавать новый.
-
-## Решённые проблемы
-
-- **Jira API 410 Gone:** `/rest/api/3/search` → `/rest/api/3/search/jql`
-- **Role mapping с кириллицей:** fallback через `String.contains()`
-- **Flyway PostgreSQL:** `org.flywaydb:flyway-database-postgresql:10.10.0`
+| Command | Описание |
+|---------|----------|
+| `/implement` | Оркестратор реализации фичи (spec → plan → backend → frontend → tests) |
+| `/bugfix` | Найти и исправить баг |
+| `/deploy` | Деплой на продакшн |
+| `/sync` | Запуск Jira sync + проверка |
+| `/review` | Code review (diff или full project) |
+| `/qa` | QA тестирование экрана/фичи |
 
 ## Atlassian OAuth 2.0
 
 1. Создать приложение в https://developer.atlassian.com/console/myapps/
 2. Permissions: `read:jira-user`, `read:jira-work`, `read:me`
-3. Authorization code grants + Callback URL: `http://localhost:8080/oauth/atlassian/callback`
+3. Callback URL: `http://localhost:8080/oauth/atlassian/callback`
 4. `offline_access` работает автоматически (не добавлять как scope)

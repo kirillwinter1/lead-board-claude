@@ -3,6 +3,7 @@ import { updateEpicOrder, updateStoryOrder } from '../api/epics'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { FilterPanel, BoardTable } from '../components/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { BoardSkeleton } from '../components/skeletons'
 import { useBoardData } from '../hooks/useBoardData'
 import { useBoardFilters } from '../hooks/useBoardFilters'
 import { useBoardForecasts } from '../hooks/useBoardForecasts'
@@ -36,6 +37,8 @@ export function BoardPage() {
     availableTeams,
     teamColorMap,
     selectedTeams,
+    availableProjects,
+    selectedProjects,
     filteredBoard,
     canReorder,
     allTeamIds,
@@ -47,6 +50,7 @@ export function BoardPage() {
     setHideDone,
     handleStatusToggle,
     handleTeamToggle,
+    handleProjectToggle,
     clearFilters,
   } = useBoardFilters(board)
 
@@ -146,6 +150,9 @@ export function BoardPage() {
         availableTeams={availableTeams}
         selectedTeams={selectedTeams}
         onTeamToggle={handleTeamToggle}
+        availableProjects={availableProjects}
+        selectedProjects={selectedProjects}
+        onProjectToggle={handleProjectToggle}
         onClearFilters={clearFilters}
         syncStatus={syncStatus}
         syncing={syncing}
@@ -161,7 +168,7 @@ export function BoardPage() {
       />
 
       <main className="main-content">
-        {loading && <div className="loading">Loading board...</div>}
+        {loading && <BoardSkeleton />}
         {error && <div className="error">Error: {error}</div>}
         {!loading && !error && filteredBoard.length === 0 && (
           <div className="empty">No epics found</div>

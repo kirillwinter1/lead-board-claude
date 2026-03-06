@@ -2,7 +2,7 @@
 name: qa
 description: QA-тестировщик. Запускай после реализации фичи для полного тестирования — составляет план, проверяет тесты, тестирует API и UI, делает скриншоты, генерирует QA-отчёт.
 argument-hint: "[screen или feature, напр. Board, Metrics, F36]"
-allowed-tools: Bash, Read, Glob, Grep, Edit, Write, Task, WebFetch
+allowed-tools: Bash, Read, Glob, Grep, Edit, Write, Task, WebFetch, mcp__playwright__browser_navigate, mcp__playwright__browser_run_code, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_wait_for, mcp__playwright__browser_resize, mcp__playwright__browser_close, mcp__playwright__browser_console_messages
 ---
 
 # QA Agent — Роль тестировщика
@@ -87,38 +87,54 @@ curl -s -b "LEAD_SESSION=<session_id>" 'http://localhost:8080/api/...'
 
 ---
 
-## Этап 5: Visual Testing (скриншоты)
+## Этап 5: Visual Testing (MCP Playwright)
 
 **Если фронтенд запущен** (проверь `curl -s http://localhost:5173`):
 
-1. **Получи session cookie** из БД (см. Этап 3)
+### Автоматическая аутентификация (ОБЯЗАТЕЛЬНО)
 
-2. **Создай storageState файл** `ai-ru/testing/screenshot-state.json`:
-```json
-{
-  "cookies": [{
-    "name": "LEAD_SESSION",
-    "value": "<session_id>",
-    "domain": "localhost",
-    "path": "/",
-    "httpOnly": false,
-    "secure": false,
-    "sameSite": "Lax"
-  }],
-  "origins": []
-}
+**НЕ нажимать кнопку Login!** Приложение использует httpOnly cookie `LEAD_SESSION`. Нужно установить cookie через Playwright API.
+
+1. **Получи session ID из БД:**
+```bash
+psql -U leadboard -d leadboard -t -A -c \
+  "SELECT id FROM user_sessions WHERE expires_at > NOW() AND id NOT LIKE 'perf-%' ORDER BY created_at DESC LIMIT 1;"
 ```
 
-3. **Сделай скриншоты** каждой страницы экрана:
-```bash
-npx playwright screenshot \
-  --browser chromium \
-  --viewport-size "1920,1080" \
-  --wait-for-timeout 3000 \
-  --full-page \
-  --load-storage ai-ru/testing/screenshot-state.json \
-  "http://localhost:5173/board/metrics" \
-  "ai-ru/testing/screenshots/<screen>_full.png"
+2. **Установи cookie и перейди на страницу** через MCP Playwright:
+```
+# Шаг 1: Открой about:blank чтобы инициализировать браузер
+mcp__playwright__browser_navigate → url: "about:blank"
+
+# Шаг 2: Установи httpOnly cookie через page.context().addCookies()
+mcp__playwright__browser_run_code → code:
+  await page.context().addCookies([{
+    name: 'LEAD_SESSION',
+    value: '<session_id>',
+    domain: 'localhost',
+    path: '/',
+    httpOnly: true,
+    sameSite: 'Lax'
+  }]);
+
+# Шаг 3: Перейди на нужную страницу
+mcp__playwright__browser_navigate → url: "http://localhost:5173/<path>"
+```
+
+**ВАЖНО:**
+- Cookie MUST be httpOnly: true — обычный `document.cookie` НЕ работает для httpOnly cookies
+- Используй `page.context().addCookies()` — это единственный способ установить httpOnly cookie
+- Session ID из `user_sessions` таблицы, НЕ из `tenant_jira_config`
+- Если после навигации видишь страницу логина — session expired, получи новый ID
+
+3. **Сделай скриншоты** каждой страницы:
+```
+# Подожди загрузки данных
+mcp__playwright__browser_wait_for → waitFor: "networkidle" (или timeout 3000)
+
+# Полностраничный скриншот
+mcp__playwright__browser_take_screenshot → fullPage: true,
+  savePath: "ai-ru/testing/screenshots/<screen>_full.png"
 ```
 
 4. **Прочитай скриншот** через Read tool и проверь:
@@ -150,16 +166,13 @@ npx playwright screenshot \
 - [ ] Нет микса языков (RU рядом с EN без причины)
 - [ ] Нет "lorem ipsum" или placeholder-текста
 
-5. **Для responsive** — дополнительный скриншот на мобильном:
-```bash
-npx playwright screenshot \
-  --browser chromium \
-  --viewport-size "375,812" \
-  --wait-for-timeout 3000 \
-  --full-page \
-  --load-storage ai-ru/testing/screenshot-state.json \
-  "http://localhost:5173/board/metrics" \
-  "ai-ru/testing/screenshots/<screen>_mobile.png"
+5. **Для responsive** — дополнительный скриншот:
+```
+mcp__playwright__browser_resize → width: 375, height: 812
+mcp__playwright__browser_navigate → url: "http://localhost:5173/<path>"
+mcp__playwright__browser_wait_for → waitFor: "networkidle"
+mcp__playwright__browser_take_screenshot → fullPage: true,
+  savePath: "ai-ru/testing/screenshots/<screen>_mobile.png"
 ```
 
 ---

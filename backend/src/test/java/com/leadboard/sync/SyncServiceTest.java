@@ -532,7 +532,7 @@ class SyncServiceTest {
         @Test
         @DisplayName("should return total count with months filter")
         void shouldReturnTotalCountWithMonths() {
-            when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
+            when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of("LB"));
             when(jiraClient.countByJql(anyString())).thenReturn(245);
 
             var result = syncService.countIssuesInJira(6);
@@ -548,7 +548,7 @@ class SyncServiceTest {
         @Test
         @DisplayName("should return total count without months filter")
         void shouldReturnTotalCountWithoutMonths() {
-            when(jiraConfigResolver.getProjectKey()).thenReturn("LB");
+            when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of("LB"));
             when(jiraClient.countByJql(anyString())).thenReturn(500);
 
             var result = syncService.countIssuesInJira(null);

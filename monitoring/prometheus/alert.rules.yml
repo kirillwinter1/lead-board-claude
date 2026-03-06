@@ -1,0 +1,69 @@
+groups:
+  - name: leadboard
+    rules:
+      - alert: BackendDown
+        expr: up{job="leadboard"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Lead Board backend is down"
+          description: "Backend has been unreachable for more than 2 minutes."
+
+      - alert: SyncFailed
+        expr: increase(leadboard_sync_errors_total[30m]) > 2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Multiple sync failures detected"
+          description: "More than 2 sync errors in the last 30 minutes."
+
+      - alert: SyncStale
+        expr: (leadboard_sync_last_success_timestamp > 0) and ((time() - leadboard_sync_last_success_timestamp) > 1800)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No successful sync for 30+ minutes"
+          description: "Last successful sync was {{ $value | humanizeDuration }} ago."
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP 5xx error rate"
+          description: "More than 5% of requests are returning 5xx errors."
+
+      - alert: HighMemoryUsage
+        expr: |
+          jvm_memory_used_bytes{area="heap"}
+          /
+          jvm_memory_max_bytes{area="heap"}
+          > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM heap usage above 80%"
+          description: "JVM heap memory usage is at {{ $value | humanizePercentage }}."
+
+      - alert: HighDBPoolUsage
+        expr: |
+          hikaricp_connections_active
+          /
+          hikaricp_connections_max
+          > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "HikariCP pool utilization above 80%"
+          description: "Database connection pool is at {{ $value | humanizePercentage }} utilization."

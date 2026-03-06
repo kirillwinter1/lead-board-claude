@@ -62,6 +62,7 @@
 | F60 | Production Monitoring | 2026-03-06 | [features/F60](features/F60_PRODUCTION_MONITORING.md) |
 | F61 | Projects UX Polish | 2026-03-06 | [features/F61](features/F61_PROJECTS_UX_POLISH.md) |
 | F62 | OAuth Token Encryption | 2026-03-06 | [features/F62](features/F62_TOKEN_ENCRYPTION.md) |
+| F63 | Skeleton Loaders + SWR Cache | 2026-03-06 | [features/F63](features/F63_SKELETON_LOADERS.md) |
 
 ## Бэклог (BF)
 

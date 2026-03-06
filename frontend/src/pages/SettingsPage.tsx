@@ -2,6 +2,15 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import axios from 'axios'
 import { BugSlaSettingsPage } from './BugSlaSettingsPage'
+import {
+  type JiraProject,
+  type ProjectSyncStatus,
+  listJiraProjects,
+  createJiraProject,
+  updateJiraProject,
+  deleteJiraProject,
+  getPerProjectSyncStatus,
+} from '../api/jiraProjects'
 import './SettingsPage.css'
 
 interface User {
@@ -47,6 +56,12 @@ export function SettingsPage() {
   const [importingChangelogs, setImportingChangelogs] = useState(false)
   const [changelogResult, setChangelogResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
+  // Project management
+  const [projects, setProjects] = useState<JiraProject[]>([])
+  const [projectSyncStatuses, setProjectSyncStatuses] = useState<ProjectSyncStatus[]>([])
+  const [newProjectKey, setNewProjectKey] = useState('')
+  const [addingProject, setAddingProject] = useState(false)
+
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
       clearInterval(pollRef.current)
@@ -77,10 +92,21 @@ export function SettingsPage() {
     pollRef.current = setInterval(poll, 2000)
   }, [stopPolling])
 
+  const fetchProjects = useCallback(async () => {
+    try {
+      const [projs, statuses] = await Promise.all([listJiraProjects(), getPerProjectSyncStatus()])
+      setProjects(projs)
+      setProjectSyncStatuses(statuses)
+    } catch {
+      // ignore — user may not have admin role yet
+    }
+  }, [])
+
   useEffect(() => {
     fetchUsers()
+    fetchProjects()
     return () => stopPolling()
-  }, [stopPolling])
+  }, [stopPolling, fetchProjects])
 
   const fetchUsers = async () => {
     try {
@@ -219,13 +245,122 @@ export function SettingsPage() {
       </section>
 
       <section className="settings-section">
-        <h2 className="settings-section-title">Workflow Configuration</h2>
+        <h2 className="settings-section-title">Jira Projects</h2>
         <p className="settings-section-description">
-          Configure issue types, statuses, roles and link type mappings.
+          Manage Jira projects to sync. Add multiple project keys to sync issues from several Jira projects.
         </p>
-        <Link to="/workflow" className="role-select" style={{ display: 'inline-block', textDecoration: 'none', textAlign: 'center', padding: '8px 16px', background: '#F4F5F7', borderRadius: 4, color: '#172B4D', fontWeight: 500 }}>
-          Open Workflow Configuration
-        </Link>
+
+        <table className="users-table" style={{ marginBottom: 12 }}>
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Name</th>
+              <th>Active</th>
+              <th>Sync</th>
+              <th>Issues</th>
+              <th>Last Sync</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map(proj => {
+              const syncStatus = projectSyncStatuses.find(s => s.projectKey === proj.projectKey)
+              return (
+                <tr key={proj.id}>
+                  <td style={{ fontWeight: 600, fontFamily: 'monospace' }}>
+                    <Link to={`/workflow?project=${proj.projectKey}`} style={{ color: '#0052CC', textDecoration: 'none' }}>
+                      {proj.projectKey}
+                    </Link>
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      defaultValue={proj.displayName}
+                      className="changelog-months-input"
+                      style={{ width: 140 }}
+                      onBlur={async (e) => {
+                        if (e.target.value !== proj.displayName) {
+                          await updateJiraProject(proj.id, { displayName: e.target.value })
+                          fetchProjects()
+                        }
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={proj.active}
+                      onChange={async () => {
+                        await updateJiraProject(proj.id, { active: !proj.active })
+                        fetchProjects()
+                      }}
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={proj.syncEnabled}
+                      onChange={async () => {
+                        await updateJiraProject(proj.id, { syncEnabled: !proj.syncEnabled })
+                        fetchProjects()
+                      }}
+                    />
+                  </td>
+                  <td>{syncStatus?.issuesCount ?? '-'}</td>
+                  <td style={{ fontSize: '0.85em' }}>
+                    {syncStatus?.lastSyncCompletedAt
+                      ? new Date(syncStatus.lastSyncCompletedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                      : 'Never'}
+                    {syncStatus?.syncInProgress && <span style={{ marginLeft: 4, color: '#0052CC' }}>syncing...</span>}
+                  </td>
+                  <td>
+                    <button
+                      className="changelog-check-btn"
+                      style={{ padding: '2px 8px', fontSize: '0.85em' }}
+                      onClick={async () => {
+                        if (confirm(`Delete project ${proj.projectKey}?`)) {
+                          await deleteJiraProject(proj.id)
+                          fetchProjects()
+                        }
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="PROJECT_KEY"
+            value={newProjectKey}
+            onChange={e => setNewProjectKey(e.target.value.toUpperCase())}
+            className="changelog-months-input"
+            style={{ width: 140, textTransform: 'uppercase' }}
+          />
+          <button
+            className="changelog-check-btn"
+            disabled={addingProject || !newProjectKey.trim()}
+            onClick={async () => {
+              try {
+                setAddingProject(true)
+                await createJiraProject(newProjectKey.trim())
+                setNewProjectKey('')
+                fetchProjects()
+              } catch (err) {
+                alert('Failed to add project')
+              } finally {
+                setAddingProject(false)
+              }
+            }}
+          >
+            {addingProject ? 'Adding...' : 'Add Project'}
+          </button>
+        </div>
       </section>
 
       <section className="settings-section">

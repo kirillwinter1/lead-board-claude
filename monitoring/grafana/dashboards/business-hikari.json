@@ -125,6 +125,70 @@
       "targets": [
         { "expr": "leadboard_tenants_active{application=\"leadboard\"}", "legendFormat": "Tenants", "refId": "A" }
       ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Created" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+          { "matcher": { "id": "byName", "options": "Updated" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "id": 9,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" }, "stacking": { "mode": "normal" } },
+      "title": "Sync — Created vs Updated",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "increase(leadboard_sync_issues_created_total[5m])", "legendFormat": "Created", "refId": "A" },
+        { "expr": "increase(leadboard_sync_issues_updated_total[5m])", "legendFormat": "Updated", "refId": "B" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "dateTimeFromNow", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1800 }, { "color": "red", "value": 3600 }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 24 },
+      "id": 10,
+      "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Last Successful Sync",
+      "type": "stat",
+      "targets": [
+        { "expr": "leadboard_sync_last_success_timestamp * 1000", "legendFormat": "Last Sync", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
+      "id": 11,
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "title": "Rate Limit Hits",
+      "type": "stat",
+      "targets": [
+        { "expr": "increase(leadboard_rate_limit_hits_total[1h])", "legendFormat": "Hits/hour", "refId": "A" }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] } },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "id": 12,
+      "options": { "tooltip": { "mode": "multi" }, "legend": { "displayMode": "list", "placement": "bottom" }, "stacking": { "mode": "normal" } },
+      "title": "Errors by Type",
+      "type": "timeseries",
+      "targets": [
+        { "expr": "increase(leadboard_errors_total[5m])", "legendFormat": "{{ type }}", "refId": "A" }
+      ]
     }
   ],
   "schemaVersion": 39,
@@ -133,5 +197,5 @@
   "time": { "from": "now-1h", "to": "now" },
   "title": "Lead Board - Business and HikariCP",
   "uid": "leadboard-business-hikari",
-  "version": 1
+  "version": 2
 }

@@ -33,6 +33,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitFilter.class);
 
+    private final ObservabilityMetrics observabilityMetrics;
+
+    public RateLimitFilter(ObservabilityMetrics observabilityMetrics) {
+        this.observabilityMetrics = observabilityMetrics;
+    }
+
     // Bucket configs: requests per window
     private static final int OAUTH_LIMIT = 20;
     private static final int SYNC_LIMIT = 5;
@@ -77,6 +83,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         if (!bucket.tryConsume()) {
             log.warn("Rate limit exceeded for IP {} on path {}", clientIp, path);
+            observabilityMetrics.recordRateLimitHit();
             response.setStatus(429);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"Too many requests. Please try again later.\"}");

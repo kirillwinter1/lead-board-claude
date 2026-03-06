@@ -9,12 +9,15 @@ import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { useStatusStyles } from '../components/board/StatusStylesContext'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { GanttSkeleton } from '../components/skeletons'
+import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import './TimelinePage.css'
 
 import { getIssueIcon } from '../components/board/helpers'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
+type TimelineCache = { forecast: ForecastResponse; unifiedPlan: UnifiedPlanningResult }
 
 // Width per unit in pixels for each zoom level
 const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
@@ -1525,7 +1528,6 @@ export function TimelinePage() {
   const { getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [searchParams, setSearchParams] = useSearchParams()
   const [teams, setTeams] = useState<Team[]>([])
-  const [forecast, setForecast] = useState<ForecastResponse | null>(null)
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
 
   // Sync teamId with URL
@@ -1537,9 +1539,13 @@ export function TimelinePage() {
       setSearchParams({})
     }
   }
-  const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(null)
+
+  // SWR: restore from cache on mount to avoid skeleton flash on revisit
+  const initialCache = selectedTeamId ? getApiCache<TimelineCache>(`timeline-${selectedTeamId}`) : undefined
+  const [forecast, setForecast] = useState<ForecastResponse | null>(initialCache?.forecast ?? null)
+  const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(initialCache?.unifiedPlan ?? null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(!initialCache)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
 
@@ -1598,7 +1604,6 @@ export function TimelinePage() {
 
     const abortController = new AbortController()
 
-    setLoading(true)
     setError(null)
 
     // Clear any pending animation timeout
@@ -1613,6 +1618,17 @@ export function TimelinePage() {
       animationTimeoutRef.current = setTimeout(() => {
         setShouldAnimate(false)
       }, 2000) // 2 seconds should cover all staggered animations
+    }
+
+    // SWR: check cache, show cached data immediately, then fetch in background
+    const cacheKey = `timeline-${selectedTeamId}`
+    const cached = !isHistoricalMode ? getApiCache<TimelineCache>(cacheKey) : undefined
+    if (cached) {
+      setForecast(cached.forecast)
+      setUnifiedPlan(cached.unifiedPlan)
+      setLoading(false)
+    } else {
+      setLoading(true)
     }
 
     if (selectedHistoricalDate && isHistoricalMode) {
@@ -1647,10 +1663,9 @@ export function TimelinePage() {
           setForecast(forecastData)
           // Merge hybrid: retro dates for past, forecast for future
           const hybridEpics = mergeHybridEpics(planData.epics, retroData)
-          setUnifiedPlan({
-            ...planData,
-            epics: hybridEpics
-          })
+          const hybridPlan = { ...planData, epics: hybridEpics }
+          setUnifiedPlan(hybridPlan)
+          setApiCache(cacheKey, { forecast: forecastData, unifiedPlan: hybridPlan })
           setLoading(false)
           triggerAnimation()
         })
@@ -1835,7 +1850,7 @@ export function TimelinePage() {
         </div>
       )}
 
-      {loading && <div className="loading">Загрузка...</div>}
+      {loading && <GanttSkeleton />}
       {error && <div className="error">{error}</div>}
 
       {!loading && !error && epics.length === 0 && (

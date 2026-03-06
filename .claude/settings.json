@@ -1,4 +1,41 @@
 {
+  "permissions": {
+    "allow": [
+      "Edit(*)",
+      "Write(*)",
+      "Read(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "Bash(cd *)",
+      "Bash(ls *)",
+      "Bash(./gradlew *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(curl *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git branch*)",
+      "Bash(git show*)",
+      "Bash(git stash*)",
+      "Bash(lsof *)",
+      "Bash(kill *)",
+      "Bash(docker *)",
+      "Bash(gh *)",
+      "Bash(wc *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(sort *)",
+      "Bash(psql *)",
+      "Agent(*)",
+      "WebFetch(*)",
+      "mcp__*"
+    ],
+    "deny": [
+      "Read(backend/.env)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

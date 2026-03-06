@@ -119,7 +119,7 @@ function CustomYTick({ x, y, payload, chartData, jiraBaseUrl }: any) {
       <foreignObject x={-labelWidth} y={-22} width={labelWidth - 10} height={44}>
         <div
           style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: _jiraBaseUrl ? 'pointer' : 'default' }}
-          onClick={() => _jiraBaseUrl && window.open(`${_jiraBaseUrl}/${row.epicKey}`, '_blank', 'noopener,noreferrer')}
+          onClick={() => _jiraBaseUrl && window.open(`${_jiraBaseUrl}${row.epicKey}`, '_blank', 'noopener,noreferrer')}
         >
           {/* Row 1: Icon + Key + indicator | Status badge */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -213,7 +213,7 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
   const handleBarClick = (data: any) => {
     const epicKey = data?.payload?.epicKey || data?.epicKey
     if (jiraBaseUrl && epicKey) {
-      window.open(`${jiraBaseUrl}/${epicKey}`, '_blank', 'noopener,noreferrer')
+      window.open(`${jiraBaseUrl}${epicKey}`, '_blank', 'noopener,noreferrer')
     }
   }
 
