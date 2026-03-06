@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getRecommendationIcon } from './helpers'
 import { getScoreBreakdown } from '../../api/board'
@@ -13,6 +13,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number; showAbove?: boolean } | null>(null)
   const cellRef = useRef<HTMLDivElement>(null)
   const abortRef = useRef<AbortController | null>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const { isBug } = useWorkflowConfig()
   const score = node.autoScore || 0
@@ -43,8 +44,32 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
     icons.push('⚠️')
   }
 
-  // Load breakdown on hover
-  const handleMouseEnter = async () => {
+  // Fetch breakdown with debounce to avoid unnecessary API calls on quick mouse-overs
+  const fetchBreakdown = useCallback(async () => {
+    if (breakdown) return
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    setLoading(true)
+    setLoadError(false)
+    try {
+      const data = await getScoreBreakdown(node.issueKey)
+      if (!controller.signal.aborted) {
+        setBreakdown(data)
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setLoadError(true)
+      }
+    } finally {
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
+    }
+  }, [node.issueKey, breakdown])
+
+  // Show tooltip instantly, debounce API call
+  const handleMouseEnter = () => {
     setShowTooltip(true)
 
     // Calculate tooltip position
@@ -80,26 +105,9 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
       })
     }
 
+    // Debounce API call — 300ms delay so quick mouse-overs don't fire requests
     if (!breakdown && !loading) {
-      abortRef.current?.abort()
-      const controller = new AbortController()
-      abortRef.current = controller
-      setLoading(true)
-      setLoadError(false)
-      try {
-        const data = await getScoreBreakdown(node.issueKey)
-        if (!controller.signal.aborted) {
-          setBreakdown(data)
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          setLoadError(true)
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false)
-        }
-      }
+      debounceRef.current = setTimeout(fetchBreakdown, 300)
     }
   }
 
@@ -124,7 +132,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
       className="priority-cell"
       style={{ color }}
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => { setShowTooltip(false); abortRef.current?.abort() }}
+      onMouseLeave={() => { setShowTooltip(false); if (debounceRef.current) clearTimeout(debounceRef.current); abortRef.current?.abort() }}
     >
       <span className="priority-score" style={{ fontWeight: 600 }}>
         {score.toFixed(0)}
