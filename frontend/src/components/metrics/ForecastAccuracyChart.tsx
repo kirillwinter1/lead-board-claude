@@ -1,4 +1,5 @@
 import { ForecastAccuracyResponse, EpicAccuracy } from '../../api/metrics'
+import { getAccuracyColor, DSR_GREEN, DSR_YELLOW, DSR_RED, PROGRESS_IN_PROGRESS, TEXT_MUTED } from '../../constants/colors'
 import './ForecastAccuracyChart.css'
 
 interface ForecastAccuracyChartProps {
@@ -12,10 +13,10 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
       <div className="chart-section">
         <h3>Forecast Accuracy</h3>
         <div className="chart-empty">
-          Нет завершённых эпиков за выбранный период.
+          No completed epics for the selected period.
           <br />
-          <small style={{ color: '#6b778c' }}>
-            Для расчёта точности прогноза нужны эпики с датой завершения (done_at) и снэпшоты прогнозов.
+          <small style={{ color: TEXT_MUTED }}>
+            Forecast accuracy requires epics with completion date (done_at) and forecast snapshots.
           </small>
         </div>
       </div>
@@ -25,30 +26,24 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—'
     const date = new Date(dateStr)
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'EARLY': return 'Раньше срока'
-      case 'ON_TIME': return 'В срок'
-      case 'LATE': return 'С опозданием'
+      case 'EARLY': return 'Early'
+      case 'ON_TIME': return 'On Time'
+      case 'LATE': return 'Late'
       default: return status
     }
-  }
-
-  const getAccuracyColor = (ratio: number) => {
-    if (ratio >= 0.95 && ratio <= 1.05) return '#36B37E' // Perfect
-    if (ratio >= 0.8 && ratio <= 1.2) return '#FFAB00'   // Acceptable
-    return '#FF5630' // Poor
   }
 
   const formatEstimate = (epic: EpicAccuracy) => {
     const initial = epic.initialEstimateHours
     const developing = epic.developingEstimateHours
     if (!initial && !developing) return '—'
-    if (initial === developing || !developing) return `${initial}ч`
-    return `${initial}ч → ${developing}ч`
+    if (initial === developing || !developing) return `${initial}h`
+    return `${initial}h → ${developing}h`
   }
 
   const getEstimateClass = (epic: EpicAccuracy) => {
@@ -63,8 +58,8 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
       <div className="accuracy-header">
         <h3>Forecast Accuracy</h3>
         <p className="accuracy-description">
-          Насколько точно команда попадает в плановые сроки по эпикам.
-          Сравниваем прогноз из планирования с фактической датой завершения.
+          How accurately the team hits planned deadlines for epics.
+          Compares forecast dates from planning with actual completion dates.
         </p>
       </div>
 
@@ -76,41 +71,41 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
           </div>
           <div className="accuracy-label">
             Accuracy Ratio
-            <span className="accuracy-hint">плановые дни / фактические дни (&gt; 1 = быстрее плана)</span>
+            <span className="accuracy-hint">planned days / actual days (&gt; 1 = faster than planned)</span>
           </div>
         </div>
 
         <div className="accuracy-card">
-          <div className="accuracy-value" style={{ color: data.onTimeDeliveryRate >= 80 ? '#36B37E' : data.onTimeDeliveryRate >= 50 ? '#FFAB00' : '#FF5630' }}>
+          <div className="accuracy-value" style={{ color: data.onTimeDeliveryRate >= 80 ? DSR_GREEN : data.onTimeDeliveryRate >= 50 ? DSR_YELLOW : DSR_RED }}>
             {data.onTimeDeliveryRate.toFixed(0)}%
           </div>
           <div className="accuracy-label">
             On-Time Delivery
-            <span className="accuracy-hint">% эпиков завершённых в срок или раньше</span>
+            <span className="accuracy-hint">% of epics completed on time or early</span>
           </div>
         </div>
 
         <div className="accuracy-card">
-          <div className="accuracy-value" style={{ color: data.avgScheduleVariance <= 0 ? '#36B37E' : data.avgScheduleVariance <= 5 ? '#FFAB00' : '#FF5630' }}>
-            {data.avgScheduleVariance > 0 ? '+' : ''}{data.avgScheduleVariance.toFixed(1)}д
+          <div className="accuracy-value" style={{ color: data.avgScheduleVariance <= 0 ? DSR_GREEN : data.avgScheduleVariance <= 5 ? DSR_YELLOW : DSR_RED }}>
+            {data.avgScheduleVariance > 0 ? '+' : ''}{data.avgScheduleVariance.toFixed(1)}d
           </div>
           <div className="accuracy-label">
             Schedule Variance
-            <span className="accuracy-hint">среднее отклонение в днях (− раньше, + позже)</span>
+            <span className="accuracy-hint">average deviation in days (− early, + late)</span>
           </div>
         </div>
 
         <div className="accuracy-card">
           <div className="accuracy-breakdown">
-            <span style={{ color: '#36B37E' }}>{data.earlyCount}</span>
-            <span style={{ color: '#6B778C' }}> / </span>
-            <span style={{ color: '#0065FF' }}>{data.onTimeCount}</span>
-            <span style={{ color: '#6B778C' }}> / </span>
-            <span style={{ color: '#FF5630' }}>{data.lateCount}</span>
+            <span style={{ color: DSR_GREEN }}>{data.earlyCount}</span>
+            <span style={{ color: TEXT_MUTED }}> / </span>
+            <span style={{ color: PROGRESS_IN_PROGRESS }}>{data.onTimeCount}</span>
+            <span style={{ color: TEXT_MUTED }}> / </span>
+            <span style={{ color: DSR_RED }}>{data.lateCount}</span>
           </div>
           <div className="accuracy-label">
-            Рано / В срок / Поздно
-            <span className="accuracy-hint">из {data.totalCompleted} эпиков</span>
+            Early / On Time / Late
+            <span className="accuracy-hint">of {data.totalCompleted} epics</span>
           </div>
         </div>
       </div>
@@ -121,15 +116,15 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
           <table className="metrics-table accuracy-table">
             <thead>
               <tr>
-                <th>Эпик</th>
-                <th title="Плановые даты начала и окончания из прогноза">План</th>
-                <th title="Фактические даты начала и завершения">Факт</th>
-                <th title="Количество рабочих дней по плану">Дней план</th>
-                <th title="Количество рабочих дней по факту">Дней факт</th>
-                <th title="Изменение оценки: при появлении → при входе в разработку">Оценка</th>
-                <th title="Плановые дни / Фактические дни. 1.0 = идеальное попадание">Ratio</th>
-                <th title="Разница в днях: факт минус план. Минус = раньше срока">Отклонение</th>
-                <th title="Раньше срока / В срок / С опозданием">Статус</th>
+                <th>Epic</th>
+                <th title="Planned start and end dates from forecast">Planned</th>
+                <th title="Actual start and completion dates">Actual</th>
+                <th title="Working days planned">Plan Days</th>
+                <th title="Working days actual">Actual Days</th>
+                <th title="Estimate change: at creation → at development start">Estimate</th>
+                <th title="Planned days / Actual days. 1.0 = perfect accuracy">Ratio</th>
+                <th title="Difference in days: actual minus planned. Minus = ahead of schedule">Variance</th>
+                <th title="Ahead of schedule / On time / Late">Status</th>
               </tr>
             </thead>
             <tbody>
@@ -181,7 +176,7 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
                   </td>
                   <td className="number-cell">
                     <span className={`variance-pill ${epic.scheduleVariance < 0 ? 'variance-early' : epic.scheduleVariance > 0 ? 'variance-late' : 'variance-ontime'}`}>
-                      {epic.scheduleVariance > 0 ? '+' : ''}{epic.scheduleVariance}д
+                      {epic.scheduleVariance > 0 ? '+' : ''}{epic.scheduleVariance}d
                     </span>
                   </td>
                   <td>
@@ -199,46 +194,46 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
       {/* How to read */}
       <div className="accuracy-howto">
         <details>
-          <summary className="accuracy-howto-toggle">Как читать эту таблицу?</summary>
+          <summary className="accuracy-howto-toggle">How to read this table?</summary>
           <div className="accuracy-howto-content">
             <div className="howto-block">
-              <strong>Что показывает Forecast Accuracy?</strong>
-              <p>Сравнивает плановые сроки эпика (из прогноза на планировании) с фактическими датами завершения. Все расчёты ведутся в <b>рабочих днях</b> (без выходных и праздников). Фактические даты берутся из истории переходов статусов (вход в Developing → выход в Done).</p>
+              <strong>What does Forecast Accuracy show?</strong>
+              <p>Compares planned epic timelines (from planning forecasts) with actual completion dates. All calculations use <b>working days</b> (excluding weekends and holidays). Actual dates are taken from status transition history (entering Developing → exiting to Done).</p>
             </div>
             <div className="howto-block">
               <strong>Accuracy Ratio</strong>
-              <p>Плановые рабочие дни делим на фактические. Идеал — <b>1.00</b> (план = факт).</p>
+              <p>Planned working days divided by actual. Ideal is <b>1.00</b> (plan = actual).</p>
               <ul>
-                <li><span style={{ color: '#36B37E' }}>0.95–1.05</span> — отличное попадание</li>
-                <li><span style={{ color: '#FFAB00' }}>0.80–1.20</span> — приемлемое отклонение</li>
-                <li><span style={{ color: '#FF5630' }}>&lt;0.80 или &gt;1.20</span> — требует внимания</li>
+                <li><span style={{ color: DSR_GREEN }}>0.95–1.05</span> — excellent accuracy</li>
+                <li><span style={{ color: DSR_YELLOW }}>0.80–1.20</span> — acceptable deviation</li>
+                <li><span style={{ color: DSR_RED }}>&lt;0.80 or &gt;1.20</span> — needs attention</li>
               </ul>
-              <p>Ratio &gt; 1 — сделали быстрее плана. Ratio &lt; 1 — медленнее. <em>Обратите внимание: направление противоположно DSR, где &gt; 1 = медленнее.</em></p>
+              <p>Ratio &gt; 1 — completed faster than planned. Ratio &lt; 1 — slower. <em>Note: this is opposite to DSR, where &gt; 1 = slower.</em></p>
             </div>
             <div className="howto-block">
-              <strong>Отклонение (Schedule Variance)</strong>
-              <p>Разница в рабочих днях между фактом и планом.</p>
+              <strong>Schedule Variance</strong>
+              <p>Difference in working days between actual and planned.</p>
               <ul>
-                <li><span className="variance-pill variance-early">−3д</span> — завершили на 3 рабочих дня раньше</li>
-                <li><span className="variance-pill variance-ontime">0д</span> — точно в срок</li>
-                <li><span className="variance-pill variance-late">+5д</span> — опоздание на 5 рабочих дней</li>
-              </ul>
-            </div>
-            <div className="howto-block">
-              <strong>Оценка (Estimate Change)</strong>
-              <p>Изменение трудозатрат эпика: от первого появления в прогнозе до входа в разработку.</p>
-              <ul>
-                <li><span className="estimate-pill estimate-same">120ч</span> — оценка не менялась</li>
-                <li><span className="estimate-pill estimate-up">80ч → 120ч</span> — оценка выросла (scope creep)</li>
-                <li><span className="estimate-pill estimate-down">120ч → 80ч</span> — оценка снизилась</li>
+                <li><span className="variance-pill variance-early">−3d</span> — completed 3 working days early</li>
+                <li><span className="variance-pill variance-ontime">0d</span> — exactly on time</li>
+                <li><span className="variance-pill variance-late">+5d</span> — 5 working days late</li>
               </ul>
             </div>
             <div className="howto-block">
-              <strong>Что делать с результатами?</strong>
+              <strong>Estimate Change</strong>
+              <p>Change in epic effort estimate: from first appearance in forecast to entering development.</p>
               <ul>
-                <li>On-Time Delivery &lt; 50% — стоит пересмотреть подход к оценке сроков</li>
-                <li>Ratio стабильно &lt; 1 — команда систематически недооценивает сложность</li>
-                <li>Ratio стабильно &gt; 1 — оценки завышены, можно планировать плотнее</li>
+                <li><span className="estimate-pill estimate-same">120h</span> — estimate unchanged</li>
+                <li><span className="estimate-pill estimate-up">80h → 120h</span> — estimate increased (scope creep)</li>
+                <li><span className="estimate-pill estimate-down">120h → 80h</span> — estimate decreased</li>
+              </ul>
+            </div>
+            <div className="howto-block">
+              <strong>What to do with the results?</strong>
+              <ul>
+                <li>On-Time Delivery &lt; 50% — consider revisiting the estimation approach</li>
+                <li>Ratio consistently &lt; 1 — team systematically underestimates complexity</li>
+                <li>Ratio consistently &gt; 1 — estimates are too high, can plan more tightly</li>
               </ul>
             </div>
           </div>

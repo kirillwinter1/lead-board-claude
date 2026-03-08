@@ -8,16 +8,16 @@ function generateSessionId(): string {
 }
 
 const PAGE_NAMES: Record<string, string> = {
-  '/': 'Board (Доска задач)',
-  '/timeline': 'Timeline (Таймлайн Gantt)',
-  '/metrics': 'Metrics (Метрики команды)',
-  '/data-quality': 'Data Quality (Качество данных)',
-  '/bug-metrics': 'Bug Metrics (Метрики багов)',
-  '/projects': 'Projects (Проекты)',
-  '/teams': 'Teams (Команды)',
+  '/': 'Board',
+  '/timeline': 'Timeline (Gantt)',
+  '/metrics': 'Team Metrics',
+  '/data-quality': 'Data Quality',
+  '/bug-metrics': 'Bug Metrics',
+  '/projects': 'Projects',
+  '/teams': 'Teams',
   '/poker': 'Planning Poker',
-  '/settings': 'Settings (Настройки)',
-  '/workflow': 'Workflow Config (Конфигурация workflow)',
+  '/settings': 'Settings',
+  '/workflow': 'Workflow Config',
 }
 
 function getPageName(pathname: string): string {
@@ -25,10 +25,10 @@ function getPageName(pathname: string): string {
   if (PAGE_NAMES[pathname]) return PAGE_NAMES[pathname]
 
   // Pattern matching for dynamic routes
-  if (/^\/poker\/room\//.test(pathname)) return 'Poker Room (Покер-комната)'
-  if (/^\/teams\/\d+\/member\//.test(pathname)) return 'Member Profile (Профиль участника)'
-  if (/^\/teams\/\d+\/competency/.test(pathname)) return 'Team Competency (Компетенции)'
-  if (/^\/teams\/\d+/.test(pathname)) return 'Team Members (Участники команды)'
+  if (/^\/poker\/room\//.test(pathname)) return 'Poker Room'
+  if (/^\/teams\/\d+\/member\//.test(pathname)) return 'Member Profile'
+  if (/^\/teams\/\d+\/competency/.test(pathname)) return 'Team Competency'
+  if (/^\/teams\/\d+/.test(pathname)) return 'Team Members'
 
   return pathname
 }

@@ -3,10 +3,10 @@ import { Modal } from './Modal'
 import { Absence, AbsenceType, CreateAbsenceRequest } from '../api/teams'
 
 const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
-  VACATION: 'Отпуск',
-  SICK_LEAVE: 'Больничный',
-  DAY_OFF: 'Отгул',
-  OTHER: 'Другое',
+  VACATION: 'Vacation',
+  SICK_LEAVE: 'Sick Leave',
+  DAY_OFF: 'Day Off',
+  OTHER: 'Other',
 }
 
 const ABSENCE_COLORS: Record<AbsenceType, string> = {
@@ -54,7 +54,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
     e.preventDefault()
     if (!startDate || !endDate) return
     if (startDate > endDate) {
-      setError('Дата начала не может быть позже даты окончания')
+      setError('Start date cannot be after end date')
       return
     }
     setSaving(true)
@@ -72,7 +72,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
 
   const handleDelete = async () => {
     if (!onDelete) return
-    if (!confirm('Удалить это отсутствие?')) return
+    if (!confirm('Delete this absence?')) return
     setSaving(true)
     try {
       await onDelete()
@@ -86,7 +86,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={absence ? 'Редактировать отсутствие' : 'Добавить отсутствие'}>
+    <Modal isOpen={isOpen} onClose={onClose} title={absence ? 'Edit Absence' : 'Add Absence'}>
       <form onSubmit={handleSubmit} className="modal-form">
         {error && (
           <div style={{ color: '#de350b', fontSize: 13, marginBottom: 12, padding: '8px 12px', background: '#ffebe6', borderRadius: 4 }}>
@@ -94,7 +94,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
           </div>
         )}
         <div className="form-group">
-          <label htmlFor="absenceType">Тип</label>
+          <label htmlFor="absenceType">Type</label>
           <select
             id="absenceType"
             value={absenceType}
@@ -107,7 +107,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
         </div>
         <div className="form-row">
           <div className="form-group">
-            <label htmlFor="startDate">Начало</label>
+            <label htmlFor="startDate">Start</label>
             <input
               id="startDate"
               type="date"
@@ -117,7 +117,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
             />
           </div>
           <div className="form-group">
-            <label htmlFor="endDate">Конец</label>
+            <label htmlFor="endDate">End</label>
             <input
               id="endDate"
               type="date"
@@ -128,13 +128,13 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
           </div>
         </div>
         <div className="form-group">
-          <label htmlFor="comment">Комментарий</label>
+          <label htmlFor="comment">Comment</label>
           <input
             id="comment"
             type="text"
             value={comment}
             onChange={e => setComment(e.target.value)}
-            placeholder="Необязательно"
+            placeholder="Optional"
             maxLength={500}
           />
         </div>
@@ -147,14 +147,14 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
               disabled={saving}
               style={{ marginRight: 'auto' }}
             >
-              Удалить
+              Delete
             </button>
           )}
           <button type="button" className="btn btn-secondary" onClick={onClose}>
-            Отмена
+            Cancel
           </button>
           <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Сохранение...' : (absence ? 'Сохранить' : 'Добавить')}
+            {saving ? 'Saving...' : (absence ? 'Save' : 'Add')}
           </button>
         </div>
       </form>

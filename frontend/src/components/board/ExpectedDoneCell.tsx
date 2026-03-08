@@ -32,9 +32,9 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
   // Confidence colors
   const confidenceClass = confidence.toLowerCase()
   const confidenceLabels = {
-    HIGH: 'Высокая',
-    MEDIUM: 'Средняя',
-    LOW: 'Низкая'
+    HIGH: 'High',
+    MEDIUM: 'Medium',
+    LOW: 'Low'
   }
 
   // Delta indicator
@@ -85,7 +85,7 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
           </div>
 
           <div className="forecast-tooltip-section">
-            <div className="forecast-tooltip-title">Расписание фаз</div>
+            <div className="forecast-tooltip-title">Phase Schedule</div>
             {Object.entries(phaseSchedule || {}).map(([role, schedule]) => schedule && (
               <div key={role} className="forecast-phase">
                 <span className="phase-label" style={{ color: getRoleColor(role) }}>{role}</span>
@@ -94,7 +94,7 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
               </div>
             ))}
             {Object.keys(phaseSchedule || {}).length === 0 && (
-              <div className="forecast-phase" style={{ color: '#666' }}>Нет данных о фазах</div>
+              <div className="forecast-phase" style={{ color: '#666' }}>No phase data</div>
             )}
           </div>
 

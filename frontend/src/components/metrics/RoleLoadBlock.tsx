@@ -8,8 +8,8 @@ interface RoleLoadBlockProps {
 }
 
 /**
- * Блок загрузки команды по ролям (SA/DEV/QA).
- * Показывает capacity, assigned hours и utilization для каждой роли.
+ * Team role load block (SA/DEV/QA).
+ * Shows capacity, assigned hours, and utilization for each role.
  */
 export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
   const [data, setData] = useState<RoleLoadResponse | null>(null)
@@ -25,7 +25,7 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
         setLoading(false)
       })
       .catch(err => {
-        setError('Не удалось загрузить данные: ' + err.message)
+        setError('Failed to load data: ' + err.message)
         setLoading(false)
       })
   }, [teamId])
@@ -34,9 +34,9 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
     return (
       <div className="role-load-block">
         <div className="role-load-header">
-          <h3>Загрузка по ролям</h3>
+          <h3>Role Load</h3>
         </div>
-        <div className="role-load-loading">Загрузка...</div>
+        <div className="role-load-loading">Loading...</div>
       </div>
     )
   }
@@ -45,7 +45,7 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
     return (
       <div className="role-load-block">
         <div className="role-load-header">
-          <h3>Загрузка по ролям</h3>
+          <h3>Role Load</h3>
         </div>
         <div className="role-load-error">{error}</div>
       </div>
@@ -59,8 +59,8 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
   return (
     <div className="role-load-block">
       <div className="role-load-header">
-        <h3>Загрузка по ролям</h3>
-        <span className="role-load-period">{data.periodDays} рабочих дней</span>
+        <h3>Role Load</h3>
+        <span className="role-load-period">{data.periodDays} working days</span>
       </div>
 
       <div className="role-load-cards">
@@ -102,7 +102,7 @@ function RoleCard({ role, info }: RoleCardProps) {
   return (
     <div className="role-card" style={{ borderLeft: `4px solid ${roleColor}` }}>
       <div className="role-card-title" style={{ color: roleColor }}>{getRoleDisplayName(role)}</div>
-      <div className="role-card-members">{info.memberCount} чел.</div>
+      <div className="role-card-members">{info.memberCount} members</div>
 
       <div className="role-card-bar-container">
         <div
@@ -127,13 +127,13 @@ function RoleCard({ role, info }: RoleCardProps) {
 function getStatusLabel(status: UtilizationStatus): string {
   switch (status) {
     case 'OVERLOAD':
-      return 'Перегрузка'
+      return 'Overload'
     case 'NORMAL':
-      return 'Норма'
+      return 'Normal'
     case 'IDLE':
-      return 'Простой'
+      return 'Idle'
     case 'NO_CAPACITY':
-      return 'Нет ресурсов'
+      return 'No Capacity'
   }
 }
 

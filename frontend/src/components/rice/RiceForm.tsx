@@ -10,10 +10,10 @@ type Selections = Record<number, number[]> // criteriaId -> optionIds
 
 const PARAM_ORDER = ['REACH', 'IMPACT', 'CONFIDENCE', 'EFFORT']
 const PARAM_LABELS: Record<string, string> = {
-  REACH: 'Reach (охват)',
-  IMPACT: 'Impact (влияние)',
-  CONFIDENCE: 'Confidence (уверенность)',
-  EFFORT: 'Effort (затраты)',
+  REACH: 'Reach',
+  IMPACT: 'Impact',
+  CONFIDENCE: 'Confidence',
+  EFFORT: 'Effort',
 }
 
 function groupByParameter(criteria: RiceCriteria[]): Record<string, RiceCriteria[]> {

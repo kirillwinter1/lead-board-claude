@@ -34,7 +34,7 @@ interface DateRange {
 // --- Utility functions ---
 
 function formatDateShort(date: Date): string {
-  return date.toLocaleDateString('ru-RU', { month: 'short', day: 'numeric' })
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function toLocalMidnight(date: Date): Date {
@@ -152,7 +152,7 @@ function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): TimelineHea
     while (current <= range.end) {
       headers.push({
         date: new Date(current),
-        label: current.toLocaleDateString('ru-RU', { month: 'short' })
+        label: current.toLocaleDateString('en-US', { month: 'short' })
       })
       current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
     }
@@ -180,7 +180,7 @@ function generateGroupHeaders(headers: TimelineHeader[], zoom: ZoomLevel): Group
       if (month !== currentMonth || year !== currentYear) {
         if (currentSpan > 0) {
           groups.push({
-            label: new Date(currentYear, currentMonth, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }),
+            label: new Date(currentYear, currentMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
             span: currentSpan
           })
         }
@@ -250,7 +250,7 @@ function generateWeekHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupH
     if (!currentWeekStart || weekStart.getTime() !== currentWeekStart.getTime()) {
       if (currentSpan > 0 && currentWeekStart) {
         weeks.push({
-          label: `Нед ${getWeekNumber(currentWeekStart)}`,
+          label: `Week ${getWeekNumber(currentWeekStart)}`,
           span: currentSpan
         })
       }
@@ -264,7 +264,7 @@ function generateWeekHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupH
   // Add last week
   if (currentSpan > 0 && currentWeekStart) {
     weeks.push({
-      label: `Нед ${getWeekNumber(currentWeekStart)}`,
+      label: `Week ${getWeekNumber(currentWeekStart)}`,
       span: currentSpan
     })
   }
@@ -300,8 +300,8 @@ function lightenColor(hex: string, factor: number): string {
 
 // Format seconds to hours
 function formatHours(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '0ч'
-  return `${Math.round(seconds / 3600)}ч`
+  if (seconds === null || seconds === 0) return '0h'
+  return `${Math.round(seconds / 3600)}h`
 }
 
 // Check if phase has hours
@@ -382,7 +382,7 @@ interface EpicLabelProps {
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
   const statusStyles = useStatusStyles()
-  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик'))
+  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -525,7 +525,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
           {/* Progress section */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ color: '#8993A4', fontSize: 11 }}>Прогресс</span>
+              <span style={{ color: '#8993A4', fontSize: 11 }}>Progress</span>
               <span style={{ color: '#B3BAC5', fontSize: 11 }}>
                 {formatHours(epic.totalLoggedSeconds)} / {formatHours(epic.totalEstimateSeconds)}
               </span>
@@ -564,7 +564,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
                 <span style={{ color: '#8993A4' }}>⏰ Due: </span>
                 <span style={{ color: dueDateDelta && dueDateDelta > 0 ? '#FF5630' : '#36B37E' }}>
                   {formatDateShort(new Date(epic.dueDate))}
-                  {dueDateDelta !== null && dueDateDelta > 0 && ` (+${dueDateDelta}д)`}
+                  {dueDateDelta !== null && dueDateDelta > 0 && ` (+${dueDateDelta}d)`}
                 </span>
               </div>
             )}
@@ -601,7 +601,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
           {/* Footer stats */}
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8993A4', fontSize: 11 }}>
             <span>📊 AutoScore: {epic.autoScore?.toFixed(0) || '—'}</span>
-            <span>📋 Stories: {epic.storiesActive} активн. / {epic.storiesTotal} всего</span>
+            <span>📋 Stories: {epic.storiesActive} active / {epic.storiesTotal} total</span>
           </div>
         </div>,
         document.body
@@ -842,7 +842,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
   })
 
   if (activeStories.length === 0) {
-    return <div className="story-empty-text">Нет сторей с данными</div>
+    return <div className="story-empty-text">No stories with data</div>
   }
 
   const storyLanes = allocateStoryLanes(activeStories)
@@ -935,7 +935,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           {hoveredStory.totalEstimateSeconds && hoveredStory.totalEstimateSeconds > 0 && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
-                <span style={{ color: '#9ca3af' }}>Прогресс</span>
+                <span style={{ color: '#9ca3af' }}>Progress</span>
                 <span style={{ color: '#e5e7eb' }}>
                   {formatHours(hoveredStory.totalLoggedSeconds)} / {formatHours(hoveredStory.totalEstimateSeconds)}
                   <span style={{ color: '#9ca3af', marginLeft: '6px' }}>
@@ -995,7 +995,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
                             {formatHours(progress.loggedSeconds)}/{formatHours(progress.estimateSeconds)}
                           </span>
                         ) : (
-                          <span>{phase?.hours.toFixed(0)}ч</span>
+                          <span>{phase?.hours.toFixed(0)}h</span>
                         )}
                       </td>
                     </tr>
@@ -1124,7 +1124,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
       >
         ~{epic.roughEstimates
           ? Object.entries(epic.roughEstimates).map(([role, days]) => `${role}:${days}`).join('/')
-          : '0'}д
+          : '0'}d
       </span>
     </div>
   )
@@ -1139,7 +1139,7 @@ interface RoughEstimateBarsProps {
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
-  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic') || getIssueTypeIconUrl('Эпик'))
+  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1196,7 +1196,7 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
                 fontWeight: 500
               }}
             >
-              Грязные оценки
+              Rough estimates
             </span>
           </div>
 
@@ -1209,7 +1209,7 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
           {hoveredEpic.roughEstimates && Object.keys(hoveredEpic.roughEstimates).length > 0 && (
             <div style={{ marginBottom: '10px', borderTop: '1px solid #374151', paddingTop: '10px' }}>
               <div style={{ color: '#9ca3af', fontSize: '11px', marginBottom: '6px' }}>
-                Оценки (дней):
+                Estimates (days):
               </div>
               <table style={{ width: '100%', fontSize: '12px' }}>
                 <tbody>
@@ -1221,7 +1221,7 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
                       </td>
                       <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
-                        {hoveredEpic.roughEstimates?.[role]} дней
+                        {hoveredEpic.roughEstimates?.[role]} days
                       </td>
                     </tr>
                   ))}
@@ -1239,7 +1239,7 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
 
           {/* Note */}
           <div style={{ marginTop: '8px', color: '#6b7280', fontSize: '11px', fontStyle: 'italic' }}>
-            Эпик без сторей, планируется по грязным оценкам
+            Epic without stories, planned by rough estimates
           </div>
         </div>,
         document.body
@@ -1773,25 +1773,25 @@ export function TimelinePage() {
 
       <div className="timeline-controls">
         <div className="filter-group">
-          <label className="filter-label">Команда</label>
+          <label className="filter-label">Team</label>
           <SingleSelectDropdown
-            label="Команда"
+            label="Team"
             options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color ?? undefined }))}
             selected={selectedTeamId !== null ? String(selectedTeamId) : null}
             onChange={v => setSelectedTeamId(v ? Number(v) : null)}
-            placeholder="Выберите команду..."
+            placeholder="Select team..."
             allowClear={false}
           />
         </div>
 
         <div className="filter-group">
-          <label className="filter-label">Масштаб</label>
+          <label className="filter-label">Scale</label>
           <SingleSelectDropdown
-            label="Масштаб"
+            label="Scale"
             options={[
-              { value: 'day', label: 'День' },
-              { value: 'week', label: 'Неделя' },
-              { value: 'month', label: 'Месяц' },
+              { value: 'day', label: 'Day' },
+              { value: 'week', label: 'Week' },
+              { value: 'month', label: 'Month' },
             ]}
             selected={zoom}
             onChange={v => v && setZoom(v as ZoomLevel)}
@@ -1801,20 +1801,20 @@ export function TimelinePage() {
 
         <div className="filter-group">
           <label className="filter-label">
-            Дата
+            Date
             {isHistoricalMode && (
-              <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>Исторические данные</span>
+              <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>Historical data</span>
             )}
           </label>
           <SingleSelectDropdown
-            label="Дата"
+            label="Date"
             options={availableDates.map(date => ({
               value: date,
-              label: new Date(date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' }),
+              label: new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
             }))}
             selected={selectedHistoricalDate || null}
             onChange={v => handleHistoricalDateChange(v ?? '')}
-            placeholder="Сегодня (live)"
+            placeholder="Today (live)"
           />
         </div>
 
@@ -1831,21 +1831,21 @@ export function TimelinePage() {
               {code}
             </span>
           ))}
-          <span className="legend-item legend-retro">Факт</span>
-          <span className="legend-item legend-forecast-striped">Прогноз</span>
-          <span className="legend-item legend-today">Сегодня</span>
+          <span className="legend-item legend-retro">Actual</span>
+          <span className="legend-item legend-forecast-striped">Forecast</span>
+          <span className="legend-item legend-today">Today</span>
           <span className="legend-item legend-due">Due Date</span>
         </div>
       </div>
 
       {isHistoricalMode && (
         <div className="historical-mode-banner">
-          📜 Просмотр исторического снэпшота от {new Date(selectedHistoricalDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+          📜 Viewing historical snapshot from {new Date(selectedHistoricalDate).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
           <button
             onClick={() => handleHistoricalDateChange('')}
             style={{ marginLeft: 12, padding: '2px 8px', fontSize: 12, cursor: 'pointer' }}
           >
-            Вернуться к текущим данным
+            Return to current data
           </button>
         </div>
       )}
@@ -1854,13 +1854,13 @@ export function TimelinePage() {
       {error && <div className="error">{error}</div>}
 
       {!loading && !error && epics.length === 0 && (
-        <div className="empty">Нет эпиков с данными для планирования</div>
+        <div className="empty">No epics with planning data</div>
       )}
 
       {!loading && !error && epics.length > 0 && (
         <div className="gantt-container">
           <div className="gantt-labels">
-            <div className="gantt-labels-header">Эпик</div>
+            <div className="gantt-labels-header">Epic</div>
             {epics.map(epic => {
               const epicForecast = epicForecasts.get(epic.epicKey)
               const rowHeight = rowHeights.get(epic.epicKey) || MIN_ROW_HEIGHT
@@ -1877,7 +1877,7 @@ export function TimelinePage() {
             })}
           </div>
 
-          <div className="gantt-chart" ref={chartRef} role="region" aria-label="Gantt-диаграмма таймлайна">
+          <div className="gantt-chart" ref={chartRef} role="region" aria-label="Timeline Gantt chart">
             <div className="gantt-header-container" style={{ width: `${chartWidth}px`, minWidth: `${chartWidth}px` }}>
               {/* Group header row (month/quarter) */}
               <div className="gantt-header-group">

@@ -40,7 +40,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
   }
 
   const hasNoEstimates = node.estimateSeconds === null || node.estimateSeconds === 0
-  if (hasNoEstimates && !node.issueType?.toLowerCase().includes('epic') && !node.issueType?.toLowerCase().includes('эпик')) {
+  if (hasNoEstimates && !node.issueType?.toLowerCase().includes('epic')) {
     icons.push('⚠️')
   }
 
@@ -111,19 +111,19 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
     }
   }
 
-  // Factor labels in Russian
+  // Factor labels
   const factorLabels: Record<string, string> = {
-    issueType: 'Тип задачи',
-    status: 'Статус',
-    progress: 'Прогресс',
-    priority: 'Приоритет',
-    dependency: 'Зависимости',
-    dueDate: 'Срок',
-    estimateQuality: 'Качество оценки',
-    flagged: 'Флаг',
-    statusWeight: 'Статус',
-    storyCompletion: 'Завершение историй',
-    dueDateWeight: 'Срок'
+    issueType: 'Issue Type',
+    status: 'Status',
+    progress: 'Progress',
+    priority: 'Priority',
+    dependency: 'Dependencies',
+    dueDate: 'Due Date',
+    estimateQuality: 'Estimate Quality',
+    flagged: 'Flag',
+    statusWeight: 'Status',
+    storyCompletion: 'Story Completion',
+    dueDateWeight: 'Due Date'
   }
 
   return (
@@ -168,19 +168,19 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
 
           {recommendedPosition !== undefined && actualPosition !== undefined && (
             <div className="priority-tooltip-recommendation">
-              Рекомендуемая позиция: <strong>{recommendedPosition}</strong>
+              Recommended position: <strong>{recommendedPosition}</strong>
               {actualPosition !== recommendedPosition && (
-                <span className="current-position"> (сейчас: {actualPosition})</span>
+                <span className="current-position"> (current: {actualPosition})</span>
               )}
             </div>
           )}
 
           {loading && (
-            <div className="priority-tooltip-loading">Загрузка...</div>
+            <div className="priority-tooltip-loading">Loading...</div>
           )}
 
           {loadError && (
-            <div className="priority-tooltip-loading" style={{ color: '#de350b' }}>Ошибка загрузки</div>
+            <div className="priority-tooltip-loading" style={{ color: '#de350b' }}>Failed to load</div>
           )}
 
           {breakdown && breakdown.breakdown && (
@@ -202,14 +202,14 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
 
           {icons.length > 0 && (
             <div className="priority-tooltip-indicators">
-              <div className="priority-tooltip-title">Индикаторы:</div>
+              <div className="priority-tooltip-title">Indicators:</div>
               {icons.map((icon, idx) => {
                 let description = ''
-                if (icon === '🐞') description = 'Баг'
-                else if (icon === '🔒') description = 'Заблокировано другими задачами'
-                else if (icon === '🚩') description = 'Работа приостановлена'
-                else if (icon === '⚡') description = 'Высокий приоритет (>80)'
-                else if (icon === '⚠️') description = 'Нет оценки времени'
+                if (icon === '🐞') description = 'Bug'
+                else if (icon === '🔒') description = 'Blocked by other issues'
+                else if (icon === '🚩') description = 'Work paused'
+                else if (icon === '⚡') description = 'High priority (>80)'
+                else if (icon === '⚠️') description = 'No time estimate'
 
                 return (
                   <div key={idx} className="priority-indicator-item">

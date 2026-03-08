@@ -11,6 +11,7 @@ import {
   Cell
 } from 'recharts'
 import { getVelocity, VelocityResponse } from '../../api/metrics'
+import { getUtilizationColor, CHART_GRID, CHART_AXIS, CHART_TICK, CHART_TOOLTIP_BG } from '../../constants/colors'
 import './VelocityChart.css'
 
 interface VelocityChartProps {
@@ -60,12 +61,6 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
     )
   }
 
-  const getUtilizationColor = (percent: number) => {
-    if (percent >= 85 && percent <= 110) return '#36B37E'
-    if (percent >= 70 && percent <= 130) return '#FFAB00'
-    return '#FF5630'
-  }
-
   const chartData = data.byWeek.map(week => ({
     name: new Date(week.weekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
     capacity: week.capacityHours,
@@ -105,22 +100,22 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
       <div className="velocity-chart-container">
         <ResponsiveContainer width="100%" height={250}>
           <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ebecf0" />
+            <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
             <XAxis
               dataKey="name"
-              tick={{ fontSize: 11, fill: '#6b778c' }}
+              tick={{ fontSize: 11, fill: CHART_TICK }}
               tickLine={false}
-              axisLine={{ stroke: '#dfe1e6' }}
+              axisLine={{ stroke: CHART_AXIS }}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#6b778c' }}
+              tick={{ fontSize: 11, fill: CHART_TICK }}
               tickLine={false}
-              axisLine={{ stroke: '#dfe1e6' }}
+              axisLine={{ stroke: CHART_AXIS }}
               tickFormatter={(value) => `${value}h`}
             />
             <Tooltip
               contentStyle={{
-                backgroundColor: '#172b4d',
+                backgroundColor: CHART_TOOLTIP_BG,
                 border: 'none',
                 borderRadius: 4,
                 color: 'white',
@@ -133,7 +128,7 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
               ]}
             />
             <Legend wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
-            <Bar dataKey="capacity" fill="#dfe1e6" name="Capacity" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="capacity" fill={CHART_AXIS} name="Capacity" radius={[4, 4, 0, 0]} />
             <Bar dataKey="logged" name="Logged" radius={[4, 4, 0, 0]}>
               {chartData.map((entry, index) => (
                 <Cell

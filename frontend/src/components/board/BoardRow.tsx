@@ -1,4 +1,4 @@
-import { isEpic, getIssueIcon } from './helpers'
+import { getIssueIcon } from './helpers'
 import { ProgressCell } from './ProgressCell'
 import { RoleChips } from './RoleChips'
 import { PriorityCell } from './PriorityCell'
@@ -11,7 +11,7 @@ import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
-  const { getIssueTypeIconUrl, isStoryOrBug } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, isStoryOrBug, isEpic } = useWorkflowConfig()
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = isStoryOrBug(node.issueType) && level === 1
 

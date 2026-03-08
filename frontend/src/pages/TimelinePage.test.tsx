@@ -166,8 +166,8 @@ describe('TimelinePage', () => {
       renderTimelinePage()
 
       await waitFor(() => {
-        // When no teams, the select shows "Выберите команду..." placeholder
-        expect(screen.getByText('Выберите команду...')).toBeInTheDocument()
+        // When no teams, the select shows "Select team..." placeholder
+        expect(screen.getByText('Select team...')).toBeInTheDocument()
       })
     })
   })

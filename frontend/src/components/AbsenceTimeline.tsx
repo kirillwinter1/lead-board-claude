@@ -10,7 +10,7 @@ const LEFT_PANEL_WIDTH = 260
 const DAYS_VISIBLE = 28
 
 function formatDateShort(d: Date): string {
-  return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })
+  return d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit' })
 }
 
 function toDateStr(d: Date): string {
@@ -68,7 +68,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
       .catch(err => {
         console.error('Failed to load absences:', err)
         setAbsences([])
-        setFetchError('Не удалось загрузить отсутствия')
+        setFetchError('Failed to load absences')
       })
       .finally(() => setLoading(false))
   }, [teamId, startDate, endDate])
@@ -156,7 +156,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
     let startIdx = 0
 
     for (let i = 0; i < days.length; i++) {
-      const month = days[i].toLocaleDateString('ru-RU', { month: 'short' })
+      const month = days[i].toLocaleDateString('en-US', { month: 'short' })
       if (month !== currentMonth) {
         if (currentMonth) {
           labels.push({ text: currentMonth, startIdx, count: i - startIdx })
@@ -175,9 +175,9 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
     <div className="absence-timeline">
       {/* Navigation */}
       <div className="absence-timeline-nav">
-        <button className="btn btn-small btn-secondary" onClick={() => navigate(-1)} aria-label="Предыдущая неделя">&larr;</button>
-        <button className="btn btn-small btn-secondary" onClick={goToday} aria-label="Перейти к сегодня">Сегодня</button>
-        <button className="btn btn-small btn-secondary" onClick={() => navigate(1)} aria-label="Следующая неделя">&rarr;</button>
+        <button className="btn btn-small btn-secondary" onClick={() => navigate(-1)} aria-label="Previous week">&larr;</button>
+        <button className="btn btn-small btn-secondary" onClick={goToday} aria-label="Go to today">Today</button>
+        <button className="btn btn-small btn-secondary" onClick={() => navigate(1)} aria-label="Next week">&rarr;</button>
         <span className="absence-timeline-range">
           {formatDateShort(startDate)} — {formatDateShort(endDate)}
         </span>
@@ -187,7 +187,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
         {/* Left panel */}
         <div className="absence-timeline-left" style={{ width: LEFT_PANEL_WIDTH }}>
           <div className="absence-timeline-left-header" style={{ height: HEADER_HEIGHT }}>
-            Участник
+            Member
           </div>
           {members.map(m => (
             <div key={m.id} className="absence-timeline-member" style={{ height: ROW_HEIGHT }}>
@@ -217,7 +217,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
                 <button
                   className="absence-add-btn"
                   onClick={() => handleAddAbsence(m.id)}
-                  title="Добавить отсутствие"
+                  title="Add absence"
                 >
                   +
                 </button>
@@ -365,7 +365,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
         absence={editingAbsence}
       />
 
-      {loading && <div className="absence-loading">Загрузка...</div>}
+      {loading && <div className="absence-loading">Loading...</div>}
       {fetchError && (
         <div style={{ marginTop: 8, padding: '8px 12px', background: '#ffebe6', color: '#de350b', borderRadius: 4, fontSize: 13 }}>
           {fetchError}

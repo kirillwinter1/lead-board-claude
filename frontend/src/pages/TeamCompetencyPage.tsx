@@ -65,11 +65,11 @@ export function TeamCompetencyPage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
-            <h1>Матрица компетенций</h1>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
+            <h1>Competency Matrix</h1>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b778c' }}>Загрузка...</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#6b778c' }}>Loading...</div>
       </main>
     )
   }
@@ -79,11 +79,11 @@ export function TeamCompetencyPage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
-            <h1>Матрица компетенций</h1>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
+            <h1>Competency Matrix</h1>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#de350b' }}>Ошибка загрузки</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#de350b' }}>Load error</div>
       </main>
     )
   }
@@ -94,8 +94,8 @@ export function TeamCompetencyPage() {
     <main className="main-content">
       <div className="page-header">
         <div className="page-header-left">
-          <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
-          <h1>Матрица компетенций</h1>
+          <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
+          <h1>Competency Matrix</h1>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export function TeamCompetencyPage() {
               <span>{severityIcon(alert.severity)}</span>
               <span>{alert.componentName}</span>
               <span style={{ opacity: 0.7 }}>
-                {alert.severity === 'CRITICAL' ? 'нет экспертов' : `1 эксперт: ${alert.experts[0]}`}
+                {alert.severity === 'CRITICAL' ? 'no experts' : `1 expert: ${alert.experts[0]}`}
               </span>
             </div>
           ))}
@@ -132,7 +132,7 @@ export function TeamCompetencyPage() {
           background: 'white', border: '1px solid #dfe1e6', borderRadius: 8,
           padding: 40, textAlign: 'center', color: '#6b778c',
         }}>
-          Нет компонентов. Синхронизируйте проект с Jira, чтобы компоненты появились.
+          No components. Sync project with Jira to make components appear.
         </div>
       ) : (
         <div style={{ background: 'white', border: '1px solid #dfe1e6', borderRadius: 8, overflow: 'auto' }}>
@@ -145,7 +145,7 @@ export function TeamCompetencyPage() {
                   background: '#fafbfc', borderBottom: '1px solid #ebecf0',
                   position: 'sticky', left: 0, zIndex: 2,
                 }}>
-                  Участник
+                  Member
                 </th>
                 {matrix.components.map(comp => (
                   <th key={comp} style={{

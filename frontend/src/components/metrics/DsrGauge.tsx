@@ -1,4 +1,5 @@
 import GaugeComponent from 'react-gauge-component'
+import { DSR_GREEN, DSR_YELLOW, DSR_RED, getDsrColor } from '../../constants/colors'
 import './MetricCard.css'
 
 interface DsrGaugeProps {
@@ -8,16 +9,7 @@ interface DsrGaugeProps {
   tooltip?: string
 }
 
-function getValueColor(v: number): string {
-  if (v <= 1.1) return '#36B37E'
-  if (v <= 1.5) return '#FFAB00'
-  return '#FF5630'
-}
-
-const DEFAULT_TOOLTIP = `DSR — относительная скорость доставки эпика.
-Формула: (рабочие дни − дни паузы) / оценка в днях.
-1.0 — норма, < 1.0 — быстрее, > 1.0 — медленнее.
-Пауза (флаг на эпике) останавливает таймер DSR.`
+const DEFAULT_TOOLTIP = `DSR — delivery speed ratio for an epic.\nFormula: (working days − pause days) / estimate in days.\n1.0 = on target, < 1.0 = faster, > 1.0 = slower.\nPause (flag on epic) stops the DSR timer.`
 
 export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: DsrGaugeProps) {
   return (
@@ -35,7 +27,7 @@ export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: 
             <GaugeComponent
               type="semicircle"
               arc={{
-                colorArray: ['#36B37E', '#FFAB00', '#FF5630'],
+                colorArray: [DSR_GREEN, DSR_YELLOW, DSR_RED],
                 subArcs: [
                   { limit: 1.1 },
                   { limit: 1.5 },
@@ -58,7 +50,7 @@ export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: 
               }}
             />
           </div>
-          <div className="dsr-gauge-value" style={{ color: getValueColor(value) }}>
+          <div className="dsr-gauge-value" style={{ color: getDsrColor(value) }}>
             {value.toFixed(2)}
           </div>
           <div className="metric-card-subtitle">{subtitle}</div>
@@ -66,7 +58,7 @@ export function DsrGauge({ value, title, subtitle, tooltip = DEFAULT_TOOLTIP }: 
       ) : (
         <>
           <div className="metric-card-value">—</div>
-          <div className="metric-card-subtitle">нет данных</div>
+          <div className="metric-card-subtitle">no data</div>
         </>
       )}
     </div>

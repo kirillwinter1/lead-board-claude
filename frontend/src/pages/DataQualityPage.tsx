@@ -3,6 +3,10 @@ import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../components/board/helpers'
+import { getStatusStyles, type StatusStyle } from '../api/board'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { StatusBadge } from '../components/board/StatusBadge'
+import { SeverityBadge, SEVERITY_COLORS } from '../components/SeverityBadge'
 import { FilterBar } from '../components/FilterBar'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { FilterChip } from '../components/FilterChips'
@@ -45,65 +49,38 @@ interface Team {
   color: string | null
 }
 
-// Human-readable Russian names for rules
+// Human-readable English names for rules
 const ruleLabels: Record<string, string> = {
-  TIME_LOGGED_WRONG_EPIC_STATUS: 'Списание времени при неверном статусе эпика',
-  TIME_LOGGED_NOT_IN_SUBTASK: 'Время списано не в подзадачу',
-  CHILD_IN_PROGRESS_EPIC_NOT: 'Дочерняя задача в работе, эпик — нет',
-  SUBTASK_IN_PROGRESS_STORY_NOT: 'Подзадача в работе, стори — нет',
-  EPIC_NO_ESTIMATE: 'Эпик без оценки',
-  SUBTASK_NO_ESTIMATE: 'Подзадача без оценки',
-  SUBTASK_WORK_NO_ESTIMATE: 'Списано время без оценки',
-  SUBTASK_OVERRUN: 'Превышение оценки подзадачи',
-  EPIC_NO_TEAM: 'Эпик без команды',
-  EPIC_TEAM_NO_MEMBERS: 'Команда эпика без участников',
-  EPIC_NO_DUE_DATE: 'Эпик без дедлайна',
-  EPIC_OVERDUE: 'Эпик просрочен',
-  EPIC_FORECAST_LATE: 'Прогноз позже дедлайна',
-  EPIC_DONE_OPEN_CHILDREN: 'Эпик закрыт, есть открытые дочерние',
-  STORY_DONE_OPEN_CHILDREN: 'Стори закрыта, есть открытые подзадачи',
-  EPIC_IN_PROGRESS_NO_STORIES: 'Эпик в работе без сторей',
-  STORY_IN_PROGRESS_NO_SUBTASKS: 'Стори в работе без подзадач',
-  STORY_NO_SUBTASK_ESTIMATES: 'Стори без оценок в подзадачах',
-  STORY_BLOCKED_BY_MISSING: 'Блокировщик не найден',
-  STORY_CIRCULAR_DEPENDENCY: 'Циклическая зависимость',
-  STORY_BLOCKED_NO_PROGRESS: 'Блокировка без прогресса >30 дней',
-  SUBTASK_DONE_NO_TIME_LOGGED: 'Подзадача закрыта без списания времени',
-  SUBTASK_TIME_LOGGED_BUT_TODO: 'Списано время, но подзадача в TODO',
-  BUG_SLA_BREACH: 'Баг превысил SLA',
-  BUG_STALE: 'Баг без обновлений >14 дней',
-  STORY_FULLY_LOGGED_NOT_DONE: 'Всё время списано, но эпик не закрыт',
+  TIME_LOGGED_WRONG_EPIC_STATUS: 'Time logged on wrong epic status',
+  TIME_LOGGED_NOT_IN_SUBTASK: 'Time logged not in subtask',
+  CHILD_IN_PROGRESS_EPIC_NOT: 'Child in progress, epic is not',
+  SUBTASK_IN_PROGRESS_STORY_NOT: 'Subtask in progress, story is not',
+  EPIC_NO_ESTIMATE: 'Epic without estimate',
+  SUBTASK_NO_ESTIMATE: 'Subtask without estimate',
+  SUBTASK_WORK_NO_ESTIMATE: 'Time logged without estimate',
+  SUBTASK_OVERRUN: 'Subtask estimate exceeded',
+  EPIC_NO_TEAM: 'Epic without team',
+  EPIC_TEAM_NO_MEMBERS: 'Epic team has no members',
+  EPIC_NO_DUE_DATE: 'Epic without due date',
+  EPIC_OVERDUE: 'Epic overdue',
+  EPIC_FORECAST_LATE: 'Forecast later than due date',
+  EPIC_DONE_OPEN_CHILDREN: 'Epic done, has open children',
+  STORY_DONE_OPEN_CHILDREN: 'Story done, has open subtasks',
+  EPIC_IN_PROGRESS_NO_STORIES: 'Epic in progress without stories',
+  STORY_IN_PROGRESS_NO_SUBTASKS: 'Story in progress without subtasks',
+  STORY_NO_SUBTASK_ESTIMATES: 'Story without subtask estimates',
+  STORY_BLOCKED_BY_MISSING: 'Blocker not found',
+  STORY_CIRCULAR_DEPENDENCY: 'Circular dependency',
+  STORY_BLOCKED_NO_PROGRESS: 'Blocked without progress >30 days',
+  SUBTASK_DONE_NO_TIME_LOGGED: 'Subtask done without time logged',
+  SUBTASK_TIME_LOGGED_BUT_TODO: 'Time logged but subtask in TODO',
+  BUG_SLA_BREACH: 'Bug SLA breach',
+  BUG_STALE: 'Bug stale >14 days',
+  STORY_FULLY_LOGGED_NOT_DONE: 'All time logged but epic not done',
 }
 
 function getRuleLabel(rule: string): string {
   return ruleLabels[rule] || rule
-}
-
-// Severity badge colors
-const severityColors: Record<string, { bg: string; text: string; border: string }> = {
-  ERROR: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },
-  WARNING: { bg: '#fef3c7', text: '#d97706', border: '#fcd34d' },
-  INFO: { bg: '#f3f4f6', text: '#6b7280', border: '#d1d5db' }
-}
-
-function SeverityBadge({ severity }: { severity: string }) {
-  const colors = severityColors[severity] || severityColors.INFO
-  return (
-    <span
-      className="severity-badge"
-      style={{
-        backgroundColor: colors.bg,
-        color: colors.text,
-        border: `1px solid ${colors.border}`,
-        padding: '2px 8px',
-        borderRadius: '4px',
-        fontSize: '11px',
-        fontWeight: 500
-      }}
-    >
-      {severity}
-    </span>
-  )
 }
 
 function SummaryCard({ title, value, color }: { title: string; value: number; color: string }) {
@@ -147,7 +124,7 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
           </span>
         </td>
         <td className="cell-summary">{issue.summary}</td>
-        <td className="cell-status">{issue.status}</td>
+        <td className="cell-status"><StatusBadge status={issue.status} /></td>
         <td className="cell-severity">
           <SeverityBadge severity={maxSeverity} />
         </td>
@@ -174,6 +151,7 @@ export function DataQualityPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
   const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set(['ERROR', 'WARNING', 'INFO']))
 
   // Sync teamId with URL
@@ -221,6 +199,10 @@ export function DataQualityPage() {
   }, [fetchTeams])
 
   useEffect(() => {
+    getStatusStyles().then(setStatusStyles).catch(() => {})
+  }, [])
+
+  useEffect(() => {
     fetchData()
   }, [fetchData])
 
@@ -260,9 +242,9 @@ export function DataQualityPage() {
 
   const formatDate = (isoString: string): string => {
     const date = new Date(isoString)
-    return date.toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -304,7 +286,7 @@ export function DataQualityPage() {
         result.push({
           category: 'Hidden',
           value: `Hide ${s}`,
-          color: severityColors[s]?.text,
+          color: SEVERITY_COLORS[s]?.text,
           onRemove: () => toggleSeverity(s),
         })
       }
@@ -319,22 +301,23 @@ export function DataQualityPage() {
   }
 
   return (
+    <StatusStylesProvider value={statusStyles}>
     <div className="data-quality-page">
       <FilterBar
         chips={chips}
         onClearAll={clearAllFilters}
         trailing={
           <button className="btn btn-primary btn-refresh" onClick={fetchData} disabled={loading}>
-            {loading ? 'Загрузка...' : 'Обновить'}
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
         }
       >
         <SingleSelectDropdown
-          label="Команда"
+          label="Team"
           options={teamOptions}
           selected={selectedTeamId ? String(selectedTeamId) : null}
           onChange={v => setSelectedTeamId(v ? Number(v) : null)}
-          placeholder="Все команды"
+          placeholder="All teams"
         />
 
         <div className="filter-checkboxes" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -344,9 +327,9 @@ export function DataQualityPage() {
               className={`btn btn-sm btn-toggle ${severityFilter.has(severity) ? 'btn-toggle-active' : ''}`}
               onClick={() => toggleSeverity(severity)}
               style={severityFilter.has(severity) ? {
-                backgroundColor: severityColors[severity]?.bg,
-                borderColor: severityColors[severity]?.border,
-                color: severityColors[severity]?.text,
+                backgroundColor: SEVERITY_COLORS[severity]?.bg,
+                borderColor: SEVERITY_COLORS[severity]?.border,
+                color: SEVERITY_COLORS[severity]?.text,
               } : undefined}
             >
               {severity}
@@ -355,38 +338,38 @@ export function DataQualityPage() {
         </div>
 
         <SingleSelectDropdown
-          label="Правило"
+          label="Rule"
           options={ruleOptions}
           selected={ruleFilter}
           onChange={v => setRuleFilter(v)}
-          placeholder="Все правила"
+          placeholder="All rules"
         />
       </FilterBar>
 
       <main className="main-content">
-        {loading && <div className="loading">Загрузка отчёта...</div>}
-        {error && <div className="error">Ошибка: {error}</div>}
+        {loading && <div className="loading">Loading report...</div>}
+        {error && <div className="error">Error: {error}</div>}
 
         {!loading && !error && data && (
           <>
             <div className="summary-cards">
-              <SummaryCard title="Всего задач" value={data.summary.totalIssues} color="#6b7280" />
-              <SummaryCard title="Ошибки" value={data.summary.issuesWithErrors} color="#dc2626" />
-              <SummaryCard title="Предупреждения" value={data.summary.issuesWithWarnings} color="#d97706" />
-              <SummaryCard title="Информация" value={data.summary.issuesWithInfo} color="#9ca3af" />
+              <SummaryCard title="Total Issues" value={data.summary.totalIssues} color="#6b7280" />
+              <SummaryCard title="Errors" value={data.summary.issuesWithErrors} color="#dc2626" />
+              <SummaryCard title="Warnings" value={data.summary.issuesWithWarnings} color="#d97706" />
+              <SummaryCard title="Info" value={data.summary.issuesWithInfo} color="#9ca3af" />
             </div>
 
             <div className="report-meta">
-              Сформировано: {formatDate(data.generatedAt)}
+              Generated: {formatDate(data.generatedAt)}
               {' | '}
-              Показано {filteredViolations.length} из {data.violations.length} задач
+              Showing {filteredViolations.length} of {data.violations.length} issues
             </div>
 
             {filteredViolations.length === 0 ? (
               <div className="empty">
                 {data.violations.length === 0
-                  ? 'Проблем с качеством данных не найдено!'
-                  : 'Нет задач, соответствующих фильтрам'}
+                  ? 'No data quality issues found!'
+                  : 'No issues matching filters'}
               </div>
             ) : (
               <div className="violations-table-container">
@@ -394,12 +377,12 @@ export function DataQualityPage() {
                   <thead>
                     <tr>
                       <th className="th-expand"></th>
-                      <th className="th-key">КЛЮЧ</th>
-                      <th className="th-type">ТИП</th>
-                      <th className="th-summary">НАЗВАНИЕ</th>
-                      <th className="th-status">СТАТУС</th>
-                      <th className="th-severity">КРИТИЧНОСТЬ</th>
-                      <th className="th-count">ПРОБЛЕМЫ</th>
+                      <th className="th-key">KEY</th>
+                      <th className="th-type">TYPE</th>
+                      <th className="th-summary">SUMMARY</th>
+                      <th className="th-status">STATUS</th>
+                      <th className="th-severity">SEVERITY</th>
+                      <th className="th-count">ISSUES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -414,5 +397,6 @@ export function DataQualityPage() {
         )}
       </main>
     </div>
+    </StatusStylesProvider>
   )
 }

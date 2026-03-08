@@ -14,6 +14,11 @@ import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../board/helpers'
 import { StatusBadge } from '../board/StatusBadge'
 import { useStatusStyles } from '../board/StatusStylesContext'
+import {
+  DSR_GREEN, DSR_YELLOW, DSR_RED, ESTIMATE_BLUE, FLAGGED_GREY,
+  getDsrColor, TEXT_PRIMARY, TEXT_MUTED, TEXT_DISABLED, TEXT_SECONDARY,
+  CHART_AXIS, CHART_GRID, CHART_TOOLTIP_BG
+} from '../../constants/colors'
 
 interface DsrBreakdownChartProps {
   epics: EpicDsr[]
@@ -33,26 +38,13 @@ interface ChartRow {
   statusColor: string | null
 }
 
-const DSR_GREEN = '#36B37E'
-const DSR_YELLOW = '#FFAB00'
-const DSR_RED = '#FF5630'
-const ESTIMATE_BLUE = '#4C9AFF'
-const FLAGGED_GREY = '#B3BAC5'
-
-function getDsrColor(dsr: number | null): string {
-  if (dsr === null) return '#6b778c'
-  if (dsr <= 1.1) return DSR_GREEN
-  if (dsr <= 1.5) return DSR_YELLOW
-  return DSR_RED
-}
-
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload?: ChartRow }> }) {
   if (!active || !payload || payload.length === 0) return null
   const row = payload[0]?.payload
   if (!row) return null
   return (
     <div style={{
-      background: '#172b4d',
+      background: CHART_TOOLTIP_BG,
       border: 'none',
       borderRadius: 6,
       padding: '10px 14px',
@@ -66,10 +58,10 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
         <img src={row.iconUrl} alt="" style={{ width: 14, height: 14 }} />
         <span style={{ fontWeight: 600 }}>{row.epicKey}</span>
       </div>
-      <div style={{ color: '#B3BAC5', marginBottom: 6 }}>{row.summary}</div>
+      <div style={{ color: TEXT_DISABLED, marginBottom: 6 }}>{row.summary}</div>
       <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: '#B3BAC5' }}>Status:</span> <StatusBadge status={row.status} color={row.statusColor} />
+          <span style={{ color: TEXT_DISABLED }}>Status:</span> <StatusBadge status={row.status} color={row.statusColor} />
         </div>
         <div style={{ marginTop: 4, display: 'flex', gap: 16 }}>
           <div><span style={{ color: ESTIMATE_BLUE }}>Est:</span> {row.estimate}d</div>
@@ -92,20 +84,24 @@ function getContrastColor(hex: string): string {
   const g = parseInt(c.substring(2, 4), 16)
   const b = parseInt(c.substring(4, 6), 16)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#172b4d' : '#ffffff'
+  return luminance > 0.6 ? TEXT_PRIMARY : '#ffffff'
 }
 
-// Custom Y-axis tick matching Timeline's compact label style
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function CustomYTick({ x, y, payload, chartData, jiraBaseUrl }: any) {
-  const _chartData = chartData as ChartRow[]
-  const _jiraBaseUrl = jiraBaseUrl as string | undefined
+interface CustomYTickProps {
+  x: number
+  y: number
+  payload: { index: number }
+  chartData: ChartRow[]
+  jiraBaseUrl: string | undefined
+}
+
+function CustomYTick({ x, y, payload, chartData, jiraBaseUrl }: CustomYTickProps) {
   const index = payload?.index ?? 0
-  const row = _chartData[index]
+  const row = chartData[index]
   if (!row) return <g />
 
-  const badgeBg = row.statusColor || '#dfe1e6'
-  const badgeText = row.statusColor ? getContrastColor(row.statusColor) : '#42526e'
+  const badgeBg = row.statusColor || CHART_AXIS
+  const badgeText = row.statusColor ? getContrastColor(row.statusColor) : TEXT_SECONDARY
 
   const maxSummary = 38
   const shortSummary = row.summary.length > maxSummary
@@ -118,14 +114,14 @@ function CustomYTick({ x, y, payload, chartData, jiraBaseUrl }: any) {
     <g transform={`translate(${x},${y})`}>
       <foreignObject x={-labelWidth} y={-22} width={labelWidth - 10} height={44}>
         <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: _jiraBaseUrl ? 'pointer' : 'default' }}
-          onClick={() => _jiraBaseUrl && window.open(`${_jiraBaseUrl}${row.epicKey}`, '_blank', 'noopener,noreferrer')}
+          style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: jiraBaseUrl ? 'pointer' : 'default' }}
+          onClick={() => jiraBaseUrl && window.open(`${jiraBaseUrl}${row.epicKey}`, '_blank', 'noopener,noreferrer')}
         >
           {/* Row 1: Icon + Key + indicator | Status badge */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <img src={row.iconUrl} alt="" style={{ width: 16, height: 16 }} />
-              <span style={{ fontWeight: 600, fontSize: 12, color: '#172b4d' }}>{row.epicKey}</span>
+              <span style={{ fontWeight: 600, fontSize: 12, color: TEXT_PRIMARY }}>{row.epicKey}</span>
             </div>
             <span style={{
               backgroundColor: badgeBg,
@@ -140,7 +136,7 @@ function CustomYTick({ x, y, payload, chartData, jiraBaseUrl }: any) {
             </span>
           </div>
           {/* Row 2: Summary */}
-          <div style={{ fontSize: 11, color: '#6b778c', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: 11, color: TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {shortSummary}
           </div>
         </div>
@@ -172,12 +168,12 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
 
   if (chartData.length === 0) {
     return (
-      <div style={{ background: 'white', borderRadius: 8, border: '1px solid #dfe1e6', padding: 20 }}>
-        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#172b4d' }}>
-          DSR: оценка vs факт
+      <div style={{ background: 'white', borderRadius: 8, border: `1px solid ${CHART_AXIS}`, padding: 20 }}>
+        <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: TEXT_PRIMARY }}>
+          DSR: Estimate vs Actual
         </h3>
-        <div style={{ color: '#6b778c', textAlign: 'center', padding: '24px 0' }}>
-          Нет эпиков с оценками за выбранный период.
+        <div style={{ color: TEXT_MUTED, textAlign: 'center', padding: '24px 0' }}>
+          No epics with estimates for the selected period.
         </div>
       </div>
     )
@@ -209,8 +205,7 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
     )
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleBarClick = (data: any) => {
+  const handleBarClick = (data: { payload?: ChartRow; epicKey?: string }) => {
     const epicKey = data?.payload?.epicKey || data?.epicKey
     if (jiraBaseUrl && epicKey) {
       window.open(`${jiraBaseUrl}${epicKey}`, '_blank', 'noopener,noreferrer')
@@ -218,13 +213,13 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
   }
 
   return (
-    <div style={{ background: 'white', borderRadius: 8, border: '1px solid #dfe1e6', padding: 20 }}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: '#172b4d' }}>
-        DSR: оценка vs факт
+    <div style={{ background: 'white', borderRadius: 8, border: `1px solid ${CHART_AXIS}`, padding: 20 }}>
+      <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: TEXT_PRIMARY }}>
+        DSR: Estimate vs Actual
       </h3>
-      <p style={{ margin: '0 0 16px', fontSize: 12, color: '#6b778c' }}>
-        DSR = эффективные дни / оценка.{' '}
-        <span style={{ color: DSR_GREEN, fontWeight: 600 }}>&#9632;</span> &le; 1.1 (в срок),{' '}
+      <p style={{ margin: '0 0 16px', fontSize: 12, color: TEXT_MUTED }}>
+        DSR = effective days / estimate.{' '}
+        <span style={{ color: DSR_GREEN, fontWeight: 600 }}>&#9632;</span> &le; 1.1 (on time),{' '}
         <span style={{ color: DSR_YELLOW, fontWeight: 600 }}>&#9632;</span> &le; 1.5,{' '}
         <span style={{ color: DSR_RED, fontWeight: 600 }}>&#9632;</span> &gt; 1.5.
       </p>
@@ -239,11 +234,11 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
         >
           <XAxis
             type="number"
-            tick={{ fontSize: 11, fill: '#6b778c' }}
+            tick={{ fontSize: 11, fill: TEXT_MUTED }}
             tickLine={false}
-            axisLine={{ stroke: '#dfe1e6' }}
+            axisLine={{ stroke: CHART_AXIS }}
             domain={[0, Math.ceil(maxValue * 1.15)]}
-            label={{ value: 'Days', position: 'insideBottomRight', offset: -5, fontSize: 11, fill: '#6b778c' }}
+            label={{ value: 'Days', position: 'insideBottomRight', offset: -5, fontSize: 11, fill: TEXT_MUTED }}
           />
           <YAxis
             type="category"
@@ -263,7 +258,7 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
           {/* Estimate bar (blue) */}
           <Bar
             dataKey="estimate"
-            name="Оценка"
+            name="Estimate"
             fill={ESTIMATE_BLUE}
             radius={[0, 3, 3, 0]}
             barSize={12}
@@ -274,7 +269,7 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
           {/* Effective working days bar (colored by DSR) */}
           <Bar
             dataKey="effective"
-            name="Факт"
+            name="Actual"
             radius={[0, 3, 3, 0]}
             barSize={12}
             label={renderDsrLabel}
@@ -289,7 +284,7 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
           {/* Flagged/pause days bar */}
           <Bar
             dataKey="flagged"
-            name="Пауза"
+            name="Pause"
             fill={FLAGGED_GREY}
             radius={[0, 3, 3, 0]}
             barSize={12}
@@ -305,16 +300,16 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
         gap: 20,
         marginTop: 4,
         paddingTop: 8,
-        borderTop: '1px solid #ebecf0',
+        borderTop: `1px solid ${CHART_GRID}`,
         fontSize: 12,
-        color: '#42526e'
+        color: TEXT_SECONDARY
       }}>
         {[
-          { color: ESTIMATE_BLUE, label: 'Оценка' },
-          { color: DSR_GREEN, label: 'Факт (в срок)' },
-          { color: DSR_YELLOW, label: 'Факт (умеренно)' },
-          { color: DSR_RED, label: 'Факт (медленно)' },
-          { color: FLAGGED_GREY, label: 'Пауза', opacity: 0.6 },
+          { color: ESTIMATE_BLUE, label: 'Estimate' },
+          { color: DSR_GREEN, label: 'Actual (on time)' },
+          { color: DSR_YELLOW, label: 'Actual (moderate)' },
+          { color: DSR_RED, label: 'Actual (slow)' },
+          { color: FLAGGED_GREY, label: 'Pause', opacity: 0.6 },
         ].map(item => (
           <span key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: 2, background: item.color, opacity: item.opacity ?? 1 }} />

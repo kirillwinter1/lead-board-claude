@@ -1,4 +1,3 @@
-import { isEpic } from './helpers'
 import { EpicRoleChip } from './EpicRoleChip'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { RoleMetrics, RoleChipsProps } from './types'
@@ -27,7 +26,7 @@ function RoleChip({ label, metrics, roleColor }: { label: string; metrics: RoleM
 }
 
 export function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProps) {
-  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, isEpic } = useWorkflowConfig()
   const roleProgress = node.roleProgress
   const roleCodes = getRoleCodes()
 

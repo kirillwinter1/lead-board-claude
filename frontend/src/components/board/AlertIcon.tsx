@@ -23,9 +23,9 @@ export function AlertIcon({ node }: { node: BoardNode }) {
 
   // Severity labels
   const severityLabels: Record<string, string> = {
-    ERROR: 'ОШИБКА',
-    WARNING: 'ПРЕДУПРЕЖДЕНИЕ',
-    INFO: 'ИНФО'
+    ERROR: 'ERROR',
+    WARNING: 'WARNING',
+    INFO: 'INFO'
   }
 
   // Severity icons
@@ -35,36 +35,36 @@ export function AlertIcon({ node }: { node: BoardNode }) {
     INFO: '🔵'
   }
 
-  // Human-readable Russian rule names
+  // Human-readable rule names
   const ruleLabels: Record<string, string> = {
-    TIME_LOGGED_WRONG_EPIC_STATUS: 'Списание времени при неверном статусе эпика',
-    TIME_LOGGED_NOT_IN_SUBTASK: 'Время списано не в подзадачу',
-    CHILD_IN_PROGRESS_EPIC_NOT: 'Дочерняя задача в работе, эпик — нет',
-    SUBTASK_IN_PROGRESS_STORY_NOT: 'Подзадача в работе, стори — нет',
-    EPIC_NO_ESTIMATE: 'Эпик без оценки',
-    SUBTASK_NO_ESTIMATE: 'Подзадача без оценки',
-    SUBTASK_WORK_NO_ESTIMATE: 'Списано время без оценки',
-    SUBTASK_OVERRUN: 'Превышение оценки подзадачи',
-    EPIC_NO_TEAM: 'Эпик без команды',
-    EPIC_TEAM_NO_MEMBERS: 'Команда эпика без участников',
-    EPIC_NO_DUE_DATE: 'Эпик без дедлайна',
-    EPIC_OVERDUE: 'Эпик просрочен',
-    EPIC_FORECAST_LATE: 'Прогноз позже дедлайна',
-    EPIC_DONE_OPEN_CHILDREN: 'Эпик закрыт, есть открытые дочерние',
-    STORY_DONE_OPEN_CHILDREN: 'Стори закрыта, есть открытые подзадачи',
-    EPIC_IN_PROGRESS_NO_STORIES: 'Эпик в работе без сторей',
-    STORY_IN_PROGRESS_NO_SUBTASKS: 'Стори в работе без подзадач',
-    STORY_NO_SUBTASK_ESTIMATES: 'Стори без оценок в подзадачах',
-    STORY_BLOCKED_BY_MISSING: 'Блокировщик не найден',
-    STORY_CIRCULAR_DEPENDENCY: 'Циклическая зависимость',
-    STORY_BLOCKED_NO_PROGRESS: 'Блокировка без прогресса >30 дней',
-    SUBTASK_DONE_NO_TIME_LOGGED: 'Подзадача закрыта без списания времени',
-    SUBTASK_TIME_LOGGED_BUT_TODO: 'Списано время, но подзадача в TODO',
-    SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED: 'Списано время, но эпик приостановлен',
-    RICE_MISSING_ASSESSMENT: 'Нет RICE-оценки',
-    BUG_SLA_BREACH: 'Баг превысил SLA',
-    BUG_STALE: 'Баг без обновлений >14 дней',
-    STORY_FULLY_LOGGED_NOT_DONE: 'Всё время списано, но задача не закрыта',
+    TIME_LOGGED_WRONG_EPIC_STATUS: 'Time logged on wrong epic status',
+    TIME_LOGGED_NOT_IN_SUBTASK: 'Time logged not in a subtask',
+    CHILD_IN_PROGRESS_EPIC_NOT: 'Child issue in progress, epic is not',
+    SUBTASK_IN_PROGRESS_STORY_NOT: 'Subtask in progress, story is not',
+    EPIC_NO_ESTIMATE: 'Epic without estimate',
+    SUBTASK_NO_ESTIMATE: 'Subtask without estimate',
+    SUBTASK_WORK_NO_ESTIMATE: 'Time logged without estimate',
+    SUBTASK_OVERRUN: 'Subtask estimate exceeded',
+    EPIC_NO_TEAM: 'Epic without team',
+    EPIC_TEAM_NO_MEMBERS: 'Epic team has no members',
+    EPIC_NO_DUE_DATE: 'Epic without due date',
+    EPIC_OVERDUE: 'Epic overdue',
+    EPIC_FORECAST_LATE: 'Forecast later than due date',
+    EPIC_DONE_OPEN_CHILDREN: 'Epic closed with open children',
+    STORY_DONE_OPEN_CHILDREN: 'Story closed with open subtasks',
+    EPIC_IN_PROGRESS_NO_STORIES: 'Epic in progress without stories',
+    STORY_IN_PROGRESS_NO_SUBTASKS: 'Story in progress without subtasks',
+    STORY_NO_SUBTASK_ESTIMATES: 'Story without subtask estimates',
+    STORY_BLOCKED_BY_MISSING: 'Blocker not found',
+    STORY_CIRCULAR_DEPENDENCY: 'Circular dependency',
+    STORY_BLOCKED_NO_PROGRESS: 'Blocked with no progress >30 days',
+    SUBTASK_DONE_NO_TIME_LOGGED: 'Subtask closed without time logged',
+    SUBTASK_TIME_LOGGED_BUT_TODO: 'Time logged but subtask is in TODO',
+    SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED: 'Time logged while epic is flagged',
+    RICE_MISSING_ASSESSMENT: 'Missing RICE assessment',
+    BUG_SLA_BREACH: 'Bug exceeded SLA',
+    BUG_STALE: 'Bug with no updates >14 days',
+    STORY_FULLY_LOGGED_NOT_DONE: 'All time logged but issue not closed',
   }
 
   return (
@@ -88,7 +88,7 @@ export function AlertIcon({ node }: { node: BoardNode }) {
           }}
         >
           <div className="alert-tooltip-header">
-            <strong>Проблемы качества данных ({count})</strong>
+            <strong>Data quality issues ({count})</strong>
           </div>
           <div className="alert-tooltip-list">
             {alerts.map((alert, idx) => (

@@ -12,7 +12,7 @@ export const playDropSound = () => {
   oscillator.connect(gainNode)
   gainNode.connect(audioContext.destination)
 
-  // Pop: высокая частота с быстрым падением
+  // Pop: high frequency with fast decay
   oscillator.frequency.setValueAtTime(600, audioContext.currentTime)
   oscillator.frequency.exponentialRampToValueAtTime(150, audioContext.currentTime + 0.08)
 
@@ -23,19 +23,13 @@ export const playDropSound = () => {
   oscillator.stop(audioContext.currentTime + 0.08)
 }
 
+// Fallback icons for when Jira icon URLs are unavailable (e.g. offline, no metadata)
 export const issueTypeIcons: Record<string, string> = {
-  'Эпик': epicIcon,
   'Epic': epicIcon,
-  'История': storyIcon,
   'Story': storyIcon,
-  'Баг': bugIcon,
   'Bug': bugIcon,
-  'Подзадача': subtaskIcon,
   'Sub-task': subtaskIcon,
   'Subtask': subtaskIcon,
-  'Аналитика': subtaskIcon,
-  'Разработка': subtaskIcon,
-  'Тестирование': subtaskIcon,
   'Analytics': subtaskIcon,
   'Development': subtaskIcon,
   'Testing': subtaskIcon,
@@ -44,10 +38,6 @@ export const issueTypeIcons: Record<string, string> = {
 export function getIssueIcon(issueType: string, jiraIconUrl?: string | null): string {
   if (jiraIconUrl) return jiraIconUrl
   return issueTypeIcons[issueType] || storyIcon
-}
-
-export function isEpic(issueType: string): boolean {
-  return issueType === 'Epic' || issueType === 'Эпик'
 }
 
 // Format number compactly: no decimal for >= 100, one decimal otherwise

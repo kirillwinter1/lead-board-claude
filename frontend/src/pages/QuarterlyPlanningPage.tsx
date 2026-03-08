@@ -14,6 +14,7 @@ import {
   ProjectViewDto,
   EpicDemandDto,
 } from '../api/quarterlyPlanning'
+import { ProjectDto } from '../api/projects'
 import './QuarterlyPlanningPage.css'
 
 interface Team {
@@ -60,11 +61,11 @@ export function QuarterlyPlanningPage() {
   useEffect(() => {
     Promise.all([
       axios.get<Team[]>('/api/teams'),
-      axios.get<ProjectOption[]>('/api/projects'),
+      axios.get<ProjectDto[]>('/api/projects'),
       quarterlyPlanningApi.getAvailableQuarters(),
     ]).then(([teamsRes, projectsRes, quarters]) => {
       setTeams(teamsRes.data)
-      setProjects(projectsRes.data.map(p => ({ issueKey: (p as any).issueKey || (p as any).key, summary: (p as any).summary || (p as any).name })))
+      setProjects(projectsRes.data.map(p => ({ issueKey: p.issueKey, summary: p.summary })))
       setAvailableQuarters(quarters)
       if (!quarter && quarters.length > 0) {
         // Default to current quarter or first available

@@ -54,7 +54,7 @@ export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: Stor
           </div>
 
           <div className="forecast-tooltip-section">
-            <div className="forecast-tooltip-title">Расписание фаз</div>
+            <div className="forecast-tooltip-title">Phase Schedule</div>
             {Object.entries(storyPlanning.phases).map(([role, phase]) => phase && (
               <div key={role} className="forecast-phase">
                 <span className="phase-label" style={{ color: getRoleColor(role) }}>{role}</span>
@@ -65,13 +65,13 @@ export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: Stor
               </div>
             ))}
             {Object.keys(storyPlanning.phases).length === 0 && (
-              <div className="forecast-phase" style={{ color: '#666' }}>Нет данных о фазах</div>
+              <div className="forecast-phase" style={{ color: '#666' }}>No phase data</div>
             )}
           </div>
 
           {storyPlanning.blockedBy && storyPlanning.blockedBy.length > 0 && (
             <div className="forecast-tooltip-footer" style={{ color: '#de350b' }}>
-              Заблокировано: {storyPlanning.blockedBy.join(', ')}
+              Blocked by: {storyPlanning.blockedBy.join(', ')}
             </div>
           )}
         </div>

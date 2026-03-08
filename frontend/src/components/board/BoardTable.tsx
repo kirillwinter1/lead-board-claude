@@ -321,24 +321,24 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
                 i
                 {showInfoTooltip && (
                   <div className="info-tooltip">
-                    <div className="info-tooltip-title">Прогноз завершения</div>
-                    <p>Дата рассчитывается на основе:</p>
+                    <div className="info-tooltip-title">Completion Forecast</div>
+                    <p>Date is calculated based on:</p>
                     <ul>
-                      <li>Остатка работы по ролям (SA → DEV → QA)</li>
-                      <li>Производительности команды</li>
-                      <li>Производственного календаря</li>
+                      <li>Remaining work by roles (SA → DEV → QA)</li>
+                      <li>Team velocity</li>
+                      <li>Work calendar</li>
                     </ul>
                     <div className="info-tooltip-section">
-                      <strong>Уверенность:</strong>
+                      <strong>Confidence:</strong>
                       <div className="confidence-legend">
-                        <span><span className="confidence-dot high"></span> Высокая — есть оценки</span>
-                        <span><span className="confidence-dot medium"></span> Средняя — частичные оценки</span>
-                        <span><span className="confidence-dot low"></span> Низкая — нет оценок</span>
+                        <span><span className="confidence-dot high"></span> High — estimates available</span>
+                        <span><span className="confidence-dot medium"></span> Medium — partial estimates</span>
+                        <span><span className="confidence-dot low"></span> Low — no estimates</span>
                       </div>
                     </div>
                     <div className="info-tooltip-section">
-                      <strong>Порядок эпиков:</strong>
-                      <p>Перетащите эпик для изменения приоритета. Стрелки показывают рекомендации AutoScore.</p>
+                      <strong>Epic ordering:</strong>
+                      <p>Drag epics to change priority. Arrows show AutoScore recommendations.</p>
                     </div>
                   </div>
                 )}

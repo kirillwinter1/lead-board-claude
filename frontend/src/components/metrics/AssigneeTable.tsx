@@ -1,4 +1,5 @@
 import { AssigneeMetrics } from '../../api/metrics'
+import { getDsrColor, DSR_GREEN, DSR_YELLOW, DSR_RED } from '../../constants/colors'
 import './AssigneeTable.css'
 
 interface AssigneeTableProps {
@@ -16,13 +17,6 @@ export function AssigneeTable({ data }: AssigneeTableProps) {
   }
 
   const sorted = [...data].sort((a, b) => b.issuesClosed - a.issuesClosed)
-
-  const getDsrColor = (dsr: number | null) => {
-    if (dsr === null) return '#6b778c'
-    if (dsr <= 1.1) return '#36B37E'
-    if (dsr <= 1.5) return '#FFAB00'
-    return '#FF5630'
-  }
 
   const getTrendIcon = (trend: string | null) => {
     switch (trend) {
@@ -79,9 +73,9 @@ export function AssigneeTable({ data }: AssigneeTableProps) {
       </table>
       <div className="assignee-table-legend">
         <span className="assignee-legend-item">
-          <strong>DSR</strong>: ≤1.1 <span style={{ color: '#36B37E' }}>good</span>,
-          ≤1.5 <span style={{ color: '#FFAB00' }}>ok</span>,
-          &gt;1.5 <span style={{ color: '#FF5630' }}>slow</span>
+          <strong>DSR</strong>: ≤1.1 <span style={{ color: DSR_GREEN }}>good</span>,
+          ≤1.5 <span style={{ color: DSR_YELLOW }}>ok</span>,
+          &gt;1.5 <span style={{ color: DSR_RED }}>slow</span>
         </span>
         <span className="assignee-legend-item">
           <strong>Trend</strong>:

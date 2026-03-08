@@ -23,6 +23,11 @@ import { RiceScoreBadge } from '../components/rice/RiceScoreBadge'
 import { Modal } from '../components/Modal'
 import { ProjectListSkeleton, GanttSkeleton } from '../components/skeletons'
 import { getApiCache, setApiCache } from '../hooks/useApiCache'
+import {
+  PROGRESS_COMPLETE, PROGRESS_IN_PROGRESS, PROGRESS_TRACK,
+  LINK_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_SUBTLE,
+  BG_SUBTLE, BORDER_DEFAULT, AVATAR_BG,
+} from '../constants/colors'
 import './ProjectTimelinePage.css'
 import './BoardPage.css'
 
@@ -46,12 +51,12 @@ function formatHours(seconds: number | null): string {
 
 function ProgressBar({ percent, width = 100 }: { percent: number; width?: number }) {
   const clampedPercent = Math.max(0, Math.min(percent, 100))
-  const color = clampedPercent >= 100 ? '#36B37E' : '#0065FF'
+  const color = clampedPercent >= 100 ? PROGRESS_COMPLETE : PROGRESS_IN_PROGRESS
   return (
     <div style={{
       width,
       height: 6,
-      background: '#DFE1E6',
+      background: PROGRESS_TRACK,
       borderRadius: 3,
       overflow: 'hidden',
       flexShrink: 0,
@@ -71,7 +76,7 @@ function ProgressBar({ percent, width = 100 }: { percent: number; width?: number
 
 function JiraLink({ issueKey, jiraBaseUrl }: { issueKey: string; jiraBaseUrl: string }) {
   if (!jiraBaseUrl) {
-    return <span style={{ fontSize: 13, color: '#0052CC', fontWeight: 600 }}>{issueKey}</span>
+    return <span style={{ fontSize: 13, color: LINK_COLOR, fontWeight: 600 }}>{issueKey}</span>
   }
   return (
     <a
@@ -79,7 +84,7 @@ function JiraLink({ issueKey, jiraBaseUrl }: { issueKey: string; jiraBaseUrl: st
       target="_blank"
       rel="noopener noreferrer"
       onClick={e => e.stopPropagation()}
-      style={{ fontSize: 13, color: '#0052CC', fontWeight: 600, textDecoration: 'none' }}
+      style={{ fontSize: 13, color: LINK_COLOR, fontWeight: 600, textDecoration: 'none' }}
       onMouseEnter={e => (e.currentTarget.style.textDecoration = 'underline')}
       onMouseLeave={e => (e.currentTarget.style.textDecoration = 'none')}
     >
@@ -95,8 +100,8 @@ function AssigneeBadge({ name, avatarUrl }: { name: string; avatarUrl: string | 
       alignItems: 'center',
       gap: 5,
       fontSize: 12,
-      color: '#42526E',
-      background: '#F4F5F7',
+      color: TEXT_SECONDARY,
+      background: BG_SUBTLE,
       padding: '2px 8px 2px 3px',
       borderRadius: 12,
       whiteSpace: 'nowrap',
@@ -113,7 +118,7 @@ function AssigneeBadge({ name, avatarUrl }: { name: string; avatarUrl: string | 
           width: 20,
           height: 20,
           borderRadius: '50%',
-          background: '#0052CC',
+          background: AVATAR_BG,
           color: '#fff',
           fontSize: 10,
           fontWeight: 600,
@@ -146,7 +151,7 @@ function RecommendationsBlock({ recommendations }: { recommendations: ProjectRec
           <span style={{ flexShrink: 0 }}>
             {r.severity === 'WARNING' ? '\u26A0\uFE0F' : '\u2139\uFE0F'}
           </span>
-          <span style={{ color: '#172B4D' }}>{r.message}</span>
+          <span style={{ color: TEXT_PRIMARY }}>{r.message}</span>
         </div>
       ))}
     </div>
@@ -634,8 +639,8 @@ export function ProjectsPage() {
   if (listProjects.length === 0) {
     return (
       <main className="main-content">
-        <div style={{ padding: 32, textAlign: 'center', color: '#6B778C' }}>
-          <h2 style={{ margin: '0 0 8px', color: '#172B4D' }}>No Projects Found</h2>
+        <div style={{ padding: 32, textAlign: 'center', color: TEXT_MUTED }}>
+          <h2 style={{ margin: '0 0 8px', color: TEXT_PRIMARY }}>No Projects Found</h2>
           <p>Configure a PROJECT issue type in Workflow Config and sync from Jira to see projects here.</p>
         </div>
       </main>
@@ -762,7 +767,7 @@ export function ProjectsPage() {
                     style={{
                       padding: '14px 20px',
                       background: '#fff',
-                      border: '1px solid #DFE1E6',
+                      border: `1px solid ${BORDER_DEFAULT}`,
                       borderRadius: expandedKeys.has(p.issueKey) ? '8px 8px 0 0' : 8,
                       cursor: 'pointer',
                       transition: 'box-shadow 0.15s',
@@ -774,7 +779,7 @@ export function ProjectsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
                       <img src={getIssueIcon(p.issueType, getIssueTypeIconUrl(p.issueType))} alt={p.issueType} style={{ width: 16, height: 16, flexShrink: 0 }} />
                       <JiraLink issueKey={p.issueKey} jiraBaseUrl={jiraBaseUrl} />
-                      <span style={{ flex: 1, fontSize: 14, color: '#172B4D', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ flex: 1, fontSize: 14, color: TEXT_PRIMARY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.summary}
                       </span>
                       {p.assigneeDisplayName && (
@@ -784,7 +789,7 @@ export function ProjectsPage() {
                       <StatusBadge status={p.status} />
                       <span style={{
                         fontSize: 16,
-                        color: '#6B778C',
+                        color: TEXT_MUTED,
                         transform: expandedKeys.has(p.issueKey) ? 'rotate(180deg)' : 'rotate(0)',
                         transition: 'transform 0.2s',
                         flexShrink: 0,
@@ -797,23 +802,23 @@ export function ProjectsPage() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <ProgressBar percent={p.progressPercent} width={120} />
                       {p.totalEstimateSeconds != null && p.totalEstimateSeconds > 0 ? (
-                        <span style={{ fontSize: 12, color: '#42526E', fontWeight: 500 }}>
+                        <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontWeight: 500 }}>
                           {formatHours(p.totalLoggedSeconds)}/{formatHours(p.totalEstimateSeconds)} ({p.progressPercent}%)
                         </span>
                       ) : (
-                        <span style={{ fontSize: 12, color: '#42526E', fontWeight: 500 }}>
+                        <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontWeight: 500 }}>
                           {p.completedEpicCount}/{p.childEpicCount} epics ({p.progressPercent}%)
                         </span>
                       )}
-                      <span style={{ color: '#DFE1E6' }}>|</span>
-                      <span style={{ fontSize: 12, color: '#97A0AF' }}>
+                      <span style={{ color: BORDER_DEFAULT }}>|</span>
+                      <span style={{ fontSize: 12, color: TEXT_SUBTLE }}>
                         {p.completedEpicCount}/{p.childEpicCount} epics
                       </span>
                       {p.expectedDone && (
                         <>
-                          <span style={{ color: '#DFE1E6' }}>|</span>
-                          <span style={{ fontSize: 12, color: '#6B778C' }}>
-                            Done by <strong style={{ color: '#42526E' }}>{formatDate(p.expectedDone)}</strong>
+                          <span style={{ color: BORDER_DEFAULT }}>|</span>
+                          <span style={{ fontSize: 12, color: TEXT_MUTED }}>
+                            Done by <strong style={{ color: TEXT_SECONDARY }}>{formatDate(p.expectedDone)}</strong>
                           </span>
                         </>
                       )}
@@ -827,7 +832,7 @@ export function ProjectsPage() {
                     const recs = recsMap.get(p.issueKey) || []
                     return (
                     <div style={{
-                      border: '1px solid #DFE1E6',
+                      border: `1px solid ${BORDER_DEFAULT}`,
                       borderTop: 'none',
                       borderRadius: '0 0 8px 8px',
                       background: '#FAFBFC',
@@ -836,7 +841,7 @@ export function ProjectsPage() {
                       {det?.description && (
                         <div style={{
                           fontSize: 13,
-                          color: '#42526E',
+                          color: TEXT_SECONDARY,
                           lineHeight: 1.5,
                           marginBottom: 12,
                           paddingBottom: 12,
@@ -847,7 +852,7 @@ export function ProjectsPage() {
                         </div>
                       )}
                       {isLoading ? (
-                        <div style={{ padding: 16, textAlign: 'center', color: '#6B778C', fontSize: 13 }}>
+                        <div style={{ padding: 16, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
                           Loading epics...
                         </div>
                       ) : det && det.epics.length > 0 ? (
@@ -884,7 +889,7 @@ export function ProjectsPage() {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ padding: 16, textAlign: 'center', color: '#6B778C', fontSize: 13 }}>
+                        <div style={{ padding: 16, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
                           No child epics found
                         </div>
                       )}
@@ -896,7 +901,7 @@ export function ProjectsPage() {
                             padding: '6px 14px',
                             fontSize: 13,
                             fontWeight: 500,
-                            color: '#0052CC',
+                            color: LINK_COLOR,
                             background: '#E9F2FF',
                             border: '1px solid #B3D4FF',
                             borderRadius: 4,
@@ -922,8 +927,8 @@ export function ProjectsPage() {
                   maxWidth={680}
                 >
                   <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #EBECF0' }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: '#172B4D' }}>
-                      <span style={{ color: '#0052CC', marginRight: 8 }}>{riceModalKey}</span>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY }}>
+                      <span style={{ color: LINK_COLOR, marginRight: 8 }}>{riceModalKey}</span>
                       {proj?.summary}
                     </div>
                   </div>
@@ -947,7 +952,7 @@ export function ProjectsPage() {
           />
         )}
         {view === 'gantt' && !loading && sortedTimelineProjects.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6B778C', fontSize: 14 }}>
+          <div style={{ padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 14 }}>
             No projects with timeline data
           </div>
         )}

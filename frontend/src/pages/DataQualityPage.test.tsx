@@ -82,18 +82,18 @@ describe('DataQualityPage', () => {
     it('should show loading state initially', () => {
       renderDataQualityPage()
 
-      expect(screen.getByText('Загрузка отчёта...')).toBeInTheDocument()
+      expect(screen.getByText('Loading report...')).toBeInTheDocument()
     })
 
     it('should render summary cards after loading', async () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Всего задач')).toBeInTheDocument()
+        expect(screen.getByText('Total Issues')).toBeInTheDocument()
         expect(screen.getByText('100')).toBeInTheDocument()
-        expect(screen.getByText('Ошибки')).toBeInTheDocument()
+        expect(screen.getByText('Errors')).toBeInTheDocument()
         expect(screen.getByText('5')).toBeInTheDocument()
-        expect(screen.getByText('Предупреждения')).toBeInTheDocument()
+        expect(screen.getByText('Warnings')).toBeInTheDocument()
         expect(screen.getByText('10')).toBeInTheDocument()
       })
     })
@@ -102,12 +102,12 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('КЛЮЧ')).toBeInTheDocument()
-        expect(screen.getByText('ТИП')).toBeInTheDocument()
-        expect(screen.getByText('НАЗВАНИЕ')).toBeInTheDocument()
-        expect(screen.getByText('СТАТУС')).toBeInTheDocument()
-        expect(screen.getByText('КРИТИЧНОСТЬ')).toBeInTheDocument()
-        expect(screen.getByText('ПРОБЛЕМЫ')).toBeInTheDocument()
+        expect(screen.getByText('KEY')).toBeInTheDocument()
+        expect(screen.getByText('TYPE')).toBeInTheDocument()
+        expect(screen.getByText('SUMMARY')).toBeInTheDocument()
+        expect(screen.getByText('STATUS')).toBeInTheDocument()
+        expect(screen.getByText('SEVERITY')).toBeInTheDocument()
+        expect(screen.getByText('ISSUES')).toBeInTheDocument()
       })
     })
   })
@@ -117,7 +117,13 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Все команды')).toBeInTheDocument()
+        expect(screen.getByText('All teams')).toBeInTheDocument()
+      })
+
+      // Open dropdown to see team options
+      fireEvent.click(screen.getByText('All teams'))
+
+      await waitFor(() => {
         expect(screen.getByText('Team A')).toBeInTheDocument()
         expect(screen.getByText('Team B')).toBeInTheDocument()
       })
@@ -127,7 +133,7 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Все правила')).toBeInTheDocument()
+        expect(screen.getByText('All rules')).toBeInTheDocument()
       })
     })
   })
@@ -137,7 +143,7 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Обновить')).toBeInTheDocument()
+        expect(screen.getByText('Refresh')).toBeInTheDocument()
       })
     })
 
@@ -145,10 +151,10 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Обновить')).toBeInTheDocument()
+        expect(screen.getByText('Refresh')).toBeInTheDocument()
       })
 
-      fireEvent.click(screen.getByText('Обновить'))
+      fireEvent.click(screen.getByText('Refresh'))
 
       await waitFor(() => {
         // Should have called API at least twice (initial + refresh)
@@ -201,7 +207,7 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Проблем с качеством данных не найдено!')).toBeInTheDocument()
+        expect(screen.getByText('No data quality issues found!')).toBeInTheDocument()
       })
     })
   })
@@ -221,7 +227,7 @@ describe('DataQualityPage', () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Ошибка: Failed to load')).toBeInTheDocument()
+        expect(screen.getByText('Error: Failed to load')).toBeInTheDocument()
       })
     })
   })
