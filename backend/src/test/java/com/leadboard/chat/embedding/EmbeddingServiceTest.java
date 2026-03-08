@@ -10,7 +10,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,15 +26,13 @@ class EmbeddingServiceTest {
     private EmbeddingService embeddingService;
 
     @BeforeEach
-    void setUp() throws Exception {
+    void setUp() {
         chatProperties = new ChatProperties();
-        embeddingService = new EmbeddingService(chatProperties, issueRepository);
+        embeddingService = new EmbeddingService(chatProperties, issueRepository, null);
     }
 
-    private void injectEmbeddingClient(EmbeddingClient client) throws Exception {
-        Field field = EmbeddingService.class.getDeclaredField("embeddingClient");
-        field.setAccessible(true);
-        field.set(embeddingService, client);
+    private void enableWithClient() {
+        embeddingService = new EmbeddingService(chatProperties, issueRepository, embeddingClient);
     }
 
     @Test
@@ -67,7 +64,7 @@ class EmbeddingServiceTest {
     @DisplayName("generateAndStore generates embedding and stores it")
     void generateAndStore_works() throws Exception {
         chatProperties.setEmbeddingEnabled(true);
-        injectEmbeddingClient(embeddingClient);
+        enableWithClient();
 
         JiraIssueEntity entity = new JiraIssueEntity();
         entity.setId(42L);
@@ -88,7 +85,7 @@ class EmbeddingServiceTest {
     @DisplayName("generateAndStore skips when embedding client returns null")
     void generateAndStore_skipsNullEmbedding() throws Exception {
         chatProperties.setEmbeddingEnabled(true);
-        injectEmbeddingClient(embeddingClient);
+        enableWithClient();
 
         JiraIssueEntity entity = new JiraIssueEntity();
         entity.setId(1L);
@@ -106,7 +103,7 @@ class EmbeddingServiceTest {
     @DisplayName("search returns results from repository")
     void search_returnsResults() throws Exception {
         chatProperties.setEmbeddingEnabled(true);
-        injectEmbeddingClient(embeddingClient);
+        enableWithClient();
 
         float[] queryEmbedding = new float[]{0.1f, 0.2f, 0.3f};
         when(embeddingClient.generateEmbedding("отчётность")).thenReturn(queryEmbedding);
@@ -128,7 +125,7 @@ class EmbeddingServiceTest {
     @DisplayName("search with teamId uses team-filtered query")
     void search_withTeamId() throws Exception {
         chatProperties.setEmbeddingEnabled(true);
-        injectEmbeddingClient(embeddingClient);
+        enableWithClient();
 
         float[] queryEmbedding = new float[]{0.1f, 0.2f};
         when(embeddingClient.generateEmbedding("security")).thenReturn(queryEmbedding);

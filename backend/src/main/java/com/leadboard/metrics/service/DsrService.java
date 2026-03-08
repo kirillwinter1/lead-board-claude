@@ -2,7 +2,6 @@ package com.leadboard.metrics.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.config.entity.WorkflowRoleEntity;
 import com.leadboard.config.service.WorkflowConfigService;
@@ -58,7 +57,8 @@ public class DsrService {
             ForecastSnapshotRepository snapshotRepository,
             WorkflowConfigService workflowConfigService,
             FlagChangelogService flagChangelogService,
-            StatusChangelogRepository statusChangelogRepository
+            StatusChangelogRepository statusChangelogRepository,
+            ObjectMapper objectMapper
     ) {
         this.issueRepository = issueRepository;
         this.workCalendarService = workCalendarService;
@@ -66,8 +66,7 @@ public class DsrService {
         this.workflowConfigService = workflowConfigService;
         this.flagChangelogService = flagChangelogService;
         this.statusChangelogRepository = statusChangelogRepository;
-        this.objectMapper = new ObjectMapper();
-        this.objectMapper.registerModule(new JavaTimeModule());
+        this.objectMapper = objectMapper;
     }
 
     public DsrResponse calculateDsr(Long teamId, LocalDate from, LocalDate to) {

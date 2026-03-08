@@ -55,4 +55,15 @@ public class SimulationController {
                 "running", simulationService.isRunning()
         ));
     }
+
+    // BUG-78/79: Return 400 for validation errors, not 500
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> handleBadRequest(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> handleConflict(IllegalStateException e) {
+        return ResponseEntity.status(409).body(Map.of("error", e.getMessage()));
+    }
 }

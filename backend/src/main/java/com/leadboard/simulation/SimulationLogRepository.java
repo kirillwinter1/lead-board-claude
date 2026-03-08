@@ -23,4 +23,6 @@ public interface SimulationLogRepository extends JpaRepository<SimulationLogEnti
     List<SimulationLogEntity> findByTeamIdAndSimDate(Long teamId, LocalDate simDate);
 
     boolean existsByStatus(String status);
+
+    List<SimulationLogEntity> findByStatus(String status);
 }

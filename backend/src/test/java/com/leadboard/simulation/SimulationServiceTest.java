@@ -1,5 +1,7 @@
 package com.leadboard.simulation;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.leadboard.simulation.dto.SimulationAction;
 import com.leadboard.simulation.dto.SimulationLogDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,12 +35,16 @@ class SimulationServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SimulationService(planner, executor, logRepository);
-
-        // No concurrent runs
-        when(logRepository.existsByStatus("RUNNING")).thenReturn(false);
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        service = new SimulationService(planner, executor, logRepository, objectMapper);
 
         // Save returns the entity as-is (simulate JPA)
+        when(logRepository.saveAndFlush(any())).thenAnswer(inv -> {
+            SimulationLogEntity entity = inv.getArgument(0);
+            if (entity.getId() == null) entity.setId(1L);
+            return entity;
+        });
         when(logRepository.save(any())).thenAnswer(inv -> {
             SimulationLogEntity entity = inv.getArgument(0);
             if (entity.getId() == null) entity.setId(1L);
@@ -98,10 +104,18 @@ class SimulationServiceTest {
 
     @Test
     void runSimulation_concurrentGuard_rejectsSecondRun() {
-        when(logRepository.existsByStatus("RUNNING")).thenReturn(true);
+        // BUG-76: now relies on DB unique index — saveAndFlush throws DataIntegrityViolationException
+        doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate"))
+                .when(logRepository).saveAndFlush(any());
 
         assertThrows(IllegalStateException.class,
                 () -> service.runSimulation(TEAM_ID, SIM_DATE, false));
+    }
+
+    @Test
+    void runSimulation_nullTeamId_throwsIllegalArgument() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.runSimulation(null, SIM_DATE, false));
     }
 
     @Test
@@ -111,9 +125,9 @@ class SimulationServiceTest {
         assertThrows(RuntimeException.class,
                 () -> service.runSimulation(TEAM_ID, SIM_DATE, false));
 
-        // Verify log was updated with FAILED status
+        // Verify log was updated with FAILED status (first save via saveAndFlush, second via save)
         ArgumentCaptor<SimulationLogEntity> captor = ArgumentCaptor.forClass(SimulationLogEntity.class);
-        verify(logRepository, atLeast(2)).save(captor.capture());
+        verify(logRepository, atLeast(1)).save(captor.capture());
 
         SimulationLogEntity lastSave = captor.getAllValues().get(captor.getAllValues().size() - 1);
         assertEquals("FAILED", lastSave.getStatus());

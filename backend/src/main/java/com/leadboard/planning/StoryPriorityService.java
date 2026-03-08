@@ -97,10 +97,8 @@ public class StoryPriorityService {
                     .filter(issue -> !issue.isSubtask())
                     .toList();
         } else {
-            // Recalculate for all stories
-            stories = issueRepository.findAll().stream()
-                    .filter(issue -> !issue.isSubtask() && issue.getParentKey() != null)
-                    .toList();
+            // Recalculate for all stories (only issues with a parent, not subtasks)
+            stories = issueRepository.findByParentKeyIsNotNullAndSubtaskFalse();
         }
 
         int count = 0;

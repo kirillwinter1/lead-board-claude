@@ -77,26 +77,6 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
 
     @Query(value = """
         SELECT
-            assignee_account_id,
-            assignee_display_name,
-            COUNT(*) as issues_closed,
-            AVG(EXTRACT(EPOCH FROM (done_at - jira_created_at)) / 86400.0) as avg_lead_time,
-            AVG(EXTRACT(EPOCH FROM (done_at - COALESCE(started_at, jira_created_at))) / 86400.0) as avg_cycle_time
-        FROM jira_issues
-        WHERE team_id = :teamId
-          AND done_at BETWEEN :from AND :to
-          AND done_at IS NOT NULL
-          AND assignee_account_id IS NOT NULL
-        GROUP BY assignee_account_id, assignee_display_name
-        ORDER BY issues_closed DESC
-        """, nativeQuery = true)
-    List<Object[]> getMetricsByAssignee(
-            @Param("teamId") Long teamId,
-            @Param("from") OffsetDateTime from,
-            @Param("to") OffsetDateTime to);
-
-    @Query(value = """
-        SELECT
             COALESCE(board_category, 'STORY') as category,
             COUNT(*) as count
         FROM jira_issues

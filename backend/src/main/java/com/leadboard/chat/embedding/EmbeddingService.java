@@ -5,7 +5,7 @@ import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,13 +23,14 @@ public class EmbeddingService {
 
     private final ChatProperties chatProperties;
     private final JiraIssueRepository issueRepository;
+    private final EmbeddingClient embeddingClient;
 
-    @Autowired(required = false)
-    private EmbeddingClient embeddingClient;
-
-    public EmbeddingService(ChatProperties chatProperties, JiraIssueRepository issueRepository) {
+    public EmbeddingService(ChatProperties chatProperties,
+                            JiraIssueRepository issueRepository,
+                            @Nullable EmbeddingClient embeddingClient) {
         this.chatProperties = chatProperties;
         this.issueRepository = issueRepository;
+        this.embeddingClient = embeddingClient;
     }
 
     @Async

@@ -8,6 +8,8 @@ import com.leadboard.metrics.entity.StatusChangelogEntity;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,8 +56,10 @@ class DsrServiceTest {
     @BeforeEach
     void setUp() {
         when(workflowConfigService.getRolesInPipelineOrder()).thenReturn(Collections.emptyList());
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
         service = new DsrService(issueRepository, workCalendarService, snapshotRepository,
-                workflowConfigService, flagChangelogService, statusChangelogRepository);
+                workflowConfigService, flagChangelogService, statusChangelogRepository, objectMapper);
     }
 
     @Test

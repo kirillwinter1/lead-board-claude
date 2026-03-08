@@ -295,6 +295,8 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     // ==================== Quarterly Planning ====================
 
+    List<JiraIssueEntity> findByParentKeyIsNotNullAndSubtaskFalse();
+
     List<JiraIssueEntity> findByLabelsIsNotNull();
 
     List<JiraIssueEntity> findByBoardCategoryAndTeamIdOrderByManualOrderAsc(String boardCategory, Long teamId);

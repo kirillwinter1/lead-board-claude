@@ -1,8 +1,9 @@
-# TASK: Fix triggerSync interval leak in useBoardData
+# TASK: Fix triggerSync interval leak in useBoardData — ✅ FIXED
 
 **Priority:** Critical
+**Status:** ✅ FIXED (verified 2026-03-08)
 **Review ID:** C5
-**File:** `frontend/src/hooks/useBoardData.ts:41-62`
+**File:** `frontend/src/hooks/useBoardData.ts`
 
 ## Проблема
 
@@ -28,3 +29,7 @@ useEffect(() => {
 ```
 
 Или использовать AbortController для отмены fetch-запросов.
+
+## Результат верификации
+
+`clearInterval(pollInterval)` корректно вызывается при завершении sync. Утечка интервала не воспроизводится.
