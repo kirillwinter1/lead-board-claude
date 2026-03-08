@@ -1,6 +1,6 @@
 ---
 name: review
-description: Code Review. Анализирует изменения кода — ищет баги, уязвимости, нарушения правил проекта, дублирование. Генерирует отчёт с приоритетами.
+description: Code Review. Analyzes code changes — finds bugs, vulnerabilities, project rule violations, duplication. Generates prioritized report. Use when user asks to review code, check changes, or audit quality.
 argument-hint: "[scope: all, staged, full, file path, or commit range e.g. HEAD~3..HEAD]"
 allowed-tools: Bash, Read, Glob, Grep, Agent
 ---

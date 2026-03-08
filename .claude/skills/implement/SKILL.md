@@ -1,6 +1,7 @@
 ---
-description: Orchestrate full feature implementation — spec, plan, backend, frontend, tests, docs
-argument-hint: [feature-description or spec-path]
+name: implement
+description: Orchestrate full feature implementation — spec, plan, backend, frontend, tests, docs. Use when user asks to implement a new feature, build functionality, or references a feature spec.
+argument-hint: "[feature-description or spec-path]"
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep, Agent, AskUserQuestion, Skill
 ---
 

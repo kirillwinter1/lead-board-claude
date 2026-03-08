@@ -1,6 +1,7 @@
 ---
-description: Find and fix a bug by description or bug number
-argument-hint: [bug-description or BUG-number]
+name: bugfix
+description: Find and fix a bug by description or bug number. Use when user reports a bug, error, or broken functionality.
+argument-hint: "[bug-description or BUG-number]"
 allowed-tools: Read, Edit, Write, Bash, Glob, Grep, Agent, AskUserQuestion
 ---
 

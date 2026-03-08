@@ -1,7 +1,8 @@
 ---
 name: design-system-rules
-description: Lead Board Design System rules and component inventory
+description: Lead Board Design System rules and component inventory. Auto-loaded when building UI components, rendering statuses, teams, icons, or charts.
 user-invocable: false
+disable-model-invocation: false
 ---
 
 # Design System — Component Inventory

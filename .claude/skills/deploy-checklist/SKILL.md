@@ -1,7 +1,8 @@
 ---
 name: deploy-checklist
-description: Production deployment checklist for Lead Board
+description: Production deployment checklist for Lead Board. Auto-loaded during deploy workflows.
 user-invocable: false
+disable-model-invocation: false
 ---
 
 # Deploy Checklist

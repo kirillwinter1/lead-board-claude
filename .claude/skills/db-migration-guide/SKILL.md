@@ -1,7 +1,8 @@
 ---
 name: db-migration-guide
-description: Database migration patterns and conventions for Lead Board
+description: Database migration patterns and conventions for Lead Board. Auto-loaded when creating Flyway migrations or modifying DB schema.
 user-invocable: false
+disable-model-invocation: false
 ---
 
 # Database Migration Guide

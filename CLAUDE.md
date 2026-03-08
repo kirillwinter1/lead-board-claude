@@ -122,16 +122,21 @@ lead-board-claude/
 - `.claude/rules/jira-integration.md` — JiraConfigResolver, no hardcoding
 - `.claude/rules/versioning.md` — F-номера, версии, требования к фичам
 
-## Commands & Skills
+## Skills (slash commands)
 
-| Command | Описание |
-|---------|----------|
-| `/implement` | Оркестратор реализации фичи (spec → plan → backend → frontend → tests) |
-| `/bugfix` | Найти и исправить баг |
-| `/deploy` | Деплой на продакшн |
-| `/sync` | Запуск Jira sync + проверка |
-| `/review` | Code review (diff или full project) |
-| `/qa` | QA тестирование экрана/фичи |
+| Skill | Описание |
+|-------|----------|
+| `/implement` | Оркестратор реализации фичи (spec → plan → backend → frontend → tests → review → QA) |
+| `/bugfix` | Найти и исправить баг по описанию или номеру |
+| `/deploy` | Деплой на продакшн или проверка статуса |
+| `/sync` | Запуск Jira sync + проверка результатов |
+| `/review` | Code review (diff, staged, full project, commit range) |
+| `/qa` | QA тестирование экрана/фичи (API + UI + скриншоты) |
+
+**Background skills** (auto-loaded, not user-invocable):
+- `design-system-rules` — component inventory, helpers, contexts
+- `deploy-checklist` — pre/post deploy checklist
+- `db-migration-guide` — Flyway migration patterns
 
 ## Atlassian OAuth 2.0
 

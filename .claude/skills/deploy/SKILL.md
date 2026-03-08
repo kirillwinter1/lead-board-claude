@@ -1,5 +1,6 @@
 ---
-description: Deploy the application to production server
+name: deploy
+description: Deploy the application to production server. Use when user asks to deploy, push to production, or check production status.
 argument-hint: "[version or 'check' to verify status]"
 allowed-tools: Read, Bash, Agent, AskUserQuestion
 ---

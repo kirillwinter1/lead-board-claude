@@ -1,5 +1,6 @@
 ---
-description: Trigger Jira sync and verify results
+name: sync
+description: Trigger Jira sync and verify results. Use when user asks to sync data from Jira, refresh issues, or check sync status.
 argument-hint: "[optional: team-name or 'full']"
 allowed-tools: Bash, Read
 ---
@@ -7,6 +8,8 @@ allowed-tools: Bash, Read
 # Jira Sync
 
 Trigger a manual Jira sync and verify the results.
+
+**Argument:** $ARGUMENTS
 
 ## Step 1: Check Backend is Running
 

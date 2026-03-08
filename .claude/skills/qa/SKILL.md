@@ -1,8 +1,8 @@
 ---
 name: qa
-description: QA-тестировщик. Запускай после реализации фичи для полного тестирования — составляет план, проверяет тесты, тестирует API и UI, делает скриншоты, генерирует QA-отчёт.
-argument-hint: "[screen или feature, напр. Board, Metrics, F36]"
-allowed-tools: Bash, Read, Glob, Grep, Edit, Write, Task, WebFetch, mcp__playwright__browser_navigate, mcp__playwright__browser_run_code, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_wait_for, mcp__playwright__browser_resize, mcp__playwright__browser_close, mcp__playwright__browser_console_messages
+description: QA tester. Run after feature implementation for full testing — creates test plan, checks tests, tests API and UI, takes screenshots, generates QA report. Use when user asks to test, QA, or verify a screen/feature.
+argument-hint: "[screen or feature, e.g. Board, Metrics, F36]"
+allowed-tools: Bash, Read, Glob, Grep, Edit, Write, WebFetch, mcp__playwright__browser_navigate, mcp__playwright__browser_run_code, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_snapshot, mcp__playwright__browser_click, mcp__playwright__browser_wait_for, mcp__playwright__browser_resize, mcp__playwright__browser_close, mcp__playwright__browser_console_messages
 ---
 
 # QA Agent — Роль тестировщика
