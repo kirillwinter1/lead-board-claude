@@ -33,13 +33,13 @@ class SimulationDeviationTest {
 
     @Test
     void applyDailyDeviation_withSeededRandom_shouldBeReproducible() {
-        Random seeded = new Random(42);
-        SimulationDeviation deviation = new SimulationDeviation(properties, seeded);
+        SimulationDeviation deviation = new SimulationDeviation(properties);
+        deviation.setRandom(new Random(42));
 
         double result1 = deviation.applyDailyDeviation(6.0);
 
-        Random seeded2 = new Random(42);
-        SimulationDeviation deviation2 = new SimulationDeviation(properties, seeded2);
+        SimulationDeviation deviation2 = new SimulationDeviation(properties);
+        deviation2.setRandom(new Random(42));
 
         double result2 = deviation2.applyDailyDeviation(6.0);
 

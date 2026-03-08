@@ -27,6 +27,7 @@ class SimulationServiceTest {
     @Mock private SimulationPlanner planner;
     @Mock private SimulationExecutor executor;
     @Mock private SimulationLogRepository logRepository;
+    @Mock private SimulationRecoveryService recoveryService;
 
     private SimulationService service;
 
@@ -37,7 +38,7 @@ class SimulationServiceTest {
     void setUp() {
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
-        service = new SimulationService(planner, executor, logRepository, objectMapper);
+        service = new SimulationService(planner, executor, logRepository, recoveryService, objectMapper);
 
         // Save returns the entity as-is (simulate JPA)
         when(logRepository.saveAndFlush(any())).thenAnswer(inv -> {

@@ -1,5 +1,6 @@
 package com.leadboard.config;
 
+import com.leadboard.simulation.SimulationNotFoundException;
 import com.leadboard.team.TeamService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,6 +64,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(Map.of("error", "Access denied"));
+    }
+
+    @ExceptionHandler(SimulationNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleSimulationNotFound(SimulationNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

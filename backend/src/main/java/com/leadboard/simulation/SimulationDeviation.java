@@ -8,7 +8,7 @@ import java.util.Random;
 public class SimulationDeviation {
 
     private final SimulationProperties properties;
-    private final Random random;
+    private Random random;
 
     public SimulationDeviation(SimulationProperties properties) {
         this.properties = properties;
@@ -16,8 +16,7 @@ public class SimulationDeviation {
     }
 
     // For testing: allow injecting a seeded Random
-    SimulationDeviation(SimulationProperties properties, Random random) {
-        this.properties = properties;
+    void setRandom(Random random) {
         this.random = random;
     }
 
