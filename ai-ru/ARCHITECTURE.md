@@ -167,10 +167,13 @@ com.leadboard/
 ```
 frontend/src/
 ├── api/            — 9 API клиентов (board, forecast, teams, metrics, poker, stories, epics, config, competency)
+├── constants/
+│   └── colors.ts            — Centralized color constants (DSR, severity, chart theme, text hierarchy)
 ├── components/
 │   ├── Layout.tsx           — Навигация + табы
 │   ├── Modal.tsx            — Модальные окна
 │   ├── MultiSelectDropdown.tsx
+│   ├── SeverityBadge.tsx     — Shared severity badge (ERROR/WARNING/INFO)
 │   ├── board/               — FilterPanel, BoardTable, BoardRow, SortableEpicRow, SortableStoryRow,
 │   │                          StatusBadge, RoleChips, EpicRoleChip, ProgressCell, PriorityCell,
 │   │                          ExpectedDoneCell, StoryExpectedDoneCell, AlertIcon, StatusStylesContext

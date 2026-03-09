@@ -63,6 +63,8 @@
 | F61 | Projects UX Polish | 2026-03-06 | [features/F61](features/F61_PROJECTS_UX_POLISH.md) |
 | F62 | OAuth Token Encryption | 2026-03-06 | [features/F62](features/F62_TOKEN_ENCRYPTION.md) |
 | F63 | Skeleton Loaders + SWR Cache | 2026-03-06 | [features/F63](features/F63_SKELETON_LOADERS.md) |
+| F64 | Multi-Project Support | 2026-03-06 | [features/F64](features/F64_MULTI_PROJECT_SUPPORT.md) |
+| F65 | Worklog Timeline | 2026-03-08 | [features/F65](features/F65_WORKLOG_TIMELINE.md) |
 
 ## Бэклог (BF)
 
@@ -111,6 +113,22 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-03-08: Desktop UI Consistency Refactoring
+- **Color centralization:** `constants/colors.ts` — DSR, severity, chart, text hierarchy constants (replaced duplicates in 6+ files)
+- **SeverityBadge extraction:** inline function from DataQualityPage → shared `components/SeverityBadge.tsx`
+- **StatusBadge in DataQualityPage:** plain-text `{issue.status}` → `<StatusBadge>` + `StatusStylesProvider`
+- **Language consistency:** RU → EN across 21 frontend files (pages, components, charts)
+- **Date locales:** `ru-RU` → `en-US`, units `ч` → `h`, `д` → `d`
+- Files: 31 changed, -54 lines net (duplication removed)
+
+### 2026-03-08: Critical Backend Fixes (from code review)
+- **Simulation race condition:** DB-level unique index + `SimulationRecoveryService` for stuck simulations
+- **DsrService NPE:** null sprint date handling
+- **EmbeddingService:** batch processing with proper error handling
+- **Unused code cleanup:** removed dead methods from `MetricsQueryRepository`
+- **Missing annotations:** `@Transactional` where needed
+- Migration: `T10__simulation_running_unique_index.sql`
 
 ### 2026-03-04: Epic Burndown Rework — plan from snapshot, actual from worklogs
 - **План (пунктир):** из forecast snapshot ближайшего к `epic.startedAt` — ступенчатое сгорание по `PlannedStory.endDate`

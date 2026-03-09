@@ -1,6 +1,6 @@
 # Технический долг Lead Board
 
-> Последнее обновление: 2026-03-06
+> Последнее обновление: 2026-03-09
 
 ## Backend
 
@@ -70,6 +70,9 @@
 | API error handling | Разные паттерны: `.catch(() => {})`, `.catch(err => console.error(...))`, `.catch(err => alert(...))` | Единый error interceptor для axios + общий обработчик |
 | ~~Цвета статусов~~ | ~~BoardPage, TimelinePage, DataQualityPage~~ | Решено: StatusStylesContext + StatusBadge повсеместно (F31/F39) |
 | ~~Tooltip positioning логика~~ | ~~BoardPage, TimelinePage~~ | Решено: общий хук `useTooltipPosition()` (src/hooks/useTooltipPosition.ts) |
+| ~~DSR/severity/chart цвета в 6+ файлах~~ | ~~DsrBreakdownChart, ForecastAccuracyChart, AssigneeTable, VelocityChart, DsrGauge, DataQualityPage~~ | Решено: `constants/colors.ts` — единый источник (2026-03-08) |
+| ~~Inline SeverityBadge~~ | ~~DataQualityPage~~ | Решено: `components/SeverityBadge.tsx` — shared component (2026-03-08) |
+| ~~Микс RU/EN в UI~~ | ~~21 файл: метрики, таймлайн, доска, графики~~ | Решено: все продуктовые экраны переведены на EN (2026-03-08) |
 
 ### Отсутствующее
 
