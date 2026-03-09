@@ -197,6 +197,43 @@ public class JiraMetadataService {
     }
 
     /**
+     * Gets priorities from Jira.
+     */
+    public List<Map<String, Object>> getPriorities() {
+        String cacheKey = "priorities";
+        String cached = getCachedValue(cacheKey, 60);
+        if (cached != null) {
+            try {
+                return objectMapper.readValue(cached, new TypeReference<>() {});
+            } catch (Exception e) {
+                log.warn("Failed to parse cached priorities", e);
+            }
+        }
+
+        try {
+            // Use /priority/search (paginated) — /priority is deprecated and returns 404 on newer Jira Cloud
+            Map<String, Object> response = callJiraApi("/rest/api/3/priority/search?maxResults=50");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> values = (List<Map<String, Object>>) response.get("values");
+            if (values == null) values = List.of();
+
+            List<Map<String, Object>> result = values.stream().map(p -> {
+                Map<String, Object> simplified = new LinkedHashMap<>();
+                simplified.put("id", p.get("id"));
+                simplified.put("name", p.get("name"));
+                simplified.put("iconUrl", p.get("iconUrl"));
+                return simplified;
+            }).toList();
+
+            cacheValue(cacheKey, objectMapper.writeValueAsString(result));
+            return result;
+        } catch (Exception e) {
+            log.error("Failed to fetch priorities from Jira", e);
+            return List.of();
+        }
+    }
+
+    /**
      * Gets statuses for a specific issue type using the statuses search API.
      * Used as fallback when /project/{key}/statuses doesn't return a particular type.
      */

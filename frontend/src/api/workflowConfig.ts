@@ -47,6 +47,12 @@ export interface JiraIssueTypeMetadata {
   iconUrl: string | null
 }
 
+export interface JiraPriorityMetadata {
+  id: string
+  name: string
+  iconUrl: string | null
+}
+
 export interface JiraStatusesByType {
   issueTypeId: string
   issueType: string

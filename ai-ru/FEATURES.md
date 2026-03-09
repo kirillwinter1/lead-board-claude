@@ -65,6 +65,7 @@
 | F63 | Skeleton Loaders + SWR Cache | 2026-03-06 | [features/F63](features/F63_SKELETON_LOADERS.md) |
 | F64 | Multi-Project Support | 2026-03-06 | [features/F64](features/F64_MULTI_PROJECT_SUPPORT.md) |
 | F65 | Worklog Timeline | 2026-03-08 | [features/F65](features/F65_WORKLOG_TIMELINE.md) |
+| F66 | Jira Priority Icons on Board | 2026-03-09 | [features/F66](features/F66_PRIORITY_ICONS.md) |
 
 ## Бэклог (BF)
 
@@ -113,6 +114,14 @@ F22 → F24
 ```
 
 ## Технические исправления (changelog)
+
+### 2026-03-09: Unified Board/Timeline workspace + shared filters
+- Board и Timeline объединены в один экран с внутренним переключателем `Board | Timeline`
+- Отдельный nav-tab `Timeline` убран; legacy route `/timeline` теперь редиректит на `/?view=timeline`
+- Timeline в embedded-режиме использует те же фильтры, что и Board: `search`, `team`, `status`, `project`, `Hide NEW`, `Hide DONE`
+- Для gantt оставлены только `Scale`, `Date` и `Legend`; бизнес-фильтры больше не дублируются
+- Исправлен сценарий с вечной загрузкой: при отсутствии ровно одной выбранной команды показывается empty state, а не spinner
+- Обновлены спецификации: [features/F14](features/F14_TIMELINE.md), [features/F59](features/F59_FILTER_UX_REDESIGN.md)
 
 ### 2026-03-08: Desktop UI Consistency Refactoring
 - **Color centralization:** `constants/colors.ts` — DSR, severity, chart, text hierarchy constants (replaced duplicates in 6+ files)

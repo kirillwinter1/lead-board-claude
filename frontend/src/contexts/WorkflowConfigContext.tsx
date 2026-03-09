@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import axios from 'axios'
-import { WorkflowRoleDto, JiraIssueTypeMetadata } from '../api/workflowConfig'
+import { WorkflowRoleDto, JiraIssueTypeMetadata, JiraPriorityMetadata } from '../api/workflowConfig'
 
 interface WorkflowConfig {
   roles: WorkflowRoleDto[]
   issueTypeCategories: Record<string, string>
   issueTypeIcons: Record<string, string>
+  priorityIcons: Record<string, string>
   loading: boolean
 }
 
@@ -20,6 +21,7 @@ interface WorkflowConfigHelpers extends WorkflowConfig {
   getRoleDisplayName: (code: string) => string
   getRoleCodes: () => string[]
   getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
+  getPriorityIconUrl: (name: string | null | undefined) => string | null
   refresh: () => void
 }
 
@@ -36,6 +38,7 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
     roles: [],
     issueTypeCategories: {},
     issueTypeIcons: {},
+    priorityIcons: {},
     loading: true,
   })
 
@@ -44,13 +47,18 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       axios.get<WorkflowRoleDto[]>('/api/config/workflow/roles').then(r => r.data),
       axios.get<Record<string, string>>('/api/config/workflow/issue-type-categories').then(r => r.data),
       axios.get<JiraIssueTypeMetadata[]>('/api/admin/jira-metadata/issue-types').then(r => r.data).catch(() => [] as JiraIssueTypeMetadata[]),
+      axios.get<JiraPriorityMetadata[]>('/api/admin/jira-metadata/priorities').then(r => r.data).catch(() => [] as JiraPriorityMetadata[]),
     ])
-      .then(([roles, categories, issueTypes]) => {
+      .then(([roles, categories, issueTypes, priorities]) => {
         const icons: Record<string, string> = {}
         issueTypes.forEach((t: JiraIssueTypeMetadata) => {
           if (t.iconUrl) icons[t.name] = t.iconUrl
         })
-        setConfig({ roles, issueTypeCategories: categories, issueTypeIcons: icons, loading: false })
+        const prioIcons: Record<string, string> = {}
+        priorities.forEach((p: JiraPriorityMetadata) => {
+          if (p.iconUrl) prioIcons[p.name] = p.iconUrl
+        })
+        setConfig({ roles, issueTypeCategories: categories, issueTypeIcons: icons, priorityIcons: prioIcons, loading: false })
       })
       .catch(() => {
         setConfig(prev => ({ ...prev, loading: false }))
@@ -101,6 +109,10 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       if (!typeName) return null
       return config.issueTypeIcons[typeName] || null
     },
+    getPriorityIconUrl: (name) => {
+      if (!name) return null
+      return config.priorityIcons[name] || null
+    },
     refresh: loadConfig,
   }
 
@@ -119,6 +131,7 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       roles: [],
       issueTypeCategories: {},
       issueTypeIcons: {},
+      priorityIcons: {},
       loading: false,
       isProject: () => false,
       isEpic: () => false,
@@ -130,6 +143,7 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       getRoleDisplayName: (code) => code,
       getRoleCodes: () => [],
       getIssueTypeIconUrl: () => null,
+      getPriorityIconUrl: () => null,
       refresh: () => {},
     }
   }

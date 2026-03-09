@@ -27,6 +27,8 @@ import {
   PROGRESS_COMPLETE, PROGRESS_IN_PROGRESS, PROGRESS_TRACK,
   LINK_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_SUBTLE,
   BG_SUBTLE, BORDER_DEFAULT, AVATAR_BG,
+  ERROR_TEXT, WARNING_BG, WARNING_BORDER, SEPARATOR, BG_PANEL,
+  PRIMARY_LIGHT_BG, PRIMARY_LIGHT_BORDER,
 } from '../constants/colors'
 import './ProjectTimelinePage.css'
 import './BoardPage.css'
@@ -141,15 +143,24 @@ function RecommendationsBlock({ recommendations }: { recommendations: ProjectRec
     <div style={{
       margin: '12px 0 4px',
       padding: '10px 14px',
-      background: '#FFFAE6',
-      border: '1px solid #FFE380',
+      background: WARNING_BG,
+      border: `1px solid ${WARNING_BORDER}`,
       borderRadius: 6,
       fontSize: 13,
     }}>
       {recommendations.map((r, i) => (
-        <div key={i} style={{ display: 'flex', gap: 6, marginBottom: i < recommendations.length - 1 ? 6 : 0 }}>
-          <span style={{ flexShrink: 0 }}>
-            {r.severity === 'WARNING' ? '\u26A0\uFE0F' : '\u2139\uFE0F'}
+        <div key={`${r.severity}-${r.message.slice(0, 40)}`} style={{ display: 'flex', gap: 6, marginBottom: i < recommendations.length - 1 ? 6 : 0 }}>
+          <span style={{
+            flexShrink: 0,
+            fontSize: 10,
+            fontWeight: 700,
+            padding: '0 5px',
+            borderRadius: 3,
+            lineHeight: '18px',
+            color: r.severity === 'WARNING' ? '#ff8b00' : '#0065ff',
+            backgroundColor: r.severity === 'WARNING' ? '#fffae6' : '#deebff',
+          }}>
+            {r.severity === 'WARNING' ? '!' : 'i'}
           </span>
           <span style={{ color: TEXT_PRIMARY }}>{r.message}</span>
         </div>
@@ -176,6 +187,7 @@ function childEpicToBoardNode(e: ChildEpicDto, jiraBaseUrl: string): BoardNode {
     epicInTodo: false,
     epicDone: false,
     roughEstimates: null,
+    priority: null,
     alerts: [],
     autoScore: null,
     manualOrder: null,
@@ -631,7 +643,7 @@ export function ProjectsPage() {
   if (error) {
     return (
       <main className="main-content">
-        <div style={{ padding: 32, textAlign: 'center', color: '#DE350B' }}>{error}</div>
+        <div style={{ padding: 32, textAlign: 'center', color: ERROR_TEXT }}>{error}</div>
       </main>
     )
   }
@@ -764,6 +776,9 @@ export function ProjectsPage() {
                   {/* Project card */}
                   <div
                     onClick={() => handleToggle(p.issueKey)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleToggle(p.issueKey) }}
+                    role="button"
+                    tabIndex={0}
                     style={{
                       padding: '14px 20px',
                       background: '#fff',
@@ -835,7 +850,7 @@ export function ProjectsPage() {
                       border: `1px solid ${BORDER_DEFAULT}`,
                       borderTop: 'none',
                       borderRadius: '0 0 8px 8px',
-                      background: '#FAFBFC',
+                      background: BG_PANEL,
                       padding: '12px 20px',
                     }}>
                       {det?.description && (
@@ -845,7 +860,7 @@ export function ProjectsPage() {
                           lineHeight: 1.5,
                           marginBottom: 12,
                           paddingBottom: 12,
-                          borderBottom: '1px solid #EBECF0',
+                          borderBottom: `1px solid ${SEPARATOR}`,
                           whiteSpace: 'pre-line',
                         }}>
                           {det.description}
@@ -902,8 +917,8 @@ export function ProjectsPage() {
                             fontSize: 13,
                             fontWeight: 500,
                             color: LINK_COLOR,
-                            background: '#E9F2FF',
-                            border: '1px solid #B3D4FF',
+                            background: PRIMARY_LIGHT_BG,
+                            border: `1px solid ${PRIMARY_LIGHT_BORDER}`,
                             borderRadius: 4,
                             cursor: 'pointer',
                           }}
@@ -926,7 +941,7 @@ export function ProjectsPage() {
                   title="RICE Scoring"
                   maxWidth={680}
                 >
-                  <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid #EBECF0' }}>
+                  <div style={{ marginBottom: 16, paddingBottom: 12, borderBottom: `1px solid ${SEPARATOR}` }}>
                     <div style={{ fontSize: 15, fontWeight: 600, color: TEXT_PRIMARY }}>
                       <span style={{ color: LINK_COLOR, marginRight: 8 }}>{riceModalKey}</span>
                       {proj?.summary}

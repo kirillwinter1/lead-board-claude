@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-03-04
+**Последнее обновление:** 2026-03-08
 
 ---
 
@@ -42,7 +42,10 @@
 | 28 | **DSR Status-Based** | DSR refactor | ✅ Проверен | 1 High, 3 Medium, 1 Low | [reports/2026-03-04_DSR_STATUS_BASED.md](reports/2026-03-04_DSR_STATUS_BASED.md) |
 | 29 | **Board Semantic Search** | F58 | ✅ Проверен | 1 Medium, 4 Low | [reports/2026-03-04_F58_BOARD_SEMANTIC_SEARCH.md](reports/2026-03-04_F58_BOARD_SEMANTIC_SEARCH.md) |
 
-**Прогресс: 29 / 29 модулей проверено (100%)**
+| 30 | **Worklog Timeline** | F65 | ✅ Проверен | 0 багов (5 рекомендаций) | [reports/2026-03-08_WORKLOG_TIMELINE.md](reports/2026-03-08_WORKLOG_TIMELINE.md) |
+| 31 | **Priority Icons on Board** | F66 | ✅ Проверен | 1 High, 1 Low | [reports/2026-03-09_F66_PRIORITY_ICONS.md](reports/2026-03-09_F66_PRIORITY_ICONS.md) |
+
+**Прогресс: 31 / 31 модулей проверено (100%)**
 
 ---
 
@@ -51,10 +54,10 @@
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
 | Critical | 2 | 9 | 11 |
-| High | 22 | 23 | 45 |
+| High | 23 | 23 | 46 |
 | Medium | 44 | 36 | 80 |
-| Low | 34 | 18 | 52 |
-| **Итого** | **102** | **86** | **188** |
+| Low | 35 | 18 | 53 |
+| **Итого** | **104** | **86** | **190** |
 
 ---
 

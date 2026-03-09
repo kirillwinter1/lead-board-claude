@@ -39,6 +39,11 @@ public class JiraMetadataController {
         return ResponseEntity.ok(metadataService.getLinkTypes());
     }
 
+    @GetMapping("/priorities")
+    public ResponseEntity<List<Map<String, Object>>> getPriorities() {
+        return ResponseEntity.ok(metadataService.getPriorities());
+    }
+
     @GetMapping("/custom-fields")
     public ResponseEntity<List<Map<String, Object>>> getCustomFields(
             @RequestParam(required = false, defaultValue = "") String keyword) {

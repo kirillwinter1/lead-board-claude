@@ -307,6 +307,7 @@ public class BoardService {
                 jiraUrl
         );
         node.setProjectKey(entity.getProjectKey());
+        node.setPriority(entity.getPriority());
 
         if (entity.isSubtask()) {
             node.setEstimateSeconds(entity.getEffectiveEstimateSeconds());

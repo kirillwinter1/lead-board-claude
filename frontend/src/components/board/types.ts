@@ -44,6 +44,7 @@ export interface BoardNode {
   expectedDone: string | null
   assigneeAccountId: string | null
   assigneeDisplayName: string | null
+  priority: string | null
   projectKey: string | null
   parentProjectKey: string | null
   children: BoardNode[]

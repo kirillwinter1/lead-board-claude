@@ -36,6 +36,7 @@ public class BoardNode {
     private String assigneeAccountId; // Assignee Jira account ID (Story only)
     private String assigneeDisplayName; // Assignee display name (Story only)
     private String projectKey; // Jira project key (e.g. "LB", "PROJ2")
+    private String priority; // Jira priority name (e.g. "High", "Medium")
     private String parentProjectKey; // Parent PROJECT issue key (Epic only)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
@@ -249,6 +250,14 @@ public class BoardNode {
 
     public void setProjectKey(String projectKey) {
         this.projectKey = projectKey;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
     }
 
     public String getParentProjectKey() {

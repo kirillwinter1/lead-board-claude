@@ -11,7 +11,8 @@ import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
-  const { getIssueTypeIconUrl, isStoryOrBug, isEpic } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getPriorityIconUrl, isStoryOrBug, isEpic } = useWorkflowConfig()
+  const priorityIconUrl = getPriorityIconUrl(node.priority)
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = isStoryOrBug(node.issueType) && level === 1
 
@@ -51,10 +52,20 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
             >⋮⋮</span>
           )}
           <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType))} alt={node.issueType} className="issue-type-icon" />
+          {node.priority && priorityIconUrl && (
+            <img
+              src={priorityIconUrl}
+              alt={node.priority}
+              title={node.priority}
+              className="priority-icon"
+              width={16}
+              height={16}
+            />
+          )}
           <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
             {node.issueKey}
           </a>
-          {node.flagged && <span className="flag-indicator" title="Flagged — work paused">🚩</span>}
+          {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
           {node.parentProjectKey && (
             <span style={{
               fontSize: 10,
