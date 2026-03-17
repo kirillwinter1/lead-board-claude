@@ -47,7 +47,7 @@
 
 | Страница | Selects |
 |----------|---------|
-| TimelinePage | Команда (с цветом), Масштаб, Дата |
+| TimelinePage | Команда (standalone), Масштаб, Дата |
 | ProjectTimelinePage | PM, Масштаб |
 | TeamMetricsPage | Period (WIP History) |
 | EpicBurndownChart | Epic selector |
@@ -66,6 +66,14 @@
 ## Timeline — тултипы у курсора
 
 Все тултипы на Timeline (EpicLabel, StoryBar, RoughEstimateBar) теперь следуют за курсором через `onMouseMove` + `clientX/clientY` вместо привязки к центру элемента.
+
+## Update 2026-03-09 — Unified Board/Timeline filters
+
+- Timeline внутри Board workspace больше не использует отдельный team-filter panel
+- Основные фильтры Board (`search`, `team`, `status`, `project`, `Hide NEW`, `Hide DONE`) переиспользуются в gantt без расхождения состояния
+- В embedded Timeline остались только собственные controls: `Scale`, `Date`, `Legend`
+- Если по общим фильтрам не выбрана ровно одна команда, gantt показывает empty state вместо вечной загрузки
+- Route `/timeline` сохранён только как legacy redirect на `/?view=timeline`
 
 ## Страницы с обновлёнными фильтрами (6)
 
@@ -89,6 +97,8 @@
 - `frontend/src/components/board/FilterPanel.tsx`
 - `frontend/src/pages/BoardPage.tsx`
 - `frontend/src/pages/TimelinePage.tsx`
+- `frontend/src/components/Layout.tsx`
+- `frontend/src/App.tsx`
 - `frontend/src/pages/ProjectTimelinePage.tsx`
 - `frontend/src/pages/TeamMetricsPage.tsx`
 - `frontend/src/pages/QuarterlyPlanningPage.tsx`

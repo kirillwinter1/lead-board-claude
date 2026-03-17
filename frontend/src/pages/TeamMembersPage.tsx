@@ -4,6 +4,7 @@ import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRe
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { Modal } from '../components/Modal'
 import { AbsenceTimeline } from '../components/AbsenceTimeline'
+import { WorklogTimeline } from '../components/WorklogTimeline'
 import './TeamsPage.css'
 
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
@@ -34,6 +35,7 @@ export function TeamMembersPage() {
     hoursPerDay: 6.0,
   })
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   // Planning config state
   const [planningConfig, setPlanningConfig] = useState<PlanningConfig>(DEFAULT_PLANNING_CONFIG)
@@ -42,6 +44,9 @@ export function TeamMembersPage() {
 
   // Absences section state
   const [showAbsences, setShowAbsences] = useState(false)
+
+  // Worklog timeline section state
+  const [showWorklogTimeline, setShowWorklogTimeline] = useState(false)
 
   const fetchData = () => {
     if (!teamId) return
@@ -95,6 +100,7 @@ export function TeamMembersPage() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingMember(null)
+    setFormError(null)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -114,7 +120,7 @@ export function TeamMembersPage() {
         fetchData()
       })
       .catch(err => {
-        alert(err.response?.data?.error || 'Failed to save member')
+        setFormError(err.response?.data?.error || 'Failed to save member')
       })
       .finally(() => setSaving(false))
   }
@@ -126,7 +132,7 @@ export function TeamMembersPage() {
     teamsApi.deactivateMember(parseInt(teamId), member.id)
       .then(() => fetchData())
       .catch(err => {
-        alert(err.response?.data?.error || 'Failed to deactivate member')
+        setError(err.response?.data?.error || 'Failed to deactivate member')
       })
   }
 
@@ -161,7 +167,7 @@ export function TeamMembersPage() {
         setPlanningConfig(updatedConfig)
       })
       .catch(err => {
-        alert(err.response?.data?.error || 'Failed to save planning config')
+        setError(err.response?.data?.error || 'Failed to save planning config')
       })
       .finally(() => setSavingConfig(false))
   }
@@ -575,12 +581,35 @@ export function TeamMembersPage() {
         )}
       </div>
 
+      {/* Worklog Timeline Section */}
+      <div className="planning-config-section">
+        <div
+          className="planning-config-header"
+          onClick={() => setShowWorklogTimeline(!showWorklogTimeline)}
+        >
+          <span className={`chevron ${showWorklogTimeline ? 'expanded' : ''}`}>›</span>
+          <h3>Worklog Timeline</h3>
+        </div>
+        {showWorklogTimeline && teamId && (
+          <div className="planning-config-content">
+            <WorklogTimeline
+              teamId={parseInt(teamId)}
+              members={members}
+              teamColor={team?.color}
+            />
+          </div>
+        )}
+      </div>
+
       <Modal
         isOpen={isModalOpen}
         onClose={closeModal}
         title={editingMember ? 'Edit Member' : 'Add Member'}
       >
         <form onSubmit={handleSubmit} className="modal-form">
+          {formError && (
+            <div className="error" style={{ marginBottom: 12 }}>{formError}</div>
+          )}
           <div className="form-group">
             <label htmlFor="jiraAccountId">Jira Account ID *</label>
             <input

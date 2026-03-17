@@ -20,7 +20,7 @@ export function ExpectedDoneCell({ forecast }: ExpectedDoneCellProps) {
   const formatDate = (dateStr: string | null): string => {
     if (!dateStr) return '--'
     const date = new Date(dateStr)
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
   }
 
   // Format date range

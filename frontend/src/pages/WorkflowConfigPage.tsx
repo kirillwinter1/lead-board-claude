@@ -112,7 +112,7 @@ function StatusColorPicker({ value, onChange }: { value: string; onChange: (colo
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+  }, [open, ref])
 
   const handleOpen = () => {
     if (!open && triggerRef.current) {
@@ -728,8 +728,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       setRoles(updated)
       refreshWorkflowContext()
       showSaveSuccess('Roles saved')
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save roles')
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { message?: string } } }
+      setError(axErr.response?.data?.message || 'Failed to save roles')
     } finally {
       setSaving(false)
     }
@@ -743,8 +744,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       setIssueTypes(updated)
       refreshWorkflowContext()
       showSaveSuccess('Issue types saved')
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save issue types')
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { message?: string } } }
+      setError(axErr.response?.data?.message || 'Failed to save issue types')
     } finally {
       setSaving(false)
     }
@@ -757,8 +759,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       const updated = await workflowConfigApi.updateStatuses(statuses, selectedProjectKey)
       setStatuses(updated)
       showSaveSuccess('Statuses saved')
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save statuses')
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { message?: string } } }
+      setError(axErr.response?.data?.message || 'Failed to save statuses')
     } finally {
       setSaving(false)
     }
@@ -771,8 +774,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       const updated = await workflowConfigApi.updateLinkTypes(linkTypes, selectedProjectKey)
       setLinkTypes(updated)
       showSaveSuccess('Link types saved')
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to save link types')
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { message?: string } } }
+      setError(axErr.response?.data?.message || 'Failed to save link types')
     } finally {
       setSaving(false)
     }
@@ -800,7 +804,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     }])
   }
 
-  const updateRole = (index: number, field: keyof WorkflowRoleDto, value: any) => {
+  const updateRole = (index: number, field: keyof WorkflowRoleDto, value: string | number | boolean) => {
     setRoles(roles.map((r, i) => i === index ? { ...r, [field]: value } : r))
   }
 
@@ -811,7 +815,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   // -- Issue Type helpers --
   const [detectingType, setDetectingType] = useState<string | null>(null)
 
-  const updateIssueType = (index: number, field: keyof IssueTypeMappingDto, value: any) => {
+  const updateIssueType = (index: number, field: keyof IssueTypeMappingDto, value: string | null) => {
     const item = issueTypes[index]
     const wasUnmapped = item.boardCategory === null
 
@@ -844,8 +848,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       // Reload config to get updated data
       await loadConfig()
       refreshWorkflowContext()
-    } catch (err: any) {
-      setError(err.response?.data?.error || `Failed to detect statuses for ${typeName}`)
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { error?: string } } }
+      setError(axErr.response?.data?.error || `Failed to detect statuses for ${typeName}`)
     } finally {
       setDetectingType(null)
     }
@@ -855,19 +860,18 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
   const addStatus = () => {
     const maxOrder = statuses.reduce((max, s) => Math.max(max, s.sortOrder), 0)
     setStatuses([...statuses, {
-      id: null, jiraStatusName: '', issueCategory: statusFilter === 'EPIC' || statusFilter === 'STORY' || statusFilter === 'BUG' || statusFilter === 'SUBTASK' ? statusFilter as any : 'STORY',
+      id: null, jiraStatusName: '', issueCategory: statusFilter === 'EPIC' || statusFilter === 'STORY' || statusFilter === 'BUG' || statusFilter === 'SUBTASK' ? statusFilter as StatusMappingDto['issueCategory'] : 'STORY',
       statusCategory: 'NEW', workflowRoleCode: null,
       sortOrder: maxOrder + 1, scoreWeight: 0,
       color: STATUS_CATEGORY_DEFAULT_COLORS['NEW'],
     }])
   }
 
-  const updateStatus = (index: number, field: keyof StatusMappingDto, value: any) => {
+  const updateStatus = (index: number, field: keyof StatusMappingDto, value: string | number | null) => {
     setStatuses(statuses.map((s, i) => {
       if (i !== index) return s
       const next = { ...s, [field]: value }
-      // Auto-update color when statusCategory changes, if current color is a default
-      if (field === 'statusCategory') {
+      if (field === 'statusCategory' && typeof value === 'string') {
         const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
         if (!s.color || s.color === oldDefault) {
           next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
@@ -890,7 +894,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     }])
   }
 
-  const updateLinkType = (index: number, field: keyof LinkTypeMappingDto, value: any) => {
+  const updateLinkType = (index: number, field: keyof LinkTypeMappingDto, value: string) => {
     setLinkTypes(linkTypes.map((l, i) => i === index ? { ...l, [field]: value } : l))
   }
 
@@ -981,8 +985,9 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       setWizardLinkTypes(suggestedLinks)
 
       setWizardStep(1)
-    } catch (err: any) {
-      setWizardError(err.response?.data?.message || err.message || 'Failed to fetch Jira metadata')
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { message?: string } }; message?: string }
+      setWizardError(axErr.response?.data?.message || axErr.message || 'Failed to fetch Jira metadata')
     } finally {
       setWizardLoading(false)
     }
@@ -1010,15 +1015,16 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       } else {
         showSaveSuccess('Wizard configuration saved successfully!')
       }
-    } catch (err: any) {
-      setWizardError(err.response?.data?.message || 'Failed to save configuration')
+    } catch (err: unknown) {
+      const axErr = err as { response?: { data?: { message?: string } } }
+      setWizardError(axErr.response?.data?.message || 'Failed to save configuration')
     } finally {
       setWizardSaving(false)
     }
   }
 
   // Wizard helpers for editing wizard-local state
-  const updateWizardIssueType = (index: number, field: keyof IssueTypeMappingDto, value: any) => {
+  const updateWizardIssueType = (index: number, field: keyof IssueTypeMappingDto, value: string | null) => {
     setWizardIssueTypes(prev => prev.map((t, i) => {
       if (i !== index) return t
       const next = { ...t, [field]: value }
@@ -1029,7 +1035,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     }))
   }
 
-  const updateWizardRole = (index: number, field: keyof WorkflowRoleDto, value: any) => {
+  const updateWizardRole = (index: number, field: keyof WorkflowRoleDto, value: string | number | boolean) => {
     setWizardRoles(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r))
   }
 
@@ -1045,11 +1051,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     setWizardRoles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const updateWizardStatus = (index: number, field: keyof StatusMappingDto, value: any) => {
+  const updateWizardStatus = (index: number, field: keyof StatusMappingDto, value: string | number | null) => {
     setWizardStatuses(prev => prev.map((s, i) => {
       if (i !== index) return s
       const next = { ...s, [field]: value }
-      if (field === 'statusCategory') {
+      if (field === 'statusCategory' && typeof value === 'string') {
         const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
         if (!s.color || s.color === oldDefault) {
           next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
@@ -1059,7 +1065,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     }))
   }
 
-  const updateWizardLinkType = (index: number, field: keyof LinkTypeMappingDto, value: any) => {
+  const updateWizardLinkType = (index: number, field: keyof LinkTypeMappingDto, value: string) => {
     setWizardLinkTypes(prev => prev.map((l, i) => i === index ? { ...l, [field]: value } : l))
   }
 
@@ -1156,12 +1162,12 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
           </div>
           {validation.errors.length > 0 && (
             <ul className="validation-errors">
-              {validation.errors.map((e, i) => <li key={i}>{e}</li>)}
+              {validation.errors.map((e, i) => <li key={`err-${i}-${e.slice(0, 20)}`}>{e}</li>)}
             </ul>
           )}
           {validation.warnings.length > 0 && (
             <ul className="validation-warnings">
-              {validation.warnings.map((w, i) => <li key={i}>{w}</li>)}
+              {validation.warnings.map((w, i) => <li key={`warn-${i}-${w.slice(0, 20)}`}>{w}</li>)}
             </ul>
           )}
         </div>
@@ -1210,7 +1216,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         <div className="wizard-progress">
           {WIZARD_STEPS.map((label, idx) => (
             <div
-              key={idx}
+              key={label}
               className={`wizard-step-indicator ${idx === wizardStep ? 'active' : ''} ${idx < wizardStep ? 'completed' : ''}`}
             >
               <div className="wizard-step-number">{idx < wizardStep ? '\u2713' : idx + 1}</div>
@@ -1295,7 +1301,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     const renderIssueTypeRow = (it: IssueTypeMappingDto, idx: number) => {
       const jiraMeta = wizardJiraIssueTypes.find(j => j.name === it.jiraTypeName)
       return (
-        <tr key={idx}>
+        <tr key={it.jiraTypeName}>
           <td>
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {jiraMeta?.iconUrl && (
@@ -1425,7 +1431,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         </div>
         {hasParallel && (
           <div style={{ marginTop: 6, fontSize: 12, color: '#B45309', display: 'flex', alignItems: 'center', gap: 4 }}>
-            {'\u26A0'} Roles with the same sort order run in parallel — forecasts assume they start simultaneously.
+            <span style={{ fontSize: 10, fontWeight: 700, padding: '0 5px', borderRadius: 3, color: '#B45309', backgroundColor: '#fffae6', marginRight: 4 }}>!</span>
+            Roles with the same sort order run in parallel — forecasts assume they start simultaneously.
           </div>
         )}
       </div>
@@ -1654,7 +1661,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
               {wizardLinkTypes.map((lt, idx) => {
                 const jiraMeta = wizardJiraLinkTypes.find(j => j.name === lt.jiraLinkTypeName)
                 return (
-                  <tr key={idx}>
+                  <tr key={lt.jiraLinkTypeName}>
                     <td><strong>{lt.jiraLinkTypeName}</strong></td>
                     <td style={{ color: '#6B778C', fontSize: 13 }}>{jiraMeta?.inward || '-'}</td>
                     <td style={{ color: '#6B778C', fontSize: 13 }}>{jiraMeta?.outward || '-'}</td>
@@ -1726,12 +1733,12 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
             </div>
             {wizardValidation.errors.length > 0 && (
               <ul className="validation-errors">
-                {wizardValidation.errors.map((e, i) => <li key={i}>{e}</li>)}
+                {wizardValidation.errors.map((e, i) => <li key={`werr-${i}-${e.slice(0, 20)}`}>{e}</li>)}
               </ul>
             )}
             {wizardValidation.warnings.length > 0 && (
               <ul className="validation-warnings">
-                {wizardValidation.warnings.map((w, i) => <li key={i}>{w}</li>)}
+                {wizardValidation.warnings.map((w, i) => <li key={`wwarn-${i}-${w.slice(0, 20)}`}>{w}</li>)}
               </ul>
             )}
           </div>

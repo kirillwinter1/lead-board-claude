@@ -174,6 +174,7 @@ export function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false)
   const [toolCallInProgress, setToolCallInProgress] = useState<string | null>(null)
   const [sessionId] = useState(generateSessionId)
+  const msgIdCounter = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -216,7 +217,8 @@ export function ChatWidget() {
     const text = input.trim()
     if (!text || isLoading) return
 
-    const userMsg: ChatMessage = { role: 'user', content: text, timestamp: Date.now() }
+    const userMsgId = `msg-${++msgIdCounter.current}`
+    const userMsg: ChatMessage = { id: userMsgId, role: 'user', content: text, timestamp: Date.now() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
@@ -224,6 +226,7 @@ export function ChatWidget() {
 
     let assistantText = ''
     const toolCalls: string[] = []
+    const assistantMsgId = `msg-${++msgIdCounter.current}`
 
     abortRef.current = sendChatMessage(
       text,
@@ -238,7 +241,7 @@ export function ChatWidget() {
               if (last?.role === 'assistant' && last.timestamp === -1) {
                 return [...prev.slice(0, -1), { ...last, content: assistantText }]
               }
-              return [...prev, { role: 'assistant', content: assistantText, timestamp: -1, toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined }]
+              return [...prev, { id: assistantMsgId, role: 'assistant', content: assistantText, timestamp: -1, toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined }]
             })
             setToolCallInProgress(null)
             break
@@ -258,14 +261,14 @@ export function ChatWidget() {
             setToolCallInProgress(null)
             break
           case 'error':
-            setMessages(prev => [...prev, { role: 'assistant', content: event.content || 'An error occurred', timestamp: Date.now() }])
+            setMessages(prev => [...prev, { id: `msg-${++msgIdCounter.current}`, role: 'assistant', content: event.content || 'An error occurred', timestamp: Date.now() }])
             setIsLoading(false)
             setToolCallInProgress(null)
             break
         }
       },
       (error: string) => {
-        setMessages(prev => [...prev, { role: 'assistant', content: `Connection error: ${error}`, timestamp: Date.now() }])
+        setMessages(prev => [...prev, { id: `msg-${++msgIdCounter.current}`, role: 'assistant', content: `Connection error: ${error}`, timestamp: Date.now() }])
         setIsLoading(false)
         setToolCallInProgress(null)
       }
@@ -317,8 +320,8 @@ export function ChatWidget() {
           </div>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={i} className={`chat-message chat-message-${msg.role}`}>
+        {messages.map((msg) => (
+          <div key={msg.id} className={`chat-message chat-message-${msg.role}`}>
             {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
           </div>
         ))}

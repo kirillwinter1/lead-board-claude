@@ -406,7 +406,9 @@ public class WorkflowConfigService {
                 .filter(WorkflowRoleEntity::isDefault)
                 .findFirst()
                 .map(WorkflowRoleEntity::getCode)
-                .orElse("DEV");
+                // No explicit default — use the first role by sort order
+                .or(() -> cachedRoles.stream().findFirst().map(WorkflowRoleEntity::getCode))
+                .orElse(null);
     }
 
     public List<WorkflowRoleEntity> getRolesInPipelineOrder() {
@@ -558,19 +560,33 @@ public class WorkflowConfigService {
                 if (entryStatus.equalsIgnoreCase(status)) return entry.getValue();
             }
 
-            // Fallback substring matching
+            // Fallback substring matching: check if the status name contains any configured role's displayName or code
             String lower = status.toLowerCase();
-            if (lower.contains("analysis") || lower.contains("анализ") || lower.contains("аналитик")) return "SA";
-            if (lower.contains("test") || lower.contains("qa") || lower.contains("тест")) return "QA";
+            for (WorkflowRoleEntity wfRole : cachedRoles) {
+                if (wfRole.getDisplayName() != null && lower.contains(wfRole.getDisplayName().toLowerCase())) {
+                    return wfRole.getCode();
+                }
+                if (wfRole.getCode() != null && lower.contains(wfRole.getCode().toLowerCase())) {
+                    return wfRole.getCode();
+                }
+            }
         }
 
-        // Fallback by issue type substring
+        // Fallback by issue type substring: check against configured roles
         if (issueType != null) {
             String typeLower = issueType.toLowerCase();
-            if (typeLower.contains("аналитик") || typeLower.contains("analyt")) return "SA";
-            if (typeLower.contains("тестир") || typeLower.contains("test") || typeLower.contains("qa")) return "QA";
-            // Bugs default to QA phase
-            if (isBug(issueType)) return "QA";
+            for (WorkflowRoleEntity wfRole : cachedRoles) {
+                if (wfRole.getDisplayName() != null && typeLower.contains(wfRole.getDisplayName().toLowerCase())) {
+                    return wfRole.getCode();
+                }
+                if (wfRole.getCode() != null && typeLower.contains(wfRole.getCode().toLowerCase())) {
+                    return wfRole.getCode();
+                }
+            }
+            // Bugs default to last role in pipeline (typically QA)
+            if (isBug(issueType) && !cachedRoles.isEmpty()) {
+                return cachedRoles.get(cachedRoles.size() - 1).getCode();
+            }
         }
 
         return getDefaultRoleCode();

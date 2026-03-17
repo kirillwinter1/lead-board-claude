@@ -78,6 +78,76 @@ export interface ProjectViewDto {
   teams: TeamAllocationDto[]
 }
 
+// ==================== Projects Overview Types ====================
+
+export interface EpicOverviewDto {
+  key: string
+  summary: string
+  teams: TeamRef[]
+  roughEstimated: boolean
+  teamMapped: boolean
+  blockers: string[]
+}
+
+export interface TeamRef {
+  id: number
+  name: string
+  color: string | null
+}
+
+export interface QuarterlyProjectOverviewDto {
+  projectKey: string
+  summary: string
+  inQuarter: boolean
+  quarterLabel: string | null
+  priorityScore: number
+  riceNormalizedScore: number
+  manualBoost: number
+  epicCount: number
+  roughEstimateCoverage: number
+  teamMappingCoverage: number
+  planningStatus: 'ready' | 'partial' | 'blocked' | 'not-added'
+  demandDays: number | null
+  forecastLabel: string
+  risk: 'low' | 'medium' | 'high'
+  teams: TeamRef[]
+  blockers: string[]
+  epics: EpicOverviewDto[]
+}
+
+export interface QuarterlyProjectsResponse {
+  quarter: string
+  inQuarterCount: number
+  readyCount: number
+  blockedCount: number
+  partialCount: number
+  teamsInvolved: number
+  totalEpics: number
+  roughCoveragePct: number
+  projects: QuarterlyProjectOverviewDto[]
+}
+
+export interface ProjectRefDto {
+  key: string
+  name: string
+  planningStatus: string
+}
+
+export interface QuarterlyTeamOverviewDto {
+  teamId: number
+  teamName: string
+  teamColor: string | null
+  capacityDays: number
+  demandDays: number
+  gapDays: number
+  utilization: number
+  capacityByRole: Record<string, number>
+  demandByRole: Record<string, number>
+  overloadedEpics: number
+  risk: 'low' | 'medium' | 'high'
+  impactingProjects: ProjectRefDto[]
+}
+
 // ==================== API ====================
 
 export const quarterlyPlanningApi = {
@@ -108,5 +178,15 @@ export const quarterlyPlanningApi = {
 
   async updateProjectBoost(projectKey: string, boost: number): Promise<void> {
     await axios.put(`/api/quarterly-planning/projects/${projectKey}/boost`, { boost })
+  },
+
+  async getProjectsOverview(quarter: string): Promise<QuarterlyProjectsResponse> {
+    const res = await axios.get('/api/quarterly-planning/projects-overview', { params: { quarter } })
+    return res.data
+  },
+
+  async getTeamsOverview(quarter: string): Promise<QuarterlyTeamOverviewDto[]> {
+    const res = await axios.get('/api/quarterly-planning/teams-overview', { params: { quarter } })
+    return res.data
   },
 }

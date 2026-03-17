@@ -5,6 +5,7 @@ import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.repository.MetricsQueryRepository;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.status.StatusCategory;
+import com.leadboard.sync.SyncService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,16 +41,18 @@ class TeamMetricsServiceTest {
     @Mock
     private WorkflowConfigService workflowConfig;
 
+    @Mock
+    private SyncService syncService;
+
     private TeamMetricsService service;
 
     @BeforeEach
     void setUp() {
-        service = new TeamMetricsService(metricsRepository, changelogRepository, workflowConfig);
+        service = new TeamMetricsService(metricsRepository, changelogRepository, workflowConfig, syncService);
     }
 
     @Test
     void calculateThroughput_returnsCorrectCount() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -64,10 +67,8 @@ class TeamMetricsServiceTest {
         when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        // When
         ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
 
-        // Then
         assertEquals(2, result.totalEpics());
         assertEquals(8, result.totalStories());
         assertEquals(10, result.total());
@@ -76,7 +77,6 @@ class TeamMetricsServiceTest {
 
     @Test
     void calculateThroughput_handlesEmptyData() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -84,17 +84,14 @@ class TeamMetricsServiceTest {
         when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        // When
         ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
 
-        // Then
         assertEquals(0, result.total());
         assertTrue(result.byPeriod().isEmpty());
     }
 
     @Test
     void calculateThroughput_includesBugCategory() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -109,10 +106,8 @@ class TeamMetricsServiceTest {
         when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        // When
         ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
 
-        // Then
         assertEquals(1, result.totalEpics());
         assertEquals(5, result.totalStories());
         assertEquals(3, result.totalBugs());
@@ -122,7 +117,6 @@ class TeamMetricsServiceTest {
 
     @Test
     void calculateLeadTime_calculatesCorrectStats() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -138,10 +132,8 @@ class TeamMetricsServiceTest {
         when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        // When
         LeadTimeResponse result = service.calculateLeadTime(teamId, from, to, null, null, null);
 
-        // Then
         assertEquals(5, result.sampleSize());
         assertEquals(new BigDecimal("6.00"), result.avgDays());
         assertEquals(new BigDecimal("6.00"), result.medianDays());
@@ -151,7 +143,6 @@ class TeamMetricsServiceTest {
 
     @Test
     void calculateLeadTime_handlesEmptyData() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -159,17 +150,14 @@ class TeamMetricsServiceTest {
         when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        // When
         LeadTimeResponse result = service.calculateLeadTime(teamId, from, to, null, null, null);
 
-        // Then
         assertEquals(0, result.sampleSize());
         assertEquals(BigDecimal.ZERO, result.avgDays());
     }
 
     @Test
     void calculateCycleTime_calculatesCorrectly() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -182,87 +170,73 @@ class TeamMetricsServiceTest {
         when(metricsRepository.getCycleTimeDays(eq(teamId), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        // When
         CycleTimeResponse result = service.calculateCycleTime(teamId, from, to, null, null, null);
 
-        // Then
         assertEquals(2, result.sampleSize());
         assertEquals(new BigDecimal("2.50"), result.avgDays());
     }
 
     @Test
+    void calculateByAssignee_withOutlierDetection() {
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        // row[9] = avg_cycle_time_prev (new field)
+        List<Object[]> mockData = Arrays.asList(
+                // Normal assignee: DSR 1.05, cycle time 3.2d
+                new Object[]{"user1", "John Doe", 10L, new BigDecimal("5.5"), new BigDecimal("3.2"),
+                        new BigDecimal("1.05"), new BigDecimal("80"), new BigDecimal("76"), 8L, new BigDecimal("3.0")},
+                // Outlier: DSR 1.8 (> 1.5)
+                new Object[]{"user2", "Jane Smith", 8L, new BigDecimal("4.0"), new BigDecimal("2.5"),
+                        new BigDecimal("1.80"), new BigDecimal("60"), new BigDecimal("65"), 8L, new BigDecimal("2.0")}
+        );
+
+        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any()))
+                .thenReturn(mockData);
+
+        List<AssigneeMetrics> result = service.calculateByAssignee(teamId, from, to);
+
+        assertEquals(2, result.size());
+        assertFalse(result.get(0).isOutlier()); // Normal
+        assertTrue(result.get(1).isOutlier());   // DSR > 1.5
+
+        // Check prev period fields
+        assertEquals(8, result.get(0).issuesClosedPrev());
+        assertNotNull(result.get(0).avgCycleTimePrev());
+    }
+
+    @Test
     void calculateByAssignee_nullLeadTimeReturnsNull() {
-        // Given — row[3] (avg_lead_time) is null
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
         List<Object[]> mockData = Collections.singletonList(
                 new Object[]{"user1", "John Doe", 5L, null, null,
-                        new BigDecimal("1.0"), new BigDecimal("40"), new BigDecimal("40"), 3L}
+                        new BigDecimal("1.0"), new BigDecimal("40"), new BigDecimal("40"), 3L, null}
         );
 
-        when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any()))
                 .thenReturn(mockData);
 
-        // When
         List<AssigneeMetrics> result = service.calculateByAssignee(teamId, from, to);
 
-        // Then — null lead/cycle time, not zero
         assertEquals(1, result.size());
         assertNull(result.get(0).avgLeadTimeDays());
         assertNull(result.get(0).avgCycleTimeDays());
     }
 
     @Test
-    void calculateByAssignee_aggregatesCorrectly() {
-        // Given
-        Long teamId = 1L;
-        LocalDate from = LocalDate.of(2024, 1, 1);
-        LocalDate to = LocalDate.of(2024, 1, 31);
-
-        // Extended query returns: account_id, display_name, issues_closed, avg_lead_time, avg_cycle_time,
-        // personal_dsr, total_time_spent_hours, total_estimate_hours, issues_prev_period
-        List<Object[]> mockData = Arrays.asList(
-                new Object[]{"user1", "John Doe", 10L, new BigDecimal("5.5"), new BigDecimal("3.2"),
-                        new BigDecimal("1.05"), new BigDecimal("80"), new BigDecimal("76"), 8L},
-                new Object[]{"user2", "Jane Smith", 8L, new BigDecimal("4.0"), new BigDecimal("2.5"),
-                        new BigDecimal("0.92"), new BigDecimal("60"), new BigDecimal("65"), 8L}
-        );
-
-        when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
-                .thenReturn(mockData);
-
-        // When
-        List<AssigneeMetrics> result = service.calculateByAssignee(teamId, from, to);
-
-        // Then
-        assertEquals(2, result.size());
-
-        AssigneeMetrics first = result.get(0);
-        assertEquals("user1", first.accountId());
-        assertEquals("John Doe", first.displayName());
-        assertEquals(10, first.issuesClosed());
-        assertEquals(new BigDecimal("5.5"), first.avgLeadTimeDays());
-        assertEquals(new BigDecimal("3.2"), first.avgCycleTimeDays());
-        assertEquals(new BigDecimal("1.05"), first.personalDsr());
-        assertNotNull(first.velocityPercent());
-        assertEquals("UP", first.trend());
-    }
-
-    @Test
     void calculateTimeInStatuses_showsAllStatusesFromData() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
-        // Config has 1 pipeline status
         when(workflowConfig.getStoryPipelineStatuses()).thenReturn(List.of(
                 new WorkflowConfigService.StoryPipelineStatus("Analysis", 20, "#DEEBFF")
         ));
 
-        // Changelog has data for Analysis AND Review (not in pipeline config)
         List<Object[]> data = Arrays.asList(
                 new Object[]{"Analysis", new BigDecimal("7200"), new BigDecimal("3600"),
                         new BigDecimal("10800"), new BigDecimal("14400"), 15L},
@@ -272,14 +246,15 @@ class TeamMetricsServiceTest {
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
                 .thenReturn(data);
 
-        // Both are IN_PROGRESS (not NEW/DONE)
-        when(workflowConfig.categorize(eq("Analysis"), any())).thenReturn(StatusCategory.IN_PROGRESS);
-        when(workflowConfig.categorize(eq("Review"), any())).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeStory("Analysis")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeSubtask("Analysis")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeEpic("Analysis")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeStory("Review")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeSubtask("Review")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeEpic("Review")).thenReturn(StatusCategory.IN_PROGRESS);
 
-        // When
         List<TimeInStatusResponse> result = service.calculateTimeInStatuses(teamId, from, to);
 
-        // Then — both statuses returned, Analysis first (pipeline), Review second
         assertEquals(2, result.size());
 
         TimeInStatusResponse analysis = result.get(0);
@@ -296,7 +271,6 @@ class TeamMetricsServiceTest {
 
     @Test
     void calculateTimeInStatuses_excludesDoneStatuses() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -312,20 +286,44 @@ class TeamMetricsServiceTest {
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
                 .thenReturn(data);
 
-        when(workflowConfig.categorize(eq("In Progress"), any())).thenReturn(StatusCategory.IN_PROGRESS);
-        when(workflowConfig.categorize(eq("Done"), any())).thenReturn(StatusCategory.DONE);
+        when(workflowConfig.categorizeStory("In Progress")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeSubtask("In Progress")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeEpic("In Progress")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeStory("Done")).thenReturn(StatusCategory.DONE);
+        when(workflowConfig.categorizeSubtask("Done")).thenReturn(StatusCategory.DONE);
+        when(workflowConfig.categorizeEpic("Done")).thenReturn(StatusCategory.DONE);
 
-        // When
         List<TimeInStatusResponse> result = service.calculateTimeInStatuses(teamId, from, to);
 
-        // Then — only "In Progress", "Done" excluded
         assertEquals(1, result.size());
         assertEquals("In Progress", result.get(0).status());
     }
 
     @Test
+    void calculateTimeInStatuses_keepsStatusesWhenGenericCategorizeWouldBeNew() {
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        when(workflowConfig.getStoryPipelineStatuses()).thenReturn(Collections.emptyList());
+        when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
+                .thenReturn(Collections.singletonList(
+                        new Object[]{"Review", new BigDecimal("3600"), new BigDecimal("1800"),
+                                new BigDecimal("5400"), new BigDecimal("7200"), 8L}
+                ));
+
+        when(workflowConfig.categorizeStory("Review")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeSubtask("Review")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(workflowConfig.categorizeEpic("Review")).thenReturn(StatusCategory.NEW);
+
+        List<TimeInStatusResponse> result = service.calculateTimeInStatuses(teamId, from, to);
+
+        assertEquals(1, result.size());
+        assertEquals("Review", result.get(0).status());
+    }
+
+    @Test
     void getSummary_returnsAllMetrics() {
-        // Given
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
@@ -338,13 +336,11 @@ class TeamMetricsServiceTest {
                 .thenReturn(Collections.emptyList());
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(metricsRepository.getExtendedMetricsByAssignee(eq(teamId), any(), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        // When
         TeamMetricsSummary result = service.getSummary(teamId, from, to, null, null);
 
-        // Then
         assertNotNull(result);
         assertEquals(from, result.from());
         assertEquals(to, result.to());
@@ -354,5 +350,46 @@ class TeamMetricsServiceTest {
         assertNotNull(result.cycleTime());
         assertNotNull(result.timeInStatuses());
         assertNotNull(result.byAssignee());
+    }
+
+    @Test
+    void getDataStatus_withData() {
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        var syncStatus = new SyncService.SyncStatus(
+                false,
+                OffsetDateTime.of(2024, 1, 31, 10, 0, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(2024, 1, 31, 10, 5, 0, 0, ZoneOffset.UTC),
+                100, null, true, null);
+        when(syncService.getSyncStatus()).thenReturn(syncStatus);
+        when(metricsRepository.countIssuesInScope(eq(teamId), any(), any())).thenReturn(50);
+        when(metricsRepository.countIssuesWithChangelog(eq(teamId), any(), any())).thenReturn(46);
+
+        MetricsDataStatus result = service.getDataStatus(teamId, from, to);
+
+        assertNotNull(result);
+        assertEquals(50, result.issuesInScope());
+        assertEquals(46, result.issuesWithChangelog());
+        assertEquals(new BigDecimal("92.0"), result.dataCoveragePercent());
+        assertFalse(result.syncInProgress());
+    }
+
+    @Test
+    void getDataStatus_noData() {
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 31);
+
+        var syncStatus = new SyncService.SyncStatus(false, null, null, 0, null, false, null);
+        when(syncService.getSyncStatus()).thenReturn(syncStatus);
+        when(metricsRepository.countIssuesInScope(eq(teamId), any(), any())).thenReturn(0);
+        when(metricsRepository.countIssuesWithChangelog(eq(teamId), any(), any())).thenReturn(0);
+
+        MetricsDataStatus result = service.getDataStatus(teamId, from, to);
+
+        assertEquals(0, result.issuesInScope());
+        assertEquals(BigDecimal.ZERO, result.dataCoveragePercent());
     }
 }

@@ -67,9 +67,6 @@ export function Layout() {
               <NavLink to={`/${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
                 Board
               </NavLink>
-              <NavLink to={`/timeline${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
-                Timeline
-              </NavLink>
               <NavLink to={`/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Metrics
               </NavLink>
@@ -106,7 +103,7 @@ export function Layout() {
             {auth.authenticated && auth.user ? (
               <div className="user-info">
                 {auth.user.avatarUrl && (
-                  <img src={auth.user.avatarUrl} alt="" className="user-avatar" />
+                  <img src={auth.user.avatarUrl} alt={auth.user.displayName} className="user-avatar" />
                 )}
                 <span className="user-name">{auth.user.displayName}</span>
                 <button className="btn btn-link btn-logout" onClick={auth.logout}>

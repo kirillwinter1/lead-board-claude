@@ -18,6 +18,9 @@ interface FilterPanelProps {
   availableProjects?: string[]
   selectedProjects?: Set<string>
   onProjectToggle?: (project: string) => void
+  availableQuarters?: string[]
+  selectedQuarters?: Set<string>
+  onQuarterToggle?: (quarter: string) => void
   onClearFilters: () => void
   syncStatus: SyncStatus | null
   syncing: boolean
@@ -35,7 +38,7 @@ interface FilterPanelProps {
 function formatSyncTime(isoString: string | null): string {
   if (!isoString) return 'Never'
   const date = new Date(isoString)
-  return date.toLocaleString('ru-RU', {
+  return date.toLocaleString(undefined, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -57,6 +60,9 @@ export function FilterPanel({
   availableProjects,
   selectedProjects,
   onProjectToggle,
+  availableQuarters,
+  selectedQuarters,
+  onQuarterToggle,
   syncStatus,
   syncing,
   onSync,
@@ -90,6 +96,15 @@ export function FilterPanel({
         })
       }
     }
+    if (selectedQuarters) {
+      for (const quarter of selectedQuarters) {
+        result.push({
+          category: 'Quarter',
+          value: quarter === '__NO_QUARTER__' ? 'No Quarter' : quarter,
+          onRemove: () => onQuarterToggle?.(quarter),
+        })
+      }
+    }
     for (const team of selectedTeams) {
       result.push({
         category: 'Team',
@@ -116,7 +131,7 @@ export function FilterPanel({
       result.push({ category: 'Search', value: `"${searchKey}"`, onRemove: () => onSearchKeyChange('') })
     }
     return result
-  }, [selectedProjects, selectedTeams, selectedStatuses, hideNew, hideDone, searchKey, teamColorMap, statusColorMap, onProjectToggle, onTeamToggle, onStatusToggle, onHideNewToggle, onHideDoneToggle, onSearchKeyChange])
+  }, [selectedProjects, selectedQuarters, selectedTeams, selectedStatuses, hideNew, hideDone, searchKey, teamColorMap, statusColorMap, onProjectToggle, onQuarterToggle, onTeamToggle, onStatusToggle, onHideNewToggle, onHideDoneToggle, onSearchKeyChange])
 
   const searchBadge = searchMode
     ? { label: searchMode === 'semantic' ? 'AI' : 'TXT', variant: (searchMode === 'semantic' ? 'ai' : 'text') as 'ai' | 'text' }
@@ -167,6 +182,17 @@ export function FilterPanel({
           selected={selectedProjects}
           onToggle={onProjectToggle}
           placeholder="All projects"
+        />
+      )}
+
+      {availableQuarters && availableQuarters.length > 0 && onQuarterToggle && selectedQuarters && (
+        <MultiSelectDropdown
+          label="Quarter"
+          options={availableQuarters}
+          selected={selectedQuarters}
+          onToggle={onQuarterToggle}
+          placeholder="All quarters"
+          renderOption={(option) => option === '__NO_QUARTER__' ? 'No Quarter' : option}
         />
       )}
 

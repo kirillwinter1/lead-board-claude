@@ -13,6 +13,7 @@ export function TeamsPage() {
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [formData, setFormData] = useState<CreateTeamRequest>({ name: '', jiraTeamValue: '', color: undefined })
   const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
 
   const [config, setConfig] = useState<TeamsConfig | null>(null)
   const [syncStatus, setSyncStatus] = useState<TeamSyncStatus | null>(null)
@@ -68,11 +69,13 @@ export function TeamsPage() {
     setIsModalOpen(false)
     setEditingTeam(null)
     setFormData({ name: '', jiraTeamValue: '', color: undefined })
+    setFormError(null)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
+    setFormError(null)
 
     const request = editingTeam
       ? teamsApi.update(editingTeam.id, formData)
@@ -84,7 +87,7 @@ export function TeamsPage() {
         fetchTeams()
       })
       .catch(err => {
-        alert(err.response?.data?.error || 'Failed to save team')
+        setFormError(err.response?.data?.error || 'Failed to save team')
       })
       .finally(() => setSaving(false))
   }
@@ -95,14 +98,14 @@ export function TeamsPage() {
     teamsApi.delete(team.id)
       .then(() => fetchTeams())
       .catch(err => {
-        alert(err.response?.data?.error || 'Failed to deactivate team')
+        setError(err.response?.data?.error || 'Failed to deactivate team')
       })
   }
 
   const formatSyncTime = (isoString: string | null): string => {
     if (!isoString) return 'Never'
     const date = new Date(isoString)
-    return date.toLocaleString('ru-RU', {
+    return date.toLocaleString(undefined, {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -130,7 +133,7 @@ export function TeamsPage() {
         setTeams(prev => prev.map(t => t.id === teamId ? { ...t, color } : t))
         setColorPickerTeamId(null)
       })
-      .catch(err => alert(err.response?.data?.error || 'Failed to update color'))
+      .catch(err => setError(err.response?.data?.error || 'Failed to update color'))
   }
 
   const canManageTeams = config?.manualTeamManagement ?? false
@@ -186,8 +189,12 @@ export function TeamsPage() {
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, position: 'relative' }}>
                       <span
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setColorPickerTeamId(colorPickerTeamId === team.id ? null : team.id)}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setColorPickerTeamId(colorPickerTeamId === team.id ? null : team.id) } }}
                         title="Click to change color"
+                        aria-label={`Change color for ${team.name}`}
                         style={{
                           display: 'inline-block',
                           width: 16,
@@ -224,7 +231,11 @@ export function TeamsPage() {
                           {TEAM_PALETTE.map(c => (
                             <span
                               key={c}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`Select color ${c}`}
                               onClick={() => handleColorChange(team.id, c)}
+                              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleColorChange(team.id, c) } }}
                               style={{
                                 width: 28,
                                 height: 28,
@@ -288,6 +299,9 @@ export function TeamsPage() {
         title={editingTeam ? 'Edit Team' : 'Create Team'}
       >
         <form onSubmit={handleSubmit} className="modal-form">
+          {formError && (
+            <div className="error" style={{ marginBottom: 12 }}>{formError}</div>
+          )}
           <div className="form-group">
             <label htmlFor="name">Team Name *</label>
             <input

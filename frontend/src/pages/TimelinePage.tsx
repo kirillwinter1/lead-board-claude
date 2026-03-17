@@ -9,11 +9,14 @@ import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { useStatusStyles } from '../components/board/StatusStylesContext'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { FilterBar } from '../components/FilterBar'
+import type { FilterChip } from '../components/FilterChips'
 import { GanttSkeleton } from '../components/skeletons'
 import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import './TimelinePage.css'
 
 import { getIssueIcon } from '../components/board/helpers'
+import { lightenColor } from '../constants/colors'
 
 type ZoomLevel = 'day' | 'week' | 'month'
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
@@ -195,7 +198,7 @@ function generateGroupHeaders(headers: TimelineHeader[], zoom: ZoomLevel): Group
     // Add last group
     if (currentSpan > 0) {
       groups.push({
-        label: new Date(currentYear, currentMonth, 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }),
+        label: new Date(currentYear, currentMonth, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
         span: currentSpan
       })
     }
@@ -287,16 +290,6 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6
 }
 
-// Helper to lighten a hex color by a factor (0=original, 1=white)
-function lightenColor(hex: string, factor: number): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  const lr = Math.round(r + (255 - r) * factor)
-  const lg = Math.round(g + (255 - g) * factor)
-  const lb = Math.round(b + (255 - b) * factor)
-  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
-}
 
 // Format seconds to hours
 function formatHours(seconds: number | null): string {
@@ -439,7 +432,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               {epic.epicKey}
             </a>
             {dueDateIndicator}
-            {epic.flagged && <span style={{ color: '#f97316', fontSize: 14 }} title="Flagged">🚩</span>}
+            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }} title="Flagged">FLG</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span
@@ -815,7 +808,9 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
           window.open(`${jiraBaseUrl}${story.storyKey}`, '_blank')
         }}
       >
-        {storyNumber}{story.flagged ? ' 🚩' : ''}{hasWarning ? ' ⚠' : ''}
+        {storyNumber}
+        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6' }}>FLG</span>}
+        {hasWarning && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff8b00', backgroundColor: '#fffae6' }}>!</span>}
       </span>
     </div>
   )
@@ -909,7 +904,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
                 <span style={{ color: '#9ca3af', fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
               )}
               {hoveredStory.flagged && (
-                <span style={{ color: '#f97316' }} title="Flagged">🚩</span>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }} title="Flagged">FLG</span>
               )}
             </div>
             <span
@@ -1103,6 +1098,9 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
       onMouseMove={e => onHover(epic, { x: e.clientX, y: e.clientY - 12 })}
       onMouseLeave={() => onHover(null)}
       onClick={() => window.open(`${jiraBaseUrl}${epic.epicKey}`, '_blank')}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => { if (e.key === 'Enter') window.open(`${jiraBaseUrl}${epic.epicKey}`, '_blank') }}
     >
       {agg && Object.entries(agg).map(([role, entry]) =>
         renderPhaseSegment(entry.startDate, entry.endDate, role)
@@ -1524,20 +1522,40 @@ function GanttRow({ plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl
 
 // --- Main component ---
 
-export function TimelinePage() {
+interface TimelineContentProps {
+  selectedTeamId?: number | null
+  filteredEpicKeys?: Set<string>
+  refreshToken?: number
+  showFilterBar?: boolean
+}
+
+export function TimelineContent({
+  selectedTeamId: controlledTeamId,
+  filteredEpicKeys,
+  refreshToken = 0,
+  showFilterBar = true,
+}: TimelineContentProps = {}) {
   const { getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [searchParams, setSearchParams] = useSearchParams()
   const [teams, setTeams] = useState<Team[]>([])
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
+  const isTeamControlled = controlledTeamId !== undefined
 
   // Sync teamId with URL
-  const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
+  const selectedTeamId = isTeamControlled
+    ? controlledTeamId
+    : (searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null)
   const setSelectedTeamId = (id: number | null) => {
-    if (id) {
-      setSearchParams({ teamId: String(id) })
-    } else {
-      setSearchParams({})
-    }
+    if (isTeamControlled) return
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (id) {
+        next.set('teamId', String(id))
+      } else {
+        next.delete('teamId')
+      }
+      return next
+    }, { replace: true })
   }
 
   // SWR: restore from cache on mount to avoid skeleton flash on revisit
@@ -1545,7 +1563,7 @@ export function TimelinePage() {
   const [forecast, setForecast] = useState<ForecastResponse | null>(initialCache?.forecast ?? null)
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(initialCache?.unifiedPlan ?? null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
-  const [loading, setLoading] = useState(!initialCache)
+  const [loading, setLoading] = useState(selectedTeamId ? !initialCache : false)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
 
@@ -1560,6 +1578,9 @@ export function TimelinePage() {
 
   const chartRef = useRef<HTMLDivElement>(null)
 
+  // Ref to capture mount-time values without triggering re-runs
+  const mountRef = useRef({ searchParams, isTeamControlled, setSearchParams })
+
   // Load config and teams (once on mount)
   useEffect(() => {
     getConfig()
@@ -1570,23 +1591,32 @@ export function TimelinePage() {
       .then(setStatusStyles)
       .catch(err => console.error('Failed to load status styles:', err))
 
+    const { searchParams: sp, isTeamControlled: controlled, setSearchParams: setSP } = mountRef.current
     teamsApi.getAll()
       .then(data => {
         const activeTeams = data.filter(t => t.active)
         setTeams(activeTeams)
         // If no team in URL and teams available, select first one
-        const urlTeamId = searchParams.get('teamId')
-        if (activeTeams.length > 0 && !urlTeamId) {
-          setSelectedTeamId(activeTeams[0].id)
+        const urlTeamId = sp.get('teamId')
+        if (!controlled && activeTeams.length > 0 && !urlTeamId) {
+          setSP(prev => {
+            const next = new URLSearchParams(prev)
+            next.set('teamId', String(activeTeams[0].id))
+            return next
+          }, { replace: true })
         }
       })
       .catch(err => setError('Failed to load teams: ' + err.message))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Run once on mount, read URL synchronously
 
   // Load available snapshot dates when team changes
   useEffect(() => {
-    if (!selectedTeamId) return
+    if (!selectedTeamId) {
+      setAvailableDates([])
+      setSelectedHistoricalDate('')
+      setIsHistoricalMode(false)
+      return
+    }
 
     getAvailableSnapshotDates(selectedTeamId)
       .then(dates => {
@@ -1600,7 +1630,13 @@ export function TimelinePage() {
 
   // Load data when team or historical date changes
   useEffect(() => {
-    if (!selectedTeamId) return
+    if (!selectedTeamId) {
+      setForecast(null)
+      setUnifiedPlan(null)
+      setLoading(false)
+      setError(null)
+      return
+    }
 
     const abortController = new AbortController()
 
@@ -1682,7 +1718,7 @@ export function TimelinePage() {
         clearTimeout(animationTimeoutRef.current)
       }
     }
-  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode])
+  }, [selectedTeamId, selectedHistoricalDate, isHistoricalMode, refreshToken])
 
   // Handle historical date selection
   const handleHistoricalDateChange = (date: string) => {
@@ -1737,8 +1773,9 @@ export function TimelinePage() {
   // Get epics from unified plan
   const epics = useMemo(() => {
     if (!unifiedPlan) return []
-    return unifiedPlan.epics
-  }, [unifiedPlan])
+    if (!filteredEpicKeys) return unifiedPlan.epics
+    return unifiedPlan.epics.filter(epic => filteredEpicKeys.has(epic.epicKey))
+  }, [unifiedPlan, filteredEpicKeys])
 
   // Match with forecast for status info
   const epicForecasts = useMemo(() => {
@@ -1764,79 +1801,168 @@ export function TimelinePage() {
     return (todayOffset / totalDays) * 100
   }, [dateRange])
 
+  const chips = useMemo<FilterChip[]>(() => {
+    const result: FilterChip[] = []
+
+    if (showFilterBar && selectedTeamId !== null) {
+      const selectedTeam = teams.find(team => team.id === selectedTeamId)
+      result.push({
+        category: 'Team',
+        value: selectedTeam?.name || `Team ${selectedTeamId}`,
+        color: selectedTeam?.color ?? undefined,
+        onRemove: () => {
+          if (teams.length > 1) {
+            setSelectedTeamId(null)
+          }
+        },
+      })
+    }
+
+    if (zoom !== 'week') {
+      result.push({
+        category: 'Scale',
+        value: zoom.charAt(0).toUpperCase() + zoom.slice(1),
+        onRemove: () => setZoom('week'),
+      })
+    }
+
+    if (isHistoricalMode && selectedHistoricalDate) {
+      result.push({
+        category: 'Date',
+        value: new Date(selectedHistoricalDate).toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        }),
+        onRemove: () => handleHistoricalDateChange(''),
+      })
+    }
+
+    return result
+  }, [isHistoricalMode, selectedHistoricalDate, selectedTeamId, showFilterBar, teams, zoom])
+
+  const clearFilters = () => {
+    if (teams.length > 1) {
+      setSelectedTeamId(null)
+    }
+    setZoom('week')
+    handleHistoricalDateChange('')
+  }
+
+  const needsTeamSelection = isTeamControlled && selectedTeamId === null
+
   return (
     <StatusStylesProvider value={statusStyles}>
-    <main className="main-content">
-      <div className="page-header">
-        <h2>Timeline</h2>
-      </div>
+      {showFilterBar ? (
+        <div style={{ padding: '0 16px' }}>
+          <FilterBar
+            chips={chips}
+            onClearAll={chips.length > 0 ? clearFilters : undefined}
+            trailing={
+              <div className="timeline-legend">
+                {getRoleCodes().map(code => (
+                  <span
+                    key={code}
+                    className="legend-item"
+                    style={{
+                      borderLeft: `3px solid ${lightenColor(getRoleColor(code), 0.5)}`,
+                      paddingLeft: 6,
+                    }}
+                  >
+                    {code}
+                  </span>
+                ))}
+                <span className="legend-item legend-retro">Actual</span>
+                <span className="legend-item legend-forecast-striped">Forecast</span>
+                <span className="legend-item legend-today">Today</span>
+                <span className="legend-item legend-due">Due Date</span>
+              </div>
+            }
+          >
+            <SingleSelectDropdown
+              label="Team"
+              options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color ?? undefined }))}
+              selected={selectedTeamId !== null ? String(selectedTeamId) : null}
+              onChange={v => setSelectedTeamId(v ? Number(v) : null)}
+              placeholder="Select team..."
+              allowClear={teams.length > 1}
+            />
 
-      <div className="timeline-controls">
-        <div className="filter-group">
-          <label className="filter-label">Team</label>
-          <SingleSelectDropdown
-            label="Team"
-            options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color ?? undefined }))}
-            selected={selectedTeamId !== null ? String(selectedTeamId) : null}
-            onChange={v => setSelectedTeamId(v ? Number(v) : null)}
-            placeholder="Select team..."
-            allowClear={false}
-          />
-        </div>
+            <SingleSelectDropdown
+              label="Scale"
+              options={[
+                { value: 'day', label: 'Day' },
+                { value: 'week', label: 'Week' },
+                { value: 'month', label: 'Month' },
+              ]}
+              selected={zoom}
+              onChange={v => v && setZoom(v as ZoomLevel)}
+              allowClear={false}
+            />
 
-        <div className="filter-group">
-          <label className="filter-label">Scale</label>
-          <SingleSelectDropdown
-            label="Scale"
-            options={[
-              { value: 'day', label: 'Day' },
-              { value: 'week', label: 'Week' },
-              { value: 'month', label: 'Month' },
-            ]}
-            selected={zoom}
-            onChange={v => v && setZoom(v as ZoomLevel)}
-            allowClear={false}
-          />
+            <SingleSelectDropdown
+              label="Date"
+              options={availableDates.map(date => ({
+                value: date,
+                label: new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+              }))}
+              selected={selectedHistoricalDate || null}
+              onChange={v => handleHistoricalDateChange(v ?? '')}
+              placeholder="Today (live)"
+            />
+          </FilterBar>
         </div>
+      ) : (
+        <div style={{ marginBottom: 16 }}>
+          <FilterBar
+            chips={chips}
+            onClearAll={chips.length > 0 ? clearFilters : undefined}
+            trailing={
+              <div className="timeline-legend">
+                {getRoleCodes().map(code => (
+                  <span
+                    key={code}
+                    className="legend-item"
+                    style={{
+                      borderLeft: `3px solid ${lightenColor(getRoleColor(code), 0.5)}`,
+                      paddingLeft: 6,
+                    }}
+                  >
+                    {code}
+                  </span>
+                ))}
+                <span className="legend-item legend-retro">Actual</span>
+                <span className="legend-item legend-forecast-striped">Forecast</span>
+                <span className="legend-item legend-today">Today</span>
+                <span className="legend-item legend-due">Due Date</span>
+              </div>
+            }
+          >
+            <SingleSelectDropdown
+              label="Scale"
+              options={[
+                { value: 'day', label: 'Day' },
+                { value: 'week', label: 'Week' },
+                { value: 'month', label: 'Month' },
+              ]}
+              selected={zoom}
+              onChange={v => v && setZoom(v as ZoomLevel)}
+              allowClear={false}
+            />
 
-        <div className="filter-group">
-          <label className="filter-label">
-            Date
-            {isHistoricalMode && (
-              <span style={{ marginLeft: 6, fontSize: 10, color: '#f97316' }}>Historical data</span>
-            )}
-          </label>
-          <SingleSelectDropdown
-            label="Date"
-            options={availableDates.map(date => ({
-              value: date,
-              label: new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
-            }))}
-            selected={selectedHistoricalDate || null}
-            onChange={v => handleHistoricalDateChange(v ?? '')}
-            placeholder="Today (live)"
-          />
+            <SingleSelectDropdown
+              label="Date"
+              options={availableDates.map(date => ({
+                value: date,
+                label: new Date(date).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+              }))}
+              selected={selectedHistoricalDate || null}
+              onChange={v => handleHistoricalDateChange(v ?? '')}
+              placeholder="Today (live)"
+            />
+          </FilterBar>
         </div>
-
-        <div className="timeline-legend">
-          {getRoleCodes().map(code => (
-            <span
-              key={code}
-              className="legend-item"
-              style={{
-                borderLeft: `3px solid ${lightenColor(getRoleColor(code), 0.5)}`,
-                paddingLeft: 6,
-              }}
-            >
-              {code}
-            </span>
-          ))}
-          <span className="legend-item legend-retro">Actual</span>
-          <span className="legend-item legend-forecast-striped">Forecast</span>
-          <span className="legend-item legend-today">Today</span>
-          <span className="legend-item legend-due">Due Date</span>
-        </div>
-      </div>
+      )}
 
       {isHistoricalMode && (
         <div className="historical-mode-banner">
@@ -1853,11 +1979,15 @@ export function TimelinePage() {
       {loading && <GanttSkeleton />}
       {error && <div className="error">{error}</div>}
 
-      {!loading && !error && epics.length === 0 && (
+      {!loading && !error && needsTeamSelection && (
+        <div className="empty">Select exactly one team in filters to see the timeline</div>
+      )}
+
+      {!loading && !error && !needsTeamSelection && epics.length === 0 && (
         <div className="empty">No epics with planning data</div>
       )}
 
-      {!loading && !error && epics.length > 0 && (
+      {!loading && !error && !needsTeamSelection && epics.length > 0 && (
         <div className="gantt-container">
           <div className="gantt-labels">
             <div className="gantt-labels-header">Epic</div>
@@ -1968,7 +2098,17 @@ export function TimelinePage() {
           </div>
         </div>
       )}
-    </main>
     </StatusStylesProvider>
+  )
+}
+
+export function TimelinePage() {
+  return (
+    <main className="main-content">
+      <div className="page-header">
+        <h2>Timeline</h2>
+      </div>
+      <TimelineContent />
+    </main>
   )
 }

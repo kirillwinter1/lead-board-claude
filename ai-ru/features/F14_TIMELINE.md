@@ -4,9 +4,31 @@
 
 ## Обзор
 
-Страница `/timeline` — Gantt-диаграмма для визуализации плана работ по эпикам.
+Timeline больше не живёт как отдельная самостоятельная вкладка. Основной сценарий:
+- корневая страница `/` открывает unified workspace `Board | Timeline`
+- переключение между режимами идёт через query-параметр `view=timeline`
+- legacy route `/timeline` сохранён как redirect на `/?view=timeline`
+
+Timeline использует тот же контекст эпиков и те же бизнес-фильтры, что и Board.
 
 ## Реализованный функционал
+
+### Unified Board/Timeline workspace
+- Переключатель `Board | Timeline` находится внутри страницы Board
+- Переключение бесшовное: без отдельного nav-tab и без смены логики фильтров
+- Верхняя навигация содержит только таб `Board`
+- Timeline в embedded-режиме рендерится внутри той же страницы и не дублирует board-фильтры
+
+### Общие фильтры с Board
+- Timeline использует те же фильтры, что и Board: `search`, `team`, `status`, `project`, `Hide NEW`, `Hide DONE`
+- Отрисовываются только те эпики, которые уже прошли board-фильтрацию
+- Для построения таймлайна должна быть выбрана ровно одна команда
+- Если команда не выбрана или выбрано несколько команд, вместо бесконечной загрузки показывается empty state
+
+### Собственные controls Timeline
+- `Scale`: Day / Week / Month
+- `Date`: live data или historical snapshot
+- Легенда ролей и индикаторов (`Actual`, `Forecast`, `Today`, `Due Date`)
 
 ### Gantt-диаграмма
 - Горизонтальные бары для эпиков (единый бар с progress overlay)
@@ -67,8 +89,9 @@ QA:       [=========]
 
 ```
 TimelinePage
-├── SummaryPanel
-├── Controls (Team, Zoom, Legend)
+├── Shared Board FilterPanel
+├── ViewToggle (Board | Timeline)
+├── TimelineControls (Scale, Date, Legend)
 └── GanttContainer
     ├── GanttLabels → LabelRow → PhaseLabels (expanded)
     └── GanttChart → GanttBody → GanttRow → PhaseRow (expanded)
@@ -106,4 +129,4 @@ TimelinePage
 ## Файлы
 
 **Backend:** `ForecastService.java`, `PlanningConfigDto.java`, `EpicForecast.java`
-**Frontend:** `TimelinePage.tsx`, `App.css`, `forecast.ts`
+**Frontend:** `TimelinePage.tsx`, `BoardPage.tsx`, `Layout.tsx`, `App.tsx`, `forecast.ts`

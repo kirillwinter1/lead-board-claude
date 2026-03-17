@@ -9,6 +9,7 @@ export function useBoardFilters(board: BoardNode[]) {
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set())
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
+  const [selectedQuarters, setSelectedQuarters] = useState<Set<string>>(new Set())
   const [hideNew, setHideNew] = useState(false)
   const [hideDone, setHideDone] = useState(false)
   const [urlTeamInitialized, setUrlTeamInitialized] = useState(false)
@@ -55,12 +56,20 @@ export function useBoardFilters(board: BoardNode[]) {
       if (epic?.teamId) {
         const currentTeamId = searchParams.get('teamId')
         if (currentTeamId !== String(epic.teamId)) {
-          setSearchParams({ teamId: String(epic.teamId) })
+          setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            next.set('teamId', String(epic.teamId))
+            return next
+          }, { replace: true })
         }
       }
     } else {
       if (searchParams.get('teamId')) {
-        setSearchParams({})
+        setSearchParams(prev => {
+          const next = new URLSearchParams(prev)
+          next.delete('teamId')
+          return next
+        }, { replace: true })
       }
     }
   }, [selectedTeams, board, urlTeamInitialized, searchParams, setSearchParams])
@@ -132,6 +141,21 @@ export function useBoardFilters(board: BoardNode[]) {
     return Array.from(projects).sort()
   }, [board])
 
+  const availableQuarters = useMemo(() => {
+    const quarters = new Set<string>()
+    let hasNull = false
+    board.forEach(epic => {
+      if (epic.quarterLabel) {
+        quarters.add(epic.quarterLabel)
+      } else {
+        hasNull = true
+      }
+    })
+    const sorted = Array.from(quarters).sort()
+    if (hasNull) sorted.push('__NO_QUARTER__')
+    return sorted
+  }, [board])
+
   const teamColorMap = useMemo(() => {
     const map = new Map<string, string>()
     board.forEach(epic => {
@@ -173,9 +197,13 @@ export function useBoardFilters(board: BoardNode[]) {
       if (selectedProjects.size > 0 && (!epic.projectKey || !selectedProjects.has(epic.projectKey))) {
         return false
       }
+      if (selectedQuarters.size > 0) {
+        const q = epic.quarterLabel || '__NO_QUARTER__'
+        if (!selectedQuarters.has(q)) return false
+      }
       return true
     })
-  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams, selectedProjects, hideNew, hideDone])
+  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams, selectedProjects, selectedQuarters, hideNew, hideDone])
 
   // Get selected team ID for forecast loading
   const selectedTeamId = useMemo(() => {
@@ -224,12 +252,25 @@ export function useBoardFilters(board: BoardNode[]) {
     })
   }
 
+  const handleQuarterToggle = (quarter: string) => {
+    setSelectedQuarters(prev => {
+      const next = new Set(prev)
+      if (next.has(quarter)) {
+        next.delete(quarter)
+      } else {
+        next.add(quarter)
+      }
+      return next
+    })
+  }
+
   const clearFilters = () => {
     setSearchKey('')
     setSearchResult(null)
     setSelectedStatuses(new Set())
     setSelectedTeams(new Set())
     setSelectedProjects(new Set())
+    setSelectedQuarters(new Set())
     setHideNew(false)
     setHideDone(false)
   }
@@ -242,9 +283,12 @@ export function useBoardFilters(board: BoardNode[]) {
     selectedStatuses,
     selectedTeams,
     selectedProjects,
+    selectedQuarters,
+    selectedTeamId,
     availableStatuses,
     availableTeams,
     availableProjects,
+    availableQuarters,
     teamColorMap,
     filteredBoard,
     canReorder,
@@ -258,6 +302,7 @@ export function useBoardFilters(board: BoardNode[]) {
     handleStatusToggle,
     handleTeamToggle,
     handleProjectToggle,
+    handleQuarterToggle,
     clearFilters,
   }
 }

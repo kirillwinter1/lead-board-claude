@@ -173,6 +173,43 @@ export interface UpdateAbsenceRequest {
   comment?: string
 }
 
+// ==================== Worklog Timeline ====================
+
+export interface WorklogDayInfo {
+  date: string
+  dayType: 'WORKDAY' | 'WEEKEND' | 'HOLIDAY'
+}
+
+export interface WorklogDayEntry {
+  date: string
+  hoursLogged: number | null
+  absenceType: string | null
+}
+
+export interface WorklogSummary {
+  totalLogged: number
+  workdaysInPeriod: number
+  capacityHours: number
+  ratio: number
+}
+
+export interface WorklogMember {
+  memberId: number
+  displayName: string | null
+  role: string
+  avatarUrl: string | null
+  hoursPerDay: number
+  entries: WorklogDayEntry[]
+  summary: WorklogSummary
+}
+
+export interface WorklogTimelineResponse {
+  from: string
+  to: string
+  days: WorklogDayInfo[]
+  members: WorklogMember[]
+}
+
 export const teamsApi = {
   getConfig: () => axios.get<TeamsConfig>('/api/teams/config').then(r => r.data),
 
@@ -233,4 +270,11 @@ export const teamsApi = {
 
   deleteAbsence: (teamId: number, memberId: number, absenceId: number) =>
     axios.delete(`/api/teams/${teamId}/members/${memberId}/absences/${absenceId}`),
+
+  // ==================== Worklog Timeline ====================
+
+  getWorklogTimeline: (teamId: number, from: string, to: string) =>
+    axios.get<WorklogTimelineResponse>(`/api/teams/${teamId}/worklog-timeline`, {
+      params: { from, to },
+    }).then(r => r.data),
 }

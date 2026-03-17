@@ -3,33 +3,34 @@ package com.leadboard.metrics.service;
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.metrics.dto.VelocityResponse;
 import com.leadboard.metrics.dto.VelocityResponse.WeeklyVelocity;
+import com.leadboard.metrics.repository.MetricsQueryRepository;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class VelocityService {
 
     private final TeamMemberRepository teamMemberRepository;
     private final WorkCalendarService calendarService;
-    private final JdbcTemplate jdbcTemplate;
+    private final MetricsQueryRepository metricsQueryRepository;
 
     public VelocityService(TeamMemberRepository teamMemberRepository,
                            WorkCalendarService calendarService,
-                           JdbcTemplate jdbcTemplate) {
+                           MetricsQueryRepository metricsQueryRepository) {
         this.teamMemberRepository = teamMemberRepository;
         this.calendarService = calendarService;
-        this.jdbcTemplate = jdbcTemplate;
+        this.metricsQueryRepository = metricsQueryRepository;
     }
 
     /**
@@ -106,29 +107,20 @@ public class VelocityService {
      * Each issue's time_spent is spread from started_at (or done_at) to done_at.
      */
     private Map<LocalDate, BigDecimal> getLoggedHoursByWeek(Long teamId, LocalDate from, LocalDate to) {
-        String sql = """
-            SELECT
-                COALESCE(time_spent_seconds, 0) as time_spent,
-                started_at::date as started,
-                done_at::date as done
-            FROM jira_issues
-            WHERE team_id = ?
-              AND done_at IS NOT NULL
-              AND done_at BETWEEN ? AND ?
-              AND COALESCE(time_spent_seconds, 0) > 0
-            """;
+        ZoneId zone = ZoneId.systemDefault();
+        OffsetDateTime fromOdt = from.atStartOfDay(zone).toOffsetDateTime();
+        OffsetDateTime toOdt = to.plusDays(1).atStartOfDay(zone).toOffsetDateTime();
 
-        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                sql, teamId, from, to.plusDays(1));
+        List<Object[]> rows = metricsQueryRepository.getVelocityData(teamId, fromOdt, toOdt);
 
         Map<LocalDate, BigDecimal> result = new LinkedHashMap<>();
 
-        for (Map<String, Object> row : rows) {
-            long timeSpentSeconds = ((Number) row.get("time_spent")).longValue();
+        for (Object[] row : rows) {
+            long timeSpentSeconds = ((Number) row[0]).longValue();
             BigDecimal hours = BigDecimal.valueOf(timeSpentSeconds).divide(BigDecimal.valueOf(3600), 4, RoundingMode.HALF_UP);
 
-            LocalDate doneDate = row.get("done") != null ? ((java.sql.Date) row.get("done")).toLocalDate() : null;
-            LocalDate startedDate = row.get("started") != null ? ((java.sql.Date) row.get("started")).toLocalDate() : null;
+            LocalDate doneDate = row[2] != null ? ((java.sql.Date) row[2]).toLocalDate() : null;
+            LocalDate startedDate = row[1] != null ? ((java.sql.Date) row[1]).toLocalDate() : null;
 
             if (doneDate == null) continue;
 

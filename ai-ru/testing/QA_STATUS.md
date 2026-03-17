@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-03-08
+**Последнее обновление:** 2026-03-17
 
 ---
 
@@ -44,8 +44,11 @@
 
 | 30 | **Worklog Timeline** | F65 | ✅ Проверен | 0 багов (5 рекомендаций) | [reports/2026-03-08_WORKLOG_TIMELINE.md](reports/2026-03-08_WORKLOG_TIMELINE.md) |
 | 31 | **Priority Icons on Board** | F66 | ✅ Проверен | 1 High, 1 Low | [reports/2026-03-09_F66_PRIORITY_ICONS.md](reports/2026-03-09_F66_PRIORITY_ICONS.md) |
+| 32 | **Metrics Redesign (CTO Dashboard)** | F66 Phase 1-4 | ✅ Проверен | 1 High, 1 Medium, 2 Low | [reports/2026-03-10_F66_METRICS_REDESIGN.md](reports/2026-03-10_F66_METRICS_REDESIGN.md) |
 
-**Прогресс: 31 / 31 модулей проверено (100%)**
+| 33 | **Quarterly Planning Production** | F68 | ✅ Проверен | 1 Medium, 2 Low | [reports/2026-03-17_F68_QUARTERLY_PLANNING_PRODUCTION.md](reports/2026-03-17_F68_QUARTERLY_PLANNING_PRODUCTION.md) |
+
+**Прогресс: 33 / 33 модулей проверено (100%)**
 
 ---
 

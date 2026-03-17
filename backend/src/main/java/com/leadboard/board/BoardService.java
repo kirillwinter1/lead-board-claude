@@ -203,6 +203,18 @@ public class BoardService {
                 }
             }
 
+            // Set quarterLabel on epic nodes (with parent project inheritance)
+            Map<String, JiraIssueEntity> projectsByKey = new HashMap<>();
+            for (JiraIssueEntity proj : projectIssues) {
+                projectsByKey.put(proj.getIssueKey(), proj);
+            }
+            for (JiraIssueEntity epic : filteredEpics) {
+                BoardNode node = epicMap.get(epic.getIssueKey());
+                if (node != null) {
+                    node.setQuarterLabel(resolveQuarterLabel(epic, epicToProjectKey, projectsByKey));
+                }
+            }
+
             for (JiraIssueEntity story : stories) {
                 BoardNode storyNode = mapToNode(story, baseUrl, teamNames, teamColors, subtasksByParent);
                 storyMap.put(story.getIssueKey(), storyNode);
@@ -529,6 +541,23 @@ public class BoardService {
             }
         }
         return epicToProjectKey;
+    }
+
+    private String resolveQuarterLabel(JiraIssueEntity epic,
+                                       Map<String, String> epicToProjectKey,
+                                       Map<String, JiraIssueEntity> projectsByKey) {
+        String directLabel = epic.getQuarterLabel();
+        if (directLabel != null) {
+            return directLabel;
+        }
+        String projKey = epicToProjectKey.get(epic.getIssueKey());
+        if (projKey != null) {
+            JiraIssueEntity parent = projectsByKey.get(projKey);
+            if (parent != null) {
+                return parent.getQuarterLabel();
+            }
+        }
+        return null;
     }
 
     private String buildCacheKey(String projectKey, String query, List<String> statuses,

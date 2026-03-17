@@ -206,7 +206,8 @@ class ChatToolExecutorTest {
                 "PROJ-1", "Initiative", "Project Alpha", null, "In Progress",
                 "John", null, 3, 1, 33,
                 null, null, LocalDate.of(2026, 6, 1),
-                new BigDecimal("75.5"), new BigDecimal("80.0")
+                new BigDecimal("75.5"), new BigDecimal("80.0"),
+                "2026Q2"
         );
         when(projectService.listProjects()).thenReturn(List.of(project));
 

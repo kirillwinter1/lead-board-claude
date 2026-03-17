@@ -52,6 +52,9 @@ class TeamControllerTest {
     private AbsenceService absenceService;
 
     @MockBean
+    private WorklogTimelineService worklogTimelineService;
+
+    @MockBean
     private JiraConfigResolver jiraConfigResolver;
 
     @MockBean
@@ -68,6 +71,8 @@ class TeamControllerTest {
     private TenantUserRepository tenantUserRepository;
     @MockBean
     private TenantRepository tenantRepository;
+    @MockBean
+    private com.leadboard.config.ObservabilityMetrics observabilityMetrics;
 
     @BeforeEach
     void setUp() {

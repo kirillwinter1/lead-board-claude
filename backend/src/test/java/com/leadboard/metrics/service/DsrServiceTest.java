@@ -91,14 +91,13 @@ class DsrServiceTest {
         when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
 
         // Subtask estimate: 10 days
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("PROJ-1-S1");
-        JiraIssueEntity subtask = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("PROJ-1-S1", "PROJ-1");
+        JiraIssueEntity subtask = createSubtask("PROJ-1-ST1", "PROJ-1-S1");
         subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("PROJ-1"))
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("PROJ-1-S1")))
                 .thenReturn(List.of(subtask));
@@ -138,14 +137,13 @@ class DsrServiceTest {
         when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
         when(workflowConfigService.isEpicInProgress("Запланировано")).thenReturn(false);
 
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("LB-1-S1");
-        JiraIssueEntity subtask = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("LB-1-S1", "LB-1");
+        JiraIssueEntity subtask = createSubtask("LB-1-ST1", "LB-1-S1");
         subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("LB-1"))
+        when(issueRepository.findByParentKeyIn(List.of("LB-1")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("LB-1-S1")))
                 .thenReturn(List.of(subtask));
@@ -186,14 +184,13 @@ class DsrServiceTest {
         when(workflowConfigService.isEpicInProgress("Blocked")).thenReturn(false);
         when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
 
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("PROJ-2-S1");
-        JiraIssueEntity subtask = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("PROJ-2-S1", "PROJ-2");
+        JiraIssueEntity subtask = createSubtask("PROJ-2-ST1", "PROJ-2-S1");
         subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("PROJ-2"))
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-2")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("PROJ-2-S1")))
                 .thenReturn(List.of(subtask));
@@ -226,6 +223,7 @@ class DsrServiceTest {
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
+        when(issueRepository.findByParentKeyIn(any())).thenReturn(Collections.emptyList());
         when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
@@ -250,14 +248,13 @@ class DsrServiceTest {
         when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
         when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
 
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("PROJ-4-S1");
-        JiraIssueEntity subtask = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("PROJ-4-S1", "PROJ-4");
+        JiraIssueEntity subtask = createSubtask("PROJ-4-ST1", "PROJ-4-S1");
         subtask.setOriginalEstimateSeconds(8L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("PROJ-4"))
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-4")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("PROJ-4-S1")))
                 .thenReturn(List.of(subtask));
@@ -297,16 +294,15 @@ class DsrServiceTest {
         when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
         when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
 
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("PROJ-5-S1");
-        JiraIssueEntity sub1 = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("PROJ-5-S1", "PROJ-5");
+        JiraIssueEntity sub1 = createSubtask("PROJ-5-ST1", "PROJ-5-S1");
         sub1.setOriginalEstimateSeconds(2L * 8 * 3600);
-        JiraIssueEntity sub2 = new JiraIssueEntity();
+        JiraIssueEntity sub2 = createSubtask("PROJ-5-ST2", "PROJ-5-S1");
         sub2.setOriginalEstimateSeconds(3L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("PROJ-5"))
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-5")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("PROJ-5-S1")))
                 .thenReturn(List.of(sub1, sub2));
@@ -343,7 +339,7 @@ class DsrServiceTest {
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("PROJ-6"))
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-6")))
                 .thenReturn(Collections.emptyList());
         when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
                 .thenReturn(Collections.emptyList());
@@ -369,14 +365,13 @@ class DsrServiceTest {
         ));
         when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
 
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("PROJ-7-S1");
-        JiraIssueEntity subtask = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("PROJ-7-S1", "PROJ-7");
+        JiraIssueEntity subtask = createSubtask("PROJ-7-ST1", "PROJ-7-S1");
         subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("PROJ-7"))
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-7")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("PROJ-7-S1")))
                 .thenReturn(List.of(subtask));
@@ -416,22 +411,22 @@ class DsrServiceTest {
         when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
         when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
 
-        JiraIssueEntity story1 = new JiraIssueEntity();
-        story1.setIssueKey("PROJ-8-S1");
-        JiraIssueEntity sub1 = new JiraIssueEntity();
+        JiraIssueEntity story1 = createStory("PROJ-8-S1", "PROJ-8");
+        JiraIssueEntity sub1 = createSubtask("PROJ-8-ST1", "PROJ-8-S1");
         sub1.setOriginalEstimateSeconds(10L * 8 * 3600);
 
-        JiraIssueEntity story2 = new JiraIssueEntity();
-        story2.setIssueKey("PROJ-9-S1");
-        JiraIssueEntity sub2 = new JiraIssueEntity();
+        JiraIssueEntity story2 = createStory("PROJ-9-S1", "PROJ-9");
+        JiraIssueEntity sub2 = createSubtask("PROJ-9-ST1", "PROJ-9-S1");
         sub2.setOriginalEstimateSeconds(10L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(completedEpic, inProgressEpic));
-        when(issueRepository.findByParentKey("PROJ-8")).thenReturn(List.of(story1));
-        when(issueRepository.findByParentKey("PROJ-9")).thenReturn(List.of(story2));
-        when(issueRepository.findByParentKeyIn(List.of("PROJ-8-S1"))).thenReturn(List.of(sub1));
-        when(issueRepository.findByParentKeyIn(List.of("PROJ-9-S1"))).thenReturn(List.of(sub2));
+        // Batch load returns all stories from both epics
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-8", "PROJ-9")))
+                .thenReturn(List.of(story1, story2));
+        // Batch load returns all subtasks from both stories
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-8-S1", "PROJ-9-S1")))
+                .thenReturn(List.of(sub1, sub2));
         when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         when(workCalendarService.countWorkdays(any(LocalDate.class), any(LocalDate.class)))
@@ -489,14 +484,13 @@ class DsrServiceTest {
         // No changelog entries
         setupChangelog("HIST-1", Collections.emptyList());
 
-        JiraIssueEntity story = new JiraIssueEntity();
-        story.setIssueKey("HIST-1-S1");
-        JiraIssueEntity subtask = new JiraIssueEntity();
+        JiraIssueEntity story = createStory("HIST-1-S1", "HIST-1");
+        JiraIssueEntity subtask = createSubtask("HIST-1-ST1", "HIST-1-S1");
         subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
 
         when(issueRepository.findEpicsForDsr(any(), any(), any()))
                 .thenReturn(List.of(epic));
-        when(issueRepository.findByParentKey("HIST-1"))
+        when(issueRepository.findByParentKeyIn(List.of("HIST-1")))
                 .thenReturn(List.of(story));
         when(issueRepository.findByParentKeyIn(List.of("HIST-1-S1")))
                 .thenReturn(List.of(subtask));
@@ -536,6 +530,20 @@ class DsrServiceTest {
         epic.setStatus(status);
         epic.setDoneAt(null);
         return epic;
+    }
+
+    private JiraIssueEntity createStory(String key, String parentKey) {
+        JiraIssueEntity story = new JiraIssueEntity();
+        story.setIssueKey(key);
+        story.setParentKey(parentKey);
+        return story;
+    }
+
+    private JiraIssueEntity createSubtask(String key, String parentKey) {
+        JiraIssueEntity subtask = new JiraIssueEntity();
+        subtask.setIssueKey(key);
+        subtask.setParentKey(parentKey);
+        return subtask;
     }
 
     private void setupChangelog(String issueKey, List<StatusChangelogEntity> entries) {

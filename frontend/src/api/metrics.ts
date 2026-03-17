@@ -58,6 +58,9 @@ export interface AssigneeMetrics {
   personalDsr: number | null
   velocityPercent: number | null
   trend: 'UP' | 'DOWN' | 'STABLE' | null
+  issuesClosedPrev: number
+  avgCycleTimePrev: number | null
+  isOutlier: boolean
 }
 
 export interface TeamMetricsSummary {
@@ -185,6 +188,31 @@ export async function getDsr(
 ): Promise<DsrResponse> {
   const params = new URLSearchParams({ teamId: String(teamId), from, to })
   const response = await axios.get(`/api/metrics/dsr?${params}`)
+  return response.data
+}
+
+// ==================== Monthly DSR Trend ====================
+
+export interface MonthlyDsrPoint {
+  month: string             // "2025-01"
+  avgDsrActual: number | null
+  avgDsrForecast: number | null
+  totalEpics: number
+  onTimeCount: number
+  onTimeRate: number
+}
+
+export interface MonthlyDsrResponse {
+  teamId: number
+  months: MonthlyDsrPoint[]
+}
+
+export async function getMonthlyDsr(
+  teamId: number,
+  months: number = 12
+): Promise<MonthlyDsrResponse> {
+  const params = new URLSearchParams({ teamId: String(teamId), months: String(months) })
+  const response = await axios.get(`/api/metrics/dsr/monthly?${params}`)
   return response.data
 }
 
@@ -332,5 +360,91 @@ export async function fetchBugMetrics(teamId?: number): Promise<BugMetricsRespon
   if (teamId) params.append('teamId', String(teamId))
   const query = params.toString() ? `?${params}` : ''
   const response = await axios.get(`/api/metrics/bugs${query}`)
+  return response.data
+}
+
+// ==================== Metrics Data Status ====================
+
+export interface MetricsDataStatus {
+  lastSyncCompletedAt: string | null
+  syncInProgress: boolean
+  issuesInScope: number
+  issuesWithChangelog: number
+  dataCoveragePercent: number
+}
+
+export async function getMetricsDataStatus(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<MetricsDataStatus> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/data-status?${params}`)
+  return response.data
+}
+
+// ==================== Executive Summary ====================
+
+export interface KpiCard {
+  label: string
+  value: string
+  rawValue: number
+  prevValue: number | null
+  deltaPercent: number | null
+  trend: string
+  sampleSize: number
+  target: number | null
+}
+
+export interface ExecutiveSummary {
+  throughput: KpiCard
+  cycleTimeMedian: KpiCard
+  leadTimeMedian: KpiCard
+  predictability: KpiCard
+  capacityUtilization: KpiCard
+  blockedRisk: KpiCard
+}
+
+export async function getExecutiveSummary(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<ExecutiveSummary> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/executive-summary?${params}`)
+  return response.data
+}
+
+// ==================== Delivery Health ====================
+
+export interface HealthDimension {
+  name: string
+  score: number
+  weight: number
+  status: 'GOOD' | 'WARNING' | 'CRITICAL'
+}
+
+export interface RiskAlert {
+  severity: 'CRITICAL' | 'WARNING' | 'INFO'
+  title: string
+  description: string
+  metric: string
+  recommendation: string
+}
+
+export interface DeliveryHealth {
+  score: number
+  grade: string
+  dimensions: HealthDimension[]
+  alerts: RiskAlert[]
+}
+
+export async function getDeliveryHealth(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<DeliveryHealth> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/delivery-health?${params}`)
   return response.data
 }

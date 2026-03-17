@@ -1,10 +1,9 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { BoardPage } from './pages/BoardPage'
 import { TeamsPage } from './pages/TeamsPage'
 import { TeamMembersPage } from './pages/TeamMembersPage'
-import { TimelinePage } from './pages/TimelinePage'
 import { TeamMetricsPage } from './pages/TeamMetricsPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { PlanningPokerPage } from './pages/PlanningPokerPage'
@@ -28,6 +27,14 @@ function TenantAwareRoot() {
   return slug ? <Layout /> : <LandingPage />
 }
 
+function LegacyTimelineRedirect() {
+  const location = useLocation()
+  const params = new URLSearchParams(location.search)
+  params.set('view', 'timeline')
+  const search = params.toString()
+  return <Navigate to={{ pathname: '/', search: search ? `?${search}` : '' }} replace />
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -38,7 +45,7 @@ function App() {
         <Route path="/register" element={<RegistrationPage />} />
         <Route path="/" element={<TenantAwareRoot />}>
           <Route index element={<BoardPage />} />
-          <Route path="timeline" element={<TimelinePage />} />
+          <Route path="timeline" element={<LegacyTimelineRedirect />} />
           <Route path="metrics" element={<TeamMetricsPage />} />
           <Route path="data-quality" element={<DataQualityPage />} />
           <Route path="poker" element={<PlanningPokerPage />} />

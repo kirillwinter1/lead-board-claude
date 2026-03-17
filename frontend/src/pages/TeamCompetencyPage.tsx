@@ -54,9 +54,9 @@ export function TeamCompetencyPage() {
 
   const severityIcon = (severity: string) => {
     switch (severity) {
-      case 'CRITICAL': return '\u26A0'
-      case 'WARNING': return '\u26A0'
-      default: return '\u2713'
+      case 'CRITICAL': return '!'
+      case 'WARNING': return '!'
+      default: return 'OK'
     }
   }
 

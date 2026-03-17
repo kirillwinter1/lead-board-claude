@@ -50,6 +50,16 @@ public class QuarterlyPlanningController {
         return ResponseEntity.ok(planningService.getAvailableQuarters());
     }
 
+    @GetMapping("/projects-overview")
+    public ResponseEntity<QuarterlyProjectsResponse> getProjectsOverview(@RequestParam String quarter) {
+        return ResponseEntity.ok(planningService.getProjectsOverview(quarter));
+    }
+
+    @GetMapping("/teams-overview")
+    public ResponseEntity<List<QuarterlyTeamOverviewDto>> getTeamsOverview(@RequestParam String quarter) {
+        return ResponseEntity.ok(planningService.getTeamsOverview(quarter));
+    }
+
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
     @PutMapping("/projects/{key}/boost")
     public ResponseEntity<Void> updateProjectBoost(

@@ -1,6 +1,8 @@
 package com.leadboard.metrics.controller;
 
 import com.leadboard.metrics.dto.*;
+import com.leadboard.metrics.dto.MonthlyDsrResponse;
+import com.leadboard.metrics.service.DeliveryHealthService;
 import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
 import com.leadboard.metrics.service.TeamMetricsService;
@@ -36,19 +38,22 @@ public class TeamMetricsController {
     private final DsrService dsrService;
     private final VelocityService velocityService;
     private final EpicBurndownService burndownService;
+    private final DeliveryHealthService deliveryHealthService;
 
     public TeamMetricsController(
             TeamMetricsService metricsService,
             ForecastAccuracyService forecastAccuracyService,
             DsrService dsrService,
             VelocityService velocityService,
-            EpicBurndownService burndownService
+            EpicBurndownService burndownService,
+            DeliveryHealthService deliveryHealthService
     ) {
         this.metricsService = metricsService;
         this.forecastAccuracyService = forecastAccuracyService;
         this.dsrService = dsrService;
         this.velocityService = velocityService;
         this.burndownService = burndownService;
+        this.deliveryHealthService = deliveryHealthService;
     }
 
     @GetMapping("/throughput")
@@ -116,9 +121,6 @@ public class TeamMetricsController {
         return metricsService.getSummary(teamId, from, to, issueType, epicKey);
     }
 
-    /**
-     * Get forecast accuracy metrics - compares planned vs actual completion dates.
-     */
     @GetMapping("/forecast-accuracy")
     public ForecastAccuracyResponse getForecastAccuracy(
             @RequestParam Long teamId,
@@ -128,11 +130,6 @@ public class TeamMetricsController {
         return forecastAccuracyService.calculateAccuracy(teamId, from, to);
     }
 
-    /**
-     * Get Delivery Speed Ratio (DSR) metrics.
-     * DSR = actual working days / estimate days
-     * 1.0 = baseline, < 1.0 = faster, > 1.0 = slower
-     */
     @GetMapping("/dsr")
     public DsrResponse getDsr(
             @RequestParam Long teamId,
@@ -142,9 +139,13 @@ public class TeamMetricsController {
         return dsrService.calculateDsr(teamId, from, to);
     }
 
-    /**
-     * Get team velocity metrics (logged hours vs capacity).
-     */
+    @GetMapping("/dsr/monthly")
+    public MonthlyDsrResponse getMonthlyDsr(
+            @RequestParam Long teamId,
+            @RequestParam(defaultValue = "12") int months) {
+        return dsrService.calculateMonthlyDsr(teamId, months);
+    }
+
     @GetMapping("/velocity")
     public VelocityResponse getVelocity(
             @RequestParam Long teamId,
@@ -154,9 +155,6 @@ public class TeamMetricsController {
         return velocityService.calculateVelocity(teamId, from, to);
     }
 
-    /**
-     * Get epic burndown chart data.
-     */
     @GetMapping("/epic-burndown")
     public ResponseEntity<?> getEpicBurndown(@RequestParam String epicKey) {
         try {
@@ -166,11 +164,35 @@ public class TeamMetricsController {
         }
     }
 
-    /**
-     * Get list of epics for burndown selector.
-     */
     @GetMapping("/epics-for-burndown")
     public List<EpicBurndownService.EpicInfo> getEpicsForBurndown(@RequestParam Long teamId) {
         return burndownService.getEpicsForTeam(teamId);
+    }
+
+    @GetMapping("/data-status")
+    public MetricsDataStatus getDataStatus(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
+        return metricsService.getDataStatus(teamId, from, to);
+    }
+
+    @GetMapping("/executive-summary")
+    public ExecutiveSummary getExecutiveSummary(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
+        return metricsService.getExecutiveSummary(teamId, from, to, dsrService, velocityService);
+    }
+
+    @GetMapping("/delivery-health")
+    public DeliveryHealth getDeliveryHealth(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
+        return deliveryHealthService.calculateHealth(teamId, from, to);
     }
 }

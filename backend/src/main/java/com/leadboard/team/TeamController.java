@@ -7,6 +7,7 @@ import com.leadboard.team.dto.CreateAbsenceRequest;
 import com.leadboard.team.dto.MemberProfileResponse;
 import com.leadboard.team.dto.PlanningConfigDto;
 import com.leadboard.team.dto.UpdateAbsenceRequest;
+import com.leadboard.team.dto.WorklogTimelineResponse;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -26,16 +27,19 @@ public class TeamController {
     private final TeamSyncService teamSyncService;
     private final MemberProfileService memberProfileService;
     private final AbsenceService absenceService;
+    private final WorklogTimelineService worklogTimelineService;
     private final JiraConfigResolver jiraConfigResolver;
     private final AuthorizationService authorizationService;
 
     public TeamController(TeamService teamService, TeamSyncService teamSyncService,
                           MemberProfileService memberProfileService, AbsenceService absenceService,
+                          WorklogTimelineService worklogTimelineService,
                           JiraConfigResolver jiraConfigResolver, AuthorizationService authorizationService) {
         this.teamService = teamService;
         this.teamSyncService = teamSyncService;
         this.memberProfileService = memberProfileService;
         this.absenceService = absenceService;
+        this.worklogTimelineService = worklogTimelineService;
         this.jiraConfigResolver = jiraConfigResolver;
         this.authorizationService = authorizationService;
     }
@@ -206,6 +210,16 @@ public class TeamController {
             @PathVariable Long memberId,
             @PathVariable Long absenceId) {
         absenceService.deleteAbsence(teamId, memberId, absenceId);
+    }
+
+    // ==================== Worklog Timeline ====================
+
+    @GetMapping("/{teamId}/worklog-timeline")
+    public WorklogTimelineResponse getWorklogTimeline(
+            @PathVariable Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return worklogTimelineService.getWorklogTimeline(teamId, from, to);
     }
 
     // ==================== Exception Handlers ====================

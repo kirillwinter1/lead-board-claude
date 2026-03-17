@@ -199,6 +199,7 @@ function childEpicToBoardNode(e: ChildEpicDto, jiraBaseUrl: string): BoardNode {
     assigneeDisplayName: null,
     projectKey: null,
     parentProjectKey: null,
+    quarterLabel: null,
     children: [],
   }
 }
@@ -246,6 +247,7 @@ export function ProjectsPage() {
   const selectedPMs = useMemo(() => new Set(searchParams.get('pm')?.split(',').filter(Boolean) || []), [searchParams])
   const selectedStatuses = useMemo(() => new Set(searchParams.get('status')?.split(',').filter(Boolean) || []), [searchParams])
   const selectedTeams = useMemo(() => new Set(searchParams.get('team')?.split(',').filter(Boolean) || []), [searchParams])
+  const selectedQuarters = useMemo(() => new Set(searchParams.get('quarter')?.split(',').filter(Boolean) || []), [searchParams])
   const sortBy = (searchParams.get('sort') as SortOption) || 'default'
   const zoom = (searchParams.get('zoom') as ZoomLevel) || 'week'
 
@@ -393,6 +395,18 @@ export function ProjectsPage() {
   }, [search, searchResult, epicToProjectMap, listProjects])
 
   // Available filter options
+  const availableQuarters = useMemo(() => {
+    const quarters = new Set<string>()
+    let hasNull = false
+    for (const p of listProjects) {
+      if (p.quarterLabel) quarters.add(p.quarterLabel)
+      else hasNull = true
+    }
+    const sorted = Array.from(quarters).sort()
+    if (hasNull) sorted.push('__NO_QUARTER__')
+    return sorted
+  }, [listProjects])
+
   const availablePMs = useMemo(() => Array.from(new Set(
     listProjects.map(p => p.assigneeDisplayName).filter((n): n is string => !!n)
   )).sort(), [listProjects])
@@ -423,6 +437,11 @@ export function ProjectsPage() {
     next.has(team) ? next.delete(team) : next.add(team)
     updateParam('team', next.size > 0 ? Array.from(next).join(',') : null)
   }
+  const handleQuarterToggle = (quarter: string) => {
+    const next = new Set(selectedQuarters)
+    next.has(quarter) ? next.delete(quarter) : next.add(quarter)
+    updateParam('quarter', next.size > 0 ? Array.from(next).join(',') : null)
+  }
   const clearFilters = () => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
@@ -430,6 +449,7 @@ export function ProjectsPage() {
       next.delete('pm')
       next.delete('status')
       next.delete('team')
+      next.delete('quarter')
       return next
     }, { replace: true })
   }
@@ -443,12 +463,16 @@ export function ProjectsPage() {
         const teams = projectTeamsMap.get(p.issueKey)
         if (!teams || !Array.from(selectedTeams).some(t => teams.has(t))) return false
       }
+      if (selectedQuarters.size > 0) {
+        const q = p.quarterLabel || '__NO_QUARTER__'
+        if (!selectedQuarters.has(q)) return false
+      }
       if (searchMatchedProjectKeys) {
         if (!searchMatchedProjectKeys.has(p.issueKey)) return false
       }
       return true
     })
-  }, [listProjects, selectedPMs, selectedStatuses, selectedTeams, searchMatchedProjectKeys, projectTeamsMap])
+  }, [listProjects, selectedPMs, selectedStatuses, selectedTeams, selectedQuarters, searchMatchedProjectKeys, projectTeamsMap])
 
   // Sort list
   const sortedListProjects = useMemo(() => {
@@ -488,6 +512,12 @@ export function ProjectsPage() {
     if (selectedStatuses.size > 0) {
       result = result.filter(p => selectedStatuses.has(p.status))
     }
+    if (selectedQuarters.size > 0) {
+      result = result.filter(p => {
+        const q = p.quarterLabel || '__NO_QUARTER__'
+        return selectedQuarters.has(q)
+      })
+    }
     if (searchMatchedProjectKeys) {
       result = result.filter(p => searchMatchedProjectKeys.has(p.issueKey))
     }
@@ -501,7 +531,7 @@ export function ProjectsPage() {
         .filter((p): p is ProjectTimelineDto => p !== null)
     }
     return result
-  }, [timelineProjects, selectedPMs, selectedStatuses, selectedTeams, searchMatchedProjectKeys])
+  }, [timelineProjects, selectedPMs, selectedStatuses, selectedTeams, selectedQuarters, searchMatchedProjectKeys])
 
   // List expand handler (multi-expand)
   const handleToggle = async (issueKey: string) => {
@@ -581,11 +611,14 @@ export function ProjectsPage() {
     for (const team of selectedTeams) {
       result.push({ category: 'Team', value: team, color: teamColorMap.get(team), onRemove: () => handleTeamToggle(team) })
     }
+    for (const quarter of selectedQuarters) {
+      result.push({ category: 'Quarter', value: quarter === '__NO_QUARTER__' ? 'No Quarter' : quarter, onRemove: () => handleQuarterToggle(quarter) })
+    }
     if (search) {
       result.push({ category: 'Search', value: `"${search}"`, onRemove: () => updateParam('search', null) })
     }
     return result
-  }, [selectedPMs, selectedStatuses, selectedTeams, search, statusColorMap, teamColorMap])
+  }, [selectedPMs, selectedStatuses, selectedTeams, selectedQuarters, search, statusColorMap, teamColorMap])
 
   // Sorted timeline projects (same sort logic as list)
   const sortedTimelineProjects = useMemo(() => {
@@ -739,6 +772,17 @@ export function ProjectsPage() {
                 onToggle={handleTeamToggle}
                 placeholder="All teams"
                 colorMap={teamColorMap}
+              />
+            )}
+
+            {availableQuarters.length > 0 && (
+              <MultiSelectDropdown
+                label="Quarter"
+                options={availableQuarters}
+                selected={selectedQuarters}
+                onToggle={handleQuarterToggle}
+                placeholder="All quarters"
+                renderOption={(option) => option === '__NO_QUARTER__' ? 'No Quarter' : option}
               />
             )}
 

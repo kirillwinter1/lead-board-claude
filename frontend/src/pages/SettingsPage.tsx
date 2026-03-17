@@ -309,7 +309,7 @@ export function SettingsPage() {
                   <td>{syncStatus?.issuesCount ?? '-'}</td>
                   <td style={{ fontSize: '0.85em' }}>
                     {syncStatus?.lastSyncCompletedAt
-                      ? new Date(syncStatus.lastSyncCompletedAt).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                      ? new Date(syncStatus.lastSyncCompletedAt).toLocaleString(undefined, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
                       : 'Never'}
                     {syncStatus?.syncInProgress && <span style={{ marginLeft: 4, color: '#0052CC' }}>syncing...</span>}
                   </td>

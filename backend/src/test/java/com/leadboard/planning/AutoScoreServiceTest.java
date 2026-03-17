@@ -64,7 +64,7 @@ class AutoScoreServiceTest {
             int count = autoScoreService.recalculateAll();
 
             assertEquals(2, count);
-            verify(issueRepository, times(2)).save(any(JiraIssueEntity.class));
+            verify(issueRepository).saveAll(any());
         }
 
         @Test
@@ -78,10 +78,7 @@ class AutoScoreServiceTest {
 
             autoScoreService.recalculateAll();
 
-            ArgumentCaptor<JiraIssueEntity> captor = ArgumentCaptor.forClass(JiraIssueEntity.class);
-            verify(issueRepository).save(captor.capture());
-
-            assertNotNull(captor.getValue().getAutoScoreCalculatedAt());
+            assertNotNull(epic.getAutoScoreCalculatedAt());
         }
 
         @Test
@@ -92,7 +89,6 @@ class AutoScoreServiceTest {
             int count = autoScoreService.recalculateAll();
 
             assertEquals(0, count);
-            verify(issueRepository, never()).save(any(JiraIssueEntity.class));
         }
 
         @Test
@@ -131,7 +127,7 @@ class AutoScoreServiceTest {
             int count = autoScoreService.recalculateForTeam(1L);
 
             assertEquals(1, count);
-            verify(issueRepository).save(epic);
+            verify(issueRepository).saveAll(any());
         }
 
         @Test

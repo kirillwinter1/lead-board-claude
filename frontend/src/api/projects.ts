@@ -16,6 +16,7 @@ export interface ProjectDto {
   expectedDone: string | null
   riceScore: number | null
   riceNormalizedScore: number | null
+  quarterLabel: string | null
 }
 
 export interface ChildEpicDto {

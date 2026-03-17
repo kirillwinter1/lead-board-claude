@@ -71,6 +71,8 @@ class WorkflowConfigControllerTest {
     private TenantRepository tenantRepository;
     @MockBean
     private com.leadboard.jira.JiraClient jiraClient;
+    @MockBean
+    private com.leadboard.config.ObservabilityMetrics observabilityMetrics;
 
     @Test
     void getConfig_returnsFullConfiguration() throws Exception {

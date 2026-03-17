@@ -1,0 +1,44 @@
+.tis-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.tis-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #6b778c;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: #f4f5f7;
+  border-bottom: 2px solid #DFE1E6;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.tis-table th:hover {
+  background: #ebecf0;
+}
+
+.tis-th-num {
+  text-align: right !important;
+}
+
+.tis-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #EBECF0;
+  color: #172b4d;
+}
+
+.tis-td-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.tis-table tbody tr:hover {
+  background: #f4f5f7;
+}

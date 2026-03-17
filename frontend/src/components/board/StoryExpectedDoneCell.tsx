@@ -15,7 +15,7 @@ export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: Stor
 
   const formatDate = (dateStr: string): string => {
     const date = new Date(dateStr)
-    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+    return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
   }
 
   const formatDateRange = (start: string | null | undefined, end: string | null | undefined): string => {

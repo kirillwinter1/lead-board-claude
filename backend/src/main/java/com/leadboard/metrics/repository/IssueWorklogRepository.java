@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -41,4 +42,22 @@ public interface IssueWorklogRepository extends JpaRepository<IssueWorklogEntity
             ORDER BY w.started_date
             """, nativeQuery = true)
     List<Object[]> findDailyTimeSpentByIssueKeys(@Param("keys") List<String> keys);
+
+    /**
+     * Aggregate daily worklogs per author for the worklog timeline.
+     * Groups by author_account_id + started_date, returns total seconds per day.
+     */
+    @Query(value = """
+            SELECT w.author_account_id, w.started_date, SUM(w.time_spent_seconds) as total_seconds
+            FROM issue_worklogs w
+            WHERE w.author_account_id IN :accountIds
+              AND w.started_date BETWEEN :fromDate AND :toDate
+            GROUP BY w.author_account_id, w.started_date
+            ORDER BY w.author_account_id, w.started_date
+            """, nativeQuery = true)
+    List<Object[]> findDailyWorklogsByAuthors(
+            @Param("accountIds") List<String> accountIds,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate
+    );
 }

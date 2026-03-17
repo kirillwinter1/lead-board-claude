@@ -9,6 +9,7 @@ interface MultiSelectDropdownProps {
   placeholder?: string
   colorMap?: Map<string, string>
   countMap?: Map<string, number>
+  renderOption?: (option: string) => string
 }
 
 export function MultiSelectDropdown({
@@ -19,6 +20,7 @@ export function MultiSelectDropdown({
   placeholder = 'All',
   colorMap,
   countMap,
+  renderOption,
 }: MultiSelectDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -90,7 +92,7 @@ export function MultiSelectDropdown({
                     }}
                   />
                 )}
-                <span className="filter-dropdown-item-label">{option}</span>
+                <span className="filter-dropdown-item-label">{renderOption ? renderOption(option) : option}</span>
                 {countMap?.has(option) && (
                   <span className="filter-dropdown-item-count">{countMap.get(option)}</span>
                 )}

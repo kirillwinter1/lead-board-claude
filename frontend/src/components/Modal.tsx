@@ -27,7 +27,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth }: ModalProps
   if (!isOpen) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} role="presentation">
       <div className="modal-content" style={maxWidth ? { maxWidth } : undefined} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">{title}</h2>

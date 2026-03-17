@@ -1,0 +1,44 @@
+.metrics-section {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #DFE1E6;
+  overflow: hidden;
+}
+
+.metrics-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  background: #FAFBFC;
+  border: none;
+  border-bottom: 1px solid #EBECF0;
+  cursor: pointer;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.metrics-section-header:hover {
+  background: #F4F5F7;
+}
+
+.metrics-section-chevron {
+  font-size: 10px;
+  color: #6b778c;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.metrics-section-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.metrics-section-content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 20px;
+}

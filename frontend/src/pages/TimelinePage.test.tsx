@@ -117,8 +117,8 @@ describe('TimelinePage', () => {
       renderTimelinePage()
 
       await waitFor(() => {
-        expect(screen.getByText('Team Alpha')).toBeInTheDocument()
-        expect(screen.getByText('Team Beta')).toBeInTheDocument()
+        expect(screen.getAllByText('Team Alpha').length).toBeGreaterThan(0)
+        expect(screen.getByText('Today (live)')).toBeInTheDocument()
       })
     })
 
@@ -145,13 +145,13 @@ describe('TimelinePage', () => {
       renderTimelinePage()
 
       await waitFor(() => {
-        expect(screen.getByText('Team Alpha')).toBeInTheDocument()
+        expect(screen.getAllByText('Team Alpha').length).toBeGreaterThan(0)
       })
 
       vi.mocked(forecastApi.getUnifiedPlanning).mockClear()
 
-      const selects = screen.getAllByRole('combobox')
-      fireEvent.change(selects[0], { target: { value: '2' } })
+      fireEvent.click(screen.getAllByText('Team Alpha')[0])
+      fireEvent.click(screen.getByText('Team Beta'))
 
       await waitFor(() => {
         expect(forecastApi.getUnifiedPlanning).toHaveBeenCalledWith(2)

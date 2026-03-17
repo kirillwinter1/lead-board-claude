@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Service for checking data quality rules on Jira issues.
@@ -227,12 +228,17 @@ public class DataQualityService {
             }
         }
 
-        // STORY_BLOCKED_BY_MISSING - Story is blocked by non-existent issue
+        // Batch-load all blockers in one query to avoid N+1
         List<String> isBlockedBy = story.getIsBlockedBy();
+        final Map<String, JiraIssueEntity> blockerMap = (isBlockedBy != null && !isBlockedBy.isEmpty())
+                ? issueRepository.findByIssueKeyIn(new ArrayList<>(isBlockedBy)).stream()
+                        .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, e -> e))
+                : Map.of();
+
+        // STORY_BLOCKED_BY_MISSING - Story is blocked by non-existent issue
         if (isBlockedBy != null && !isBlockedBy.isEmpty()) {
             for (String blockerKey : isBlockedBy) {
-                Optional<JiraIssueEntity> blocker = issueRepository.findByIssueKey(blockerKey);
-                if (blocker.isEmpty()) {
+                if (!blockerMap.containsKey(blockerKey)) {
                     violations.add(DataQualityViolation.of(
                             DataQualityRule.STORY_BLOCKED_BY_MISSING,
                             blockerKey
@@ -256,24 +262,28 @@ public class DataQualityService {
             if (storyCreated != null) {
                 long daysSinceCreated = ChronoUnit.DAYS.between(storyCreated, OffsetDateTime.now());
                 if (daysSinceCreated > 30) {
-                    // Check if blocking stories have made progress
-                    for (String blockerKey : isBlockedBy) {
-                        Optional<JiraIssueEntity> blocker = issueRepository.findByIssueKey(blockerKey);
-                        if (blocker.isPresent()) {
-                            JiraIssueEntity blockerIssue = blocker.get();
-                            // If blocker is not done and has no time logged in subtasks, no progress
-                            if (!workflowConfigService.isDone(blockerIssue.getStatus(), blockerIssue.getIssueType())) {
-                                List<JiraIssueEntity> blockerSubtasks = issueRepository.findByParentKey(blockerKey);
-                                long blockerTimeSpent = blockerSubtasks.stream()
-                                        .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
-                                        .sum();
-                                if (blockerTimeSpent == 0) {
-                                    violations.add(DataQualityViolation.of(
-                                            DataQualityRule.STORY_BLOCKED_NO_PROGRESS,
-                                            blockerKey
-                                    ));
-                                }
-                            }
+                    // Batch-load subtasks of all blockers in one query
+                    List<String> notDoneBlockerKeys = isBlockedBy.stream()
+                            .filter(blockerMap::containsKey)
+                            .filter(key -> !workflowConfigService.isDone(
+                                    blockerMap.get(key).getStatus(), blockerMap.get(key).getIssueType()))
+                            .toList();
+                    Map<String, List<JiraIssueEntity>> blockerSubtasksByParent = Map.of();
+                    if (!notDoneBlockerKeys.isEmpty()) {
+                        blockerSubtasksByParent = issueRepository.findByParentKeyIn(new ArrayList<>(notDoneBlockerKeys)).stream()
+                                .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+                    }
+
+                    for (String blockerKey : notDoneBlockerKeys) {
+                        List<JiraIssueEntity> blockerSubtasks = blockerSubtasksByParent.getOrDefault(blockerKey, List.of());
+                        long blockerTimeSpent = blockerSubtasks.stream()
+                                .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
+                                .sum();
+                        if (blockerTimeSpent == 0) {
+                            violations.add(DataQualityViolation.of(
+                                    DataQualityRule.STORY_BLOCKED_NO_PROGRESS,
+                                    blockerKey
+                            ));
                         }
                     }
                 }
@@ -493,18 +503,14 @@ public class DataQualityService {
     /**
      * Checks if any subtasks in the hierarchy have estimates.
      * Only subtask estimates count - story-level estimates are ignored.
+     * Uses batch query to avoid N+1.
      */
     private boolean hasEstimatesInHierarchy(List<JiraIssueEntity> children) {
-        for (JiraIssueEntity child : children) {
-            // Check subtasks of this child - only subtask estimates count
-            List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(child.getIssueKey());
-            for (JiraIssueEntity subtask : subtasks) {
-                if (subtask.getOriginalEstimateSeconds() != null && subtask.getOriginalEstimateSeconds() > 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        if (children.isEmpty()) return false;
+        List<String> childKeys = children.stream().map(JiraIssueEntity::getIssueKey).toList();
+        List<JiraIssueEntity> allSubtasks = issueRepository.findByParentKeyIn(childKeys);
+        return allSubtasks.stream()
+                .anyMatch(subtask -> subtask.getOriginalEstimateSeconds() != null && subtask.getOriginalEstimateSeconds() > 0);
     }
 
     /**
@@ -523,7 +529,8 @@ public class DataQualityService {
     }
 
     /**
-     * Checks for circular dependencies using DFS.
+     * Checks for circular dependencies using DFS with pre-loaded issue map.
+     * Pre-loads all reachable issues via batch queries to avoid N+1.
      *
      * @param storyKey The story to check
      * @param visited Set of visited stories (for building path)
@@ -531,22 +538,58 @@ public class DataQualityService {
      * @return true if circular dependency detected
      */
     private boolean hasCircularDependency(String storyKey, Set<String> visited, Set<String> recStack) {
+        // Pre-load all reachable issues into a map using BFS batch loading
+        Map<String, JiraIssueEntity> issueCache = new HashMap<>();
+        Set<String> toLoad = new HashSet<>();
+        toLoad.add(storyKey);
+
+        while (!toLoad.isEmpty()) {
+            List<String> keysToFetch = toLoad.stream()
+                    .filter(k -> !issueCache.containsKey(k))
+                    .toList();
+            if (keysToFetch.isEmpty()) break;
+
+            List<JiraIssueEntity> loaded = issueRepository.findByIssueKeyIn(new ArrayList<>(keysToFetch));
+            for (JiraIssueEntity issue : loaded) {
+                issueCache.put(issue.getIssueKey(), issue);
+            }
+            // Mark missing keys so we don't try to load them again
+            for (String key : keysToFetch) {
+                issueCache.putIfAbsent(key, null);
+            }
+
+            toLoad.clear();
+            for (JiraIssueEntity issue : loaded) {
+                List<String> blockers = issue.getIsBlockedBy();
+                if (blockers != null) {
+                    for (String blocker : blockers) {
+                        if (!issueCache.containsKey(blocker)) {
+                            toLoad.add(blocker);
+                        }
+                    }
+                }
+            }
+        }
+
+        return hasCircularDependencyDfs(storyKey, visited, recStack, issueCache);
+    }
+
+    private boolean hasCircularDependencyDfs(String storyKey, Set<String> visited, Set<String> recStack,
+                                              Map<String, JiraIssueEntity> issueCache) {
         visited.add(storyKey);
         recStack.add(storyKey);
 
-        Optional<JiraIssueEntity> storyOpt = issueRepository.findByIssueKey(storyKey);
-        if (storyOpt.isEmpty()) {
+        JiraIssueEntity story = issueCache.get(storyKey);
+        if (story == null) {
             recStack.remove(storyKey);
             return false;
         }
 
-        JiraIssueEntity story = storyOpt.get();
         List<String> isBlockedBy = story.getIsBlockedBy();
-
         if (isBlockedBy != null) {
             for (String blocker : isBlockedBy) {
                 if (!visited.contains(blocker)) {
-                    if (hasCircularDependency(blocker, visited, recStack)) {
+                    if (hasCircularDependencyDfs(blocker, visited, recStack, issueCache)) {
                         return true;
                     }
                 } else if (recStack.contains(blocker)) {

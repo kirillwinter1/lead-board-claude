@@ -4,6 +4,12 @@ import { ProjectTimelineDto, EpicTimelineDto } from '../api/projects'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { StatusBadge } from './board/StatusBadge'
 import { getIssueIcon } from './board/helpers'
+import {
+  PROGRESS_COMPLETE, PROGRESS_IN_PROGRESS, CHART_GRID,
+  TOOLTIP_BG, TOOLTIP_HIGHLIGHT, TOOLTIP_TEXT, TOOLTIP_LABEL,
+  TOOLTIP_DIVIDER, TOOLTIP_PROGRESS_TRACK, TOOLTIP_SUCCESS, TOOLTIP_VALUE, TOOLTIP_ACCENT,
+  lightenColor,
+} from '../constants/colors'
 import '../pages/ProjectTimelinePage.css'
 
 export type ZoomLevel = 'day' | 'week' | 'month'
@@ -63,15 +69,8 @@ function formatDateShort(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-export function lightenColor(hex: string, factor: number): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
-  const lr = Math.round(r + (255 - r) * factor)
-  const lg = Math.round(g + (255 - g) * factor)
-  const lb = Math.round(b + (255 - b) * factor)
-  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
-}
+// Re-export lightenColor for backward compatibility (ProjectsPage imports it from here)
+export { lightenColor }
 
 function calculateDateRange(projects: ProjectTimelineDto[]): DateRange {
   const today = new Date()
@@ -412,7 +411,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
           className="pt-project-bar-progress"
           style={{
             width: `${project.progressPercent}%`,
-            background: project.progressPercent >= 100 ? '#36B37E' : '#0065FF',
+            background: project.progressPercent >= 100 ? PROGRESS_COMPLETE : PROGRESS_IN_PROGRESS,
           }}
         />
       </div>
@@ -457,7 +456,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                         className="pt-progress-bar-fill"
                         style={{
                           width: `${p.progressPercent}%`,
-                          background: p.progressPercent >= 100 ? '#36B37E' : '#0065FF',
+                          background: p.progressPercent >= 100 ? PROGRESS_COMPLETE : PROGRESS_IN_PROGRESS,
                         }}
                       />
                     </div>
@@ -503,7 +502,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             <div className="pt-header-group">
               {groupHeaders.map((g, i) => (
                 <div
-                  key={i}
+                  key={`g-${i}-${g.label}`}
                   className="pt-header-group-cell"
                   style={{ width: `${g.span * ZOOM_UNIT_WIDTH[zoom]}px`, flex: 'none' }}
                 >
@@ -515,7 +514,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
               <div className="pt-header-week">
                 {weekHeaders.map((w, i) => (
                   <div
-                    key={i}
+                    key={`w-${i}-${w.label}`}
                     className="pt-header-week-cell"
                     style={{ width: `${w.span * ZOOM_UNIT_WIDTH[zoom]}px`, flex: 'none' }}
                   >
@@ -525,9 +524,9 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
               </div>
             )}
             <div className="pt-header-unit">
-              {headers.map((h, i) => (
+              {headers.map((h) => (
                 <div
-                  key={i}
+                  key={h.date.toISOString()}
                   className={`pt-header-cell${zoom === 'day' && isWeekend(h.date) ? ' pt-header-cell-weekend' : ''}`}
                   style={{ width: `${ZOOM_UNIT_WIDTH[zoom]}px`, flex: 'none' }}
                 >
@@ -542,7 +541,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             style={{
               width: `${chartWidth}px`,
               minWidth: `${chartWidth}px`,
-              backgroundImage: `repeating-linear-gradient(to right, transparent, transparent ${ZOOM_UNIT_WIDTH[zoom] - 1}px, #ebecf0 ${ZOOM_UNIT_WIDTH[zoom] - 1}px, #ebecf0 ${ZOOM_UNIT_WIDTH[zoom]}px)`,
+              backgroundImage: `repeating-linear-gradient(to right, transparent, transparent ${ZOOM_UNIT_WIDTH[zoom] - 1}px, ${CHART_GRID} ${ZOOM_UNIT_WIDTH[zoom] - 1}px, ${CHART_GRID} ${ZOOM_UNIT_WIDTH[zoom]}px)`,
               backgroundSize: `${ZOOM_UNIT_WIDTH[zoom]}px 100%`,
               position: 'relative',
             }}
@@ -609,7 +608,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             transform: 'translateY(-100%)',
             zIndex: 10000,
             pointerEvents: 'none',
-            background: 'rgba(23, 43, 77, 0.98)',
+            background: TOOLTIP_BG,
             borderRadius: 8,
             padding: 14,
             minWidth: 300,
@@ -620,15 +619,15 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{hoveredEpic.epicKey}</span>
+            <span style={{ fontWeight: 600, color: TOOLTIP_HIGHLIGHT }}>{hoveredEpic.epicKey}</span>
             <StatusBadge status={hoveredEpic.status || 'Unknown'} />
           </div>
-          <div style={{ color: '#B3BAC5', marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>{hoveredEpic.summary}</div>
+          <div style={{ color: TOOLTIP_TEXT, marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>{hoveredEpic.summary}</div>
           {hoveredEpic.progressPercent != null && (
             <div style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <span style={{ color: '#8993A4', fontSize: 11 }}>Progress</span>
-                <span style={{ color: '#B3BAC5', fontSize: 11 }}>
+                <span style={{ color: TOOLTIP_LABEL, fontSize: 11 }}>Progress</span>
+                <span style={{ color: TOOLTIP_TEXT, fontSize: 11 }}>
                   {hoveredEpic.roleProgress ? (() => {
                     let totalLogged = 0, totalEst = 0
                     Object.values(hoveredEpic.roleProgress!).forEach(rp => {
@@ -639,23 +638,23 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                   })() : ''}
                 </span>
               </div>
-              <div style={{ width: '100%', height: 8, backgroundColor: '#42526e', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: 8, backgroundColor: TOOLTIP_PROGRESS_TRACK, borderRadius: 4, overflow: 'hidden' }}>
                 <div style={{
                   width: `${hoveredEpic.progressPercent}%`,
                   height: '100%',
-                  backgroundColor: (hoveredEpic.progressPercent ?? 0) >= 100 ? '#36B37E' : '#0065FF',
+                  backgroundColor: (hoveredEpic.progressPercent ?? 0) >= 100 ? PROGRESS_COMPLETE : PROGRESS_IN_PROGRESS,
                   borderRadius: 4,
                 }} />
               </div>
-              <div style={{ textAlign: 'right', color: '#B3BAC5', fontSize: 12, marginTop: 2 }}>
+              <div style={{ textAlign: 'right', color: TOOLTIP_TEXT, fontSize: 12, marginTop: 2 }}>
                 {hoveredEpic.progressPercent}%
               </div>
             </div>
           )}
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12 }}>
             <div>
-              <span style={{ color: '#8993A4' }}>Dates: </span>
-              <span style={{ color: '#B3BAC5' }}>
+              <span style={{ color: TOOLTIP_LABEL }}>Dates: </span>
+              <span style={{ color: TOOLTIP_TEXT }}>
                 {hoveredEpic.startDate ? formatDateShort(new Date(hoveredEpic.startDate)) : '\u2014'}
                 {' \u2192 '}
                 {hoveredEpic.endDate ? formatDateShort(new Date(hoveredEpic.endDate)) : '\u2014'}
@@ -663,12 +662,12 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             </div>
           </div>
           {hoveredEpic.teamName && (
-            <div style={{ fontSize: 11, color: '#8993A4', marginBottom: 8 }}>
-              Team: <span style={{ color: hoveredEpic.teamColor || '#B3BAC5' }}>{hoveredEpic.teamName}</span>
+            <div style={{ fontSize: 11, color: TOOLTIP_LABEL, marginBottom: 8 }}>
+              Team: <span style={{ color: hoveredEpic.teamColor || TOOLTIP_TEXT }}>{hoveredEpic.teamName}</span>
             </div>
           )}
           {hoveredEpic.roleProgress && (
-            <div style={{ borderTop: '1px solid #42526e', paddingTop: 10 }}>
+            <div style={{ borderTop: `1px solid ${TOOLTIP_DIVIDER}`, paddingTop: 10 }}>
               <table style={{ width: '100%', fontSize: 12 }}>
                 <tbody>
                   {roleCodes.filter(r => hoveredEpic.roleProgress?.[r]).map(role => {
@@ -677,9 +676,9 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                       <tr key={role}>
                         <td style={{ padding: '3px 4px' }}>
                           <span style={{ color: getRoleColor(role) }}>{'\u25CF'}</span> {role}
-                          {rp.completed && <span style={{ color: '#22c55e', marginLeft: 4 }}>{'\u2713'}</span>}
+                          {rp.completed && <span style={{ color: TOOLTIP_SUCCESS, marginLeft: 4 }}>{'\u2713'}</span>}
                         </td>
-                        <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                        <td style={{ padding: '3px 4px', textAlign: 'right', color: TOOLTIP_VALUE }}>
                           {formatHours(rp.loggedSeconds)}/{formatHours(rp.estimateSeconds)}
                         </td>
                       </tr>
@@ -690,8 +689,8 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             </div>
           )}
           {hoveredEpic.isRoughEstimate && hoveredEpic.roughEstimates && (
-            <div style={{ borderTop: '1px solid #42526e', paddingTop: 10 }}>
-              <div style={{ color: '#8993A4', fontSize: 11, marginBottom: 4 }}>Rough Estimate</div>
+            <div style={{ borderTop: `1px solid ${TOOLTIP_DIVIDER}`, paddingTop: 10 }}>
+              <div style={{ color: TOOLTIP_LABEL, fontSize: 11, marginBottom: 4 }}>Rough Estimate</div>
               {roleCodes.filter(r => (hoveredEpic.roughEstimates?.[r] ?? 0) > 0).map(role => (
                 <div key={role} style={{ fontSize: 12, padding: '2px 4px' }}>
                   <span style={{ color: getRoleColor(role) }}>{'\u25CF'}</span> {role}: {hoveredEpic.roughEstimates![role]}d
@@ -714,7 +713,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             transform: 'translateY(-100%)',
             zIndex: 10000,
             pointerEvents: 'none',
-            background: 'rgba(23, 43, 77, 0.98)',
+            background: TOOLTIP_BG,
             borderRadius: 8,
             padding: 14,
             minWidth: 260,
@@ -725,41 +724,41 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{hoveredProject.issueKey}</span>
+            <span style={{ fontWeight: 600, color: TOOLTIP_HIGHLIGHT }}>{hoveredProject.issueKey}</span>
             <StatusBadge status={hoveredProject.status} />
           </div>
-          <div style={{ color: '#B3BAC5', marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>{hoveredProject.summary}</div>
+          <div style={{ color: TOOLTIP_TEXT, marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>{hoveredProject.summary}</div>
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12 }}>
             <div>
-              <span style={{ color: '#8993A4' }}>Epics: </span>
-              <span style={{ color: '#B3BAC5' }}>{hoveredProject.epics.length}</span>
+              <span style={{ color: TOOLTIP_LABEL }}>Epics: </span>
+              <span style={{ color: TOOLTIP_TEXT }}>{hoveredProject.epics.length}</span>
             </div>
             {hoveredProject.riceNormalizedScore != null && (
               <div>
-                <span style={{ color: '#8993A4' }}>RICE: </span>
-                <span style={{ color: '#FFD700', fontWeight: 600 }}>{hoveredProject.riceNormalizedScore}</span>
+                <span style={{ color: TOOLTIP_LABEL }}>RICE: </span>
+                <span style={{ color: TOOLTIP_ACCENT, fontWeight: 600 }}>{hoveredProject.riceNormalizedScore}</span>
               </div>
             )}
             {hoveredProject.quarterLabel && (
               <div>
-                <span style={{ color: '#8993A4' }}>Quarter: </span>
-                <span style={{ color: '#B3BAC5' }}>{hoveredProject.quarterLabel}</span>
+                <span style={{ color: TOOLTIP_LABEL }}>Quarter: </span>
+                <span style={{ color: TOOLTIP_TEXT }}>{hoveredProject.quarterLabel}</span>
               </div>
             )}
           </div>
           <div style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ color: '#8993A4', fontSize: 11 }}>Progress</span>
+              <span style={{ color: TOOLTIP_LABEL, fontSize: 11 }}>Progress</span>
             </div>
-            <div style={{ width: '100%', height: 8, backgroundColor: '#42526e', borderRadius: 4, overflow: 'hidden' }}>
+            <div style={{ width: '100%', height: 8, backgroundColor: TOOLTIP_PROGRESS_TRACK, borderRadius: 4, overflow: 'hidden' }}>
               <div style={{
                 width: `${hoveredProject.progressPercent}%`,
                 height: '100%',
-                backgroundColor: hoveredProject.progressPercent >= 100 ? '#36B37E' : '#0065FF',
+                backgroundColor: hoveredProject.progressPercent >= 100 ? PROGRESS_COMPLETE : PROGRESS_IN_PROGRESS,
                 borderRadius: 4,
               }} />
             </div>
-            <div style={{ textAlign: 'right', color: '#B3BAC5', fontSize: 12, marginTop: 2 }}>
+            <div style={{ textAlign: 'right', color: TOOLTIP_TEXT, fontSize: 12, marginTop: 2 }}>
               {hoveredProject.progressPercent}%
             </div>
           </div>
@@ -767,8 +766,8 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
             const range = projectDateRanges[hoveredProject.issueKey]
             if (!range?.start || !range?.end) return null
             return (
-              <div style={{ fontSize: 12, color: '#B3BAC5' }}>
-                <span style={{ color: '#8993A4' }}>Dates: </span>
+              <div style={{ fontSize: 12, color: TOOLTIP_TEXT }}>
+                <span style={{ color: TOOLTIP_LABEL }}>Dates: </span>
                 {formatDateShort(range.start)} {'\u2192'} {formatDateShort(range.end)}
               </div>
             )

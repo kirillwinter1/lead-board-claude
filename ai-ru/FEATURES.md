@@ -66,6 +66,8 @@
 | F64 | Multi-Project Support | 2026-03-06 | [features/F64](features/F64_MULTI_PROJECT_SUPPORT.md) |
 | F65 | Worklog Timeline | 2026-03-08 | [features/F65](features/F65_WORKLOG_TIMELINE.md) |
 | F66 | Jira Priority Icons on Board | 2026-03-09 | [features/F66](features/F66_PRIORITY_ICONS.md) |
+| F67 | Quarter Label & Filter on Board and Projects | 2026-03-10 | [features/F67](features/F67_QUARTER_FILTER.md) |
+| F68 | Quarterly Planning Production UI | 2026-03-16 | [features/F68](features/F68_QUARTERLY_PLANNING_PRODUCTION.md) |
 
 ## Бэклог (BF)
 

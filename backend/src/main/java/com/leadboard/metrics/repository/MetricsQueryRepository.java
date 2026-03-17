@@ -94,9 +94,73 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             @Param("epicKey") String epicKey);
 
     /**
-     * Extended assignee metrics with personal DSR, velocity, and trend calculation.
-     * Returns: account_id, display_name, issues_closed, avg_lead_time, avg_cycle_time,
-     *          personal_dsr, total_time_spent_hours, total_estimate_hours, issues_prev_period
+     * Get completed issues with time_spent for velocity calculation.
+     * Returns: time_spent_seconds, started_at::date, done_at::date
+     */
+    @Query(value = """
+        SELECT
+            COALESCE(time_spent_seconds, 0) as time_spent,
+            CAST(started_at AS date) as started,
+            CAST(done_at AS date) as done
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at IS NOT NULL
+          AND done_at BETWEEN :from AND :to
+          AND COALESCE(time_spent_seconds, 0) > 0
+        """, nativeQuery = true)
+    List<Object[]> getVelocityData(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Count issues in scope (completed in date range for team).
+     */
+    @Query(value = """
+        SELECT COUNT(*)
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+        """, nativeQuery = true)
+    int countIssuesInScope(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Count issues with changelog data.
+     */
+    @Query(value = """
+        SELECT COUNT(DISTINCT sc.issue_key)
+        FROM status_changelog sc
+        JOIN jira_issues ji ON sc.issue_key = ji.issue_key
+        WHERE ji.team_id = :teamId
+          AND ji.done_at BETWEEN :from AND :to
+        """, nativeQuery = true)
+    int countIssuesWithChangelog(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Count blocked (flagged) and aging (in-progress > threshold) issues.
+     * Returns: [flaggedCount, agingCount]
+     */
+    @Query(value = """
+        SELECT
+            COUNT(CASE WHEN flagged = true THEN 1 END) as flagged_count,
+            COUNT(CASE WHEN started_at IS NOT NULL AND done_at IS NULL
+                       AND started_at < :threshold THEN 1 END) as aging_count
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at IS NULL
+        """, nativeQuery = true)
+    Object[] countBlockedAndAgingIssues(
+            @Param("teamId") Long teamId,
+            @Param("threshold") OffsetDateTime threshold);
+
+    /**
+     * Extended assignee metrics with previous period cycle time.
      */
     @Query(value = """
         WITH current_period AS (
@@ -124,7 +188,8 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
         prev_period AS (
             SELECT
                 assignee_account_id,
-                COUNT(*) as issues_closed_prev
+                COUNT(*) as issues_closed_prev,
+                AVG(EXTRACT(EPOCH FROM (done_at - COALESCE(started_at, jira_created_at))) / 86400.0) as avg_cycle_time_prev
             FROM jira_issues
             WHERE team_id = ?1
               AND done_at BETWEEN ?4 AND ?2
@@ -141,12 +206,13 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             c.personal_dsr,
             c.total_time_spent_hours,
             c.total_estimate_hours,
-            COALESCE(p.issues_closed_prev, 0) as issues_prev_period
+            COALESCE(p.issues_closed_prev, 0) as issues_prev_period,
+            p.avg_cycle_time_prev
         FROM current_period c
         LEFT JOIN prev_period p ON c.assignee_account_id = p.assignee_account_id
         ORDER BY c.issues_closed DESC
         """, nativeQuery = true)
-    List<Object[]> getExtendedMetricsByAssignee(
+    List<Object[]> getExtendedMetricsByAssigneeV2(
             Long teamId,
             OffsetDateTime from,
             OffsetDateTime to,

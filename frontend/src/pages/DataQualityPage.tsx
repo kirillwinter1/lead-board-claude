@@ -130,8 +130,8 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
         </td>
         <td className="cell-count">{issue.violations.length}</td>
       </tr>
-      {expanded && issue.violations.map((v, i) => (
-        <tr key={i} className="violation-detail-row">
+      {expanded && issue.violations.map((v) => (
+        <tr key={`${issue.issueKey}-${v.rule}-${v.severity}`} className="violation-detail-row">
           <td></td>
           <td colSpan={6}>
             <div className="violation-detail">

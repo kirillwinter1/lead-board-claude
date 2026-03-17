@@ -89,8 +89,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
     const d = new Date()
     d.setHours(0, 0, 0, 0)
     return d
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startDate])
+  }, [])
 
   const todayOffset = useMemo(() => {
     const diff = daysBetween(startDate, today)

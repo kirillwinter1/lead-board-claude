@@ -38,6 +38,7 @@ public class BoardNode {
     private String projectKey; // Jira project key (e.g. "LB", "PROJ2")
     private String priority; // Jira priority name (e.g. "High", "Medium")
     private String parentProjectKey; // Parent PROJECT issue key (Epic only)
+    private String quarterLabel; // Quarter label (e.g. "2026Q2") from Jira labels (Epic only)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
     private List<BoardNode> children = new ArrayList<>();
 
@@ -266,6 +267,14 @@ public class BoardNode {
 
     public void setParentProjectKey(String parentProjectKey) {
         this.parentProjectKey = parentProjectKey;
+    }
+
+    public String getQuarterLabel() {
+        return quarterLabel;
+    }
+
+    public void setQuarterLabel(String quarterLabel) {
+        this.quarterLabel = quarterLabel;
     }
 
     public List<DataQualityViolation> getAlerts() {

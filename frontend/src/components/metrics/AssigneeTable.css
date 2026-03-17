@@ -21,6 +21,16 @@
   background: #f4f5f7;
 }
 
+.metrics-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.metrics-table th.sortable:hover {
+  background: #ebecf0;
+}
+
 .metrics-table td {
   color: #172b4d;
 }
@@ -40,6 +50,45 @@
 
 .metrics-na {
   color: #a5adba;
+}
+
+/* Outlier */
+.outlier-row {
+  background: #fff5f5 !important;
+}
+
+.outlier-row:hover {
+  background: #ffebe6 !important;
+}
+
+.outlier-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #FF5630;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* Delta Badges */
+.delta-badge {
+  font-size: 11px;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.delta-up {
+  color: #36B37E;
+}
+
+.delta-down {
+  color: #FF5630;
 }
 
 /* Trend Icons */
@@ -69,6 +118,20 @@
   color: #6b778c;
 }
 
+/* Search */
+.assignee-search {
+  padding: 6px 12px;
+  border: 1px solid #DFE1E6;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 180px;
+  outline: none;
+}
+
+.assignee-search:focus {
+  border-color: #0052CC;
+}
+
 /* Legend */
 .assignee-table-legend {
   display: flex;
@@ -86,4 +149,3 @@
   align-items: center;
   gap: 4px;
 }
-

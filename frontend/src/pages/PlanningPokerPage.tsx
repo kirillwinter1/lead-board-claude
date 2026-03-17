@@ -124,7 +124,7 @@ export function PlanningPokerPage() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—'
-    return new Date(dateStr).toLocaleDateString('ru-RU', {
+    return new Date(dateStr).toLocaleDateString(undefined, {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',

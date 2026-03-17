@@ -63,3 +63,42 @@ export const AVATAR_BG = '#0052CC'
 
 // Jira link color
 export const LINK_COLOR = '#0052CC'
+
+// Error / danger
+export const ERROR_TEXT = '#DE350B'
+
+// Warning / recommendation callout
+export const WARNING_BG = '#FFFAE6'
+export const WARNING_BORDER = '#FFE380'
+
+// Separator / divider
+export const SEPARATOR = '#EBECF0'
+
+// Expanded / detail panel background
+export const BG_PANEL = '#FAFBFC'
+
+// Primary light button
+export const PRIMARY_LIGHT_BG = '#E9F2FF'
+export const PRIMARY_LIGHT_BORDER = '#B3D4FF'
+
+// Tooltip (dark background context)
+export const TOOLTIP_BG = 'rgba(23, 43, 77, 0.98)'
+export const TOOLTIP_HIGHLIGHT = '#B3D4FF'
+export const TOOLTIP_TEXT = '#B3BAC5'
+export const TOOLTIP_LABEL = '#8993A4'
+export const TOOLTIP_DIVIDER = '#42526e'
+export const TOOLTIP_PROGRESS_TRACK = '#42526e'
+export const TOOLTIP_SUCCESS = '#22c55e'
+export const TOOLTIP_VALUE = '#e5e7eb'
+export const TOOLTIP_ACCENT = '#FFD700'
+
+// Helper: lighten a hex color by a factor (0 = original, 1 = white)
+export function lightenColor(hex: string, factor: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  const lr = Math.round(r + (255 - r) * factor)
+  const lg = Math.round(g + (255 - g) * factor)
+  const lb = Math.round(b + (255 - b) * factor)
+  return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
+}

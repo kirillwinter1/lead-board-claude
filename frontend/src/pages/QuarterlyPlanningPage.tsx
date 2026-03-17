@@ -1,166 +1,120 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import axios from 'axios'
-import { MetricCard } from '../components/metrics/MetricCard'
-import { StatusBadge } from '../components/board/StatusBadge'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { TeamBadge } from '../components/TeamBadge'
-
-import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import {
   quarterlyPlanningApi,
-  QuarterlyDemandDto,
-  QuarterlySummaryDto,
-  ProjectViewDto,
-  EpicDemandDto,
+  QuarterlyProjectsResponse,
+  QuarterlyProjectOverviewDto,
+  QuarterlyTeamOverviewDto,
 } from '../api/quarterlyPlanning'
-import { ProjectDto } from '../api/projects'
 import './QuarterlyPlanningPage.css'
 
-interface Team {
-  id: number
-  name: string
-  color: string | null
-}
-
-interface ProjectOption {
-  issueKey: string
-  summary: string
-}
-
-type ViewTab = 'teams' | 'projects'
+type PlanningTab = 'projects' | 'readiness' | 'teams'
+type ProjectFilter = 'all' | 'in-quarter' | 'blocked' | 'not-added'
 
 export function QuarterlyPlanningPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
+  return <QuarterlyPlanningLivePage />
+}
+
+function QuarterlyPlanningLivePage() {
   const { getRoleColor, getRoleCodes } = useWorkflowConfig()
 
-  const [teams, setTeams] = useState<Team[]>([])
-  const [projects, setProjects] = useState<ProjectOption[]>([])
   const [availableQuarters, setAvailableQuarters] = useState<string[]>([])
-  const [quarter, setQuarter] = useState<string>('')
-  const [activeTab, setActiveTab] = useState<ViewTab>('teams')
+  const [quarter, setQuarter] = useState('')
+  const [activeTab, setActiveTab] = useState<PlanningTab>('projects')
+  const [filter, setFilter] = useState<ProjectFilter>('all')
+  const [selectedProjectKey, setSelectedProjectKey] = useState<string | null>(null)
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
 
-  // Team view state
-  const [teamDemand, setTeamDemand] = useState<QuarterlyDemandDto | null>(null)
-  const [summary, setSummary] = useState<QuarterlySummaryDto | null>(null)
-
-  // Project view state
-  const [projectView, setProjectView] = useState<ProjectViewDto | null>(null)
+  const [projectsData, setProjectsData] = useState<QuarterlyProjectsResponse | null>(null)
+  const [teamsData, setTeamsData] = useState<QuarterlyTeamOverviewDto[]>([])
 
   const [loading, setLoading] = useState(true)
   const [dataLoading, setDataLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
-  const selectedProjectKey = searchParams.get('projectKey') || null
-  const teamAbortRef = useRef<AbortController | null>(null)
-  const projectAbortRef = useRef<AbortController | null>(null)
-
   // ==================== Init ====================
 
   useEffect(() => {
-    Promise.all([
-      axios.get<Team[]>('/api/teams'),
-      axios.get<ProjectDto[]>('/api/projects'),
-      quarterlyPlanningApi.getAvailableQuarters(),
-    ]).then(([teamsRes, projectsRes, quarters]) => {
-      setTeams(teamsRes.data)
-      setProjects(projectsRes.data.map(p => ({ issueKey: p.issueKey, summary: p.summary })))
+    quarterlyPlanningApi.getAvailableQuarters().then(quarters => {
       setAvailableQuarters(quarters)
-      if (!quarter && quarters.length > 0) {
-        // Default to current quarter or first available
+      if (quarters.length > 0) {
         const now = new Date()
         const currentQ = `${now.getFullYear()}Q${Math.floor(now.getMonth() / 3) + 1}`
         setQuarter(quarters.includes(currentQ) ? currentQ : quarters[0])
       }
       setLoading(false)
-    }).catch(() => {
-      setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [])
 
   // ==================== Data loading ====================
 
-  const loadTeamView = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (!quarter) return
-    teamAbortRef.current?.abort()
-    const controller = new AbortController()
-    teamAbortRef.current = controller
     setError(null)
     setDataLoading(true)
     try {
-      if (selectedTeamId) {
-        const demand = await quarterlyPlanningApi.getDemand(selectedTeamId, quarter)
-        if (controller.signal.aborted) return
-        setTeamDemand(demand)
+      const [projRes, teamsRes] = await Promise.all([
+        quarterlyPlanningApi.getProjectsOverview(quarter),
+        quarterlyPlanningApi.getTeamsOverview(quarter),
+      ])
+      setProjectsData(projRes)
+      setTeamsData(teamsRes)
+
+      // Auto-select first in-quarter project
+      if (!selectedProjectKey) {
+        const firstInQ = projRes.projects.find(p => p.inQuarter)
+        if (firstInQ) setSelectedProjectKey(firstInQ.projectKey)
       }
-      const sum = await quarterlyPlanningApi.getSummary(quarter)
-      if (controller.signal.aborted) return
-      setSummary(sum)
+      // Auto-select first team
+      if (!selectedTeamId && teamsRes.length > 0) {
+        setSelectedTeamId(teamsRes[0].teamId)
+      }
     } catch (err) {
-      if (controller.signal.aborted) return
       setError(err instanceof Error ? err.message : 'Failed to load data')
     } finally {
-      if (!controller.signal.aborted) setDataLoading(false)
+      setDataLoading(false)
     }
-  }, [selectedTeamId, quarter])
+  }, [quarter])
 
-  const loadProjectView = useCallback(async () => {
-    if (!quarter || !selectedProjectKey) return
-    projectAbortRef.current?.abort()
-    const controller = new AbortController()
-    projectAbortRef.current = controller
-    setError(null)
-    setDataLoading(true)
-    try {
-      const view = await quarterlyPlanningApi.getProjectView(selectedProjectKey, quarter)
-      if (controller.signal.aborted) return
-      setProjectView(view)
-    } catch (err) {
-      if (controller.signal.aborted) return
-      setError(err instanceof Error ? err.message : 'Failed to load project view')
-    } finally {
-      if (!controller.signal.aborted) setDataLoading(false)
-    }
-  }, [selectedProjectKey, quarter])
+  useEffect(() => { loadData() }, [loadData])
 
-  useEffect(() => {
-    if (activeTab === 'teams') loadTeamView()
-  }, [activeTab, loadTeamView])
+  // ==================== Derived data ====================
 
-  useEffect(() => {
-    if (activeTab === 'projects') loadProjectView()
-  }, [activeTab, loadProjectView])
+  const filteredProjects = useMemo(() => {
+    if (!projectsData) return []
+    return projectsData.projects.filter(p => {
+      if (filter === 'all') return true
+      if (filter === 'in-quarter') return p.inQuarter
+      if (filter === 'blocked') return p.planningStatus === 'blocked' || p.planningStatus === 'partial'
+      return p.planningStatus === 'not-added'
+    })
+  }, [projectsData, filter])
 
-  // ==================== Handlers ====================
+  const selectedProject = projectsData?.projects.find(p => p.projectKey === selectedProjectKey) ?? null
+  const selectedTeam = teamsData.find(t => t.teamId === selectedTeamId) ?? teamsData[0] ?? null
 
-  const handleTeamChange = (value: string | null) => {
-    const params: Record<string, string> = {}
-    if (value) params.teamId = value
-    if (selectedProjectKey) params.projectKey = selectedProjectKey
-    setSearchParams(params)
-  }
-
-  const handleProjectChange = (value: string | null) => {
-    const params: Record<string, string> = {}
-    if (selectedTeamId) params.teamId = String(selectedTeamId)
-    if (value) params.projectKey = value
-    setSearchParams(params)
-  }
-
-  const navigateQuarter = (direction: -1 | 1) => {
-    const idx = availableQuarters.indexOf(quarter)
-    const newIdx = idx + direction
-    if (newIdx >= 0 && newIdx < availableQuarters.length) {
-      setQuarter(availableQuarters[newIdx])
-    }
-  }
+  const readinessIssues = useMemo(() => {
+    if (!projectsData) return []
+    const inQuarter = projectsData.projects.filter(p => p.inQuarter)
+    const epicsWithoutRough = inQuarter.reduce((sum, p) => {
+      return sum + p.epics.filter(e => !e.roughEstimated).length
+    }, 0)
+    const epicsWithoutTeams = inQuarter.reduce((sum, p) => {
+      return sum + p.epics.filter(e => !e.teamMapped).length
+    }, 0)
+    const partiallyReady = inQuarter.filter(p => p.planningStatus === 'partial').length
+    return [
+      { title: 'Epics without rough estimates', count: epicsWithoutRough, action: 'Open blocked epics', tone: epicsWithoutRough > 0 ? 'critical' : 'ok' },
+      { title: 'Epics without team mapping', count: epicsWithoutTeams, action: 'Review routing', tone: epicsWithoutTeams > 0 ? 'warning' : 'ok' },
+      { title: 'Projects partially ready', count: partiallyReady, action: 'Filter projects', tone: partiallyReady > 0 ? 'warning' : 'ok' },
+    ]
+  }, [projectsData])
 
   const handleBoostChange = async (projectKey: string, boost: number) => {
     try {
       await quarterlyPlanningApi.updateProjectBoost(projectKey, boost)
-      if (activeTab === 'teams') loadTeamView()
-      else loadProjectView()
+      loadData()
     } catch (err) {
       console.error('Failed to update boost:', err)
     }
@@ -169,540 +123,530 @@ export function QuarterlyPlanningPage() {
   // ==================== Render ====================
 
   if (loading) {
-    return <div className="qp-page"><div className="loading">Loading...</div></div>
+    return <div className="qpp-page"><div className="qpp-empty-state">Loading...</div></div>
   }
 
+  const summary = projectsData
+
   return (
-    <div className="qp-page">
-      <div className="qp-header">
-        <h2>Quarterly Planning</h2>
-        <div className="qp-quarter-nav">
-          <button
-            className="qp-nav-btn"
-            onClick={() => navigateQuarter(-1)}
-            disabled={availableQuarters.indexOf(quarter) <= 0}
-          >
-            &larr;
-          </button>
-          <SingleSelectDropdown
-            label="Quarter"
-            options={availableQuarters.map(q => ({ value: q, label: q }))}
-            selected={quarter}
-            onChange={v => v && setQuarter(v)}
-            allowClear={false}
-          />
-          <button
-            className="qp-nav-btn"
-            onClick={() => navigateQuarter(1)}
-            disabled={availableQuarters.indexOf(quarter) >= availableQuarters.length - 1}
-          >
-            &rarr;
-          </button>
+    <div className="qpp-page">
+      <div className="qpp-hero">
+        <div>
+          <h1>Quarterly Planning</h1>
+          <p>
+            {summary
+              ? `${summary.inQuarterCount} project${summary.inQuarterCount !== 1 ? 's' : ''} in quarter, ${summary.readyCount} ready to plan.`
+              : 'Select a quarter to view planning overview.'}
+          </p>
+        </div>
+        <div className="qpp-hero-actions">
+          <label className="qpp-select">
+            <span>Quarter</span>
+            <select value={quarter} onChange={e => { setQuarter(e.target.value); setSelectedProjectKey(null); setSelectedTeamId(null) }}>
+              {availableQuarters.map(q => <option key={q} value={q}>{q}</option>)}
+            </select>
+          </label>
         </div>
       </div>
 
-      <div className="qp-tabs">
-        <button
-          className={`qp-tab ${activeTab === 'teams' ? 'active' : ''}`}
-          onClick={() => setActiveTab('teams')}
-        >
-          By Teams
-        </button>
-        <button
-          className={`qp-tab ${activeTab === 'projects' ? 'active' : ''}`}
-          onClick={() => setActiveTab('projects')}
-        >
-          By Projects
-        </button>
+      <div className="qpp-steps">
+        <StepCard index="01" title="Projects in quarter" body="PM includes projects by setting the Jira quarter label." active={activeTab === 'projects'} />
+        <StepCard index="02" title="Readiness check" body="Planning only becomes reliable when rough estimates and team mapping are complete." active={activeTab === 'readiness'} />
+        <StepCard index="03" title="Team impact" body="Only then does capacity vs demand make sense as a decision layer." active={activeTab === 'teams'} />
       </div>
 
-      {error && <div className="error-message">{error}</div>}
-      {dataLoading && <div className="loading" style={{ padding: '8px 0' }}>Loading data...</div>}
+      {summary && (
+        <div className="qpp-summary-grid">
+          <SummaryMetricCard title="Projects in quarter" value={String(summary.inQuarterCount)} hint="Projects labeled with the selected quarter in Jira" />
+          <SummaryMetricCard title="Ready to plan" value={String(summary.readyCount)} hint={`${summary.partialCount} partial \u00B7 ${summary.blockedCount} blocked`} tone={summary.blockedCount > 0 ? 'warning' : 'neutral'} />
+          <SummaryMetricCard title="Epics coverage" value={`${summary.roughCoveragePct}%`} hint={`${summary.totalEpics} epics checked for rough estimates`} tone={summary.roughCoveragePct < 100 ? 'warning' : 'good'} />
+          <SummaryMetricCard title="Teams involved" value={String(summary.teamsInvolved)} hint="Cross-team load only matters after readiness is green" />
+        </div>
+      )}
+
+      <div className="qpp-tabs">
+        <button className={activeTab === 'projects' ? 'active' : ''} onClick={() => setActiveTab('projects')}>Projects</button>
+        <button className={activeTab === 'readiness' ? 'active' : ''} onClick={() => setActiveTab('readiness')}>Readiness</button>
+        <button className={activeTab === 'teams' ? 'active' : ''} onClick={() => setActiveTab('teams')}>Teams</button>
+      </div>
+
+      {error && <div style={{ color: '#ba3526', padding: '12px 0' }}>{error}</div>}
+      {dataLoading && <div className="qpp-empty-state">Loading data...</div>}
 
       {availableQuarters.length === 0 && !loading && (
-        <div className="qp-empty">No quarter labels found. Add labels like "2026Q2" to epics or projects in Jira.</div>
+        <div className="qpp-empty-state">No quarter labels found. Add labels like "2026Q2" to epics or projects in Jira.</div>
       )}
 
-      {activeTab === 'teams' ? (
-        <TeamView
-          teams={teams}
-          selectedTeamId={selectedTeamId}
-          onTeamChange={handleTeamChange}
-          teamDemand={teamDemand}
-          summary={summary}
+      {!dataLoading && activeTab === 'projects' && projectsData && (
+        <ProjectsTab
+          projects={filteredProjects}
+          filter={filter}
+          onFilterChange={setFilter}
+          selectedProject={selectedProject}
+          onSelectProject={setSelectedProjectKey}
           quarter={quarter}
-          getRoleColor={getRoleColor}
-          getRoleCodes={getRoleCodes}
           onBoostChange={handleBoostChange}
         />
-      ) : (
-        <ProjectView
-          projects={projects}
-          selectedProjectKey={selectedProjectKey}
-          onProjectChange={handleProjectChange}
-          projectView={projectView}
+      )}
+
+      {!dataLoading && activeTab === 'readiness' && projectsData && (
+        <ReadinessTab
+          issues={readinessIssues}
+          projects={projectsData.projects.filter(p => p.inQuarter)}
           quarter={quarter}
+        />
+      )}
+
+      {!dataLoading && activeTab === 'teams' && teamsData.length > 0 && (
+        <TeamsTab
+          teams={teamsData}
+          selectedTeam={selectedTeam}
+          onSelectTeam={setSelectedTeamId}
           getRoleColor={getRoleColor}
           getRoleCodes={getRoleCodes}
-          onBoostChange={handleBoostChange}
         />
       )}
     </div>
   )
 }
 
-// ==================== Helpers ====================
+// ==================== Projects Tab ====================
 
-/** Sort roles by pipeline order from WorkflowConfig, unknown roles at end */
-function sortRoles(roles: string[], getRoleCodes: () => string[]): string[] {
-  const configOrder = getRoleCodes()
-  const sorted = configOrder.filter(r => roles.includes(r))
-  roles.forEach(r => { if (!configOrder.includes(r)) sorted.push(r) })
-  return sorted
-}
-
-/** Collect all role keys from capacity + demand maps */
-function collectAllRoles(
-  capacity: Record<string, number>,
-  demand: Record<string, number>,
-  getRoleCodes: () => string[]
-): string[] {
-  const all = new Set([...Object.keys(capacity), ...Object.keys(demand)])
-  return sortRoles([...all], getRoleCodes)
-}
-
-// ==================== Team View ====================
-
-function TeamView({
-  teams, selectedTeamId, onTeamChange, teamDemand, summary, quarter, getRoleColor, getRoleCodes, onBoostChange
-}: {
-  teams: Team[]
-  selectedTeamId: number | null
-  onTeamChange: (value: string | null) => void
-  teamDemand: QuarterlyDemandDto | null
-  summary: QuarterlySummaryDto | null
+function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSelectProject, quarter, onBoostChange }: {
+  projects: QuarterlyProjectOverviewDto[]
+  filter: ProjectFilter
+  onFilterChange: (f: ProjectFilter) => void
+  selectedProject: QuarterlyProjectOverviewDto | null
+  onSelectProject: (key: string) => void
   quarter: string
-  getRoleColor: (code: string) => string
-  getRoleCodes: () => string[]
   onBoostChange: (key: string, boost: number) => void
 }) {
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set())
-
-  const toggleProject = (key: string) => {
-    setCollapsedProjects(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }
-
-  const totalCapacity = teamDemand?.capacity
-    ? Object.values(teamDemand.capacity.capacityByRole).reduce((a, b) => a + b, 0)
-    : 0
-  const totalDemand = teamDemand
-    ? (() => {
-        let sum = 0
-        for (const p of teamDemand.projects) {
-          sum += Object.values(p.totalDemandByRole).reduce((a: number, b: number) => a + b, 0)
-        }
-        for (const e of teamDemand.unassignedEpics) {
-          sum += Object.values(e.demandByRole).reduce((a: number, b: number) => a + b, 0)
-        }
-        return sum
-      })()
-    : 0
-  const utilization = totalCapacity > 0 ? Math.round((totalDemand / totalCapacity) * 100) : 0
-  const overcommitCount = teamDemand
-    ? teamDemand.projects.flatMap(p => p.epics).filter(e => e.overCapacity).length +
-      teamDemand.unassignedEpics.filter(e => e.overCapacity).length
-    : 0
-
-  // Chart data — use capacity from teamDemand directly (more reliable than summary snapshot)
-  const chartRoles = teamDemand?.capacity
-    ? collectAllRoles(
-        teamDemand.capacity.capacityByRole,
-        (() => {
-          const dem: Record<string, number> = {}
-          for (const p of teamDemand.projects) {
-            for (const [k, v] of Object.entries(p.totalDemandByRole)) {
-              dem[k] = (dem[k] || 0) + v
-            }
-          }
-          return dem
-        })(),
-        getRoleCodes
-      )
-    : []
-  const demandByRole: Record<string, number> = {}
-  if (teamDemand) {
-    for (const p of teamDemand.projects) {
-      for (const [k, v] of Object.entries(p.totalDemandByRole)) {
-        demandByRole[k] = (demandByRole[k] || 0) + v
-      }
-    }
-    for (const e of teamDemand.unassignedEpics) {
-      for (const [k, v] of Object.entries(e.demandByRole)) {
-        demandByRole[k] = (demandByRole[k] || 0) + v
-      }
-    }
-  }
-  const chartData = chartRoles.map(role => ({
-    role,
-    Capacity: teamDemand?.capacity.capacityByRole[role] || 0,
-    Demand: demandByRole[role] || 0,
-    color: getRoleColor(role),
-  }))
-
   return (
-    <div className="qp-team-view">
-      <div className="qp-filter-row">
-        <SingleSelectDropdown
-          label="Team"
-          options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color || undefined }))}
-          selected={selectedTeamId ? String(selectedTeamId) : null}
-          onChange={onTeamChange}
-          placeholder="Select team..."
-        />
-      </div>
-
-      {selectedTeamId && teamDemand && (
-        <>
-          <div className="qp-metrics-row">
-            <MetricCard title="Capacity" value={`${totalCapacity.toFixed(0)} days`} tooltip="Total effective days for the quarter (adjusted by grade and hours)" />
-            <MetricCard title="Demand" value={`${totalDemand.toFixed(0)} days`} tooltip="Total demand from all epics (with risk buffer)" />
-            <MetricCard
-              title="Utilization"
-              value={`${utilization}%`}
-              trend={utilization > 100 ? 'down' : utilization > 80 ? 'neutral' : 'up'}
-              tooltip="Demand / Capacity"
-            />
-            <MetricCard title="Overcommit" value={overcommitCount} tooltip="Number of epics exceeding remaining capacity" />
-          </div>
-
-          {chartData.length > 0 && (
-            <div className="qp-chart-container">
-              <h3>Capacity vs Demand by Role</h3>
-              <div className="qp-chart-bars">
-                {chartData.map(item => {
-                  const max = Math.max(...chartData.map(d => Math.max(d.Capacity, d.Demand)), 1)
-                  const capPct = (item.Capacity / max) * 100
-                  const demPct = (item.Demand / max) * 100
-                  const over = item.Demand > item.Capacity
-                  return (
-                    <div key={item.role} className="qp-chart-bar-group">
-                      <div className="qp-chart-bar-pair">
-                        <div className="qp-chart-bar-wrapper">
-                          <div
-                            className="qp-chart-bar"
-                            style={{ height: `${capPct}%`, backgroundColor: item.color, opacity: 0.3 }}
-                            title={`Capacity: ${item.Capacity.toFixed(1)}d`}
-                          />
-                          <span className="qp-chart-bar-val">{item.Capacity.toFixed(0)}d</span>
-                        </div>
-                        <div className="qp-chart-bar-wrapper">
-                          <div
-                            className={`qp-chart-bar ${over ? 'over' : ''}`}
-                            style={{ height: `${demPct}%`, backgroundColor: over ? '#d32f2f' : item.color }}
-                            title={`Demand: ${item.Demand.toFixed(1)}d`}
-                          />
-                          <span className="qp-chart-bar-val">{item.Demand.toFixed(0)}d</span>
-                        </div>
-                      </div>
-                      <span className="qp-chart-bar-label" style={{ color: item.color }}>{item.role}</span>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="qp-chart-legend">
-                <span className="qp-chart-legend-item"><span className="qp-chart-legend-swatch" style={{ opacity: 0.3 }} /> Capacity</span>
-                <span className="qp-chart-legend-item"><span className="qp-chart-legend-swatch" style={{ opacity: 1 }} /> Demand</span>
-              </div>
-            </div>
-          )}
-
-          {teamDemand.projects.map(project => (
-            <div key={project.projectKey} className={`qp-project-group ${!project.fitsInCapacity ? 'qp-project-over' : ''}`}>
-              <div className="qp-project-header" onClick={() => toggleProject(project.projectKey)}>
-                <span className="qp-collapse-icon">{collapsedProjects.has(project.projectKey) ? '▸' : '▾'}</span>
-                <span className="qp-project-key">{project.projectKey}</span>
-                <span className="qp-project-name">{project.summary}</span>
-                {project.riceNormalizedScore != null && project.riceNormalizedScore > 0 && (
-                  <span className="qp-rice-badge" title={`RICE: ${project.riceNormalizedScore.toFixed(0)}/100`}>
-                    RICE: {project.riceNormalizedScore.toFixed(0)}
-                  </span>
-                )}
-                <span className="qp-priority-badge" title="Priority score">
-                  P: {project.priorityScore?.toFixed(0) ?? '—'}
-                </span>
-                <BoostControl
-                  currentBoost={project.manualBoost || 0}
-                  onBoostChange={(boost) => onBoostChange(project.projectKey, boost)}
-                />
-                {!project.fitsInCapacity && <span className="qp-overcommit-badge">Over Capacity</span>}
-              </div>
-              {!collapsedProjects.has(project.projectKey) && (
-                <EpicTable epics={project.epics} getRoleColor={getRoleColor} getRoleCodes={getRoleCodes}
-                  capacityByRole={teamDemand.capacity.capacityByRole} />
-              )}
-            </div>
-          ))}
-
-          {teamDemand.unassignedEpics.length > 0 && (
-            <div className="qp-project-group">
-              <div className="qp-project-header">
-                <span className="qp-project-name" style={{ fontStyle: 'italic', color: '#888' }}>Unassigned Epics</span>
-              </div>
-              <EpicTable epics={teamDemand.unassignedEpics} getRoleColor={getRoleColor} getRoleCodes={getRoleCodes} />
-            </div>
-          )}
-        </>
-      )}
-
-      {!selectedTeamId && summary && (
-        <div className="qp-summary-grid">
-          <h3>All Teams — {quarter}</h3>
-          {summary.teams.map(team => (
-            <SummaryCard key={team.teamId} team={team} getRoleColor={getRoleColor} getRoleCodes={getRoleCodes} />
-          ))}
+    <div className="qpp-panel">
+      <div className="qpp-panel-header">
+        <div>
+          <h2>Projects in Quarter</h2>
+          <p>Source of truth: Jira label like <code>{quarter}</code>. Add/remove labels directly in Jira.</p>
         </div>
-      )}
+        <div className="qpp-filter-bar">
+          <FilterChip active={filter === 'all'} onClick={() => onFilterChange('all')}>All</FilterChip>
+          <FilterChip active={filter === 'in-quarter'} onClick={() => onFilterChange('in-quarter')}>In quarter</FilterChip>
+          <FilterChip active={filter === 'blocked'} onClick={() => onFilterChange('blocked')}>Needs planning work</FilterChip>
+          <FilterChip active={filter === 'not-added'} onClick={() => onFilterChange('not-added')}>Not added</FilterChip>
+        </div>
+      </div>
+
+      <div className="qpp-project-layout">
+        <div className="qpp-table-card">
+          <table className="qpp-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Quarter</th>
+                <th>Teams</th>
+                <th>Epics</th>
+                <th>Rough est.</th>
+                <th>Status</th>
+                <th>Forecast</th>
+              </tr>
+            </thead>
+            <tbody>
+              {projects.map(p => (
+                <tr
+                  key={p.projectKey}
+                  className={selectedProject?.projectKey === p.projectKey ? 'selected' : ''}
+                  onClick={() => onSelectProject(p.projectKey)}
+                >
+                  <td>
+                    <div className="qpp-project-cell">
+                      <strong>{p.projectKey}</strong>
+                      <span>{p.summary}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`qpp-quarter-pill ${p.inQuarter ? 'active' : ''}`}>
+                      {p.inQuarter ? quarter : 'Not set'}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="qpp-team-stack">
+                      {p.teams.map(t => (
+                        <TeamBadge key={t.id} name={t.name} color={t.color || '#666'} />
+                      ))}
+                      {p.teams.length === 0 && <span style={{ color: '#60708f', fontSize: 13 }}>No teams</span>}
+                    </div>
+                  </td>
+                  <td>{p.epicCount}</td>
+                  <td>{p.roughEstimateCoverage}%</td>
+                  <td><StatusPill status={p.planningStatus}>{statusLabel(p.planningStatus)}</StatusPill></td>
+                  <td>{p.forecastLabel}</td>
+                </tr>
+              ))}
+              {projects.length === 0 && (
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: '#60708f', padding: 24 }}>No projects match the selected filter.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="qpp-detail-card">
+          {selectedProject ? (
+            <ProjectDetail project={selectedProject} onBoostChange={onBoostChange} />
+          ) : (
+            <div className="qpp-empty-state">Select a project to inspect quarter label, readiness, and blockers.</div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
-// ==================== Project View ====================
-
-function ProjectView({
-  projects, selectedProjectKey, onProjectChange, projectView, quarter, getRoleColor, getRoleCodes, onBoostChange
-}: {
-  projects: ProjectOption[]
-  selectedProjectKey: string | null
-  onProjectChange: (value: string | null) => void
-  projectView: ProjectViewDto | null
-  quarter: string
-  getRoleColor: (code: string) => string
-  getRoleCodes: () => string[]
+function ProjectDetail({ project, onBoostChange }: {
+  project: QuarterlyProjectOverviewDto
   onBoostChange: (key: string, boost: number) => void
 }) {
   return (
-    <div className="qp-project-view">
-      <div className="qp-filter-row">
-        <SingleSelectDropdown
-          label="Project"
-          options={projects.map(p => ({ value: p.issueKey, label: p.summary || p.issueKey }))}
-          selected={selectedProjectKey}
-          onChange={onProjectChange}
-          placeholder="Select project..."
-        />
+    <>
+      <div className="qpp-detail-head">
+        <div>
+          <div className="qpp-detail-key">{project.projectKey}</div>
+          <h3>{project.summary}</h3>
+        </div>
+        <StatusPill status={project.planningStatus}>{statusLabel(project.planningStatus)}</StatusPill>
+      </div>
+      <div className="qpp-detail-metrics">
+        <MetricMini label="Priority" value={String(Math.round(project.priorityScore))} />
+        <MetricMini label="RICE" value={String(Math.round(project.riceNormalizedScore))} />
+        <BoostMini currentBoost={project.manualBoost ?? 0} onBoostChange={b => onBoostChange(project.projectKey, b)} />
+        <MetricMini label="Risk" value={riskLabel(project.risk)} />
+      </div>
+      <div className="qpp-checklist">
+        <ChecklistItem label="Project has quarter label" ok={project.inQuarter} />
+        <ChecklistItem label="Epics mapped to teams" ok={project.teamMappingCoverage === 100} note={`${project.teamMappingCoverage}% coverage`} />
+        <ChecklistItem label="Rough estimates complete" ok={project.roughEstimateCoverage === 100} note={`${project.roughEstimateCoverage}% coverage`} />
+      </div>
+      <div className="qpp-blockers">
+        <h4>Blockers</h4>
+        {project.blockers.length > 0 ? (
+          <ul>{project.blockers.map(b => <li key={b}>{b}</li>)}</ul>
+        ) : (
+          <p>Project is ready for planning. PM can now validate team capacity impact.</p>
+        )}
+      </div>
+      <div className="qpp-epics">
+        <h4>Epics ({project.epics.length})</h4>
+        {project.epics.map(epic => (
+          <div key={epic.key} className="qpp-epic-row">
+            <div>
+              <strong>{epic.key}</strong>
+              <span>{epic.summary}</span>
+            </div>
+            <div className="qpp-epic-meta">
+              <span>{epic.teams.length > 0 ? epic.teams.map(t => t.name).join(' + ') : 'Unassigned'}</span>
+              <span className={epic.roughEstimated ? 'ok' : 'bad'}>{epic.roughEstimated ? 'Rough est. ready' : 'No rough estimate'}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// ==================== Readiness Tab ====================
+
+function ReadinessTab({ issues, projects, quarter }: {
+  issues: { title: string; count: number; action: string; tone: string }[]
+  projects: QuarterlyProjectOverviewDto[]
+  quarter: string
+}) {
+  return (
+    <div className="qpp-panel">
+      <div className="qpp-panel-header">
+        <div>
+          <h2>Planning Readiness</h2>
+          <p>This screen separates "project is in the quarter" from "project can be planned reliably".</p>
+        </div>
       </div>
 
-      {!selectedProjectKey && (
-        <div className="qp-empty">Select a project to see team allocation and epic demand.</div>
-      )}
-
-      {projectView && (
-        <>
-          <div className="qp-project-info">
-            <span className="qp-project-key-lg">{projectView.projectKey}</span>
-            <h3>{projectView.summary}</h3>
-            <span className="qp-priority-badge">P: {projectView.priorityScore?.toFixed(0)}</span>
-            <BoostControl
-              currentBoost={projectView.manualBoost || 0}
-              onBoostChange={(boost) => onBoostChange(projectView.projectKey, boost)}
-            />
+      <div className="qpp-readiness-grid">
+        {issues.map(issue => (
+          <div key={issue.title} className={`qpp-issue-card ${issue.tone}`}>
+            <span className="qpp-issue-count">{issue.count}</span>
+            <div>
+              <h3>{issue.title}</h3>
+              <p>{issue.action}</p>
+            </div>
           </div>
+        ))}
+      </div>
 
-          {projectView.teams.map(team => {
-            const roles = collectAllRoles(team.teamCapacity, team.projectDemand, getRoleCodes)
-            return (
-              <div key={team.teamId} className={`qp-team-allocation ${team.overloaded ? 'qp-team-over' : ''}`}>
-                <div className="qp-team-allocation-header">
-                  <TeamBadge name={team.teamName} color={team.teamColor || '#666'} />
-                  {team.overloaded && <span className="qp-overcommit-badge">Over Capacity</span>}
-                </div>
-
-                <div className="qp-capacity-bars">
-                  {roles.map(role => {
-                    const cap = team.teamCapacity[role] || 0
-                    const dem = team.projectDemand[role] || 0
-                    const pct = cap > 0 ? (dem / cap) * 100 : 0
-                    const over = dem > cap
-                    return (
-                      <div key={role} className="qp-capacity-bar-item">
-                        <span className="qp-bar-label" style={{ color: getRoleColor(role) }}>{role}</span>
-                        <div className="qp-bar-track">
-                          <div
-                            className={`qp-bar-fill ${over ? 'over' : ''}`}
-                            style={{
-                              width: `${Math.min(pct, 100)}%`,
-                              backgroundColor: getRoleColor(role),
-                            }}
-                          />
-                        </div>
-                        <span className="qp-bar-value">{dem.toFixed(0)}/{cap.toFixed(0)}d</span>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                <EpicTable epics={team.epics} getRoleColor={getRoleColor} getRoleCodes={getRoleCodes}
-                  capacityByRole={team.teamCapacity} />
-              </div>
-            )
-          })}
-
-          {projectView.teams.length === 0 && (
-            <div className="qp-empty">No epics found for this project in {quarter}</div>
-          )}
-        </>
-      )}
+      <div className="qpp-table-card">
+        <table className="qpp-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Quarter label</th>
+              <th>Team mapping</th>
+              <th>Rough estimates</th>
+              <th>Ready to plan</th>
+              <th>Why blocked</th>
+            </tr>
+          </thead>
+          <tbody>
+            {projects.map(p => (
+              <tr key={p.projectKey}>
+                <td>
+                  <div className="qpp-project-cell">
+                    <strong>{p.projectKey}</strong>
+                    <span>{p.summary}</span>
+                  </div>
+                </td>
+                <td>{quarter}</td>
+                <td>{p.teamMappingCoverage}%</td>
+                <td>{p.roughEstimateCoverage}%</td>
+                <td><StatusPill status={p.planningStatus}>{p.planningStatus === 'ready' ? 'Yes' : 'No'}</StatusPill></td>
+                <td>{p.blockers.length > 0 ? p.blockers.join(', ') : 'No blocking issues'}</td>
+              </tr>
+            ))}
+            {projects.length === 0 && (
+              <tr><td colSpan={6} style={{ textAlign: 'center', color: '#60708f', padding: 24 }}>No projects in this quarter yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
+  )
+}
+
+// ==================== Teams Tab ====================
+
+function TeamsTab({ teams, selectedTeam, onSelectTeam, getRoleColor, getRoleCodes }: {
+  teams: QuarterlyTeamOverviewDto[]
+  selectedTeam: QuarterlyTeamOverviewDto | null
+  onSelectTeam: (id: number) => void
+  getRoleColor: (code: string) => string
+  getRoleCodes: () => string[]
+}) {
+  return (
+    <div className="qpp-panel">
+      <div className="qpp-panel-header">
+        <div>
+          <h2>Team Impact</h2>
+          <p>Capacity is only meaningful after quarter composition and readiness are already clear.</p>
+        </div>
+      </div>
+
+      <div className="qpp-team-layout">
+        <div className="qpp-table-card">
+          <table className="qpp-table">
+            <thead>
+              <tr>
+                <th>Team</th>
+                <th>Capacity</th>
+                <th>Demand</th>
+                <th>Gap</th>
+                <th>Utilization</th>
+                <th>Overloaded epics</th>
+                <th>Risk</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teams.map(t => (
+                <tr
+                  key={t.teamId}
+                  className={selectedTeam?.teamId === t.teamId ? 'selected' : ''}
+                  onClick={() => onSelectTeam(t.teamId)}
+                >
+                  <td><TeamBadge name={t.teamName} color={t.teamColor || '#666'} /></td>
+                  <td>{Math.round(t.capacityDays)}d</td>
+                  <td>{Math.round(t.demandDays)}d</td>
+                  <td className={t.gapDays < 0 ? 'bad' : 'ok'}>
+                    {t.gapDays > 0 ? '+' : ''}{Math.round(t.gapDays)}d
+                  </td>
+                  <td>{t.utilization}%</td>
+                  <td>{t.overloadedEpics}</td>
+                  <td><RiskPill risk={t.risk}>{riskLabel(t.risk)}</RiskPill></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="qpp-detail-card">
+          {selectedTeam ? (
+            <TeamDetail team={selectedTeam} getRoleColor={getRoleColor} getRoleCodes={getRoleCodes} />
+          ) : (
+            <div className="qpp-empty-state">No team data available for this quarter.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TeamDetail({ team, getRoleColor, getRoleCodes }: {
+  team: QuarterlyTeamOverviewDto
+  getRoleColor: (code: string) => string
+  getRoleCodes: () => string[]
+}) {
+  const allRoles = useMemo(() => {
+    const set = new Set([...Object.keys(team.capacityByRole), ...Object.keys(team.demandByRole)])
+    const configOrder = getRoleCodes()
+    const sorted = configOrder.filter(r => set.has(r))
+    set.forEach(r => { if (!configOrder.includes(r)) sorted.push(r) })
+    return sorted
+  }, [team, getRoleCodes])
+
+  return (
+    <>
+      <div className="qpp-detail-head">
+        <div>
+          <div className="qpp-detail-key">Team focus</div>
+          <h3>{team.teamName}</h3>
+        </div>
+        <RiskPill risk={team.risk}>{team.utilization}% utilized</RiskPill>
+      </div>
+
+      <div className="qpp-role-bars">
+        {allRoles.map(role => {
+          const cap = team.capacityByRole[role] || 0
+          const demand = team.demandByRole[role] || 0
+          const util = cap > 0 ? Math.round((demand / cap) * 100) : 0
+          return (
+            <div key={role} className="qpp-role-row">
+              <span style={{ color: getRoleColor(role) }}>{role}</span>
+              <div className="qpp-role-track">
+                <div className={`qpp-role-fill ${util > 100 ? 'over' : ''}`} style={{ width: `${Math.min(util, 100)}%` }} />
+              </div>
+              <strong>{Math.round(demand)}/{Math.round(cap)}d</strong>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="qpp-impact-projects">
+        <h4>Projects impacting this team</h4>
+        {team.impactingProjects.map(p => (
+          <div key={p.key} className="qpp-impact-row">
+            <div>
+              <strong>{p.key}</strong>
+              <span>{p.name}</span>
+            </div>
+            <div>
+              <StatusPill status={p.planningStatus as 'ready' | 'partial' | 'blocked' | 'not-added'}>
+                {statusLabel(p.planningStatus as 'ready' | 'partial' | 'blocked' | 'not-added')}
+              </StatusPill>
+            </div>
+          </div>
+        ))}
+        {team.impactingProjects.length === 0 && (
+          <p style={{ color: '#60708f' }}>No projects assigned to this team for the quarter.</p>
+        )}
+      </div>
+    </>
   )
 }
 
 // ==================== Shared Components ====================
 
-function EpicTable({ epics, getRoleColor, getRoleCodes, capacityByRole }: {
-  epics: EpicDemandDto[]
-  getRoleColor: (code: string) => string
-  getRoleCodes: () => string[]
-  capacityByRole?: Record<string, number>
-}) {
-  if (epics.length === 0) return null
-
-  // Use all roles from capacity + epic demands, sorted by pipeline order
-  const epicRoles = new Set(epics.flatMap(e => Object.keys(e.demandByRole)))
-  const capRoles = capacityByRole ? Object.keys(capacityByRole) : []
-  const allRolesSet = new Set([...capRoles, ...epicRoles])
-  const allRoles = sortRoles([...allRolesSet], getRoleCodes)
-
+function StepCard({ index, title, body, active }: { index: string; title: string; body: string; active?: boolean }) {
   return (
-    <table className="qp-epic-table">
-      <thead>
-        <tr>
-          <th>Epic</th>
-          <th>Status</th>
-          {allRoles.map(role => (
-            <th key={role} className="qp-role-header" style={{ color: getRoleColor(role) }}>{role}</th>
-          ))}
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {epics.map(epic => (
-          <tr key={epic.epicKey} className={epic.overCapacity ? 'qp-over-capacity' : ''}>
-            <td className="qp-epic-name-cell">
-              <a className="qp-epic-key" href={`/?epicKey=${epic.epicKey}`} title={epic.summary}>{epic.epicKey}</a>
-              <span className="qp-epic-summary">{epic.summary}</span>
-            </td>
-            <td><StatusBadge status={epic.status} /></td>
-            {allRoles.map(role => (
-              <td key={role} className="qp-demand-cell">
-                {epic.demandByRole[role] != null
-                  ? <span className="qp-demand-value">{epic.demandByRole[role].toFixed(1)}</span>
-                  : <span className="qp-demand-empty">—</span>}
-              </td>
-            ))}
-            <td>
-              {epic.overCapacity && <span className="qp-over-badge" title="Exceeds remaining capacity">!</span>}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-function SummaryCard({
-  team, getRoleColor, getRoleCodes
-}: {
-  team: { teamId: number, teamName: string, teamColor: string | null, capacityByRole: Record<string, number>, demandByRole: Record<string, number>, utilizationPctByRole: Record<string, number>, overloaded: boolean }
-  getRoleColor: (code: string) => string
-  getRoleCodes: () => string[]
-}) {
-  const roles = collectAllRoles(team.capacityByRole, team.demandByRole, getRoleCodes)
-  const totalCap = Object.values(team.capacityByRole).reduce((a, b) => a + b, 0)
-  const totalDem = Object.values(team.demandByRole).reduce((a, b) => a + b, 0)
-  const totalUtil = totalCap > 0 ? Math.round((totalDem / totalCap) * 100) : 0
-
-  return (
-    <div className={`qp-summary-card ${team.overloaded ? 'overloaded' : ''}`}>
-      <div className="qp-summary-card-header">
-        <TeamBadge name={team.teamName} color={team.teamColor || '#666'} />
-        <span className={`qp-util-total ${totalUtil > 100 ? 'over' : totalUtil > 80 ? 'warn' : ''}`}>
-          {totalUtil}%
-        </span>
-      </div>
-      <div className="qp-summary-bars">
-        {roles.map(role => {
-          const cap = team.capacityByRole[role] || 0
-          const dem = team.demandByRole[role] || 0
-          const util = team.utilizationPctByRole[role] || 0
-          return (
-            <div key={role} className="qp-summary-bar-row">
-              <span className="qp-bar-label" style={{ color: getRoleColor(role) }}>{role}</span>
-              <div className="qp-bar-track">
-                <div
-                  className={`qp-bar-fill ${util > 100 ? 'over' : ''}`}
-                  style={{
-                    width: `${Math.min(util, 100)}%`,
-                    backgroundColor: getRoleColor(role),
-                  }}
-                />
-              </div>
-              <span className="qp-bar-value">{dem.toFixed(0)}/{cap.toFixed(0)}d ({util.toFixed(0)}%)</span>
-            </div>
-          )
-        })}
-      </div>
+    <div className={`qpp-step-card ${active ? 'active' : ''}`}>
+      <span>{index}</span>
+      <h3>{title}</h3>
+      <p>{body}</p>
     </div>
   )
 }
 
-function BoostControl({
-  currentBoost, onBoostChange
-}: {
-  currentBoost: number
-  onBoostChange: (boost: number) => void
-}) {
+function SummaryMetricCard({ title, value, hint, tone = 'neutral' }: { title: string; value: string; hint: string; tone?: 'neutral' | 'warning' | 'good' }) {
+  return (
+    <div className={`qpp-metric-card ${tone}`}>
+      <span>{title}</span>
+      <strong>{value}</strong>
+      <small>{hint}</small>
+    </div>
+  )
+}
+
+function MetricMini({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="qpp-mini-metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function BoostMini({ currentBoost, onBoostChange }: { currentBoost: number; onBoostChange: (b: number) => void }) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(String(currentBoost))
 
   const handleSave = () => {
     const num = parseInt(value, 10)
-    if (!isNaN(num)) {
-      onBoostChange(Math.max(-50, Math.min(50, num)))
-    }
+    if (!isNaN(num)) onBoostChange(Math.max(-50, Math.min(50, num)))
     setEditing(false)
   }
 
   if (editing) {
     return (
-      <span className="qp-boost-control">
+      <div className="qpp-mini-metric">
+        <span>Boost</span>
         <input
           type="number"
-          className="qp-boost-input"
           value={value}
           onChange={e => setValue(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
           onBlur={handleSave}
-          min={-50}
-          max={50}
+          min={-50} max={50}
           autoFocus
+          style={{ width: 60, fontSize: 18, fontWeight: 700, border: '1px solid #bfd3ff', borderRadius: 8, padding: '2px 6px', textAlign: 'center' }}
         />
-      </span>
+      </div>
     )
   }
 
   return (
-    <span className="qp-boost-control" onClick={() => { setValue(String(currentBoost)); setEditing(true) }} title="Manual priority boost (-50 to +50)">
-      {currentBoost !== 0 && (
-        <span className={`qp-boost-value ${currentBoost > 0 ? 'positive' : 'negative'}`}>
-          {currentBoost > 0 ? '+' : ''}{currentBoost}
-        </span>
-      )}
-      <span className="qp-boost-icon">⚡</span>
-    </span>
+    <div className="qpp-mini-metric" onClick={() => { setValue(String(currentBoost)); setEditing(true) }} style={{ cursor: 'pointer' }} title="Click to edit boost (-50 to +50)">
+      <span>Boost</span>
+      <strong>{currentBoost > 0 ? `+${currentBoost}` : String(currentBoost)}</strong>
+    </div>
   )
+}
+
+function ChecklistItem({ label, ok, note }: { label: string; ok: boolean; note?: string }) {
+  return (
+    <div className={`qpp-check-row ${ok ? 'ok' : 'bad'}`}>
+      <span>{ok ? 'Ready' : 'Needs work'}</span>
+      <div>
+        <strong>{label}</strong>
+        {note && <small>{note}</small>}
+      </div>
+    </div>
+  )
+}
+
+function FilterChip({ children, active, onClick }: { children: string; active: boolean; onClick: () => void }) {
+  return <button className={`qpp-chip ${active ? 'active' : ''}`} onClick={onClick}>{children}</button>
+}
+
+function StatusPill({ status, children }: { status: string; children: string }) {
+  return <span className={`qpp-status-pill ${status}`}>{children}</span>
+}
+
+function RiskPill({ risk, children }: { risk: string; children: React.ReactNode }) {
+  return <span className={`qpp-risk-pill ${risk}`}>{children}</span>
+}
+
+// ==================== Helpers ====================
+
+function statusLabel(status: string): string {
+  if (status === 'ready') return 'Ready'
+  if (status === 'partial') return 'Partial'
+  if (status === 'blocked') return 'Blocked'
+  return 'Not added'
+}
+
+function riskLabel(risk: string): string {
+  return risk.charAt(0).toUpperCase() + risk.slice(1)
 }

@@ -79,7 +79,8 @@ public class ProjectService {
                     timeTotals[1] > 0 ? timeTotals[1] : null,
                     expectedDone,
                     rice != null ? rice.riceScore() : null,
-                    rice != null ? rice.normalizedScore() : null
+                    rice != null ? rice.normalizedScore() : null,
+                    p.getQuarterLabel()
             );
         }).toList();
     }

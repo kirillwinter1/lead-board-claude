@@ -24,25 +24,21 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
   else if (score >= 40) color = '#ffab00' // yellow for medium
   else if (score < 0) color = '#de350b' // red for negative (blocked)
 
-  // Icons
-  const icons: string[] = []
+  // Indicators
+  const indicators: { key: string; label: string; color: string; bg: string; text: string }[] = []
   if (isBug(node.issueType)) {
-    icons.push('🐞')
+    indicators.push({ key: 'bug', label: 'BUG', color: '#de350b', bg: '#ffebe6', text: 'Bug' })
   }
   if (node.blockedBy && node.blockedBy.length > 0) {
-    icons.push('🔒')
+    indicators.push({ key: 'blocked', label: 'BLK', color: '#6b778c', bg: '#f4f5f7', text: 'Blocked by other issues' })
   }
   if (node.flagged) {
-    icons.push('🚩')
+    indicators.push({ key: 'flagged', label: 'FLG', color: '#ff5630', bg: '#ffebe6', text: 'Work paused' })
   }
   if (score > 80) {
-    icons.push('⚡')
+    indicators.push({ key: 'high', label: 'HI', color: '#36b37e', bg: '#e3fcef', text: 'High priority (>80)' })
   }
 
-  const hasNoEstimates = node.estimateSeconds === null || node.estimateSeconds === 0
-  if (hasNoEstimates && !node.issueType?.toLowerCase().includes('epic')) {
-    icons.push('⚠️')
-  }
 
   // Fetch breakdown with debounce to avoid unnecessary API calls on quick mouse-overs
   const fetchBreakdown = useCallback(async () => {
@@ -123,7 +119,11 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
     flagged: 'Flag',
     statusWeight: 'Status',
     storyCompletion: 'Story Completion',
-    dueDateWeight: 'Due Date'
+    dueDateWeight: 'Due Date',
+    size: 'Size',
+    age: 'Age',
+    riceBoost: 'RICE Score',
+    alignmentBoost: 'Alignment',
   }
 
   return (
@@ -142,9 +142,25 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
           {getRecommendationIcon(actualPosition, recommendedPosition, node.autoScore).icon}
         </span>
       )}
-      {icons.length > 0 && (
-        <span className="priority-icons" style={{ marginLeft: '6px' }}>
-          {icons.join(' ')}
+      {indicators.length > 0 && (
+        <span className="priority-icons" style={{ marginLeft: '4px', display: 'inline-flex', gap: '3px' }}>
+          {indicators.map(ind => (
+            <span
+              key={ind.key}
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                lineHeight: '16px',
+                padding: '0 4px',
+                borderRadius: 3,
+                color: ind.color,
+                backgroundColor: ind.bg,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {ind.label}
+            </span>
+          ))}
         </span>
       )}
 
@@ -163,7 +179,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
             <span className="priority-tooltip-type">{node.issueType}</span>
           </div>
           <div className="priority-tooltip-total">
-            Total Score: <strong>{score.toFixed(1)}</strong>
+            Total Score: <strong>{breakdown?.totalScore != null ? breakdown.totalScore.toFixed(1) : score.toFixed(1)}</strong>
           </div>
 
           {recommendedPosition !== undefined && actualPosition !== undefined && (
@@ -200,24 +216,27 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
             </div>
           )}
 
-          {icons.length > 0 && (
+          {indicators.length > 0 && (
             <div className="priority-tooltip-indicators">
               <div className="priority-tooltip-title">Indicators:</div>
-              {icons.map((icon, idx) => {
-                let description = ''
-                if (icon === '🐞') description = 'Bug'
-                else if (icon === '🔒') description = 'Blocked by other issues'
-                else if (icon === '🚩') description = 'Work paused'
-                else if (icon === '⚡') description = 'High priority (>80)'
-                else if (icon === '⚠️') description = 'No time estimate'
-
-                return (
-                  <div key={idx} className="priority-indicator-item">
-                    <span className="indicator-icon">{icon}</span>
-                    <span className="indicator-description">{description}</span>
-                  </div>
-                )
-              })}
+              {indicators.map(ind => (
+                <div key={ind.key} className="priority-indicator-item">
+                  <span
+                    className="indicator-icon"
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      padding: '0 4px',
+                      borderRadius: 3,
+                      color: ind.color,
+                      backgroundColor: ind.bg,
+                    }}
+                  >
+                    {ind.label}
+                  </span>
+                  <span className="indicator-description">{ind.text}</span>
+                </div>
+              ))}
             </div>
           )}
         </div>,

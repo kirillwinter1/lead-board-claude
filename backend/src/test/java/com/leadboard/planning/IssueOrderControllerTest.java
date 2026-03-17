@@ -39,6 +39,8 @@ class IssueOrderControllerTest {
     private TenantUserRepository tenantUserRepository;
     @MockBean
     private TenantRepository tenantRepository;
+    @MockBean
+    private com.leadboard.config.ObservabilityMetrics observabilityMetrics;
 
     // ==================== Epic Order Tests ====================
 

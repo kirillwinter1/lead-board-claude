@@ -298,6 +298,209 @@ class QuarterlyPlanningServiceTest {
         assertTrue(demand.unassignedEpics().isEmpty());
     }
 
+    // ==================== Projects Overview Tests ====================
+
+    @Test
+    void testProjectsOverview_readyProject() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Ready Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Epic One");
+        epic1.setParentKey("PROJ-1");
+        epic1.setTeamId(1L);
+        epic1.setRoughEstimates(Map.of("DEV", new BigDecimal("10"), "QA", new BigDecimal("5")));
+
+        JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic Two");
+        epic2.setParentKey("PROJ-1");
+        epic2.setTeamId(1L);
+        epic2.setRoughEstimates(Map.of("DEV", new BigDecimal("8")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic1, epic2));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+
+        TeamEntity team1 = createTeam(1L, "Alpha");
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team1));
+        when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of());
+
+        QuarterlyProjectsResponse response = service.getProjectsOverview("2026Q2");
+
+        assertNotNull(response);
+        assertEquals("2026Q2", response.quarter());
+        assertEquals(1, response.inQuarterCount());
+        assertEquals(1, response.readyCount());
+        assertFalse(response.projects().isEmpty());
+
+        QuarterlyProjectOverviewDto dto = response.projects().get(0);
+        assertEquals("PROJ-1", dto.projectKey());
+        assertTrue(dto.inQuarter());
+        assertEquals("ready", dto.planningStatus());
+        assertEquals(100, dto.roughEstimateCoverage());
+        assertEquals(100, dto.teamMappingCoverage());
+        assertNotNull(dto.demandDays());
+        assertTrue(dto.blockers().isEmpty());
+    }
+
+    @Test
+    void testProjectsOverview_blockedProject() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Blocked Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Epic No Estimate");
+        epic1.setParentKey("PROJ-1");
+        epic1.setTeamId(1L);
+        // No rough estimates
+
+        JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic No Estimate 2");
+        epic2.setParentKey("PROJ-1");
+        epic2.setTeamId(1L);
+        // No rough estimates
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic1, epic2));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+
+        QuarterlyProjectsResponse response = service.getProjectsOverview("2026Q2");
+
+        QuarterlyProjectOverviewDto dto = response.projects().get(0);
+        assertEquals("blocked", dto.planningStatus());
+        assertEquals(0, dto.roughEstimateCoverage());
+        assertNull(dto.demandDays()); // Demand unavailable when rough missing
+        assertEquals("Demand unavailable", dto.forecastLabel());
+        assertFalse(dto.blockers().isEmpty());
+    }
+
+    @Test
+    void testProjectsOverview_partialProject() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Partial Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Epic Estimated");
+        epic1.setParentKey("PROJ-1");
+        epic1.setTeamId(1L);
+        epic1.setRoughEstimates(Map.of("DEV", new BigDecimal("10")));
+
+        // 2nd epic has rough estimates but no team
+        JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic No Team");
+        epic2.setParentKey("PROJ-1");
+        epic2.setTeamId(null); // No team
+        epic2.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
+
+        // 3rd epic both have
+        JiraIssueEntity epic3 = createIssue("EPIC-3", "EPIC", "Epic Full");
+        epic3.setParentKey("PROJ-1");
+        epic3.setTeamId(1L);
+        epic3.setRoughEstimates(Map.of("QA", new BigDecimal("3")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic1, epic2, epic3));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+
+        QuarterlyProjectsResponse response = service.getProjectsOverview("2026Q2");
+
+        QuarterlyProjectOverviewDto dto = response.projects().get(0);
+        // roughCoverage = 100% (all 3 have rough), teamMappingCoverage = 67% (2/3 have team)
+        // 67% < 80% → blocked (not partial)
+        // Actually the logic: roughCoverage < 60 OR teamMappingCoverage < 80 → blocked
+        assertEquals(100, dto.roughEstimateCoverage());
+        // teamMappingCoverage = 2/3 = 67% which is < 80 → blocked
+        assertTrue(dto.teamMappingCoverage() < 80);
+    }
+
+    @Test
+    void testProjectsOverview_notInQuarter() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Not In Quarter");
+        project.setLabels(null); // No quarter label
+
+        JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Some Epic");
+        epic1.setParentKey("PROJ-1");
+        epic1.setTeamId(1L);
+        epic1.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic1));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+
+        QuarterlyProjectsResponse response = service.getProjectsOverview("2026Q2");
+
+        assertEquals(0, response.inQuarterCount());
+        assertFalse(response.projects().isEmpty());
+        assertEquals("not-added", response.projects().get(0).planningStatus());
+        assertFalse(response.projects().get(0).inQuarter());
+    }
+
+    @Test
+    void testTeamsOverview_basicCalculation() {
+        TeamEntity team = createTeam(1L, "Alpha");
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of(team));
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        TeamMemberEntity member = createMember(1L, team, "DEV", Grade.MIDDLE, "8.0");
+        when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(member));
+
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        epic.setParentKey("PROJ-1");
+        epic.setTeamId(1L);
+        epic.setRoughEstimates(Map.of("DEV", new BigDecimal("20")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
+        when(issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", 1L))
+                .thenReturn(List.of(epic));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        List<QuarterlyTeamOverviewDto> result = service.getTeamsOverview("2026Q2");
+
+        assertFalse(result.isEmpty());
+        QuarterlyTeamOverviewDto teamDto = result.get(0);
+        assertEquals(1L, teamDto.teamId());
+        assertTrue(teamDto.capacityDays().compareTo(BigDecimal.ZERO) > 0);
+        assertTrue(teamDto.demandDays().compareTo(BigDecimal.ZERO) > 0);
+        assertTrue(teamDto.utilization() > 0);
+        assertFalse(teamDto.impactingProjects().isEmpty());
+    }
+
+    @Test
+    void testTeamsOverview_overloadedTeam() {
+        TeamEntity team = createTeam(1L, "Alpha");
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of(team));
+        when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
+
+        // Small capacity: 1 member, 10 workdays
+        TeamMemberEntity member = createMember(1L, team, "DEV", Grade.MIDDLE, "8.0");
+        when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(member));
+        when(workCalendarService.countWorkdays(any(), any())).thenReturn(10);
+
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        // Huge demand: 50d DEV demand vs 10d capacity
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Big Epic");
+        epic.setParentKey("PROJ-1");
+        epic.setTeamId(1L);
+        epic.setRoughEstimates(Map.of("DEV", new BigDecimal("50")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
+        when(issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", 1L))
+                .thenReturn(List.of(epic));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        List<QuarterlyTeamOverviewDto> result = service.getTeamsOverview("2026Q2");
+
+        QuarterlyTeamOverviewDto teamDto = result.get(0);
+        assertTrue(teamDto.utilization() > 100, "Team should be overloaded");
+        assertEquals("high", teamDto.risk());
+        assertTrue(teamDto.overloadedEpics() > 0);
+    }
+
     // ==================== Helpers ====================
 
     private TeamEntity createTeam(Long id, String name) {

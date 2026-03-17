@@ -4,6 +4,8 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.dto.*;
 import com.leadboard.metrics.repository.MetricsQueryRepository;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
+import com.leadboard.status.StatusCategory;
+import com.leadboard.sync.SyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,13 +30,16 @@ public class TeamMetricsService {
     private final MetricsQueryRepository metricsRepository;
     private final StatusChangelogRepository changelogRepository;
     private final WorkflowConfigService workflowConfig;
+    private final SyncService syncService;
 
     public TeamMetricsService(MetricsQueryRepository metricsRepository,
                               StatusChangelogRepository changelogRepository,
-                              WorkflowConfigService workflowConfig) {
+                              WorkflowConfigService workflowConfig,
+                              SyncService syncService) {
         this.metricsRepository = metricsRepository;
         this.changelogRepository = changelogRepository;
         this.workflowConfig = workflowConfig;
+        this.syncService = syncService;
     }
 
     /**
@@ -170,16 +176,8 @@ public class TeamMetricsService {
             String status = (String) row[0];
             if (status == null) continue;
 
-            // Exclude NEW and DONE statuses
-            try {
-                var cat = workflowConfig.categorize(status, null);
-                if (cat == com.leadboard.status.StatusCategory.NEW
-                        || cat == com.leadboard.status.StatusCategory.DONE
-                        || cat == com.leadboard.status.StatusCategory.TODO) {
-                    continue;
-                }
-            } catch (Exception e) {
-                // Safe fallback — include if categorization fails
+            if (shouldExcludeTimeInStatus(status)) {
+                continue;
             }
 
             BigDecimal avgSec = row[1] != null ? new BigDecimal(row[1].toString()) : BigDecimal.ZERO;
@@ -216,78 +214,295 @@ public class TeamMetricsService {
         return result;
     }
 
+    private boolean shouldExcludeTimeInStatus(String status) {
+        try {
+            List<StatusCategory> categories = List.of(
+                    workflowConfig.categorizeStory(status),
+                    workflowConfig.categorizeSubtask(status),
+                    workflowConfig.categorizeEpic(status)
+            );
+
+            boolean hasActiveCategory = categories.stream()
+                    .anyMatch(cat -> cat == StatusCategory.IN_PROGRESS || cat == StatusCategory.PLANNED);
+            if (hasActiveCategory) {
+                return false;
+            }
+
+            return categories.stream()
+                    .allMatch(cat -> cat == StatusCategory.NEW
+                            || cat == StatusCategory.TODO
+                            || cat == StatusCategory.DONE);
+        } catch (Exception e) {
+            log.debug("Failed to classify time-in-status category for '{}', keeping row", status, e);
+            return false;
+        }
+    }
+
     /**
-     * Calculate metrics by assignee with extended fields (DSR, velocity, trend).
+     * Calculate metrics by assignee with extended fields (DSR, velocity, trend, outlier).
      */
     public List<AssigneeMetrics> calculateByAssignee(Long teamId, LocalDate from, LocalDate to) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
-        // Previous period of the same length for trend calculation
-        long periodDays = java.time.temporal.ChronoUnit.DAYS.between(from, to);
+        long periodDays = ChronoUnit.DAYS.between(from, to);
         LocalDate prevFrom = from.minusDays(periodDays);
         OffsetDateTime prevFromDt = prevFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 
-        List<Object[]> data = metricsRepository.getExtendedMetricsByAssignee(teamId, fromDt, toDt, prevFromDt);
+        List<Object[]> data = metricsRepository.getExtendedMetricsByAssigneeV2(teamId, fromDt, toDt, prevFromDt);
 
-        return data.stream()
-                .map(row -> {
-                    String accountId = (String) row[0];
-                    String displayName = (String) row[1];
-                    int issuesClosed = ((Number) row[2]).intValue();
-                    BigDecimal avgLeadTime = row[3] != null
-                            ? new BigDecimal(row[3].toString()).setScale(1, RoundingMode.HALF_UP)
-                            : null;
-                    BigDecimal avgCycleTime = row[4] != null
-                            ? new BigDecimal(row[4].toString()).setScale(1, RoundingMode.HALF_UP)
-                            : null;
+        // First pass: build list
+        List<AssigneeMetrics> metrics = new ArrayList<>();
+        for (Object[] row : data) {
+            String accountId = (String) row[0];
+            String displayName = (String) row[1];
+            int issuesClosed = ((Number) row[2]).intValue();
+            BigDecimal avgLeadTime = row[3] != null
+                    ? new BigDecimal(row[3].toString()).setScale(1, RoundingMode.HALF_UP) : null;
+            BigDecimal avgCycleTime = row[4] != null
+                    ? new BigDecimal(row[4].toString()).setScale(1, RoundingMode.HALF_UP) : null;
+            BigDecimal personalDsr = row[5] != null
+                    ? new BigDecimal(row[5].toString()).setScale(2, RoundingMode.HALF_UP) : null;
 
-                    // Personal DSR (time_spent / original_estimate)
-                    BigDecimal personalDsr = row[5] != null
-                            ? new BigDecimal(row[5].toString()).setScale(2, RoundingMode.HALF_UP)
-                            : null;
+            BigDecimal velocityPercent = null;
+            if (row[6] != null && row[7] != null) {
+                BigDecimal timeSpent = new BigDecimal(row[6].toString());
+                BigDecimal estimate = new BigDecimal(row[7].toString());
+                if (estimate.compareTo(BigDecimal.ZERO) > 0) {
+                    velocityPercent = timeSpent.divide(estimate, 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                            .setScale(0, RoundingMode.HALF_UP);
+                }
+            }
 
-                    // Velocity = (time_spent / estimate) * 100
-                    BigDecimal velocityPercent = null;
-                    if (row[6] != null && row[7] != null) {
-                        BigDecimal timeSpent = new BigDecimal(row[6].toString());
-                        BigDecimal estimate = new BigDecimal(row[7].toString());
-                        if (estimate.compareTo(BigDecimal.ZERO) > 0) {
-                            velocityPercent = timeSpent.divide(estimate, 4, RoundingMode.HALF_UP)
-                                    .multiply(BigDecimal.valueOf(100))
-                                    .setScale(0, RoundingMode.HALF_UP);
-                        }
-                    }
+            int issuesPrev = row[8] != null ? ((Number) row[8]).intValue() : 0;
+            String trend = calculateTrend(issuesClosed, issuesPrev);
 
-                    // Trend calculation (compare with previous period)
-                    int issuesPrev = row[8] != null ? ((Number) row[8]).intValue() : 0;
-                    String trend = calculateTrend(issuesClosed, issuesPrev);
+            BigDecimal avgCycleTimePrev = row[9] != null
+                    ? new BigDecimal(row[9].toString()).setScale(1, RoundingMode.HALF_UP) : null;
 
-                    return new AssigneeMetrics(
-                            accountId,
-                            displayName != null ? displayName : "Unknown",
-                            issuesClosed,
-                            avgLeadTime,
-                            avgCycleTime,
-                            personalDsr,
-                            velocityPercent,
-                            trend
-                    );
-                })
+            metrics.add(new AssigneeMetrics(
+                    accountId,
+                    displayName != null ? displayName : "Unknown",
+                    issuesClosed, avgLeadTime, avgCycleTime,
+                    personalDsr, velocityPercent, trend,
+                    issuesPrev, avgCycleTimePrev, false
+            ));
+        }
+
+        // Second pass: compute team median cycle time, flag outliers
+        List<BigDecimal> cycleTimes = metrics.stream()
+                .map(AssigneeMetrics::avgCycleTimeDays)
+                .filter(Objects::nonNull)
+                .sorted()
                 .collect(Collectors.toList());
+        BigDecimal teamMedianCycleTime = cycleTimes.isEmpty() ? null : percentile(cycleTimes, 0.5);
+
+        List<AssigneeMetrics> result = new ArrayList<>();
+        for (AssigneeMetrics m : metrics) {
+            boolean outlier = false;
+            if (m.personalDsr() != null && m.personalDsr().compareTo(new BigDecimal("1.5")) > 0) {
+                outlier = true;
+            }
+            if (teamMedianCycleTime != null && m.avgCycleTimeDays() != null
+                    && m.avgCycleTimeDays().compareTo(teamMedianCycleTime.multiply(BigDecimal.valueOf(2))) > 0) {
+                outlier = true;
+            }
+
+            result.add(new AssigneeMetrics(
+                    m.accountId(), m.displayName(), m.issuesClosed(),
+                    m.avgLeadTimeDays(), m.avgCycleTimeDays(),
+                    m.personalDsr(), m.velocityPercent(), m.trend(),
+                    m.issuesClosedPrev(), m.avgCycleTimePrev(), outlier
+            ));
+        }
+
+        return result;
+    }
+
+    /**
+     * Get data status for metrics dashboard.
+     */
+    public MetricsDataStatus getDataStatus(Long teamId, LocalDate from, LocalDate to) {
+        OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        OffsetDateTime lastSyncAt = null;
+        boolean syncInProgress = false;
+        try {
+            SyncService.SyncStatus syncStatus = syncService.getSyncStatus();
+            lastSyncAt = syncStatus.lastSyncCompletedAt();
+            syncInProgress = syncStatus.syncInProgress();
+        } catch (Exception e) {
+            log.debug("Failed to get sync status for data-status bar", e);
+        }
+
+        int issuesInScope = 0;
+        int issuesWithChangelog = 0;
+        try {
+            issuesInScope = metricsRepository.countIssuesInScope(teamId, fromDt, toDt);
+            issuesWithChangelog = metricsRepository.countIssuesWithChangelog(teamId, fromDt, toDt);
+        } catch (Exception e) {
+            log.debug("Failed to count issues for data-status bar", e);
+        }
+
+        BigDecimal coverage = issuesInScope > 0
+                ? BigDecimal.valueOf(issuesWithChangelog)
+                    .divide(BigDecimal.valueOf(issuesInScope), 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .setScale(1, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        return new MetricsDataStatus(
+                lastSyncAt,
+                syncInProgress,
+                issuesInScope,
+                issuesWithChangelog,
+                coverage
+        );
+    }
+
+    /**
+     * Get executive summary with KPI cards and deltas vs previous period.
+     */
+    public ExecutiveSummary getExecutiveSummary(Long teamId, LocalDate from, LocalDate to,
+                                                 DsrService dsrService, VelocityService velocityService) {
+        long periodDays = ChronoUnit.DAYS.between(from, to);
+        LocalDate prevFrom = from.minusDays(periodDays);
+        LocalDate prevTo = from.minusDays(1);
+
+        // Throughput
+        ExecutiveSummary.KpiCard throughputKpi;
+        try {
+            ThroughputResponse currentThroughput = calculateThroughput(teamId, from, to, null, null, null);
+            ThroughputResponse prevThroughput = calculateThroughput(teamId, prevFrom, prevTo, null, null, null);
+            throughputKpi = buildKpiCard("Throughput",
+                    String.valueOf(currentThroughput.total()),
+                    BigDecimal.valueOf(currentThroughput.total()),
+                    BigDecimal.valueOf(prevThroughput.total()),
+                    currentThroughput.total(), null);
+        } catch (Exception e) {
+            log.debug("Failed to compute throughput KPI", e);
+            throughputKpi = buildKpiCard("Throughput", "—", BigDecimal.ZERO, null, 0, null);
+        }
+
+        // Cycle time median
+        ExecutiveSummary.KpiCard cycleKpi;
+        try {
+            CycleTimeResponse currentCycle = calculateCycleTime(teamId, from, to, null, null, null);
+            CycleTimeResponse prevCycle = calculateCycleTime(teamId, prevFrom, prevTo, null, null, null);
+            cycleKpi = buildKpiCard("Cycle Time",
+                    currentCycle.sampleSize() > 0 ? currentCycle.medianDays() + "d" : "—",
+                    currentCycle.medianDays(),
+                    prevCycle.sampleSize() > 0 ? prevCycle.medianDays() : null,
+                    currentCycle.sampleSize(), null);
+        } catch (Exception e) {
+            log.debug("Failed to compute cycle time KPI", e);
+            cycleKpi = buildKpiCard("Cycle Time", "—", BigDecimal.ZERO, null, 0, null);
+        }
+
+        // Lead time median
+        ExecutiveSummary.KpiCard leadKpi;
+        try {
+            LeadTimeResponse currentLead = calculateLeadTime(teamId, from, to, null, null, null);
+            LeadTimeResponse prevLead = calculateLeadTime(teamId, prevFrom, prevTo, null, null, null);
+            leadKpi = buildKpiCard("Lead Time",
+                    currentLead.sampleSize() > 0 ? currentLead.medianDays() + "d" : "—",
+                    currentLead.medianDays(),
+                    prevLead.sampleSize() > 0 ? prevLead.medianDays() : null,
+                    currentLead.sampleSize(), null);
+        } catch (Exception e) {
+            log.debug("Failed to compute lead time KPI", e);
+            leadKpi = buildKpiCard("Lead Time", "—", BigDecimal.ZERO, null, 0, null);
+        }
+
+        // Predictability (on-time rate from DSR)
+        ExecutiveSummary.KpiCard predictabilityKpi;
+        try {
+            var currentDsr = dsrService.calculateDsr(teamId, from, to);
+            var prevDsr = dsrService.calculateDsr(teamId, prevFrom, prevTo);
+            predictabilityKpi = buildKpiCard("Predictability",
+                    currentDsr.totalEpics() > 0 ? currentDsr.onTimeRate().setScale(0, RoundingMode.HALF_UP) + "%" : "—",
+                    currentDsr.onTimeRate(),
+                    prevDsr.totalEpics() > 0 ? prevDsr.onTimeRate() : null,
+                    currentDsr.totalEpics(), BigDecimal.valueOf(80));
+        } catch (Exception e) {
+            log.debug("Failed to compute predictability KPI", e);
+            predictabilityKpi = buildKpiCard("Predictability", "—", BigDecimal.ZERO, null, 0, BigDecimal.valueOf(80));
+        }
+
+        // Capacity utilization (from velocity)
+        ExecutiveSummary.KpiCard capacityKpi;
+        try {
+            var currentVelocity = velocityService.calculateVelocity(teamId, from, to);
+            var prevVelocity = velocityService.calculateVelocity(teamId, prevFrom, prevTo);
+            capacityKpi = buildKpiCard("Utilization",
+                    currentVelocity.utilizationPercent() + "%",
+                    currentVelocity.utilizationPercent(),
+                    prevVelocity.utilizationPercent(),
+                    currentVelocity.byWeek().size(), BigDecimal.valueOf(90));
+        } catch (Exception e) {
+            log.debug("Failed to compute capacity KPI", e);
+            capacityKpi = buildKpiCard("Utilization", "—", BigDecimal.ZERO, null, 0, BigDecimal.valueOf(90));
+        }
+
+        // Blocked risk
+        ExecutiveSummary.KpiCard blockedKpi;
+        try {
+            OffsetDateTime threshold = LocalDate.now().minusDays(14).atStartOfDay().atOffset(ZoneOffset.UTC);
+            Object[] blocked = metricsRepository.countBlockedAndAgingIssues(teamId, threshold);
+            int flaggedCount = blocked != null && blocked[0] != null ? ((Number) blocked[0]).intValue() : 0;
+            int agingCount = blocked != null && blocked[1] != null ? ((Number) blocked[1]).intValue() : 0;
+            int totalRisk = flaggedCount + agingCount;
+            blockedKpi = new ExecutiveSummary.KpiCard(
+                    "Blocked/Aging", String.valueOf(totalRisk),
+                    BigDecimal.valueOf(totalRisk), null, null,
+                    totalRisk > 0 ? "WARNING" : "STABLE",
+                    totalRisk, BigDecimal.ZERO);
+        } catch (Exception e) {
+            log.debug("Failed to compute blocked/aging KPI", e);
+            blockedKpi = new ExecutiveSummary.KpiCard(
+                    "Blocked/Aging", "—", BigDecimal.ZERO, null, null,
+                    "STABLE", 0, BigDecimal.ZERO);
+        }
+
+        return new ExecutiveSummary(throughputKpi, cycleKpi, leadKpi, predictabilityKpi, capacityKpi, blockedKpi);
+    }
+
+    private ExecutiveSummary.KpiCard buildKpiCard(String label, String formattedValue,
+                                                    BigDecimal current, BigDecimal prev,
+                                                    int sampleSize, BigDecimal target) {
+        BigDecimal deltaPercent = null;
+        String trend = "STABLE";
+
+        if (prev != null && prev.compareTo(BigDecimal.ZERO) > 0) {
+            deltaPercent = current.subtract(prev)
+                    .divide(prev, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .setScale(1, RoundingMode.HALF_UP);
+            if (deltaPercent.compareTo(BigDecimal.valueOf(5)) > 0) {
+                trend = "UP";
+            } else if (deltaPercent.compareTo(BigDecimal.valueOf(-5)) < 0) {
+                trend = "DOWN";
+            }
+        } else if (prev == null && current.compareTo(BigDecimal.ZERO) > 0) {
+            trend = "UP";
+        }
+
+        return new ExecutiveSummary.KpiCard(label, formattedValue, current, prev, deltaPercent, trend, sampleSize, target);
     }
 
     /**
      * Calculate trend based on current vs previous period.
      */
-    private String calculateTrend(int current, int previous) {
+    String calculateTrend(int current, int previous) {
         if (previous == 0) {
             return current > 0 ? "UP" : "STABLE";
         }
         double changePercent = ((double) (current - previous) / previous) * 100;
-        if (changePercent > 10) {
+        if (changePercent > 5) {
             return "UP";
-        } else if (changePercent < -10) {
+        } else if (changePercent < -5) {
             return "DOWN";
         }
         return "STABLE";
@@ -312,9 +527,6 @@ public class TeamMetricsService {
 
     /**
      * Calculate moving average for throughput data.
-     * @param byPeriod list of period throughputs
-     * @param window number of periods for the window
-     * @return list of moving average values (same length as input)
      */
     private List<BigDecimal> calculateMovingAverage(List<PeriodThroughput> byPeriod, int window) {
         List<BigDecimal> result = new ArrayList<>();
@@ -348,24 +560,18 @@ public class TeamMetricsService {
 
         int size = sortedValues.size();
 
-        // Average
         BigDecimal sum = sortedValues.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal avg = sum.divide(BigDecimal.valueOf(size), 2, RoundingMode.HALF_UP);
 
-        // Min and Max
         BigDecimal min = sortedValues.get(0).setScale(2, RoundingMode.HALF_UP);
         BigDecimal max = sortedValues.get(size - 1).setScale(2, RoundingMode.HALF_UP);
-
-        // Median (P50)
         BigDecimal median = percentile(sortedValues, 0.5);
-
-        // P90
         BigDecimal p90 = percentile(sortedValues, 0.9);
 
         return new LeadTimeResponse(avg, median, p90, min, max, size);
     }
 
-    private BigDecimal percentile(List<BigDecimal> sortedValues, double p) {
+    BigDecimal percentile(List<BigDecimal> sortedValues, double p) {
         if (sortedValues.isEmpty()) return BigDecimal.ZERO;
         int size = sortedValues.size();
         double index = p * (size - 1);

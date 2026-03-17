@@ -18,5 +18,6 @@ public record ProjectDto(
         Long totalLoggedSeconds,
         LocalDate expectedDone,
         BigDecimal riceScore,
-        BigDecimal riceNormalizedScore
+        BigDecimal riceNormalizedScore,
+        String quarterLabel
 ) {}

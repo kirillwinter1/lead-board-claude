@@ -2,6 +2,7 @@ package com.leadboard.metrics.service;
 
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.metrics.dto.VelocityResponse;
+import com.leadboard.metrics.repository.MetricsQueryRepository;
 import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,10 +12,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,13 +33,13 @@ class VelocityServiceTest {
     private WorkCalendarService calendarService;
 
     @Mock
-    private JdbcTemplate jdbcTemplate;
+    private MetricsQueryRepository metricsQueryRepository;
 
     private VelocityService service;
 
     @BeforeEach
     void setUp() {
-        service = new VelocityService(teamMemberRepository, calendarService, jdbcTemplate);
+        service = new VelocityService(teamMemberRepository, calendarService, metricsQueryRepository);
     }
 
     @Test
@@ -51,14 +52,14 @@ class VelocityServiceTest {
 
         // Issue: started Mon Jan 6, done Mon Jan 20 = 14 days total
         // 80 hours logged (10 days * 8h)
-        // Should distribute: 7 days in week Jan 6, 7 days in week Jan 13
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("time_spent", 80L * 3600); // 80 hours in seconds
-        row.put("started", java.sql.Date.valueOf("2025-01-06"));
-        row.put("done", java.sql.Date.valueOf("2025-01-20"));
+        Object[] row = new Object[]{
+            80L * 3600, // time_spent_seconds
+            java.sql.Date.valueOf("2025-01-06"), // started
+            java.sql.Date.valueOf("2025-01-20")  // done
+        };
 
-        when(jdbcTemplate.queryForList(anyString(), eq(1L), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of(row));
+        when(metricsQueryRepository.getVelocityData(eq(1L), any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(Collections.singletonList(row));
 
         when(calendarService.countWorkdays(any(LocalDate.class), any(LocalDate.class))).thenReturn(5);
 
@@ -87,13 +88,14 @@ class VelocityServiceTest {
         when(teamMemberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(member));
 
         // Issue: started and done in same week
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("time_spent", 16L * 3600); // 16 hours
-        row.put("started", java.sql.Date.valueOf("2025-01-06"));
-        row.put("done", java.sql.Date.valueOf("2025-01-08")); // same week
+        Object[] row = new Object[]{
+            16L * 3600, // 16 hours
+            java.sql.Date.valueOf("2025-01-06"), // started
+            java.sql.Date.valueOf("2025-01-08")  // done (same week)
+        };
 
-        when(jdbcTemplate.queryForList(anyString(), eq(1L), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of(row));
+        when(metricsQueryRepository.getVelocityData(eq(1L), any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(Collections.singletonList(row));
 
         when(calendarService.countWorkdays(any(LocalDate.class), any(LocalDate.class))).thenReturn(5);
 
@@ -119,13 +121,14 @@ class VelocityServiceTest {
         when(teamMemberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(member));
 
         // Issue with no started_at — should fall back to done_at week
-        Map<String, Object> row = new LinkedHashMap<>();
-        row.put("time_spent", 24L * 3600); // 24 hours
-        row.put("started", null);
-        row.put("done", java.sql.Date.valueOf("2025-01-15")); // Wed of week Jan 13
+        Object[] row = new Object[]{
+            24L * 3600, // 24 hours
+            null,       // started (null)
+            java.sql.Date.valueOf("2025-01-15")  // done (Wed of week Jan 13)
+        };
 
-        when(jdbcTemplate.queryForList(anyString(), eq(1L), any(LocalDate.class), any(LocalDate.class)))
-                .thenReturn(List.of(row));
+        when(metricsQueryRepository.getVelocityData(eq(1L), any(OffsetDateTime.class), any(OffsetDateTime.class)))
+                .thenReturn(Collections.singletonList(row));
 
         when(calendarService.countWorkdays(any(LocalDate.class), any(LocalDate.class))).thenReturn(5);
 
@@ -150,7 +153,7 @@ class VelocityServiceTest {
         member.setHoursPerDay(new BigDecimal("8"));
         member.setActive(true);
         when(teamMemberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(member));
-        when(jdbcTemplate.queryForList(anyString(), eq(1L), any(LocalDate.class), any(LocalDate.class)))
+        when(metricsQueryRepository.getVelocityData(eq(1L), any(OffsetDateTime.class), any(OffsetDateTime.class)))
                 .thenReturn(Collections.emptyList());
         when(calendarService.countWorkdays(any(LocalDate.class), any(LocalDate.class))).thenReturn(5);
 

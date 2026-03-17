@@ -339,6 +339,335 @@ public class QuarterlyPlanningService {
         return quarters;
     }
 
+    // ==================== Projects Overview ====================
+
+    public QuarterlyProjectsResponse getProjectsOverview(String quarterLabel) {
+        List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
+        List<TeamEntity> allTeams = teamRepository.findByActiveTrue();
+        Map<Long, TeamEntity> teamsById = new HashMap<>();
+        for (TeamEntity team : allTeams) {
+            teamsById.put(team.getId(), team);
+        }
+
+        // Load all epics (across all teams) for project overview
+        List<JiraIssueEntity> allEpics = issueRepository.findByBoardCategory("EPIC");
+        Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
+        Map<String, JiraIssueEntity> projectsByKey = new HashMap<>();
+        for (JiraIssueEntity p : allProjects) {
+            projectsByKey.put(p.getIssueKey(), p);
+        }
+
+        // Build project -> child epics map
+        Map<String, List<JiraIssueEntity>> epicsByProject = new LinkedHashMap<>();
+        for (JiraIssueEntity epic : allEpics) {
+            String projKey = epicToProjectKey.get(epic.getIssueKey());
+            if (projKey != null) {
+                epicsByProject.computeIfAbsent(projKey, k -> new ArrayList<>()).add(epic);
+            }
+        }
+
+        // RICE scores
+        Set<String> projectKeys = new HashSet<>(projectsByKey.keySet());
+        Map<String, RiceAssessmentEntity> riceByKey = loadRiceScores(projectKeys);
+
+        // Default risk buffer for demand calculation
+        BigDecimal defaultRiskBuffer = new BigDecimal("0.2");
+
+        List<QuarterlyProjectOverviewDto> projectDtos = new ArrayList<>();
+        Set<Long> teamsInvolvedSet = new HashSet<>();
+        int totalEpicsInQuarter = 0;
+        int estimatedEpicsInQuarter = 0;
+
+        for (JiraIssueEntity project : allProjects) {
+            String projectKey = project.getIssueKey();
+            List<JiraIssueEntity> childEpics = epicsByProject.getOrDefault(projectKey, List.of());
+
+            // Filter to non-done epics
+            List<JiraIssueEntity> activeEpics = childEpics.stream()
+                    .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
+                    .toList();
+
+            // Resolve quarter for each active epic
+            List<JiraIssueEntity> quarterEpics = new ArrayList<>();
+            for (JiraIssueEntity epic : activeEpics) {
+                String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+                if (quarterLabel.equals(epicQuarter)) {
+                    quarterEpics.add(epic);
+                }
+            }
+
+            // Determine if project is in quarter
+            boolean projectHasQuarterLabel = quarterLabel.equals(project.getQuarterLabel());
+            boolean hasEpicsInQuarter = !quarterEpics.isEmpty();
+            boolean inQuarter = projectHasQuarterLabel || hasEpicsInQuarter;
+
+            // Use all active epics for coverage calculations if project is in quarter
+            List<JiraIssueEntity> epicsForCoverage = inQuarter ? activeEpics : List.of();
+
+            // Rough estimate coverage
+            int totalEpicCount = epicsForCoverage.size();
+            int roughEstimatedCount = 0;
+            int teamMappedCount = 0;
+            for (JiraIssueEntity epic : epicsForCoverage) {
+                if (epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty()) {
+                    roughEstimatedCount++;
+                }
+                if (epic.getTeamId() != null) {
+                    teamMappedCount++;
+                }
+            }
+
+            int roughCoverage = totalEpicCount > 0 ? Math.round((roughEstimatedCount * 100f) / totalEpicCount) : 0;
+            int teamMappingCoverage = totalEpicCount > 0 ? Math.round((teamMappedCount * 100f) / totalEpicCount) : 0;
+
+            // Planning status
+            String planningStatus;
+            if (!inQuarter) {
+                planningStatus = "not-added";
+            } else if (roughCoverage == 100 && teamMappingCoverage == 100) {
+                planningStatus = "ready";
+            } else if (roughCoverage < 60 || teamMappingCoverage < 80) {
+                planningStatus = "blocked";
+            } else {
+                planningStatus = "partial";
+            }
+
+            // Demand calculation
+            BigDecimal demandDays = null;
+            if (inQuarter && roughCoverage == 100) {
+                BigDecimal totalDemand = BigDecimal.ZERO;
+                for (JiraIssueEntity epic : quarterEpics) {
+                    Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, defaultRiskBuffer);
+                    for (BigDecimal val : epicDemand.values()) {
+                        totalDemand = totalDemand.add(val);
+                    }
+                }
+                demandDays = totalDemand;
+            }
+
+            // Forecast label
+            String forecastLabel = demandDays != null
+                    ? demandDays.setScale(0, java.math.RoundingMode.HALF_UP) + "d demand"
+                    : "Demand unavailable";
+
+            // Blockers
+            List<String> blockers = new ArrayList<>();
+            if (inQuarter) {
+                int missingRough = totalEpicCount - roughEstimatedCount;
+                if (missingRough > 0) {
+                    blockers.add(missingRough + " epic" + (missingRough > 1 ? "s" : "") + " without rough estimates");
+                }
+                int missingTeam = totalEpicCount - teamMappedCount;
+                if (missingTeam > 0) {
+                    blockers.add(missingTeam + " epic" + (missingTeam > 1 ? "s" : "") + " without team mapping");
+                }
+            }
+
+            // Risk
+            String risk;
+            if (blockers.size() >= 2 || roughCoverage < 50) {
+                risk = "high";
+            } else if (!blockers.isEmpty() || roughCoverage < 80 || teamMappingCoverage < 90) {
+                risk = "medium";
+            } else {
+                risk = "low";
+            }
+
+            // Teams
+            Set<Long> projectTeamIds = new LinkedHashSet<>();
+            for (JiraIssueEntity epic : activeEpics) {
+                if (epic.getTeamId() != null) {
+                    projectTeamIds.add(epic.getTeamId());
+                }
+            }
+            List<QuarterlyProjectOverviewDto.TeamRef> teamRefs = new ArrayList<>();
+            for (Long teamId : projectTeamIds) {
+                TeamEntity team = teamsById.get(teamId);
+                if (team != null) {
+                    teamRefs.add(new QuarterlyProjectOverviewDto.TeamRef(team.getId(), team.getName(), team.getColor()));
+                }
+            }
+
+            // RICE + Priority
+            RiceAssessmentEntity rice = riceByKey.get(projectKey);
+            BigDecimal riceScore = rice != null ? rice.getNormalizedScore() : BigDecimal.ZERO;
+            Integer boost = project.getManualBoost() != null ? project.getManualBoost() : 0;
+            BigDecimal priorityScore = computePriorityScore(riceScore, boost);
+
+            // Epic overview DTOs
+            List<QuarterlyProjectOverviewDto.EpicOverviewDto> epicOverviews = new ArrayList<>();
+            for (JiraIssueEntity epic : activeEpics) {
+                boolean hasRough = epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty();
+                boolean hasTeam = epic.getTeamId() != null;
+
+                List<QuarterlyProjectOverviewDto.TeamRef> epicTeams = new ArrayList<>();
+                if (epic.getTeamId() != null) {
+                    TeamEntity team = teamsById.get(epic.getTeamId());
+                    if (team != null) {
+                        epicTeams.add(new QuarterlyProjectOverviewDto.TeamRef(team.getId(), team.getName(), team.getColor()));
+                    }
+                }
+
+                List<String> epicBlockers = new ArrayList<>();
+                if (!hasRough) epicBlockers.add("No rough estimates");
+                if (!hasTeam) epicBlockers.add("No team mapping");
+
+                epicOverviews.add(new QuarterlyProjectOverviewDto.EpicOverviewDto(
+                        epic.getIssueKey(), epic.getSummary(), epicTeams, hasRough, hasTeam, epicBlockers
+                ));
+            }
+
+            projectDtos.add(new QuarterlyProjectOverviewDto(
+                    projectKey, project.getSummary(), inQuarter,
+                    inQuarter ? quarterLabel : null,
+                    priorityScore, riceScore, boost,
+                    totalEpicCount, roughCoverage, teamMappingCoverage,
+                    planningStatus, demandDays, forecastLabel, risk,
+                    teamRefs, blockers, epicOverviews
+            ));
+
+            // Summary stats
+            if (inQuarter) {
+                teamsInvolvedSet.addAll(projectTeamIds);
+                totalEpicsInQuarter += totalEpicCount;
+                estimatedEpicsInQuarter += roughEstimatedCount;
+            }
+        }
+
+        // Sort by priority descending
+        projectDtos.sort(Comparator.comparing(QuarterlyProjectOverviewDto::priorityScore).reversed());
+
+        // Summary counts
+        int inQuarterCount = 0, readyCount = 0, blockedCount = 0, partialCount = 0;
+        for (QuarterlyProjectOverviewDto dto : projectDtos) {
+            switch (dto.planningStatus()) {
+                case "ready" -> { inQuarterCount++; readyCount++; }
+                case "partial" -> { inQuarterCount++; partialCount++; }
+                case "blocked" -> { inQuarterCount++; blockedCount++; }
+                default -> {} // not-added
+            }
+        }
+
+        int roughCoveragePct = totalEpicsInQuarter > 0
+                ? Math.round((estimatedEpicsInQuarter * 100f) / totalEpicsInQuarter)
+                : 0;
+
+        return new QuarterlyProjectsResponse(
+                quarterLabel, inQuarterCount, readyCount, blockedCount, partialCount,
+                teamsInvolvedSet.size(), totalEpicsInQuarter, roughCoveragePct,
+                projectDtos
+        );
+    }
+
+    // ==================== Teams Overview ====================
+
+    public List<QuarterlyTeamOverviewDto> getTeamsOverview(String quarterLabel) {
+        List<TeamEntity> teams = teamRepository.findByActiveTrue();
+        List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
+        List<JiraIssueEntity> allEpics = issueRepository.findByBoardCategory("EPIC");
+        Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
+        Map<String, JiraIssueEntity> projectsByKey = new HashMap<>();
+        for (JiraIssueEntity p : allProjects) {
+            projectsByKey.put(p.getIssueKey(), p);
+        }
+
+        BigDecimal defaultRiskBuffer = new BigDecimal("0.2");
+
+        // Pre-compute project planning statuses
+        Map<String, String> projectStatusMap = new HashMap<>();
+        QuarterlyProjectsResponse projectsOverview = getProjectsOverview(quarterLabel);
+        for (QuarterlyProjectOverviewDto po : projectsOverview.projects()) {
+            projectStatusMap.put(po.projectKey(), po.planningStatus());
+        }
+
+        List<QuarterlyTeamOverviewDto> result = new ArrayList<>();
+
+        for (TeamEntity team : teams) {
+            try {
+                QuarterlyCapacityDto capacity = getTeamCapacity(team.getId(), quarterLabel);
+
+                // Find team's quarter epics
+                List<JiraIssueEntity> teamEpics = issueRepository
+                        .findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", team.getId());
+                List<JiraIssueEntity> quarterEpics = new ArrayList<>();
+                for (JiraIssueEntity epic : teamEpics) {
+                    if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
+                    String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+                    if (quarterLabel.equals(epicQuarter)) {
+                        quarterEpics.add(epic);
+                    }
+                }
+
+                // Compute demand by role
+                PlanningConfigDto config = teamService.getPlanningConfig(team.getId());
+                BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : defaultRiskBuffer;
+
+                Map<String, BigDecimal> demandByRole = new LinkedHashMap<>();
+                Map<String, BigDecimal> remainingCap = new LinkedHashMap<>(capacity.capacityByRole());
+                int overloadedEpics = 0;
+
+                for (JiraIssueEntity epic : quarterEpics) {
+                    Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, riskBuffer);
+                    boolean epicOverloaded = false;
+                    for (Map.Entry<String, BigDecimal> entry : epicDemand.entrySet()) {
+                        demandByRole.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
+                        BigDecimal remaining = remainingCap.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+                        if (remaining.compareTo(entry.getValue()) < 0) {
+                            epicOverloaded = true;
+                        }
+                        remainingCap.put(entry.getKey(), remaining.subtract(entry.getValue()));
+                    }
+                    if (epicOverloaded) overloadedEpics++;
+                }
+
+                BigDecimal totalCapacity = capacity.capacityByRole().values().stream()
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal totalDemand = demandByRole.values().stream()
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal gapDays = totalCapacity.subtract(totalDemand);
+                int utilization = totalCapacity.compareTo(BigDecimal.ZERO) > 0
+                        ? totalDemand.multiply(new BigDecimal("100"))
+                            .divide(totalCapacity, 0, java.math.RoundingMode.HALF_UP).intValue()
+                        : 0;
+
+                String risk = utilization > 100 ? "high" : utilization > 85 ? "medium" : "low";
+
+                // Impacting projects
+                Set<String> impactingProjectKeys = new LinkedHashSet<>();
+                for (JiraIssueEntity epic : quarterEpics) {
+                    String projKey = epicToProjectKey.get(epic.getIssueKey());
+                    if (projKey != null) {
+                        impactingProjectKeys.add(projKey);
+                    }
+                }
+
+                List<QuarterlyTeamOverviewDto.ProjectRef> impactingProjects = new ArrayList<>();
+                for (String projKey : impactingProjectKeys) {
+                    JiraIssueEntity proj = projectsByKey.get(projKey);
+                    if (proj != null) {
+                        impactingProjects.add(new QuarterlyTeamOverviewDto.ProjectRef(
+                                projKey, proj.getSummary(),
+                                projectStatusMap.getOrDefault(projKey, "not-added")
+                        ));
+                    }
+                }
+
+                result.add(new QuarterlyTeamOverviewDto(
+                        team.getId(), team.getName(), team.getColor(),
+                        totalCapacity, totalDemand, gapDays, utilization,
+                        capacity.capacityByRole(), demandByRole,
+                        overloadedEpics, risk, impactingProjects
+                ));
+            } catch (Exception e) {
+                log.warn("Failed to compute teams overview for team {}: {}", team.getName(), e.getMessage());
+            }
+        }
+
+        // Sort by utilization descending
+        result.sort(Comparator.comparingInt(QuarterlyTeamOverviewDto::utilization).reversed());
+        return result;
+    }
+
     // ==================== Private Helpers ====================
 
     private String resolveQuarterLabel(JiraIssueEntity epic,

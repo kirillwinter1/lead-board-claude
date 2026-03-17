@@ -76,6 +76,40 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
           ))}
         </div>
       )}
+
+      {/* Recommendations */}
+      {data.roles && (() => {
+        const recs: string[] = []
+        for (const [, info] of Object.entries(data.roles)) {
+          if (info.utilizationPercent > 120) {
+            recs.push('Consider adding capacity or reducing scope')
+            break
+          }
+        }
+        for (const [, info] of Object.entries(data.roles)) {
+          if (info.utilizationPercent < 50 && info.memberCount > 0) {
+            recs.push('Capacity available for reallocation')
+            break
+          }
+        }
+        if (data.alerts.some(a => a.type === 'IMBALANCE')) {
+          recs.push('Rebalance assignments across roles')
+        }
+        if (recs.length === 0) return null
+        return (
+          <div style={{
+            marginTop: 12,
+            padding: '8px 12px',
+            background: '#FFFAE6',
+            border: '1px solid #FFE380',
+            borderRadius: 6,
+            fontSize: 12,
+            color: '#42526e',
+          }}>
+            {recs.map((r, i) => <div key={i}>• {r}</div>)}
+          </div>
+        )
+      })()}
     </div>
   )
 }

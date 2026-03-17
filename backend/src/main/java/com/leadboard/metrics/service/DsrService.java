@@ -18,11 +18,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.leadboard.metrics.dto.MonthlyDsrResponse;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Delivery Speed Ratio (DSR) Service.
@@ -88,6 +92,17 @@ public class DsrService {
         List<ForecastSnapshotEntity> snapshots = snapshotRepository.findByTeamIdAndDateRange(teamId, snapshotFrom, to);
         Map<LocalDate, UnifiedPlanningResult> snapshotsByDate = parseSnapshots(snapshots);
 
+        // Batch-load all stories (children of epics) and their subtasks to avoid N+1
+        List<String> epicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
+        Map<String, List<JiraIssueEntity>> storiesByEpicKey = issueRepository.findByParentKeyIn(epicKeys).stream()
+                .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+        List<String> allStoryKeys = storiesByEpicKey.values().stream()
+                .flatMap(List::stream).map(JiraIssueEntity::getIssueKey).toList();
+        Map<String, List<JiraIssueEntity>> subtasksByStoryKey = allStoryKeys.isEmpty()
+                ? Map.of()
+                : issueRepository.findByParentKeyIn(allStoryKeys).stream()
+                        .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+
         List<EpicDsr> epicDsrs = new ArrayList<>();
         BigDecimal totalDsrActual = BigDecimal.ZERO;
         BigDecimal totalDsrForecast = BigDecimal.ZERO;
@@ -96,7 +111,7 @@ public class DsrService {
         int onTimeCount = 0;
 
         for (JiraIssueEntity epic : epics) {
-            EpicDsr dsr = calculateEpicDsr(epic, snapshotsByDate);
+            EpicDsr dsr = calculateEpicDsr(epic, snapshotsByDate, storiesByEpicKey, subtasksByStoryKey);
             if (dsr != null) {
                 epicDsrs.add(dsr);
                 if (dsr.dsrActual() != null) {
@@ -127,7 +142,9 @@ public class DsrService {
         return new DsrResponse(avgDsrActual, avgDsrForecast, totalEpics, onTimeCount, onTimeRate, epicDsrs);
     }
 
-    private EpicDsr calculateEpicDsr(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate) {
+    private EpicDsr calculateEpicDsr(JiraIssueEntity epic, Map<LocalDate, UnifiedPlanningResult> snapshotsByDate,
+                                     Map<String, List<JiraIssueEntity>> storiesByEpicKey,
+                                     Map<String, List<JiraIssueEntity>> subtasksByStoryKey) {
         InProgressResult inProgressResult = calculateInProgressWorkdays(epic.getIssueKey(), epic);
 
         if (inProgressResult.totalWorkdays <= 0) {
@@ -137,7 +154,7 @@ public class DsrService {
         int flaggedDays = calculateFlaggedDaysInPeriods(epic.getIssueKey(), inProgressResult.periods);
         int effectiveWorkingDays = Math.max(inProgressResult.totalWorkdays - flaggedDays, 1);
 
-        BigDecimal estimateDays = calculateEstimateDays(epic);
+        BigDecimal estimateDays = calculateEstimateDays(epic, storiesByEpicKey, subtasksByStoryKey);
         BigDecimal forecastDays = calculateForecastDays(epic, snapshotsByDate);
 
         BigDecimal dsrActual = estimateDays != null && estimateDays.compareTo(BigDecimal.ZERO) > 0
@@ -223,13 +240,14 @@ public class DsrService {
         return total;
     }
 
-    private BigDecimal calculateEstimateDays(JiraIssueEntity epic) {
-        // 1. Try subtask estimates (Epic → Story → Subtask)
-        List<JiraIssueEntity> stories = issueRepository.findByParentKey(epic.getIssueKey());
+    private BigDecimal calculateEstimateDays(JiraIssueEntity epic,
+                                             Map<String, List<JiraIssueEntity>> storiesByEpicKey,
+                                             Map<String, List<JiraIssueEntity>> subtasksByStoryKey) {
+        // 1. Try subtask estimates (Epic → Story → Subtask) using pre-loaded data
+        List<JiraIssueEntity> stories = storiesByEpicKey.getOrDefault(epic.getIssueKey(), List.of());
         if (!stories.isEmpty()) {
-            List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
-            List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
-            long totalEstimateSeconds = subtasks.stream()
+            long totalEstimateSeconds = stories.stream()
+                    .flatMap(story -> subtasksByStoryKey.getOrDefault(story.getIssueKey(), List.of()).stream())
                     .mapToLong(st -> st.getOriginalEstimateSeconds() != null ? st.getOriginalEstimateSeconds() : 0)
                     .sum();
 
@@ -287,6 +305,38 @@ public class DsrService {
             }
         }
         return result;
+    }
+
+    /**
+     * Calculate monthly DSR trend over the last N months.
+     * For each month, calls calculateDsr with that month's date range.
+     */
+    public MonthlyDsrResponse calculateMonthlyDsr(Long teamId, int months) {
+        if (months < 1) months = 1;
+        if (months > 24) months = 24;
+
+        YearMonth current = YearMonth.now();
+        YearMonth start = current.minusMonths(months - 1);
+
+        List<MonthlyDsrResponse.MonthlyDsrPoint> points = new ArrayList<>();
+
+        for (YearMonth ym = start; !ym.isAfter(current); ym = ym.plusMonths(1)) {
+            LocalDate from = ym.atDay(1);
+            LocalDate to = ym.atEndOfMonth();
+
+            DsrResponse dsr = calculateDsr(teamId, from, to);
+
+            points.add(new MonthlyDsrResponse.MonthlyDsrPoint(
+                    ym.toString(), // "2025-01"
+                    dsr.totalEpics() > 0 ? dsr.avgDsrActual() : null,
+                    dsr.totalEpics() > 0 ? dsr.avgDsrForecast() : null,
+                    dsr.totalEpics(),
+                    dsr.onTimeCount(),
+                    dsr.onTimeRate()
+            ));
+        }
+
+        return new MonthlyDsrResponse(teamId, points);
     }
 
     // Internal data structures

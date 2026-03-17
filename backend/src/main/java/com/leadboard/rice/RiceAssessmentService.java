@@ -95,27 +95,40 @@ public class RiceAssessmentService {
      * Compute effort_auto from real subtask estimates for an issue.
      * E = totalEstimateHours / (8 hours × 20 working days)
      * Returns person-months, or null if no estimates found.
+     * Uses batch queries to avoid N+1.
      */
     public BigDecimal computeEffortAuto(String issueKey) {
-        // Find children (stories for epics, epics for projects)
+        // Level 1: Find children (stories for epics, epics for projects)
         List<JiraIssueEntity> children = issueRepository.findByParentKey(issueKey);
         if (children.isEmpty()) return null;
 
+        // Separate children into epics (Project→Epic path) and non-epics (Epic→Story path)
+        List<String> epicChildKeys = new ArrayList<>();
+        List<String> nonEpicChildKeys = new ArrayList<>();
+        for (JiraIssueEntity child : children) {
+            if ("EPIC".equals(child.getBoardCategory())) {
+                epicChildKeys.add(child.getIssueKey());
+            } else {
+                nonEpicChildKeys.add(child.getIssueKey());
+            }
+        }
+
         long totalEstimateSeconds = 0;
 
-        for (JiraIssueEntity child : children) {
-            if (child.getBoardCategory() != null && "EPIC".equals(child.getBoardCategory())) {
-                // Project → Epic: aggregate from stories → subtasks
-                List<JiraIssueEntity> stories = issueRepository.findByParentKey(child.getIssueKey());
-                for (JiraIssueEntity story : stories) {
-                    List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(story.getIssueKey());
-                    for (JiraIssueEntity subtask : subtasks) {
-                        totalEstimateSeconds += subtask.getEffectiveEstimateSeconds();
-                    }
-                }
-            } else {
-                // Epic → Story: aggregate from subtasks
-                List<JiraIssueEntity> subtasks = issueRepository.findByParentKey(child.getIssueKey());
+        // Epic→Story path: batch-load subtasks of all non-epic children
+        if (!nonEpicChildKeys.isEmpty()) {
+            List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(nonEpicChildKeys);
+            for (JiraIssueEntity subtask : subtasks) {
+                totalEstimateSeconds += subtask.getEffectiveEstimateSeconds();
+            }
+        }
+
+        // Project→Epic→Story→Subtask path: batch-load stories, then batch-load their subtasks
+        if (!epicChildKeys.isEmpty()) {
+            List<JiraIssueEntity> stories = issueRepository.findByParentKeyIn(epicChildKeys);
+            if (!stories.isEmpty()) {
+                List<String> storyKeys = stories.stream().map(JiraIssueEntity::getIssueKey).toList();
+                List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
                 for (JiraIssueEntity subtask : subtasks) {
                     totalEstimateSeconds += subtask.getEffectiveEstimateSeconds();
                 }

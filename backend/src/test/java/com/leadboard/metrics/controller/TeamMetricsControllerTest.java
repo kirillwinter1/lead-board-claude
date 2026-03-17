@@ -5,11 +5,14 @@ import com.leadboard.config.AppProperties;
 import com.leadboard.tenant.TenantRepository;
 import com.leadboard.tenant.TenantUserRepository;
 import com.leadboard.metrics.dto.*;
+import com.leadboard.metrics.service.DeliveryHealthService;
 import com.leadboard.metrics.service.DsrService;
 import com.leadboard.metrics.service.ForecastAccuracyService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import com.leadboard.metrics.service.VelocityService;
 import com.leadboard.metrics.service.EpicBurndownService;
+import com.leadboard.config.ObservabilityMetrics;
+import com.leadboard.sync.SyncService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -48,6 +51,15 @@ class TeamMetricsControllerTest {
 
     @MockBean
     private EpicBurndownService burndownService;
+
+    @MockBean
+    private DeliveryHealthService deliveryHealthService;
+
+    @MockBean
+    private SyncService syncService;
+
+    @MockBean
+    private ObservabilityMetrics observabilityMetrics;
 
     @MockBean
     private SessionRepository sessionRepository;

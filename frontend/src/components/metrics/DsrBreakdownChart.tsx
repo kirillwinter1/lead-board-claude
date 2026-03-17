@@ -88,8 +88,8 @@ function getContrastColor(hex: string): string {
 }
 
 interface CustomYTickProps {
-  x: number
-  y: number
+  x: string | number
+  y: string | number
   payload: { index: number }
   chartData: ChartRow[]
   jiraBaseUrl: string | undefined

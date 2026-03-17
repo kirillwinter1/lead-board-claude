@@ -80,6 +80,20 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
               {node.parentProjectKey}
             </span>
           )}
+          {node.quarterLabel && (
+            <span style={{
+              fontSize: 10,
+              padding: '1px 5px',
+              borderRadius: 3,
+              background: '#E3FCEF',
+              color: '#006644',
+              fontWeight: 500,
+              whiteSpace: 'nowrap',
+              lineHeight: '16px',
+            }}>
+              {node.quarterLabel}
+            </span>
+          )}
           <span className="issue-title">{node.title}</span>
         </div>
       </div>

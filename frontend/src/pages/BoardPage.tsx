@@ -1,16 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { updateEpicOrder, updateStoryOrder } from '../api/epics'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { FilterPanel, BoardTable } from '../components/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { BoardSkeleton } from '../components/skeletons'
+import { ViewToggle } from '../components/ViewToggle'
 import { useBoardData } from '../hooks/useBoardData'
 import { useBoardFilters } from '../hooks/useBoardFilters'
 import { useBoardForecasts } from '../hooks/useBoardForecasts'
+import { TimelineContent } from './TimelinePage'
 import './BoardPage.css'
 
+type BoardWorkspaceView = 'board' | 'timeline'
+
 export function BoardPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
+  const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
 
   useEffect(() => {
     getStatusStyles().then(setStatusStyles).catch(() => {})
@@ -39,6 +46,9 @@ export function BoardPage() {
     selectedTeams,
     availableProjects,
     selectedProjects,
+    availableQuarters,
+    selectedQuarters,
+    selectedTeamId,
     filteredBoard,
     canReorder,
     allTeamIds,
@@ -51,6 +61,7 @@ export function BoardPage() {
     handleStatusToggle,
     handleTeamToggle,
     handleProjectToggle,
+    handleQuarterToggle,
     clearFilters,
   } = useBoardFilters(board)
 
@@ -61,15 +72,15 @@ export function BoardPage() {
   } = useBoardForecasts(allTeamIds)
 
   const handleSync = useCallback(() => {
-    triggerSync(loadForecasts)
+    triggerSync(() => {
+      loadForecasts()
+      setTimelineRefreshToken(prev => prev + 1)
+    })
   }, [triggerSync, loadForecasts])
 
-  // Handle reorder via drag & drop - simple position-based API
-  // Pattern: Optimistic UI + Backend Reconciliation
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
 
-    // Optimistic update: reorder within the selected team only
     setBoard(prevBoard => {
       const epicToMove = prevBoard.find(e => e.issueKey === epicKey)
       if (!epicToMove) return prevBoard
@@ -84,7 +95,7 @@ export function BoardPage() {
 
       const reorderedTeam = teamItems.map((item, idx) => ({
         ...item,
-        manualOrder: idx + 1
+        manualOrder: idx + 1,
       }))
 
       let teamIdx = 0
@@ -105,8 +116,6 @@ export function BoardPage() {
     }
   }, [setBoard, fetchBoard, loadForecasts])
 
-  // Handle story reorder via drag & drop - simple position-based API
-  // Pattern: Optimistic UI + Backend Reconciliation
   const handleStoryReorder = useCallback(async (storyKey: string, parentEpicKey: string, newIndex: number) => {
     const newPosition = newIndex + 1
 
@@ -123,7 +132,7 @@ export function BoardPage() {
 
         const updatedChildren = children.map((child, idx) => ({
           ...child,
-          manualOrder: idx + 1
+          manualOrder: idx + 1,
         }))
 
         return { ...epic, children: updatedChildren }
@@ -139,52 +148,99 @@ export function BoardPage() {
     }
   }, [setBoard, fetchBoard, loadForecasts])
 
+  const view: BoardWorkspaceView = searchParams.get('view') === 'timeline' ? 'timeline' : 'board'
+  const updateView = (nextView: BoardWorkspaceView) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      if (nextView === 'timeline') {
+        next.set('view', 'timeline')
+      } else {
+        next.delete('view')
+      }
+      return next
+    }, { replace: true })
+  }
+
+  const filteredEpicKeys = useMemo(() => new Set(filteredBoard.map(epic => epic.issueKey)), [filteredBoard])
+
   return (
     <StatusStylesProvider value={statusStyles}>
-      <FilterPanel
-        searchKey={searchKey}
-        onSearchKeyChange={setSearchKey}
-        availableStatuses={availableStatuses}
-        selectedStatuses={selectedStatuses}
-        onStatusToggle={handleStatusToggle}
-        availableTeams={availableTeams}
-        selectedTeams={selectedTeams}
-        onTeamToggle={handleTeamToggle}
-        availableProjects={availableProjects}
-        selectedProjects={selectedProjects}
-        onProjectToggle={handleProjectToggle}
-        onClearFilters={clearFilters}
-        syncStatus={syncStatus}
-        syncing={syncing}
-        onSync={handleSync}
-        teamColorMap={teamColorMap}
-        searchMode={searchMode}
-        searchLoading={searchLoading}
-        hideNew={hideNew}
-        hideDone={hideDone}
-        onHideNewToggle={() => setHideNew(v => !v)}
-        onHideDoneToggle={() => setHideDone(v => !v)}
-        epicTitles={useMemo(() => board.map(e => e.title), [board])}
-      />
-
       <main className="main-content">
-        {loading && <BoardSkeleton />}
-        {error && <div className="error">Error: {error}</div>}
-        {!loading && !error && filteredBoard.length === 0 && (
-          <div className="empty">No epics found</div>
-        )}
-        {!loading && !error && filteredBoard.length > 0 && (
-          <BoardTable
-            items={filteredBoard}
-            roughEstimateConfig={roughEstimateConfig}
-            onRoughEstimateUpdate={handleRoughEstimateUpdate}
-            forecastMap={forecastMap}
-            storyPlanningMap={storyPlanningMap}
-            canReorder={canReorder}
-            onReorder={handleReorder}
-            onStoryReorder={handleStoryReorder}
+        <div style={{ padding: '12px 16px 0', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h2 style={{ margin: 0 }}>Board</h2>
+          <ViewToggle
+            value={view}
+            onChange={value => updateView(value as BoardWorkspaceView)}
+            options={[
+              { value: 'board', label: 'Board' },
+              { value: 'timeline', label: 'Timeline' },
+            ]}
           />
-        )}
+        </div>
+
+        <div style={{ padding: '0 16px' }}>
+          <FilterPanel
+            searchKey={searchKey}
+            onSearchKeyChange={setSearchKey}
+            availableStatuses={availableStatuses}
+            selectedStatuses={selectedStatuses}
+            onStatusToggle={handleStatusToggle}
+            availableTeams={availableTeams}
+            selectedTeams={selectedTeams}
+            onTeamToggle={handleTeamToggle}
+            availableProjects={availableProjects}
+            selectedProjects={selectedProjects}
+            onProjectToggle={handleProjectToggle}
+            availableQuarters={availableQuarters}
+            selectedQuarters={selectedQuarters}
+            onQuarterToggle={handleQuarterToggle}
+            onClearFilters={clearFilters}
+            syncStatus={syncStatus}
+            syncing={syncing}
+            onSync={handleSync}
+            teamColorMap={teamColorMap}
+            searchMode={searchMode}
+            searchLoading={searchLoading}
+            hideNew={hideNew}
+            hideDone={hideDone}
+            onHideNewToggle={() => setHideNew(v => !v)}
+            onHideDoneToggle={() => setHideDone(v => !v)}
+            epicTitles={useMemo(() => board.map(e => e.title), [board])}
+          />
+        </div>
+
+        <div style={{ padding: '0 16px' }}>
+          {view === 'board' && (
+            <>
+              {loading && <BoardSkeleton />}
+              {error && <div className="error">Error: {error}</div>}
+              {!loading && !error && filteredBoard.length === 0 && (
+                <div className="empty">No epics found</div>
+              )}
+              {!loading && !error && filteredBoard.length > 0 && (
+                <BoardTable
+                  items={filteredBoard}
+                  roughEstimateConfig={roughEstimateConfig}
+                  onRoughEstimateUpdate={handleRoughEstimateUpdate}
+                  forecastMap={forecastMap}
+                  storyPlanningMap={storyPlanningMap}
+                  canReorder={canReorder}
+                  onReorder={handleReorder}
+                  onStoryReorder={handleStoryReorder}
+                />
+              )}
+            </>
+          )}
+
+          {view === 'timeline' && (
+            <TimelineContent
+              selectedTeamId={selectedTeamId}
+              filteredEpicKeys={filteredEpicKeys}
+              refreshToken={timelineRefreshToken}
+              showFilterBar={false}
+            />
+          )}
+        </div>
       </main>
     </StatusStylesProvider>
   )
