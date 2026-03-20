@@ -52,15 +52,17 @@ export function RoleCardFull({ id, nameRu, nameEn, responsibilityRu, responsibil
           ))}
         </tbody>
       </table>
-      <div className="role-card-screens">
-        <strong>{t('Ключевые экраны:', 'Key screens:')}</strong>{' '}
-        {keyScreens.map((s, i) => (
-          <span key={i}>
-            {i > 0 && ', '}
-            <Link to={s.path}>{s.label}</Link>
-          </span>
-        ))}
-      </div>
+      {keyScreens.length > 0 && (
+        <div className="role-card-screens">
+          <strong>{t('Ключевые экраны:', 'Key screens:')}</strong>{' '}
+          {keyScreens.map((s, i) => (
+            <span key={i}>
+              {i > 0 && ', '}
+              <Link to={s.path}>{s.label}</Link>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

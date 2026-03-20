@@ -22,16 +22,6 @@ export interface GuideChecklistItem {
   textEn: string
 }
 
-export interface GuideRoleData {
-  id: string
-  nameRu: string
-  nameEn: string
-  responsibilityRu: string
-  responsibilityEn: string
-  stages: { stageRu: string; stageEn: string; actionsRu: string; actionsEn: string }[]
-  keyScreens: GuideScreenLink[]
-}
-
 export interface GuideSidebarItem {
   id: string
   titleRu: string

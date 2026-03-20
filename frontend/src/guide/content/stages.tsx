@@ -247,7 +247,7 @@ function StagePlanning() {
       </div>
 
       <h4>{t('Дерево декомпозиции', 'Decomposition tree')}</h4>
-      <pre className="guide-code-block">{`Epic
+      <pre>{`Epic
 ├── Story A
 │   ├── Subtask [SA]   — 2 ${t('ч/д', 'pd')}
 │   ├── Subtask [DEV]  — 5 ${t('ч/д', 'pd')}
@@ -385,7 +385,7 @@ function StageDevelopment() {
 
       <ScreenLinks screens={[
         { label: 'Board', path: '/', descriptionRu: 'Основная рабочая доска', descriptionEn: 'Main work board' },
-        { label: 'Member Profile', path: '/teams/1/member/1', descriptionRu: 'Профиль участника — нагрузка, задачи', descriptionEn: 'Member profile — workload, tasks' },
+        { label: 'Teams', path: '/teams', descriptionRu: 'Команды → профиль участника — нагрузка, задачи', descriptionEn: 'Teams → member profile — workload, tasks' },
         { label: 'Timeline', path: '/?view=timeline', descriptionRu: 'Прогноз и отслеживание сроков', descriptionEn: 'Forecast and deadline tracking' },
         { label: 'Metrics', path: '/metrics', descriptionRu: 'DSR, throughput, velocity', descriptionEn: 'DSR, throughput, velocity' },
       ]} />
@@ -468,12 +468,10 @@ function StageE2E() {
         ]}
       />
 
-      <p>
-        <strong>{t('Контроль качества:', 'Quality control:')}</strong>{' '}
-        <ScreenLinks screens={[
-          { label: 'Bug Metrics', path: '/bug-metrics', descriptionRu: 'Метрики багов', descriptionEn: 'Bug metrics' },
-        ]} />
-      </p>
+      <p><strong>{t('Контроль качества:', 'Quality control:')}</strong></p>
+      <ScreenLinks screens={[
+        { label: 'Bug Metrics', path: '/bug-metrics', descriptionRu: 'Метрики багов', descriptionEn: 'Bug metrics' },
+      ]} />
     </>
   )
 }

@@ -8,7 +8,7 @@ function RulesContent() {
     <>
       {/* Task Hierarchy */}
       <h3>{t('Иерархия задач', 'Task Hierarchy')}</h3>
-      <pre className="guide-code-block">{`Epic (${t('проект/фича', 'project/feature')})
+      <pre>{`Epic (${t('проект/фича', 'project/feature')})
 └── Story / Bug (${t('единица работы', 'work unit')})
     └── Subtask (${t('действие по роли', 'role-specific action')})
         ├── Subtask [${t('Роль A', 'Role A')}]

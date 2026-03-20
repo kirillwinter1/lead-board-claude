@@ -35,8 +35,11 @@ function SidebarGroup({ item, activeId, onNavigate }: {
       <button
         className={`sidebar-item${isActive ? ' active' : ''}${isChildActive ? ' child-active' : ''}${hasChildren ? ' has-children' : ''}`}
         onClick={() => {
-          if (hasChildren) setExpanded(!expanded)
-          onNavigate(item.id)
+          if (hasChildren) {
+            setExpanded(!expanded)
+          } else {
+            onNavigate(item.id)
+          }
         }}
       >
         {hasChildren && (

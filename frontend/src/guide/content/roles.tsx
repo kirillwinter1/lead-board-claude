@@ -167,7 +167,7 @@ function RolesContent() {
           { label: 'Board', path: '/', descriptionRu: 'Доска', descriptionEn: 'Board' },
           { label: 'Data Quality', path: '/data-quality', descriptionRu: 'Качество данных', descriptionEn: 'Data quality' },
           { label: 'Timeline', path: '/?view=timeline', descriptionRu: 'Таймлайн', descriptionEn: 'Timeline' },
-          { label: 'Team Members', path: '/teams/1', descriptionRu: 'Участники команды', descriptionEn: 'Team members' },
+          { label: 'Teams', path: '/teams', descriptionRu: 'Команды → участники', descriptionEn: 'Teams → members' },
         ]}
       />
 
@@ -206,7 +206,7 @@ function RolesContent() {
         ]}
         keyScreens={[
           { label: 'Board', path: '/', descriptionRu: 'Доска', descriptionEn: 'Board' },
-          { label: 'Member Profile', path: '/teams/1/member/1', descriptionRu: 'Профиль участника', descriptionEn: 'Member profile' },
+          { label: 'Teams', path: '/teams', descriptionRu: 'Команды → профиль участника', descriptionEn: 'Teams → member profile' },
           { label: 'Planning Poker', path: '/poker', descriptionRu: 'Покер планирования', descriptionEn: 'Planning Poker' },
         ]}
       />
@@ -238,9 +238,7 @@ function RolesContent() {
             actionsEn: 'Deploys to production, monitors, rolls back if needed',
           },
         ]}
-        keyScreens={[
-          { label: 'Grafana / CI/CD', path: '/', descriptionRu: 'Внешние системы мониторинга и деплоя', descriptionEn: 'External monitoring and deployment systems' },
-        ]}
+        keyScreens={[]}
       />
 
       <p style={{ marginTop: 12, fontStyle: 'italic', color: 'var(--color-text-secondary, #666)' }}>
