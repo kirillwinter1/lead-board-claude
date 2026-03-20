@@ -1,0 +1,90 @@
+/* RoleCardCompact */
+.role-card {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  background: #f8f9fa;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  padding: 8px 14px;
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.role-card-name {
+  color: #0052cc;
+  font-weight: 600;
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.role-card-actions {
+  color: #5e6c84;
+  line-height: 1.5;
+}
+
+/* RoleCardFull */
+.role-card-full {
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  scroll-margin-top: 72px;
+}
+
+.role-card-full-name {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+.role-card-full-responsibility {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #5e6c84;
+  line-height: 1.6;
+}
+
+.role-card-stages-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.role-card-stages-table th {
+  background: #f4f5f7;
+  text-align: left;
+  padding: 8px 12px;
+  font-weight: 600;
+  color: #172b4d;
+  border-bottom: 2px solid #dfe1e6;
+}
+
+.role-card-stages-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #ebecf0;
+  color: #172b4d;
+  line-height: 1.5;
+}
+
+.role-card-stages-table tr:last-child td {
+  border-bottom: none;
+}
+
+.role-card-screens {
+  font-size: 14px;
+  color: #172b4d;
+  line-height: 1.6;
+}
+
+.role-card-screens a {
+  color: #0052cc;
+  text-decoration: none;
+}
+
+.role-card-screens a:hover {
+  text-decoration: underline;
+}
