@@ -1,0 +1,139 @@
+.pipeline-visual {
+  margin: 24px 0 40px;
+}
+
+.pipeline-stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 16px;
+}
+
+.pipeline-stage-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.pipeline-stage-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  height: 72px;
+  padding: 8px 12px;
+  background: #fff;
+  border: 2px solid #0052cc;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.pipeline-stage-box:hover {
+  background: #e9f2ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 82, 204, 0.15);
+}
+
+.pipeline-stage-box.active {
+  background: #0052cc;
+  color: #fff;
+}
+
+.pipeline-stage-box.active .pipeline-stage-number,
+.pipeline-stage-box.active .pipeline-stage-label,
+.pipeline-stage-box.active .pipeline-stage-opt {
+  color: #fff;
+}
+
+.pipeline-stage-box.optional {
+  border-style: dashed;
+  border-color: #8993a4;
+}
+
+.pipeline-stage-box.optional .pipeline-stage-label {
+  color: #8993a4;
+}
+
+.pipeline-stage-box.optional:hover {
+  background: #f4f5f7;
+}
+
+.pipeline-stage-box.optional.active {
+  background: #0052cc;
+  border-color: #0052cc;
+  border-style: solid;
+}
+
+.pipeline-stage-box.optional.active .pipeline-stage-label {
+  color: #fff;
+}
+
+.pipeline-stage-number {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8993a4;
+}
+
+.pipeline-stage-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #172b4d;
+  white-space: pre-line;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.pipeline-stage-opt {
+  font-size: 10px;
+  font-style: italic;
+  color: #8993a4;
+}
+
+.pipeline-arrow {
+  color: #0052cc;
+  font-size: 14px;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.pipeline-qc-bar {
+  background: linear-gradient(135deg, #e3f2fd 0%, #e8f5e9 100%);
+  border: 1px solid #b3d4fc;
+  border-radius: 8px;
+  padding: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pipeline-qc-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0052cc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pipeline-qc-items {
+  font-size: 12px;
+  color: #44546f;
+}
+
+@media (max-width: 1024px) {
+  .pipeline-stages {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .pipeline-arrow {
+    display: none;
+  }
+
+  .pipeline-stage-box {
+    width: 100%;
+  }
+}
