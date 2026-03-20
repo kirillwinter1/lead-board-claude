@@ -90,6 +90,9 @@ export function Layout() {
               <NavLink to={`/quarterly-planning${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Planning
               </NavLink>
+              <NavLink to="/guide" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
+                Guide
+              </NavLink>
               {auth.isAdmin() && (
                 <NavLink to="/settings" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                   Settings
