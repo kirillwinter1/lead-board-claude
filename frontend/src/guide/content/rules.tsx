@@ -141,15 +141,15 @@ function RulesContent() {
       </p>
       <ul>
         <li>
-          <strong>{t('Флаг на Epic', 'Epic flag')}</strong> — {t(
-            'AutoScore −100. Сигнал: Epic заблокирован.',
-            'AutoScore −100. Signal: Epic is blocked.'
+          <strong>{t('Флаг на Epic', 'Epic flag')}</strong>: {t(
+            'AutoScore -100. Epic заблокирован.',
+            'AutoScore -100. Epic is blocked.'
           )}
         </li>
         <li>
-          <strong>{t('Флаг на Story', 'Story flag')}</strong> — {t(
-            'AutoScore −200, DSR ставится на паузу. Сигнал: Story заблокирована, время не считается.',
-            'AutoScore −200, DSR is paused. Signal: Story is blocked, time is not counted.'
+          <strong>{t('Флаг на Story', 'Story flag')}</strong>: {t(
+            'AutoScore -200, DSR встаёт на паузу. Story заблокирована, время не считается.',
+            'AutoScore -200, DSR pauses. Story is blocked, time stops counting.'
           )}
         </li>
       </ul>
@@ -158,8 +158,8 @@ function RulesContent() {
       <h3>{t('WIP-лимиты', 'WIP Limits')}</h3>
       <p>
         {t(
-          'Ограничивают количество одновременно активных Epic/Story на команду или роль. Предотвращают переключение контекста и размывание фокуса. Когда лимит достигнут — сначала завершите текущие задачи.',
-          'Limit the number of concurrently active Epics/Stories per team or role. Prevent context switching and focus dilution. When the limit is reached — finish current tasks first.'
+          'Ограничивают число активных Epic/Story на команду или роль. Не дают переключаться между задачами и терять фокус. Если лимит достигнут, сначала закончите текущие задачи.',
+          'Cap the number of active Epics/Stories per team or role. Keep people from jumping between tasks and losing focus. If you hit the limit, finish current tasks first.'
         )}
       </p>
     </>

@@ -9,7 +9,7 @@ function RolesContent() {
     <>
       <p>
         {t(
-          'Справочник по всем ролям процесса delivery. Роли конвейера (SA, DEV, QA) — примеры по умолчанию. Их можно настроить в ',
+          'Справочник по всем ролям процесса delivery. Роли конвейера (SA, DEV, QA) - примеры по умолчанию. Их можно настроить в ',
           'Reference for all delivery process roles. Pipeline roles (SA, DEV, QA) are default examples. They are configurable in '
         )}
         <Link to="/workflow">{t('Конфигурации Workflow', 'Workflow Config')}</Link>
@@ -243,7 +243,7 @@ function RolesContent() {
 
       <p style={{ marginTop: 12, fontStyle: 'italic', color: 'var(--color-text-secondary, #666)' }}>
         {t(
-          'Ключевые экраны DevOps — внешние: Grafana (мониторинг), CI/CD (деплой), серверные логи.',
+          'Ключевые экраны DevOps - внешние: Grafana (мониторинг), CI/CD (деплой), серверные логи.',
           'Key DevOps screens are external: Grafana (monitoring), CI/CD (deployment), server logs.'
         )}
       </p>

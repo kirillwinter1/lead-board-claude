@@ -56,7 +56,7 @@ function StageIdea() {
 
       <AntiPatterns items={[
         { ru: 'Начинать разработку без сформулированной цели', en: 'Starting development without a formulated goal' },
-        { ru: 'Epic без описания — только заголовок', en: 'Epic without description — title only' },
+        { ru: 'Epic без описания, только заголовок', en: 'Epic without description, title only' },
       ]} />
 
       <p>
@@ -121,7 +121,7 @@ function StageBrd() {
       />
 
       <AntiPatterns items={[
-        { ru: '«Допишу потом» — требования остаются пустыми неделями', en: '"I\'ll write it later" — requirements stay empty for weeks' },
+        { ru: '«Допишу потом», и требования остаются пустыми неделями', en: '"I\'ll write it later", and requirements stay empty for weeks' },
         { ru: 'Требования без критериев приёмки', en: 'Requirements without acceptance criteria' },
       ]} />
 
@@ -189,7 +189,7 @@ function StageRoughEstimates() {
 
       <AntiPatterns items={[
         { ru: 'Одно число на весь Epic без разбивки по ролям', en: 'Single number for the entire Epic without role breakdown' },
-        { ru: 'Пропуск грязных оценок — сразу в декомпозицию', en: 'Skipping rough estimates — jumping straight to decomposition' },
+        { ru: 'Пропуск грязных оценок, сразу в декомпозицию', en: 'Skipping rough estimates, jumping straight to decomposition' },
         { ru: 'Оценка без участия реальных исполнителей', en: 'Estimation without actual doers involved' },
       ]} />
 
@@ -249,12 +249,12 @@ function StagePlanning() {
       <h4>{t('Дерево декомпозиции', 'Decomposition tree')}</h4>
       <pre>{`Epic
 ├── Story A
-│   ├── Subtask [SA]   — 2 ${t('ч/д', 'pd')}
-│   ├── Subtask [DEV]  — 5 ${t('ч/д', 'pd')}
-│   └── Subtask [QA]   — 3 ${t('ч/д', 'pd')}
+│   ├── Subtask [SA]    2 ${t('ч/д', 'pd')}
+│   ├── Subtask [DEV]   5 ${t('ч/д', 'pd')}
+│   └── Subtask [QA]    3 ${t('ч/д', 'pd')}
 └── Story B
-    ├── Subtask [DEV]  — 3 ${t('ч/д', 'pd')}
-    └── Subtask [QA]   — 2 ${t('ч/д', 'pd')}`}</pre>
+    ├── Subtask [DEV]   3 ${t('ч/д', 'pd')}
+    └── Subtask [QA]    2 ${t('ч/д', 'pd')}`}</pre>
 
       <h4>{t('Порядок оценки', 'Estimation flow')}</h4>
       <ol>
@@ -277,23 +277,23 @@ function StagePlanning() {
         items={[
           { textRu: 'Полная декомпозиция: Epic → Stories → Subtasks', textEn: 'Full decomposition: Epic → Stories → Subtasks' },
           { textRu: 'Оценки проставлены во всех Subtask', textEn: 'Estimates set in all Subtasks' },
-          { textRu: 'Data Quality — без критичных проблем', textEn: 'Data Quality — no critical issues' },
+          { textRu: 'Data Quality без критичных проблем', textEn: 'Data Quality has no critical issues' },
           { textRu: 'WIP-лимиты не превышены', textEn: 'WIP limits not exceeded' },
         ]}
       />
 
       <AntiPatterns items={[
-        { ru: 'Stories без Subtask — невозможно отследить по ролям', en: 'Stories without Subtasks — impossible to track by role' },
-        { ru: 'Subtask без оценок — ломает прогноз', en: 'Subtasks without estimates — breaks forecast' },
-        { ru: 'Игнорирование WIP-лимитов — перегрузка команды', en: 'Ignoring WIP limits — team overload' },
-        { ru: 'Manual Boost без причины — искажает приоритизацию', en: 'Manual Boost without reason — distorts prioritization' },
+        { ru: 'Stories без Subtask: невозможно отследить по ролям', en: 'Stories without Subtasks: impossible to track by role' },
+        { ru: 'Subtask без оценок: ломает прогноз', en: 'Subtasks without estimates: breaks the forecast' },
+        { ru: 'Игнорирование WIP-лимитов: перегрузка команды', en: 'Ignoring WIP limits: team overload' },
+        { ru: 'Manual Boost без причины: искажает приоритизацию', en: 'Manual Boost without reason: distorts prioritization' },
       ]} />
 
       <p>
         <strong>{t('Контроль качества:', 'Quality control:')}</strong>{' '}
         {t(
-          'Data Quality, Board — WIP, Forecast accuracy.',
-          'Data Quality, Board — WIP, Forecast accuracy.'
+          'Data Quality, Board (WIP), Forecast accuracy.',
+          'Data Quality, Board (WIP), Forecast accuracy.'
         )}
       </p>
     </>
@@ -385,7 +385,7 @@ function StageDevelopment() {
 
       <ScreenLinks screens={[
         { label: 'Board', path: '/', descriptionRu: 'Основная рабочая доска', descriptionEn: 'Main work board' },
-        { label: 'Teams', path: '/teams', descriptionRu: 'Команды → профиль участника — нагрузка, задачи', descriptionEn: 'Teams → member profile — workload, tasks' },
+        { label: 'Teams', path: '/teams', descriptionRu: 'Команды → профиль участника, нагрузка, задачи', descriptionEn: 'Teams → member profile, workload, tasks' },
         { label: 'Timeline', path: '/?view=timeline', descriptionRu: 'Прогноз и отслеживание сроков', descriptionEn: 'Forecast and deadline tracking' },
         { label: 'Metrics', path: '/metrics', descriptionRu: 'DSR, throughput, velocity', descriptionEn: 'DSR, throughput, velocity' },
       ]} />
@@ -400,10 +400,10 @@ function StageDevelopment() {
       />
 
       <AntiPatterns items={[
-        { ru: 'Не логировать время — искажает метрики и прогнозы', en: 'Not logging time — distorts metrics and forecasts' },
+        { ru: 'Не логировать время: искажает метрики и прогнозы', en: 'Not logging time: distorts metrics and forecasts' },
         { ru: 'Брать новые задачи при превышении WIP', en: 'Taking new tasks when WIP is exceeded' },
         { ru: 'Работать над задачей с флагом (блокером)', en: 'Working on a flagged (blocked) task' },
-        { ru: 'Не переводить статусы — доска не отражает реальность', en: 'Not moving statuses — board does not reflect reality' },
+        { ru: 'Не переводить статусы: доска не отражает реальность', en: 'Not moving statuses: the board stops reflecting reality' },
       ]} />
     </>
   )
