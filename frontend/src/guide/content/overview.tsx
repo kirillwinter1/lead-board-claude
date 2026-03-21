@@ -60,29 +60,6 @@ function OverviewContent() {
         </li>
       </ul>
 
-      <h3>{t('Конвейер', 'The Pipeline')}</h3>
-      <p>
-        {t(
-          'Задача (Epic) проходит конвейер из 8 этапов по порядку:',
-          'Each task (Epic) goes through a pipeline of 8 stages in order:'
-        )}
-      </p>
-      <ol>
-        <li><strong>{t('Идея', 'Idea')}</strong>: {t('фиксация бизнес-потребности', 'capture business need')}</li>
-        <li><strong>{t('БТ (BRD)', 'BRD')}</strong>: {t('формализация требований', 'formalize requirements')}</li>
-        <li><strong>{t('Грязные оценки', 'Rough Estimates')}</strong>: {t('ранняя оценка объёма', 'early volume estimation')}</li>
-        <li><strong>{t('Планирование', 'Planning')}</strong>: {t('декомпозиция и точные оценки', 'decomposition and precise estimates')}</li>
-        <li><strong>{t('Разработка', 'Development')}</strong>: {t('выполнение работы', 'execute the work')}</li>
-        <li><strong>{t('E2E', 'E2E')}</strong> <em>({t('опц.', 'opt.')})</em>: {t('сквозная проверка', 'end-to-end verification')}</li>
-        <li><strong>{t('Приёмка', 'Acceptance')}</strong> <em>({t('опц.', 'opt.')})</em>: {t('подтверждение PO', 'PO confirmation')}</li>
-        <li><strong>{t('Готово', 'Done')}</strong>: {t('деплой, ретроспектива', 'deployment, retrospective')}</li>
-      </ol>
-      <p>
-        {t(
-          'На каждом этапе свои роли и экраны Lead Board. Контроль качества (Data Quality, метрики, WIP, DSR) работает сквозной на всех этапах.',
-          'Each stage has its own roles and Lead Board screens. Quality control (Data Quality, metrics, WIP, DSR) runs across all stages.'
-        )}
-      </p>
     </>
   )
 }

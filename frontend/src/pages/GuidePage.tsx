@@ -96,15 +96,21 @@ function GuidePageContent() {
         </GuideSection>
 
         {/* Pipeline wrapper with id="pipeline" */}
-        <div id="pipeline" style={{ scrollMarginTop: 72 }}>
+        <GuideSection id="pipeline" titleRu="Конвейер" titleEn="Pipeline">
+          <p>
+            {t(
+              'Задача (Epic) проходит конвейер из 8 этапов по порядку. На каждом этапе свои роли и экраны Lead Board. Контроль качества (Data Quality, метрики, WIP, DSR) работает сквозной на всех этапах.',
+              'Each task (Epic) goes through a pipeline of 8 stages in order. Each stage has its own roles and Lead Board screens. Quality control (Data Quality, metrics, WIP, DSR) runs across all stages.'
+            )}
+          </p>
           <PipelineVisual activeStageId={activeId} onStageClick={handleNavigate} />
+        </GuideSection>
 
-          {stagesSections.map(stage => (
-            <GuideSection key={stage.id} id={stage.id} titleRu={stage.titleRu} titleEn={stage.titleEn}>
-              {lang === 'ru' ? stage.contentRu : stage.contentEn}
-            </GuideSection>
-          ))}
-        </div>
+        {stagesSections.map(stage => (
+          <GuideSection key={stage.id} id={stage.id} titleRu={stage.titleRu} titleEn={stage.titleEn}>
+            {lang === 'ru' ? stage.contentRu : stage.contentEn}
+          </GuideSection>
+        ))}
 
         {/* Roles */}
         <GuideSection id={rolesSection.id} titleRu={rolesSection.titleRu} titleEn={rolesSection.titleEn}>
