@@ -11,61 +11,94 @@ function StageIdea() {
   return (
     <>
       <p>
-        <strong>{t('Цель:', 'Goal:')}</strong>{' '}
         {t(
-          'Зафиксировать бизнес-потребность, оценить ценность, принять решение go/no-go.',
-          'Capture business need, assess value, decide go/no-go.'
+          'PO, PM или стейкхолдер фиксирует потребность как Project в Jira. На этом этапе не нужна детальная проработка, но нужно чётко ответить на два вопроса: какую проблему решаем и почему это важно сейчас.',
+          'A PO, PM, or stakeholder captures a need as a Project in Jira. No detailed elaboration is needed at this stage, but two questions must be clearly answered: what problem are we solving and why it matters now.'
         )}
       </p>
 
-      <h4>{t('Роли', 'Roles')}</h4>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <RoleCardCompact
-          nameRu="Product Owner"
-          nameEn="Product Owner"
-          actionsRu="Формулирует идею, описывает бизнес-ценность, создаёт Epic в Jira, заполняет RICE"
-          actionsEn="Formulates idea, describes business value, creates Epic in Jira, fills RICE"
-        />
-        <RoleCardCompact
-          nameRu="Delivery Manager"
-          nameEn="Delivery Manager"
-          actionsRu="Проверяет соответствие roadmap, оценивает приоритет в контексте других задач"
-          actionsEn="Checks roadmap fit, assesses priority in the context of other tasks"
-        />
-        <RoleCardCompact
-          nameRu="Team Lead"
-          nameEn="Team Lead"
-          actionsRu="Оценивает техническую реализуемость на верхнем уровне"
-          actionsEn="Assesses high-level technical feasibility"
-        />
-      </div>
+      <h4>{t('Что должно быть в Project', 'What a Project should contain')}</h4>
+      <table className="guide-table">
+        <thead>
+          <tr>
+            <th>{t('Поле', 'Field')}</th>
+            <th>{t('Пример', 'Example')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>{t('Проблема', 'Problem')}</td>
+            <td>{t('Клиенты уходят на этапе оплаты, конверсия 12%', 'Customers drop off at checkout, conversion 12%')}</td>
+          </tr>
+          <tr>
+            <td>{t('Ценность', 'Value')}</td>
+            <td>{t('Поднять конверсию до 25% = +$200k/мес', 'Raise conversion to 25% = +$200k/mo')}</td>
+          </tr>
+          <tr>
+            <td>{t('Scope (что входит / не входит)', 'Scope (in / out)')}</td>
+            <td>{t('Редизайн чекаута. Не трогаем каталог.', 'Checkout redesign. Catalog stays as is.')}</td>
+          </tr>
+          <tr>
+            <td>{t('Метрика успеха', 'Success metric')}</td>
+            <td>{t('Конверсия оплаты > 25% через 30 дней', 'Checkout conversion > 25% after 30 days')}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>{t('Приоритизация через RICE', 'Prioritization via RICE')}</h4>
+      <p>
+        {t(
+          'Без скоринга приоритизация превращается в политику: побеждает тот, кто громче. RICE даёт общий язык для сравнения идей:',
+          'Without scoring, prioritization becomes politics: whoever is loudest wins. RICE gives a shared language for comparing ideas:'
+        )}
+      </p>
+      <ul>
+        <li><strong>Reach</strong> - {t('сколько пользователей затронет за квартал', 'how many users affected per quarter')}</li>
+        <li><strong>Impact</strong> - {t('насколько сильно повлияет (0.25 / 0.5 / 1 / 2 / 3)', 'how much impact (0.25 / 0.5 / 1 / 2 / 3)')}</li>
+        <li><strong>Confidence</strong> - {t('уверенность в оценках (20-100%). Ниже 50% если нет данных', 'confidence in estimates (20-100%). Below 50% if no data')}</li>
+        <li><strong>Effort</strong> - {t('трудозатраты в человеко-месяцах', 'effort in person-months')}</li>
+      </ul>
+      <p>
+        {t(
+          'Lead Board рассчитывает RICE автоматически и учитывает его в приоритизации задач на доске.',
+          'Lead Board calculates RICE automatically and factors it into task prioritization on the board.'
+        )}
+      </p>
+
+      <h4>{t('Решение: берём или нет', 'Decision: go or no-go')}</h4>
+      <p>
+        {t(
+          'PO, TL и DM принимают решение по каждой идее. Три исхода:',
+          'PO, TL, and DM decide on each idea. Three outcomes:'
+        )}
+      </p>
+      <ul>
+        <li><strong>GO</strong> - {t('Epic переходит на этап БТ', 'Epic moves to BRD stage')}</li>
+        <li><strong>{t('Бэклог', 'Backlog')}</strong> - {t('не сейчас, вернёмся в следующем квартале', 'not now, revisit next quarter')}</li>
+        <li><strong>{t('Отклонить', 'Reject')}</strong> - {t('с зафиксированной причиной. Отказ - это нормально. Здоровая команда отклоняет 40-60% идей', 'with a documented reason. Rejection is normal. A healthy team rejects 40-60% of ideas')}</li>
+      </ul>
 
       <ScreenLinks screens={[
         { label: 'Board', path: '/', descriptionRu: 'Epic в статусе NEW', descriptionEn: 'Epic in NEW status' },
+        { label: 'Projects', path: '/projects', descriptionRu: 'Обзор проектов', descriptionEn: 'Projects overview' },
       ]} />
 
       <StageChecklist
-        titleRu="Критерии перехода"
-        titleEn="Transition criteria"
+        titleRu="Готово, когда"
+        titleEn="Done when"
         items={[
-          { textRu: 'Epic создан в Jira с описанием бизнес-ценности', textEn: 'Epic created in Jira with business value description' },
-          { textRu: 'RICE-оценка заполнена', textEn: 'RICE assessment filled' },
-          { textRu: 'Решение go/no-go принято', textEn: 'Go/no-go decision made' },
+          { textRu: 'Epic создан с описанием проблемы, ценности и scope', textEn: 'Epic created with problem, value, and scope' },
+          { textRu: 'RICE заполнен', textEn: 'RICE filled' },
+          { textRu: 'Решение принято и зафиксировано', textEn: 'Decision made and recorded' },
         ]}
       />
 
       <AntiPatterns items={[
-        { ru: 'Начинать разработку без сформулированной цели', en: 'Starting development without a formulated goal' },
-        { ru: 'Epic без описания, только заголовок', en: 'Epic without description, title only' },
+        { ru: 'Epic без описания, только заголовок. "Потом допишу" = никогда', en: 'Epic with no description, title only. "I\'ll add it later" = never' },
+        { ru: 'Решение в формате "давайте подумаем" без конкретного GO/NO-GO', en: 'Decision as "let\'s think about it" without a concrete GO/NO-GO' },
+        { ru: 'RICE не заполнен: каждая идея кажется срочной, приоритизация невозможна', en: 'RICE not filled: every idea seems urgent, prioritization impossible' },
+        { ru: 'Бэклог на 300+ идей без пересмотра. Раз в квартал чистите', en: 'Backlog of 300+ ideas without review. Clean it up quarterly' },
       ]} />
-
-      <p>
-        <strong>{t('Контроль качества:', 'Quality control:')}</strong>{' '}
-        {t(
-          'Data Quality проверяет наличие описания и заполненность RICE.',
-          'Data Quality checks description presence and RICE completeness.'
-        )}
-      </p>
     </>
   )
 }
@@ -382,6 +415,56 @@ function StageDevelopment() {
           </tr>
         </tbody>
       </table>
+
+      <h4>{t('Грейды и ёмкость', 'Grades & capacity')}</h4>
+      <p>
+        {t(
+          'Грейд влияет на расчёт ёмкости команды и прогноз сроков:',
+          'Grade affects team capacity calculation and deadline forecast:'
+        )}
+      </p>
+      <table className="guide-table">
+        <thead>
+          <tr>
+            <th>{t('Грейд', 'Grade')}</th>
+            <th>{t('Коэффициент', 'Coefficient')}</th>
+            <th>{t('Значение', 'Meaning')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Senior</td><td>0.8</td><td>{t('На 20% быстрее', '20% faster')}</td></tr>
+          <tr><td>Middle</td><td>1.0</td><td>{t('Базовая линия', 'Baseline')}</td></tr>
+          <tr><td>Junior</td><td>1.5</td><td>{t('На 50% больше времени', '50% more time')}</td></tr>
+        </tbody>
+      </table>
+
+      <h4>{t('Грязные оценки', 'Rough estimates')}</h4>
+      <p>
+        {t(
+          'До детальной декомпозиции Team Lead собирает грязные оценки по каждой роли в человеко-днях. Это позволяет получить ранний прогноз сроков ещё до появления Subtask.',
+          'Before detailed decomposition, the Team Lead collects rough estimates per role in person-days. This gives an early deadline forecast before Subtasks even exist.'
+        )}
+      </p>
+
+      <h4>{t('Флаги и паузы', 'Flags & pauses')}</h4>
+      <p>
+        {t(
+          'Флаги сигнализируют о блокерах:',
+          'Flags signal blockers:'
+        )}
+      </p>
+      <ul>
+        <li><strong>{t('Флаг на Epic', 'Epic flag')}</strong>: AutoScore -100. {t('Epic заблокирован.', 'Epic is blocked.')}</li>
+        <li><strong>{t('Флаг на Story', 'Story flag')}</strong>: AutoScore -200, {t('DSR встаёт на паузу. Story заблокирована, время не считается.', 'DSR pauses. Story is blocked, time stops counting.')}</li>
+      </ul>
+
+      <h4>{t('WIP-лимиты', 'WIP limits')}</h4>
+      <p>
+        {t(
+          'Ограничивают число активных Epic/Story на команду или роль. Если лимит достигнут, команда доделывает текущие задачи, прежде чем брать новые.',
+          'Cap the number of active Epics/Stories per team or role. If the limit is reached, the team finishes current tasks before taking new ones.'
+        )}
+      </p>
 
       <ScreenLinks screens={[
         { label: 'Board', path: '/', descriptionRu: 'Основная рабочая доска', descriptionEn: 'Main work board' },

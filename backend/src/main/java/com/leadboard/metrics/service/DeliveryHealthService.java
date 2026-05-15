@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.leadboard.config.entity.BoardCategory;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -68,7 +70,7 @@ public class DeliveryHealthService {
 
         // 2. Speed (weight 0.25) — cycle time vs 5d target
         try {
-            var cycleTime = metricsService.calculateCycleTime(teamId, from, to, null, null, null);
+            var cycleTime = metricsService.calculateCycleTime(teamId, from, to, BoardCategory.STORY.name(), null, null, null);
             if (cycleTime.sampleSize() > 0) {
                 BigDecimal target = BigDecimal.valueOf(5);
                 BigDecimal median = cycleTime.medianDays();
@@ -141,7 +143,7 @@ public class DeliveryHealthService {
 
         // 4. Quality (weight 0.20) — based on throughput trend
         try {
-            var throughput = metricsService.calculateThroughput(teamId, from, to, null, null, null);
+            var throughput = metricsService.calculateThroughput(teamId, from, to, null, null, null, null);
             qualityScore = throughput.total() > 0 ? BigDecimal.valueOf(70) : BigDecimal.valueOf(30);
         } catch (Exception e) {
             log.debug("Failed to compute quality for team {}", teamId, e);

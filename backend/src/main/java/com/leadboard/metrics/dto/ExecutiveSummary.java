@@ -1,6 +1,7 @@
 package com.leadboard.metrics.dto;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 public record ExecutiveSummary(
     KpiCard throughput,
@@ -18,6 +19,8 @@ public record ExecutiveSummary(
         BigDecimal deltaPercent,
         String trend,
         int sampleSize,
-        BigDecimal target
+        BigDecimal target,
+        Map<String, BigDecimal> percentiles,
+        Map<String, BigDecimal> prevPercentiles
     ) {}
 }

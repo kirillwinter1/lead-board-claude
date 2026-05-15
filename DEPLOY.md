@@ -6,15 +6,32 @@
 - **Проект на сервере:** `/opt/leadboard/`
 - **Nginx конфиг:** `/etc/nginx/sites-available/onelane`
 
-## Сборка образов (локально на Mac)
-```bash
-# Frontend
-cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend
-docker build --platform linux/amd64 -t onelane-frontend:latest .
+## Сборка (локально на Mac)
 
-# Backend
+**Сборка всегда локальная. Docker только упаковывает готовые артефакты.**
+
+```bash
+# Backend — собрать JAR
+cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/backend
+./gradlew bootJar
+# Результат: build/libs/leadboard-*.jar
+
+# Frontend — собрать dist
+cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend
+npm run build
+# Результат: dist/
+```
+
+## Упаковка в Docker (без сборки внутри)
+
+```bash
+# Backend — копирует готовый JAR
 cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/backend
 docker build --platform linux/amd64 -t onelane-backend:latest .
+
+# Frontend — копирует готовый dist
+cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend
+docker build --platform linux/amd64 -t onelane-frontend:latest .
 ```
 
 **ВАЖНО:** Флаг `--platform linux/amd64` обязателен (Mac = arm64, сервер = amd64)
@@ -52,9 +69,21 @@ ssh root@79.174.94.70 "cd /opt/leadboard && docker compose -f docker-compose.pro
 ```
 
 ## Полный деплой (одной командой)
+
+### Backend only
 ```bash
-# Frontend only
+cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/backend && \
+./gradlew bootJar && \
+docker build --platform linux/amd64 -t onelane-backend:latest . && \
+docker save onelane-backend:latest | gzip > /tmp/onelane-backend.tar.gz && \
+scp /tmp/onelane-backend.tar.gz root@79.174.94.70:/root/ && \
+ssh root@79.174.94.70 "docker load < /root/onelane-backend.tar.gz && cd /opt/leadboard && docker compose -f docker-compose.prod.yml up -d backend"
+```
+
+### Frontend only
+```bash
 cd /Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend && \
+npm run build && \
 docker build --platform linux/amd64 -t onelane-frontend:latest . && \
 docker save onelane-frontend:latest | gzip > /tmp/onelane-frontend.tar.gz && \
 scp /tmp/onelane-frontend.tar.gz root@79.174.94.70:/root/ && \
@@ -151,7 +180,7 @@ TOKEN_ENCRYPTION_KEY=your-secret-key-at-least-16-chars
 ## Troubleshooting
 
 **SSH зависает:**
-- Сервер может быть перегружен сборкой Docker
+- Сервер может быть перегружен
 - Подождать 1-2 минуты и попробовать снова
 
 **Backend не стартует (Connection refused to localhost:5432):**

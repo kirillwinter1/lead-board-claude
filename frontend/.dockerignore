@@ -1,8 +1,8 @@
 # Dependencies
 node_modules/
 
-# Build outputs
-dist/
+# Build outputs (keep dist/ for Docker packaging)
+# dist/
 
 # IDE
 .idea/

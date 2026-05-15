@@ -44,6 +44,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int SYNC_LIMIT = 5;
     private static final int REGISTRATION_LIMIT = 10;
     private static final int CHAT_LIMIT = 30;
+    private static final int METRICS_LIMIT = 600;
     private static final long WINDOW_MS = 60_000; // 1 minute
 
     @Value("${app.rate-limit.general:200}")
@@ -107,6 +108,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/chat/message")) {
             return CHAT_LIMIT;
         }
+        if (path.startsWith("/api/metrics/")) {
+            return METRICS_LIMIT;
+        }
         return generalApiLimit;
     }
 
@@ -122,6 +126,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         if (path.startsWith("/api/chat/message")) {
             return "chat";
+        }
+        if (path.startsWith("/api/metrics/")) {
+            return "metrics";
         }
         return "api";
     }

@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { TeamBadge } from '../components/TeamBadge'
+import { RiceScoreBadge } from '../components/rice/RiceScoreBadge'
+import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { TEXT_MUTED, ERROR_TEXT } from '../constants/colors'
 import {
   quarterlyPlanningApi,
   QuarterlyProjectsResponse,
@@ -17,7 +20,7 @@ export function QuarterlyPlanningPage() {
 }
 
 function QuarterlyPlanningLivePage() {
-  const { getRoleColor, getRoleCodes } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
 
   const [availableQuarters, setAvailableQuarters] = useState<string[]>([])
   const [quarter, setQuarter] = useState('')
@@ -170,7 +173,7 @@ function QuarterlyPlanningLivePage() {
         <button className={activeTab === 'teams' ? 'active' : ''} onClick={() => setActiveTab('teams')}>Teams</button>
       </div>
 
-      {error && <div style={{ color: '#ba3526', padding: '12px 0' }}>{error}</div>}
+      {error && <div style={{ color: ERROR_TEXT, padding: '12px 0' }}>{error}</div>}
       {dataLoading && <div className="qpp-empty-state">Loading data...</div>}
 
       {availableQuarters.length === 0 && !loading && (
@@ -186,6 +189,7 @@ function QuarterlyPlanningLivePage() {
           onSelectProject={setSelectedProjectKey}
           quarter={quarter}
           onBoostChange={handleBoostChange}
+          getIssueTypeIconUrl={getIssueTypeIconUrl}
         />
       )}
 
@@ -212,7 +216,7 @@ function QuarterlyPlanningLivePage() {
 
 // ==================== Projects Tab ====================
 
-function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSelectProject, quarter, onBoostChange }: {
+function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSelectProject, quarter, onBoostChange, getIssueTypeIconUrl }: {
   projects: QuarterlyProjectOverviewDto[]
   filter: ProjectFilter
   onFilterChange: (f: ProjectFilter) => void
@@ -220,6 +224,7 @@ function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSele
   onSelectProject: (key: string) => void
   quarter: string
   onBoostChange: (key: string, boost: number) => void
+  getIssueTypeIconUrl: (type: string) => string | null
 }) {
   return (
     <div className="qpp-panel">
@@ -273,7 +278,7 @@ function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSele
                       {p.teams.map(t => (
                         <TeamBadge key={t.id} name={t.name} color={t.color || '#666'} />
                       ))}
-                      {p.teams.length === 0 && <span style={{ color: '#60708f', fontSize: 13 }}>No teams</span>}
+                      {p.teams.length === 0 && <span style={{ color: TEXT_MUTED, fontSize: 13 }}>No teams</span>}
                     </div>
                   </td>
                   <td>{p.epicCount}</td>
@@ -283,7 +288,7 @@ function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSele
                 </tr>
               ))}
               {projects.length === 0 && (
-                <tr><td colSpan={7} style={{ textAlign: 'center', color: '#60708f', padding: 24 }}>No projects match the selected filter.</td></tr>
+                <tr><td colSpan={7} style={{ textAlign: 'center', color: TEXT_MUTED, padding: 24 }}>No projects match the selected filter.</td></tr>
               )}
             </tbody>
           </table>
@@ -291,7 +296,7 @@ function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSele
 
         <div className="qpp-detail-card">
           {selectedProject ? (
-            <ProjectDetail project={selectedProject} onBoostChange={onBoostChange} />
+            <ProjectDetail project={selectedProject} onBoostChange={onBoostChange} getIssueTypeIconUrl={getIssueTypeIconUrl} />
           ) : (
             <div className="qpp-empty-state">Select a project to inspect quarter label, readiness, and blockers.</div>
           )}
@@ -301,9 +306,10 @@ function ProjectsTab({ projects, filter, onFilterChange, selectedProject, onSele
   )
 }
 
-function ProjectDetail({ project, onBoostChange }: {
+function ProjectDetail({ project, onBoostChange, getIssueTypeIconUrl }: {
   project: QuarterlyProjectOverviewDto
   onBoostChange: (key: string, boost: number) => void
+  getIssueTypeIconUrl: (type: string) => string | null
 }) {
   return (
     <>
@@ -316,7 +322,10 @@ function ProjectDetail({ project, onBoostChange }: {
       </div>
       <div className="qpp-detail-metrics">
         <MetricMini label="Priority" value={String(Math.round(project.priorityScore))} />
-        <MetricMini label="RICE" value={String(Math.round(project.riceNormalizedScore))} />
+        <div className="qpp-mini-metric">
+          <span>RICE</span>
+          <RiceScoreBadge score={project.riceNormalizedScore} />
+        </div>
         <BoostMini currentBoost={project.manualBoost ?? 0} onBoostChange={b => onBoostChange(project.projectKey, b)} />
         <MetricMini label="Risk" value={riskLabel(project.risk)} />
       </div>
@@ -338,11 +347,18 @@ function ProjectDetail({ project, onBoostChange }: {
         {project.epics.map(epic => (
           <div key={epic.key} className="qpp-epic-row">
             <div>
-              <strong>{epic.key}</strong>
+              <strong>
+                <img src={getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))} width={16} height={16} alt="" style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                {epic.key}
+              </strong>
               <span>{epic.summary}</span>
             </div>
             <div className="qpp-epic-meta">
-              <span>{epic.teams.length > 0 ? epic.teams.map(t => t.name).join(' + ') : 'Unassigned'}</span>
+              <div className="qpp-team-stack">
+                {epic.teams.length > 0
+                  ? epic.teams.map(t => <TeamBadge key={t.id} name={t.name} color={t.color} />)
+                  : <span style={{ color: TEXT_MUTED }}>Unassigned</span>}
+              </div>
               <span className={epic.roughEstimated ? 'ok' : 'bad'}>{epic.roughEstimated ? 'Rough est. ready' : 'No rough estimate'}</span>
             </div>
           </div>
@@ -409,7 +425,7 @@ function ReadinessTab({ issues, projects, quarter }: {
               </tr>
             ))}
             {projects.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: 'center', color: '#60708f', padding: 24 }}>No projects in this quarter yet.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', color: TEXT_MUTED, padding: 24 }}>No projects in this quarter yet.</td></tr>
             )}
           </tbody>
         </table>
@@ -516,7 +532,7 @@ function TeamDetail({ team, getRoleColor, getRoleCodes }: {
             <div key={role} className="qpp-role-row">
               <span style={{ color: getRoleColor(role) }}>{role}</span>
               <div className="qpp-role-track">
-                <div className={`qpp-role-fill ${util > 100 ? 'over' : ''}`} style={{ width: `${Math.min(util, 100)}%` }} />
+                <div className="qpp-role-fill" style={{ width: `${Math.min(util, 100)}%`, background: util > 100 ? ERROR_TEXT : getRoleColor(role) }} />
               </div>
               <strong>{Math.round(demand)}/{Math.round(cap)}d</strong>
             </div>
@@ -540,7 +556,7 @@ function TeamDetail({ team, getRoleColor, getRoleCodes }: {
           </div>
         ))}
         {team.impactingProjects.length === 0 && (
-          <p style={{ color: '#60708f' }}>No projects assigned to this team for the quarter.</p>
+          <p style={{ color: TEXT_MUTED }}>No projects assigned to this team for the quarter.</p>
         )}
       </div>
     </>
@@ -600,7 +616,7 @@ function BoostMini({ currentBoost, onBoostChange }: { currentBoost: number; onBo
           onBlur={handleSave}
           min={-50} max={50}
           autoFocus
-          style={{ width: 60, fontSize: 18, fontWeight: 700, border: '1px solid #bfd3ff', borderRadius: 8, padding: '2px 6px', textAlign: 'center' }}
+          className="qpp-boost-input"
         />
       </div>
     )

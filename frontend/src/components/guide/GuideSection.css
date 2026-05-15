@@ -18,6 +18,17 @@
   color: #172b4d;
 }
 
+.guide-section-body h3 {
+  margin: 32px 0 12px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.guide-section-body h3:first-child {
+  margin-top: 0;
+}
+
 .guide-section-body p {
   margin: 0 0 12px;
 }

@@ -18,6 +18,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
         FROM jira_issues
         WHERE team_id = :teamId
           AND done_at BETWEEN :from AND :to
+          AND (:boardCategory IS NULL OR board_category = :boardCategory)
           AND (:issueType IS NULL OR issue_type = :issueType)
           AND (:epicKey IS NULL OR parent_key = :epicKey OR issue_key = :epicKey)
           AND (:assigneeAccountId IS NULL OR assignee_account_id = :assigneeAccountId)
@@ -28,6 +29,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             @Param("teamId") Long teamId,
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to,
+            @Param("boardCategory") String boardCategory,
             @Param("issueType") String issueType,
             @Param("epicKey") String epicKey,
             @Param("assigneeAccountId") String assigneeAccountId);
@@ -41,6 +43,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
           AND done_at BETWEEN :from AND :to
           AND done_at IS NOT NULL
           AND jira_created_at IS NOT NULL
+          AND (:boardCategory IS NULL OR board_category = :boardCategory)
           AND (:issueType IS NULL OR issue_type = :issueType)
           AND (:epicKey IS NULL OR parent_key = :epicKey OR issue_key = :epicKey)
           AND (:assigneeAccountId IS NULL OR assignee_account_id = :assigneeAccountId)
@@ -50,6 +53,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             @Param("teamId") Long teamId,
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to,
+            @Param("boardCategory") String boardCategory,
             @Param("issueType") String issueType,
             @Param("epicKey") String epicKey,
             @Param("assigneeAccountId") String assigneeAccountId);
@@ -62,6 +66,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
         WHERE team_id = :teamId
           AND done_at BETWEEN :from AND :to
           AND done_at IS NOT NULL
+          AND (:boardCategory IS NULL OR board_category = :boardCategory)
           AND (:issueType IS NULL OR issue_type = :issueType)
           AND (:epicKey IS NULL OR parent_key = :epicKey OR issue_key = :epicKey)
           AND (:assigneeAccountId IS NULL OR assignee_account_id = :assigneeAccountId)
@@ -71,6 +76,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             @Param("teamId") Long teamId,
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to,
+            @Param("boardCategory") String boardCategory,
             @Param("issueType") String issueType,
             @Param("epicKey") String epicKey,
             @Param("assigneeAccountId") String assigneeAccountId);
@@ -82,6 +88,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
         FROM jira_issues
         WHERE team_id = :teamId
           AND done_at BETWEEN :from AND :to
+          AND (:boardCategory IS NULL OR board_category = :boardCategory)
           AND (:issueType IS NULL OR issue_type = :issueType)
           AND (:epicKey IS NULL OR parent_key = :epicKey OR issue_key = :epicKey)
         GROUP BY COALESCE(board_category, 'STORY')
@@ -90,6 +97,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             @Param("teamId") Long teamId,
             @Param("from") OffsetDateTime from,
             @Param("to") OffsetDateTime to,
+            @Param("boardCategory") String boardCategory,
             @Param("issueType") String issueType,
             @Param("epicKey") String epicKey);
 
@@ -183,6 +191,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
               AND done_at IS NOT NULL
               AND assignee_account_id IS NOT NULL
               AND (started_at IS NULL OR done_at >= started_at)
+              AND (?5 IS NULL OR board_category = ?5)
             GROUP BY assignee_account_id, assignee_display_name
         ),
         prev_period AS (
@@ -195,6 +204,7 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
               AND done_at BETWEEN ?4 AND ?2
               AND done_at IS NOT NULL
               AND assignee_account_id IS NOT NULL
+              AND (?5 IS NULL OR board_category = ?5)
             GROUP BY assignee_account_id
         )
         SELECT
@@ -216,5 +226,70 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             Long teamId,
             OffsetDateTime from,
             OffsetDateTime to,
-            OffsetDateTime prevFrom);
+            OffsetDateTime prevFrom,
+            String boardCategory);
+
+    /**
+     * Weekly STORY throughput for sparklines.
+     */
+    @Query(value = """
+        SELECT
+            DATE_TRUNC('week', done_at) as period_start,
+            COUNT(*) as count
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+          AND board_category = 'STORY'
+        GROUP BY DATE_TRUNC('week', done_at)
+        ORDER BY period_start
+        """, nativeQuery = true)
+    List<Object[]> getWeeklyStoryThroughput(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Weekly median cycle time (STORY only) for sparklines.
+     */
+    @Query(value = """
+        SELECT
+            DATE_TRUNC('week', done_at) as period_start,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (done_at - COALESCE(started_at, jira_created_at))) / 86400.0
+            ) as median_days
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+          AND done_at IS NOT NULL
+          AND board_category = 'STORY'
+        GROUP BY DATE_TRUNC('week', done_at)
+        ORDER BY period_start
+        """, nativeQuery = true)
+    List<Object[]> getWeeklyCycleTimeMedian(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Weekly median lead time (STORY only) for sparklines.
+     */
+    @Query(value = """
+        SELECT
+            DATE_TRUNC('week', done_at) as period_start,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (done_at - jira_created_at)) / 86400.0
+            ) as median_days
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+          AND done_at IS NOT NULL
+          AND jira_created_at IS NOT NULL
+          AND board_category = 'STORY'
+        GROUP BY DATE_TRUNC('week', done_at)
+        ORDER BY period_start
+        """, nativeQuery = true)
+    List<Object[]> getWeeklyLeadTimeMedian(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
 }

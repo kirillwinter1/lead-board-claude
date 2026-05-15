@@ -3,8 +3,9 @@ import { GuideSidebarItem } from '../types'
 export const guideSidebarItems: GuideSidebarItem[] = [
   { id: 'overview', titleRu: 'Обзор процесса', titleEn: 'Process Overview' },
   { id: 'rules', titleRu: 'Правила и ограничения', titleEn: 'Rules & Constraints' },
+  { id: 'pipeline', titleRu: 'Типы задач', titleEn: 'Task Types' },
   {
-    id: 'pipeline',
+    id: 'conveyor',
     titleRu: 'Конвейер',
     titleEn: 'Pipeline',
     children: [

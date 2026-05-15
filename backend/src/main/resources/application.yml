@@ -113,10 +113,16 @@ chat:
   embedding-model: ${CHAT_EMBEDDING_MODEL:openai/text-embedding-3-small}
   embedding-base-url: ${CHAT_EMBEDDING_BASE_URL:}
 
+spring.task.scheduling:
+  pool:
+    size: 3
+
 simulation:
   enabled: ${SIMULATION_ENABLED:false}
   cron: ${SIMULATION_CRON:0 0 19 * * MON-FRI}
   team-ids: ${SIMULATION_TEAM_IDS:}
+  max-consecutive-failures: ${SIMULATION_MAX_FAILURES:3}
+  timeout-minutes: ${SIMULATION_TIMEOUT_MINUTES:5}
   deviation:
     daily-hours-variance: ${SIMULATION_DAILY_VARIANCE:0.3}
     on-track-chance: ${SIMULATION_ON_TRACK_CHANCE:0.70}

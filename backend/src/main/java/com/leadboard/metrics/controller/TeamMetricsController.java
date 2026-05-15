@@ -61,11 +61,12 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String boardCategory,
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey,
             @RequestParam(required = false) String assigneeAccountId) {
         validateDateRange(from, to);
-        return metricsService.calculateThroughput(teamId, from, to, issueType, epicKey, assigneeAccountId);
+        return metricsService.calculateThroughput(teamId, from, to, boardCategory, issueType, epicKey, assigneeAccountId);
     }
 
     @GetMapping("/lead-time")
@@ -73,11 +74,12 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "STORY") String boardCategory,
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey,
             @RequestParam(required = false) String assigneeAccountId) {
         validateDateRange(from, to);
-        return metricsService.calculateLeadTime(teamId, from, to, issueType, epicKey, assigneeAccountId);
+        return metricsService.calculateLeadTime(teamId, from, to, boardCategory, issueType, epicKey, assigneeAccountId);
     }
 
     @GetMapping("/cycle-time")
@@ -85,11 +87,12 @@ public class TeamMetricsController {
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false, defaultValue = "STORY") String boardCategory,
             @RequestParam(required = false) String issueType,
             @RequestParam(required = false) String epicKey,
             @RequestParam(required = false) String assigneeAccountId) {
         validateDateRange(from, to);
-        return metricsService.calculateCycleTime(teamId, from, to, issueType, epicKey, assigneeAccountId);
+        return metricsService.calculateCycleTime(teamId, from, to, boardCategory, issueType, epicKey, assigneeAccountId);
     }
 
     @GetMapping("/time-in-status")
@@ -194,5 +197,14 @@ public class TeamMetricsController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         validateDateRange(from, to);
         return deliveryHealthService.calculateHealth(teamId, from, to);
+    }
+
+    @GetMapping("/sparklines")
+    public SparklineResponse getSparklines(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
+        return metricsService.getSparklines(teamId, from, to, dsrService, velocityService);
     }
 }

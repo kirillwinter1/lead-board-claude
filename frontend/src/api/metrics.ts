@@ -23,6 +23,7 @@ export interface ThroughputResponse {
 export interface LeadTimeResponse {
   avgDays: number
   medianDays: number
+  p85Days: number
   p90Days: number
   minDays: number
   maxDays: number
@@ -32,6 +33,7 @@ export interface LeadTimeResponse {
 export interface CycleTimeResponse {
   avgDays: number
   medianDays: number
+  p85Days: number
   p90Days: number
   minDays: number
   maxDays: number
@@ -394,6 +396,8 @@ export interface KpiCard {
   trend: string
   sampleSize: number
   target: number | null
+  percentiles: Record<string, number> | null
+  prevPercentiles: Record<string, number> | null
 }
 
 export interface ExecutiveSummary {
@@ -446,5 +450,30 @@ export async function getDeliveryHealth(
 ): Promise<DeliveryHealth> {
   const params = new URLSearchParams({ teamId: String(teamId), from, to })
   const response = await axios.get(`/api/metrics/delivery-health?${params}`)
+  return response.data
+}
+
+// ==================== Sparklines ====================
+
+export interface SparklinePoint {
+  period: string
+  value: number
+}
+
+export interface SparklineData {
+  throughput: SparklinePoint[]
+  cycleTimeMedian: SparklinePoint[]
+  leadTimeMedian: SparklinePoint[]
+  predictability: SparklinePoint[]
+  utilization: SparklinePoint[]
+}
+
+export async function getSparklines(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<SparklineData> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/sparklines?${params}`)
   return response.data
 }

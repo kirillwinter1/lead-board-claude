@@ -2,7 +2,7 @@
   max-width: 1440px;
   margin: 0 auto;
   padding: 24px 28px 48px;
-  color: #17243f;
+  color: #172b4d;
 }
 
 .qpp-hero {
@@ -42,7 +42,7 @@
 .qpp-hero p {
   max-width: 720px;
   margin: 0;
-  color: #4d5d79;
+  color: #42526e;
   font-size: 15px;
   line-height: 1.5;
 }
@@ -60,7 +60,7 @@
   min-width: 160px;
   font-size: 12px;
   font-weight: 700;
-  color: #60708f;
+  color: #6b778c;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -83,7 +83,7 @@
   min-height: 44px;
   padding: 0 16px;
   border-radius: 14px;
-  background: #17243f;
+  background: #172b4d;
   color: #fff;
   text-decoration: none;
   font-weight: 700;
@@ -131,7 +131,7 @@
 
 .qpp-step-card p {
   margin: 0;
-  color: #5f6f8b;
+  color: #6b778c;
   line-height: 1.45;
 }
 
@@ -162,7 +162,7 @@
 .qpp-mini-metric span {
   display: block;
   margin-bottom: 8px;
-  color: #60708f;
+  color: #6b778c;
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -180,7 +180,7 @@
 .qpp-mini-metric strong,
 .qpp-panel-header p,
 .qpp-empty-state {
-  color: #5f6f8b;
+  color: #6b778c;
 }
 
 .qpp-tabs {
@@ -198,7 +198,7 @@
   border: none;
   border-radius: 12px;
   background: transparent;
-  color: #60708f;
+  color: #6b778c;
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -287,7 +287,7 @@
 .qpp-table th {
   padding: 14px 16px;
   background: #f7f9fd;
-  color: #60708f;
+  color: #6b778c;
   text-align: left;
   font-size: 12px;
   font-weight: 800;
@@ -323,14 +323,14 @@
 .qpp-blockers h4,
 .qpp-epics h4,
 .qpp-impact-projects h4 {
-  color: #17243f;
+  color: #172b4d;
 }
 
 .qpp-project-cell span,
 .qpp-detail-key,
 .qpp-epic-row span,
 .qpp-impact-row span {
-  color: #60708f;
+  color: #6b778c;
 }
 
 .qpp-quarter-pill,
@@ -358,7 +358,7 @@
 
 .qpp-status-pill.ready {
   background: #e8f8ee;
-  color: #16784b;
+  color: #36B37E;
 }
 
 .qpp-status-pill.partial {
@@ -368,17 +368,17 @@
 
 .qpp-status-pill.blocked {
   background: #ffe9e7;
-  color: #ba3526;
+  color: #DE350B;
 }
 
 .qpp-status-pill.not-added {
   background: #edf1f7;
-  color: #60708f;
+  color: #6b778c;
 }
 
 .qpp-risk-pill.low {
   background: #eef8f2;
-  color: #16784b;
+  color: #36B37E;
 }
 
 .qpp-risk-pill.medium {
@@ -388,7 +388,7 @@
 
 .qpp-risk-pill.high {
   background: #ffebe9;
-  color: #ba3526;
+  color: #DE350B;
 }
 
 .qpp-team-stack {
@@ -453,7 +453,7 @@
 
 .qpp-mini-metric strong {
   font-size: 20px;
-  color: #17243f;
+  color: #172b4d;
 }
 
 .qpp-checklist {
@@ -497,7 +497,7 @@
 }
 
 .qpp-check-row small {
-  color: #60708f;
+  color: #6b778c;
 }
 
 .qpp-blockers,
@@ -515,12 +515,12 @@
 .qpp-blockers ul {
   margin: 0;
   padding-left: 18px;
-  color: #ba3526;
+  color: #DE350B;
 }
 
 .qpp-blockers p {
   margin: 0;
-  color: #4d5d79;
+  color: #42526e;
 }
 
 .qpp-epic-row,
@@ -552,12 +552,12 @@
 
 .qpp-epic-meta .ok,
 .ok {
-  color: #16784b;
+  color: #36B37E;
 }
 
 .qpp-epic-meta .bad,
 .bad {
-  color: #ba3526;
+  color: #DE350B;
 }
 
 .qpp-readiness-grid {
@@ -596,7 +596,7 @@
   min-width: 54px;
   min-height: 54px;
   border-radius: 18px;
-  background: #17243f;
+  background: #172b4d;
   color: #fff;
   font-size: 22px;
   font-weight: 800;
@@ -609,7 +609,7 @@
 
 .qpp-issue-card p {
   margin: 0;
-  color: #60708f;
+  color: #6b778c;
 }
 
 .qpp-role-bars {
@@ -641,11 +641,16 @@
 .qpp-role-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #4b8bff 0%, #204998 100%);
 }
 
-.qpp-role-fill.over {
-  background: linear-gradient(90deg, #ff8d7a 0%, #ba3526 100%);
+.qpp-boost-input {
+  width: 60px;
+  font-size: 18px;
+  font-weight: 700;
+  border: 1px solid #DFE1E6;
+  border-radius: 8px;
+  padding: 2px 6px;
+  text-align: center;
 }
 
 .qpp-empty-state {

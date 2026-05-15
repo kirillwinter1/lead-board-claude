@@ -50,9 +50,9 @@ class DeliveryHealthServiceTest {
                         10, 9, new BigDecimal("95"), Collections.emptyList()));
 
         // Cycle time: 3d (under 5d target)
-        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new CycleTimeResponse(new BigDecimal("3.5"), new BigDecimal("3.0"),
-                        new BigDecimal("5.0"), new BigDecimal("1.0"), new BigDecimal("7.0"), 20));
+                        new BigDecimal("4.5"), new BigDecimal("5.0"), new BigDecimal("1.0"), new BigDecimal("7.0"), 20));
 
         // Velocity: 90%
         when(velocityService.calculateVelocity(eq(teamId), any(), any()))
@@ -60,7 +60,7 @@ class DeliveryHealthServiceTest {
                         new BigDecimal("100"), new BigDecimal("90"), new BigDecimal("90"), Collections.emptyList()));
 
         // Throughput: some data
-        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new ThroughputResponse(2, 10, 5, 0, 17, Collections.emptyList(), Collections.emptyList()));
 
         DeliveryHealth result = service.calculateHealth(teamId, from, to);
@@ -82,15 +82,15 @@ class DeliveryHealthServiceTest {
                 .thenReturn(new DsrResponse(new BigDecimal("1.5"), new BigDecimal("1.3"),
                         5, 2, new BigDecimal("40"), Collections.emptyList()));
 
-        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new CycleTimeResponse(new BigDecimal("12.0"), new BigDecimal("11.0"),
-                        new BigDecimal("15.0"), new BigDecimal("3.0"), new BigDecimal("20.0"), 10));
+                        new BigDecimal("14.0"), new BigDecimal("15.0"), new BigDecimal("3.0"), new BigDecimal("20.0"), 10));
 
         when(velocityService.calculateVelocity(eq(teamId), any(), any()))
                 .thenReturn(new VelocityResponse(teamId, from, to,
                         new BigDecimal("100"), new BigDecimal("140"), new BigDecimal("140"), Collections.emptyList()));
 
-        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new ThroughputResponse(0, 3, 1, 0, 4, Collections.emptyList(), Collections.emptyList()));
 
         DeliveryHealth result = service.calculateHealth(teamId, from, to);
@@ -110,13 +110,13 @@ class DeliveryHealthServiceTest {
         when(dsrService.calculateDsr(eq(teamId), any(), any()))
                 .thenReturn(new DsrResponse(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, Collections.emptyList()));
 
-        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any()))
-                .thenReturn(new CycleTimeResponse(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0));
+        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new CycleTimeResponse(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0));
 
         when(velocityService.calculateVelocity(eq(teamId), any(), any()))
                 .thenThrow(new RuntimeException("No data"));
 
-        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new ThroughputResponse(0, 0, 0, 0, 0, Collections.emptyList(), Collections.emptyList()));
 
         DeliveryHealth result = service.calculateHealth(teamId, from, to);
@@ -138,11 +138,11 @@ class DeliveryHealthServiceTest {
 
         when(dsrService.calculateDsr(eq(teamId), any(), any()))
                 .thenReturn(new DsrResponse(BigDecimal.ZERO, BigDecimal.ZERO, 0, 0, BigDecimal.ZERO, Collections.emptyList()));
-        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any()))
-                .thenReturn(new CycleTimeResponse(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0));
+        when(metricsService.calculateCycleTime(eq(teamId), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new CycleTimeResponse(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0));
         when(velocityService.calculateVelocity(eq(teamId), any(), any()))
                 .thenThrow(new RuntimeException("No data"));
-        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsService.calculateThroughput(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(new ThroughputResponse(0, 0, 0, 0, 0, Collections.emptyList(), Collections.emptyList()));
 
         DeliveryHealth result = svc.calculateHealth(teamId, from, to);

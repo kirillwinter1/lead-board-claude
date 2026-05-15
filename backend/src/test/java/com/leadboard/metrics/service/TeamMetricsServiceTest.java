@@ -64,10 +64,10 @@ class TeamMetricsServiceTest {
                 new Object[]{Timestamp.valueOf("2024-01-08 00:00:00"), "STORY", 3L}
         );
 
-        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
+        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null, null);
 
         assertEquals(2, result.totalEpics());
         assertEquals(8, result.totalStories());
@@ -81,10 +81,10 @@ class TeamMetricsServiceTest {
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
-        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
+        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null, null);
 
         assertEquals(0, result.total());
         assertTrue(result.byPeriod().isEmpty());
@@ -103,10 +103,10 @@ class TeamMetricsServiceTest {
                 new Object[]{periodStart, "EPIC", 1L}
         );
 
-        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null);
+        ThroughputResponse result = service.calculateThroughput(teamId, from, to, null, null, null, null);
 
         assertEquals(1, result.totalEpics());
         assertEquals(5, result.totalStories());
@@ -129,10 +129,10 @@ class TeamMetricsServiceTest {
                 new Object[]{new BigDecimal("10.0"), "TEST-5"}
         );
 
-        when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        LeadTimeResponse result = service.calculateLeadTime(teamId, from, to, null, null, null);
+        LeadTimeResponse result = service.calculateLeadTime(teamId, from, to, null, null, null, null);
 
         assertEquals(5, result.sampleSize());
         assertEquals(new BigDecimal("6.00"), result.avgDays());
@@ -147,10 +147,10 @@ class TeamMetricsServiceTest {
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
-        when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
-        LeadTimeResponse result = service.calculateLeadTime(teamId, from, to, null, null, null);
+        LeadTimeResponse result = service.calculateLeadTime(teamId, from, to, null, null, null, null);
 
         assertEquals(0, result.sampleSize());
         assertEquals(BigDecimal.ZERO, result.avgDays());
@@ -167,10 +167,10 @@ class TeamMetricsServiceTest {
                 new Object[]{new BigDecimal("3.5"), "TEST-2"}
         );
 
-        when(metricsRepository.getCycleTimeDays(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getCycleTimeDays(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
-        CycleTimeResponse result = service.calculateCycleTime(teamId, from, to, null, null, null);
+        CycleTimeResponse result = service.calculateCycleTime(teamId, from, to, null, null, null, null);
 
         assertEquals(2, result.sampleSize());
         assertEquals(new BigDecimal("2.50"), result.avgDays());
@@ -192,7 +192,7 @@ class TeamMetricsServiceTest {
                         new BigDecimal("1.80"), new BigDecimal("60"), new BigDecimal("65"), 8L, new BigDecimal("2.0")}
         );
 
-        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
         List<AssigneeMetrics> result = service.calculateByAssignee(teamId, from, to);
@@ -217,7 +217,7 @@ class TeamMetricsServiceTest {
                         new BigDecimal("1.0"), new BigDecimal("40"), new BigDecimal("40"), 3L, null}
         );
 
-        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any(), any()))
                 .thenReturn(mockData);
 
         List<AssigneeMetrics> result = service.calculateByAssignee(teamId, from, to);
@@ -328,15 +328,15 @@ class TeamMetricsServiceTest {
         LocalDate from = LocalDate.of(2024, 1, 1);
         LocalDate to = LocalDate.of(2024, 1, 31);
 
-        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getLeadTimeDays(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(metricsRepository.getCycleTimeDays(eq(teamId), any(), any(), any(), any(), any()))
+        when(metricsRepository.getCycleTimeDays(eq(teamId), any(), any(), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
         when(changelogRepository.getTimeInStatusStats(eq(teamId), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any()))
+        when(metricsRepository.getExtendedMetricsByAssigneeV2(eq(teamId), any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         TeamMetricsSummary result = service.getSummary(teamId, from, to, null, null);

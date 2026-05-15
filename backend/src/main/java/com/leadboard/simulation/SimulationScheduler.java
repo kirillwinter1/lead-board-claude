@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.*;
 
 @Component
 @ConditionalOnProperty(name = "simulation.enabled", havingValue = "true")
@@ -42,6 +43,29 @@ public class SimulationScheduler {
             return;
         }
 
+        int timeoutMinutes = properties.getTimeoutMinutes();
+        ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "simulation-worker");
+            t.setDaemon(true);
+            return t;
+        });
+
+        try {
+            Future<?> future = executor.submit(this::runAllTenants);
+            future.get(timeoutMinutes, TimeUnit.MINUTES);
+        } catch (TimeoutException e) {
+            log.error("Simulation timed out after {} minutes — aborting", timeoutMinutes);
+        } catch (ExecutionException e) {
+            log.error("Simulation failed: {}", e.getCause().getMessage(), e.getCause());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Simulation scheduler interrupted");
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    private void runAllTenants() {
         // BUG-77 fix: iterate tenants and set TenantContext like TenantSyncScheduler
         List<TenantEntity> tenants = tenantRepository.findAllActive();
 

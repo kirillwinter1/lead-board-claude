@@ -1,5 +1,6 @@
-# Build outputs
+# Build outputs (keep build/libs for Docker packaging)
 build/
+!build/libs/
 .gradle/
 out/
 

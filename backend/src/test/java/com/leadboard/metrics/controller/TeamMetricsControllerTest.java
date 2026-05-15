@@ -81,6 +81,7 @@ class TeamMetricsControllerTest {
                 new LeadTimeResponse(
                         new BigDecimal("5.5"),
                         new BigDecimal("4.0"),
+                        new BigDecimal("8.0"),
                         new BigDecimal("10.0"),
                         new BigDecimal("1.0"),
                         new BigDecimal("15.0"),
@@ -89,6 +90,7 @@ class TeamMetricsControllerTest {
                 new CycleTimeResponse(
                         new BigDecimal("3.5"),
                         new BigDecimal("2.5"),
+                        new BigDecimal("6.0"),
                         new BigDecimal("8.0"),
                         new BigDecimal("0.5"),
                         new BigDecimal("12.0"),
@@ -128,7 +130,7 @@ class TeamMetricsControllerTest {
                 Arrays.asList(new BigDecimal("6.0"))
         );
 
-        when(metricsService.calculateThroughput(eq(1L), any(), any(), any(), any(), any()))
+        when(metricsService.calculateThroughput(eq(1L), any(), any(), any(), any(), any(), any()))
                 .thenReturn(response);
 
         // When & Then
@@ -189,13 +191,14 @@ class TeamMetricsControllerTest {
         LeadTimeResponse response = new LeadTimeResponse(
                 new BigDecimal("6.0"),
                 new BigDecimal("5.0"),
+                new BigDecimal("10.0"),
                 new BigDecimal("12.0"),
                 new BigDecimal("1.0"),
                 new BigDecimal("20.0"),
                 25
         );
 
-        when(metricsService.calculateLeadTime(eq(1L), any(), any(), eq("Story"), isNull(), isNull()))
+        when(metricsService.calculateLeadTime(eq(1L), any(), any(), eq("STORY"), eq("Story"), isNull(), isNull()))
                 .thenReturn(response);
 
         // When & Then

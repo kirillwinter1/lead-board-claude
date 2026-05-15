@@ -27,3 +27,21 @@ docker-compose.prod.yml
 
 # Test coverage
 frontend/coverage/
+
+# Local tool caches / runtimes
+.playwright-cli/
+.playwright-mcp/
+.superpowers/
+.plan*
+plans/
+.claude/skills/frontend-design/
+.claude/skills/writing-style/
+backend/.claude/
+frontend/.claude/
+frontend/test-results/
+docs/superpowers/
+output/
+
+# Ad-hoc screenshots in root
+/velocity_*.png
+/worklog_*.png

@@ -22,6 +22,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.leadboard.config.entity.BoardCategory;
+
 @Service
 public class TeamMetricsService {
 
@@ -46,13 +48,14 @@ public class TeamMetricsService {
      * Calculate throughput (completed issues) for a period.
      */
     public ThroughputResponse calculateThroughput(Long teamId, LocalDate from, LocalDate to,
-                                                   String issueType, String epicKey, String assigneeAccountId) {
+                                                   String boardCategory, String issueType,
+                                                   String epicKey, String assigneeAccountId) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
         // Get throughput by week
         List<Object[]> weeklyData = metricsRepository.getThroughputByWeek(
-                teamId, fromDt, toDt, issueType, epicKey, assigneeAccountId);
+                teamId, fromDt, toDt, boardCategory, issueType, epicKey, assigneeAccountId);
 
         // Group by period
         Map<LocalDate, Map<String, Integer>> periodMap = new LinkedHashMap<>();
@@ -103,14 +106,16 @@ public class TeamMetricsService {
 
     /**
      * Calculate lead time (creation to completion).
+     * Filters by board_category (internal model) when boardCategory is provided.
      */
     public LeadTimeResponse calculateLeadTime(Long teamId, LocalDate from, LocalDate to,
-                                               String issueType, String epicKey, String assigneeAccountId) {
+                                               String boardCategory, String issueType,
+                                               String epicKey, String assigneeAccountId) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
         List<Object[]> data = metricsRepository.getLeadTimeDays(
-                teamId, fromDt, toDt, issueType, epicKey, assigneeAccountId);
+                teamId, fromDt, toDt, boardCategory, issueType, epicKey, assigneeAccountId);
 
         List<BigDecimal> leadTimes = data.stream()
                 .map(row -> row[0] != null ? new BigDecimal(row[0].toString()) : null)
@@ -124,14 +129,16 @@ public class TeamMetricsService {
 
     /**
      * Calculate cycle time (start of work to completion).
+     * Filters by board_category (internal model) when boardCategory is provided.
      */
     public CycleTimeResponse calculateCycleTime(Long teamId, LocalDate from, LocalDate to,
-                                                 String issueType, String epicKey, String assigneeAccountId) {
+                                                 String boardCategory, String issueType,
+                                                 String epicKey, String assigneeAccountId) {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
         List<Object[]> data = metricsRepository.getCycleTimeDays(
-                teamId, fromDt, toDt, issueType, epicKey, assigneeAccountId);
+                teamId, fromDt, toDt, boardCategory, issueType, epicKey, assigneeAccountId);
 
         List<BigDecimal> cycleTimes = data.stream()
                 .map(row -> row[0] != null ? new BigDecimal(row[0].toString()) : null)
@@ -142,7 +149,7 @@ public class TeamMetricsService {
 
         LeadTimeResponse stats = calculateTimeStats(cycleTimes);
         return new CycleTimeResponse(
-                stats.avgDays(), stats.medianDays(), stats.p90Days(),
+                stats.avgDays(), stats.medianDays(), stats.p85Days(), stats.p90Days(),
                 stats.minDays(), stats.maxDays(), stats.sampleSize()
         );
     }
@@ -249,7 +256,8 @@ public class TeamMetricsService {
         LocalDate prevFrom = from.minusDays(periodDays);
         OffsetDateTime prevFromDt = prevFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 
-        List<Object[]> data = metricsRepository.getExtendedMetricsByAssigneeV2(teamId, fromDt, toDt, prevFromDt);
+        List<Object[]> data = metricsRepository.getExtendedMetricsByAssigneeV2(
+                teamId, fromDt, toDt, prevFromDt, BoardCategory.STORY.name());
 
         // First pass: build list
         List<AssigneeMetrics> metrics = new ArrayList<>();
@@ -371,11 +379,12 @@ public class TeamMetricsService {
         LocalDate prevFrom = from.minusDays(periodDays);
         LocalDate prevTo = from.minusDays(1);
 
-        // Throughput
+        // Throughput (STORY only — internal board_category model)
+        String storyCategory = BoardCategory.STORY.name();
         ExecutiveSummary.KpiCard throughputKpi;
         try {
-            ThroughputResponse currentThroughput = calculateThroughput(teamId, from, to, null, null, null);
-            ThroughputResponse prevThroughput = calculateThroughput(teamId, prevFrom, prevTo, null, null, null);
+            ThroughputResponse currentThroughput = calculateThroughput(teamId, from, to, storyCategory, null, null, null);
+            ThroughputResponse prevThroughput = calculateThroughput(teamId, prevFrom, prevTo, storyCategory, null, null, null);
             throughputKpi = buildKpiCard("Throughput",
                     String.valueOf(currentThroughput.total()),
                     BigDecimal.valueOf(currentThroughput.total()),
@@ -386,31 +395,51 @@ public class TeamMetricsService {
             throughputKpi = buildKpiCard("Throughput", "—", BigDecimal.ZERO, null, 0, null);
         }
 
-        // Cycle time median
+        // Cycle time (STORY only — internal board_category model)
         ExecutiveSummary.KpiCard cycleKpi;
         try {
-            CycleTimeResponse currentCycle = calculateCycleTime(teamId, from, to, null, null, null);
-            CycleTimeResponse prevCycle = calculateCycleTime(teamId, prevFrom, prevTo, null, null, null);
+            CycleTimeResponse currentCycle = calculateCycleTime(teamId, from, to, storyCategory, null, null, null);
+            CycleTimeResponse prevCycle = calculateCycleTime(teamId, prevFrom, prevTo, storyCategory, null, null, null);
+            Map<String, BigDecimal> cyclePercentiles = Map.of(
+                    "median", currentCycle.medianDays(),
+                    "p85", currentCycle.p85Days(),
+                    "p90", currentCycle.p90Days());
+            Map<String, BigDecimal> prevCyclePercentiles = prevCycle.sampleSize() > 0
+                    ? Map.of("median", prevCycle.medianDays(),
+                             "p85", prevCycle.p85Days(),
+                             "p90", prevCycle.p90Days())
+                    : null;
             cycleKpi = buildKpiCard("Cycle Time",
                     currentCycle.sampleSize() > 0 ? currentCycle.medianDays() + "d" : "—",
                     currentCycle.medianDays(),
                     prevCycle.sampleSize() > 0 ? prevCycle.medianDays() : null,
-                    currentCycle.sampleSize(), null);
+                    currentCycle.sampleSize(), null,
+                    cyclePercentiles, prevCyclePercentiles);
         } catch (Exception e) {
             log.debug("Failed to compute cycle time KPI", e);
             cycleKpi = buildKpiCard("Cycle Time", "—", BigDecimal.ZERO, null, 0, null);
         }
 
-        // Lead time median
+        // Lead time (STORY only — internal board_category model)
         ExecutiveSummary.KpiCard leadKpi;
         try {
-            LeadTimeResponse currentLead = calculateLeadTime(teamId, from, to, null, null, null);
-            LeadTimeResponse prevLead = calculateLeadTime(teamId, prevFrom, prevTo, null, null, null);
+            LeadTimeResponse currentLead = calculateLeadTime(teamId, from, to, storyCategory, null, null, null);
+            LeadTimeResponse prevLead = calculateLeadTime(teamId, prevFrom, prevTo, storyCategory, null, null, null);
+            Map<String, BigDecimal> leadPercentiles = Map.of(
+                    "median", currentLead.medianDays(),
+                    "p85", currentLead.p85Days(),
+                    "p90", currentLead.p90Days());
+            Map<String, BigDecimal> prevLeadPercentiles = prevLead.sampleSize() > 0
+                    ? Map.of("median", prevLead.medianDays(),
+                             "p85", prevLead.p85Days(),
+                             "p90", prevLead.p90Days())
+                    : null;
             leadKpi = buildKpiCard("Lead Time",
                     currentLead.sampleSize() > 0 ? currentLead.medianDays() + "d" : "—",
                     currentLead.medianDays(),
                     prevLead.sampleSize() > 0 ? prevLead.medianDays() : null,
-                    currentLead.sampleSize(), null);
+                    currentLead.sampleSize(), null,
+                    leadPercentiles, prevLeadPercentiles);
         } catch (Exception e) {
             log.debug("Failed to compute lead time KPI", e);
             leadKpi = buildKpiCard("Lead Time", "—", BigDecimal.ZERO, null, 0, null);
@@ -458,12 +487,12 @@ public class TeamMetricsService {
                     "Blocked/Aging", String.valueOf(totalRisk),
                     BigDecimal.valueOf(totalRisk), null, null,
                     totalRisk > 0 ? "WARNING" : "STABLE",
-                    totalRisk, BigDecimal.ZERO);
+                    totalRisk, BigDecimal.ZERO, null, null);
         } catch (Exception e) {
             log.debug("Failed to compute blocked/aging KPI", e);
             blockedKpi = new ExecutiveSummary.KpiCard(
                     "Blocked/Aging", "—", BigDecimal.ZERO, null, null,
-                    "STABLE", 0, BigDecimal.ZERO);
+                    "STABLE", 0, BigDecimal.ZERO, null, null);
         }
 
         return new ExecutiveSummary(throughputKpi, cycleKpi, leadKpi, predictabilityKpi, capacityKpi, blockedKpi);
@@ -472,6 +501,14 @@ public class TeamMetricsService {
     private ExecutiveSummary.KpiCard buildKpiCard(String label, String formattedValue,
                                                     BigDecimal current, BigDecimal prev,
                                                     int sampleSize, BigDecimal target) {
+        return buildKpiCard(label, formattedValue, current, prev, sampleSize, target, null, null);
+    }
+
+    private ExecutiveSummary.KpiCard buildKpiCard(String label, String formattedValue,
+                                                    BigDecimal current, BigDecimal prev,
+                                                    int sampleSize, BigDecimal target,
+                                                    Map<String, BigDecimal> percentiles,
+                                                    Map<String, BigDecimal> prevPercentiles) {
         BigDecimal deltaPercent = null;
         String trend = "STABLE";
 
@@ -489,7 +526,8 @@ public class TeamMetricsService {
             trend = "UP";
         }
 
-        return new ExecutiveSummary.KpiCard(label, formattedValue, current, prev, deltaPercent, trend, sampleSize, target);
+        return new ExecutiveSummary.KpiCard(label, formattedValue, current, prev, deltaPercent, trend,
+                sampleSize, target, percentiles, prevPercentiles);
     }
 
     /**
@@ -513,9 +551,9 @@ public class TeamMetricsService {
      */
     public TeamMetricsSummary getSummary(Long teamId, LocalDate from, LocalDate to,
                                           String issueType, String epicKey) {
-        ThroughputResponse throughput = calculateThroughput(teamId, from, to, issueType, epicKey, null);
-        LeadTimeResponse leadTime = calculateLeadTime(teamId, from, to, issueType, epicKey, null);
-        CycleTimeResponse cycleTime = calculateCycleTime(teamId, from, to, issueType, epicKey, null);
+        ThroughputResponse throughput = calculateThroughput(teamId, from, to, null, issueType, epicKey, null);
+        LeadTimeResponse leadTime = calculateLeadTime(teamId, from, to, BoardCategory.STORY.name(), issueType, epicKey, null);
+        CycleTimeResponse cycleTime = calculateCycleTime(teamId, from, to, BoardCategory.STORY.name(), issueType, epicKey, null);
         List<TimeInStatusResponse> timeInStatuses = calculateTimeInStatuses(teamId, from, to);
         List<AssigneeMetrics> byAssignee = calculateByAssignee(teamId, from, to);
 
@@ -554,7 +592,7 @@ public class TeamMetricsService {
         if (sortedValues.isEmpty()) {
             return new LeadTimeResponse(
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                    BigDecimal.ZERO, BigDecimal.ZERO, 0
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0
             );
         }
 
@@ -566,9 +604,10 @@ public class TeamMetricsService {
         BigDecimal min = sortedValues.get(0).setScale(2, RoundingMode.HALF_UP);
         BigDecimal max = sortedValues.get(size - 1).setScale(2, RoundingMode.HALF_UP);
         BigDecimal median = percentile(sortedValues, 0.5);
+        BigDecimal p85 = percentile(sortedValues, 0.85);
         BigDecimal p90 = percentile(sortedValues, 0.9);
 
-        return new LeadTimeResponse(avg, median, p90, min, max, size);
+        return new LeadTimeResponse(avg, median, p85, p90, min, max, size);
     }
 
     BigDecimal percentile(List<BigDecimal> sortedValues, double p) {
@@ -613,5 +652,89 @@ public class TeamMetricsService {
         }
         log.warn("Unknown date type: {}", value.getClass().getName());
         return null;
+    }
+
+    /**
+     * Get sparkline data for all KPI cards in one request.
+     * Returns 10 weeks of weekly data (or 3 months for predictability).
+     */
+    public SparklineResponse getSparklines(Long teamId, LocalDate from, LocalDate to,
+                                            DsrService dsrService, VelocityService velocityService) {
+        // Sparkline period: 10 weeks back from 'from'
+        LocalDate sparkFrom = from.minusWeeks(10);
+        OffsetDateTime sparkFromDt = sparkFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        // 1. Throughput (weekly STORY count)
+        List<SparklineResponse.SparklinePoint> throughputPoints = new ArrayList<>();
+        try {
+            List<Object[]> rows = metricsRepository.getWeeklyStoryThroughput(teamId, sparkFromDt, toDt);
+            for (Object[] row : rows) {
+                LocalDate period = parseLocalDate(row[0]);
+                if (period != null) {
+                    throughputPoints.add(new SparklineResponse.SparklinePoint(
+                            period, BigDecimal.valueOf(((Number) row[1]).longValue())));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get throughput sparkline", e);
+        }
+
+        // 2. Cycle Time median (weekly)
+        List<SparklineResponse.SparklinePoint> cyclePoints = new ArrayList<>();
+        try {
+            List<Object[]> rows = metricsRepository.getWeeklyCycleTimeMedian(teamId, sparkFromDt, toDt);
+            for (Object[] row : rows) {
+                LocalDate period = parseLocalDate(row[0]);
+                BigDecimal median = row[1] != null ? new BigDecimal(row[1].toString()).setScale(1, RoundingMode.HALF_UP) : null;
+                if (period != null && median != null) {
+                    cyclePoints.add(new SparklineResponse.SparklinePoint(period, median));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get cycle time sparkline", e);
+        }
+
+        // 3. Lead Time median (weekly)
+        List<SparklineResponse.SparklinePoint> leadPoints = new ArrayList<>();
+        try {
+            List<Object[]> rows = metricsRepository.getWeeklyLeadTimeMedian(teamId, sparkFromDt, toDt);
+            for (Object[] row : rows) {
+                LocalDate period = parseLocalDate(row[0]);
+                BigDecimal median = row[1] != null ? new BigDecimal(row[1].toString()).setScale(1, RoundingMode.HALF_UP) : null;
+                if (period != null && median != null) {
+                    leadPoints.add(new SparklineResponse.SparklinePoint(period, median));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get lead time sparkline", e);
+        }
+
+        // 4. Predictability (monthly on-time rate)
+        List<SparklineResponse.SparklinePoint> predictPoints = new ArrayList<>();
+        try {
+            var monthlyDsr = dsrService.calculateMonthlyDsr(teamId, 3);
+            for (var month : monthlyDsr.months()) {
+                LocalDate monthDate = LocalDate.parse(month.month() + "-01");
+                predictPoints.add(new SparklineResponse.SparklinePoint(
+                        monthDate, month.onTimeRate()));
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get predictability sparkline", e);
+        }
+
+        // 5. Utilization (weekly)
+        List<SparklineResponse.SparklinePoint> utilPoints = new ArrayList<>();
+        try {
+            var velocity = velocityService.calculateVelocity(teamId, sparkFrom, to);
+            for (var week : velocity.byWeek()) {
+                utilPoints.add(new SparklineResponse.SparklinePoint(
+                        week.weekStart(), week.utilizationPercent()));
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get utilization sparkline", e);
+        }
+
+        return new SparklineResponse(throughputPoints, cyclePoints, leadPoints, predictPoints, utilPoints);
     }
 }
