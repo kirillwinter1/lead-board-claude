@@ -2,6 +2,7 @@ package com.leadboard.config;
 
 import com.leadboard.jira.JiraClientException;
 import com.leadboard.planning.EpicNotFoundException;
+import com.leadboard.planning.ProjectNotFoundException;
 import com.leadboard.simulation.SimulationNotFoundException;
 import com.leadboard.team.TeamService;
 import org.slf4j.Logger;
@@ -77,6 +78,15 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EpicNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleEpicNotFound(EpicNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(ProjectNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleProjectNotFound(ProjectNotFoundException ex) {
+        // F70: explicit handler so the generic Exception fallback (500) does not
+        // swallow the @ResponseStatus(NOT_FOUND) declared on ProjectNotFoundException.
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", ex.getMessage()));

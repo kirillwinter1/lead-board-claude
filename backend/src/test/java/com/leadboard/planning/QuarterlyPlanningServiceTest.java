@@ -39,6 +39,7 @@ class QuarterlyPlanningServiceTest {
     @Mock private WorkflowConfigService workflowConfigService;
     @Mock private JiraClient jiraClient;
     @Mock private EpicLabelPersistenceService epicLabelPersistenceService;
+    @Mock private ProjectLabelPersistenceService projectLabelPersistenceService;
 
     private QuarterlyPlanningService service;
 
@@ -48,7 +49,8 @@ class QuarterlyPlanningServiceTest {
                 issueRepository, teamRepository, memberRepository,
                 absenceService, workCalendarService, teamService,
                 riceAssessmentRepository, workflowConfigService,
-                jiraClient, epicLabelPersistenceService
+                jiraClient, epicLabelPersistenceService,
+                projectLabelPersistenceService
         );
 
         when(teamService.getPlanningConfig(anyLong())).thenReturn(PlanningConfigDto.defaults());
@@ -76,6 +78,17 @@ class QuarterlyPlanningServiceTest {
                     e.setLabels(labels.toArray(new String[0])));
             return null;
         }).when(epicLabelPersistenceService).mirrorEpicLabels(anyString(), anyList());
+
+        // F70: mirror the same in-memory write for project label mutations so the
+        // post-mutation reads in setProjectDesiredQuarter / getProjectCommitment
+        // see the freshly-written labels.
+        doAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            List<String> labels = invocation.getArgument(1);
+            issueRepository.findByIssueKey(key).ifPresent(e ->
+                    e.setLabels(labels.toArray(new String[0])));
+            return null;
+        }).when(projectLabelPersistenceService).mirrorProjectLabels(anyString(), anyList());
     }
 
     // ==================== Capacity Tests ====================
@@ -804,6 +817,395 @@ class QuarterlyPlanningServiceTest {
         assertTrue(result.inQuarter());
         assertEquals(List.of(7L), result.overloadedTeams(),
                 "Overloaded team must be reported in the response after mutation");
+    }
+
+    // ==================== F70: setProjectDesiredQuarter ====================
+
+    @Test
+    void setProjectDesiredQuarter_addsLabel_callsJiraClient() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project Alpha");
+        project.setLabels(new String[]{"feature"});
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+
+        ProjectQuarterCommitmentDto result = service.setProjectDesiredQuarter("PROJ-1", "2026Q2");
+
+        verify(jiraClient).updateLabels(eq("PROJ-1"), argThat(labels ->
+                labels.contains("2026Q2") && labels.contains("feature")));
+        verify(projectLabelPersistenceService).mirrorProjectLabels(eq("PROJ-1"), argThat(labels ->
+                labels.contains("2026Q2") && labels.contains("feature")));
+        assertEquals("2026Q2", result.desiredQuarter());
+        assertEquals("PROJ-1", result.projectKey());
+    }
+
+    @Test
+    void setProjectDesiredQuarter_nullQuarter_removesAllQuarterLabels() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2", "feature", "2026Q1"});
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+
+        ProjectQuarterCommitmentDto result = service.setProjectDesiredQuarter("PROJ-1", null);
+
+        // Both YYYYQn labels must be stripped, "feature" preserved.
+        verify(jiraClient).updateLabels(eq("PROJ-1"), argThat(labels ->
+                labels.size() == 1 && labels.contains("feature")));
+        assertNull(result.desiredQuarter());
+    }
+
+    @Test
+    void setProjectDesiredQuarter_rejectsInvalidQuarter() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.setProjectDesiredQuarter("PROJ-1", "not-a-quarter"));
+        // Validation runs before any lookup or external call.
+        verifyNoInteractions(jiraClient);
+        verifyNoInteractions(projectLabelPersistenceService);
+    }
+
+    @Test
+    void setProjectDesiredQuarter_rejectsNonProject() {
+        // boardCategory != "PROJECT" → ProjectNotFoundException (404).
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Some epic");
+        when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
+
+        assertThrows(ProjectNotFoundException.class,
+                () -> service.setProjectDesiredQuarter("EPIC-1", "2026Q2"));
+        verifyNoInteractions(jiraClient);
+        verifyNoInteractions(projectLabelPersistenceService);
+    }
+
+    @Test
+    void setProjectDesiredQuarter_missingProject_throwsProjectNotFoundException() {
+        when(issueRepository.findByIssueKey("PROJ-MISSING")).thenReturn(Optional.empty());
+        assertThrows(ProjectNotFoundException.class,
+                () -> service.setProjectDesiredQuarter("PROJ-MISSING", "2026Q2"));
+        verifyNoInteractions(jiraClient);
+    }
+
+    @Test
+    void setProjectDesiredQuarter_returnsFreshDesiredQuarter_evenIfPersistenceMockDoesNotMutateEntity() {
+        // Regression: the outer @Transactional(readOnly = true) keeps the project
+        // entity in the session L1 cache. The inner REQUIRES_NEW write uses its
+        // OWN session — the outer's cached instance is never automatically
+        // refreshed. If setProjectDesiredQuarter relied on re-loading via
+        // findByIssueKey for its response payload, it would silently return the
+        // OLD desired_quarter (Hibernate returns the cached managed instance,
+        // discarding the freshly-read DB row).
+        //
+        // This test pins the contract: the response DTO must reflect the JUST-SET
+        // quarter even if the persistence bean is a true black box that does NOT
+        // mutate the entity passed around by the caller — emulating production,
+        // where the inner write touches a different EntityManager.
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q1"}); // initial old desired quarter
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        // Override the shared @BeforeEach stub: this mock must NOT mutate the
+        // outer entity — exactly the production semantic for a separate session.
+        doNothing().when(projectLabelPersistenceService).mirrorProjectLabels(anyString(), anyList());
+
+        ProjectQuarterCommitmentDto result = service.setProjectDesiredQuarter("PROJ-1", "2026Q2");
+
+        assertEquals("2026Q2", result.desiredQuarter(),
+                "Response must surface the just-saved quarter even without L1-cache refresh");
+    }
+
+    // ==================== F70: getProjectCommitment ====================
+
+    @Test
+    void getProjectCommitment_groupsEpicsByTeam() {
+        // Project desired = Q2. Three teams of epics:
+        //   - Team 1 (Alpha): 2 committed to Q2, 1 to Q3
+        //   - Team 2 (Beta):  1 uncommitted
+        //   - Team 3 has no epics
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity e1 = epicForProject("EPIC-1", "PROJ-1", 1L, "2026Q2");
+        JiraIssueEntity e2 = epicForProject("EPIC-2", "PROJ-1", 1L, "2026Q2");
+        JiraIssueEntity e3 = epicForProject("EPIC-3", "PROJ-1", 1L, "2026Q3");
+        JiraIssueEntity e4 = epicForProject("EPIC-4", "PROJ-1", 2L, null);
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(e1, e2, e3, e4));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+
+        TeamEntity alpha = createTeam(1L, "Alpha");
+        TeamEntity beta = createTeam(2L, "Beta");
+        when(teamRepository.findAllById(anyIterable())).thenReturn(List.of(alpha, beta));
+
+        ProjectQuarterCommitmentDto result = service.getProjectCommitment("PROJ-1");
+
+        assertEquals("2026Q2", result.desiredQuarter());
+        assertEquals(2, result.commitmentByTeam().size());
+
+        Map<Long, TeamCommitmentDto> byTeam = result.commitmentByTeam().stream()
+                .collect(java.util.stream.Collectors.toMap(TeamCommitmentDto::teamId, t -> t));
+        TeamCommitmentDto a = byTeam.get(1L);
+        assertEquals(3, a.totalEpics());
+        assertEquals(2, a.committedEpics(), "2 epics committed to desired Q2");
+        assertEquals(1, a.otherQuarterEpics(), "1 epic moved to Q3");
+        assertEquals(0, a.uncommittedEpics());
+
+        TeamCommitmentDto b = byTeam.get(2L);
+        assertEquals(1, b.totalEpics());
+        assertEquals(0, b.committedEpics());
+        assertEquals(1, b.uncommittedEpics(), "Epic without committed_quarter");
+    }
+
+    @Test
+    void getProjectCommitment_uncommittedEpicsCounted() {
+        // Project has desired_quarter, but no child epic carries any quarter label.
+        // All epics must land in the "uncommitted" bucket — committed_quarter is
+        // a direct label read with no inheritance.
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity e1 = epicForProject("EPIC-1", "PROJ-1", 1L, null);
+        JiraIssueEntity e2 = epicForProject("EPIC-2", "PROJ-1", 1L, null);
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(e1, e2));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(teamRepository.findAllById(anyIterable())).thenReturn(List.of(createTeam(1L, "Alpha")));
+
+        ProjectQuarterCommitmentDto result = service.getProjectCommitment("PROJ-1");
+
+        TeamCommitmentDto a = result.commitmentByTeam().get(0);
+        assertEquals(2, a.totalEpics());
+        assertEquals(0, a.committedEpics());
+        assertEquals(2, a.uncommittedEpics());
+    }
+
+    @Test
+    void getProjectCommitment_epicsWithoutTeamFallIntoSyntheticBucket() {
+        // Epics without a team mapping must surface (teamId=0) so PM can see them.
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity e1 = epicForProject("EPIC-1", "PROJ-1", null, "2026Q2");
+
+        when(issueRepository.findByIssueKey("PROJ-1")).thenReturn(Optional.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(e1));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+
+        ProjectQuarterCommitmentDto result = service.getProjectCommitment("PROJ-1");
+
+        assertEquals(1, result.commitmentByTeam().size());
+        TeamCommitmentDto bucket = result.commitmentByTeam().get(0);
+        assertEquals(0L, bucket.teamId());
+        assertEquals(1, bucket.totalEpics());
+        assertEquals(1, bucket.committedEpics());
+    }
+
+    // ==================== F70: getEpicsForQuarter with onlyDesired ====================
+
+    @Test
+    void getEpicsForQuarter_onlyDesiredTrue_filtersToDesiredProjects() {
+        // Two projects: PROJ-A desires Q2, PROJ-B desires Q1. The Q2 view must
+        // expose epics under PROJ-A only and drop PROJ-B's epic regardless of
+        // its committed_quarter label.
+        JiraIssueEntity projA = createIssue("PROJ-A", "PROJECT", "Project A");
+        projA.setLabels(new String[]{"2026Q2"});
+        JiraIssueEntity projB = createIssue("PROJ-B", "PROJECT", "Project B");
+        projB.setLabels(new String[]{"2026Q1"});
+
+        JiraIssueEntity epicA = createIssue("EPIC-A1", "EPIC", "Under A");
+        epicA.setParentKey("PROJ-A");
+        epicA.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity epicB = createIssue("EPIC-B1", "EPIC", "Under B");
+        epicB.setParentKey("PROJ-B");
+        epicB.setLabels(new String[]{"2026Q1"});
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(projA, projB));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epicA, epicB));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2", true);
+
+        assertEquals(1, response.epics().size(), "Only PROJ-A's epic survives the filter");
+        assertEquals("EPIC-A1", response.epics().get(0).epicKey());
+        assertEquals("2026Q2", response.epics().get(0).projectDesiredQuarter());
+        assertFalse(response.epics().get(0).isStandalone());
+    }
+
+    @Test
+    void getEpicsForQuarter_onlyDesiredFalse_returnsAllEpicsBackwardCompat() {
+        // F69 backward-compatible behaviour: with the toggle OFF every active
+        // epic must be returned, regardless of parent project's desired quarter.
+        JiraIssueEntity projA = createIssue("PROJ-A", "PROJECT", "Project A");
+        projA.setLabels(new String[]{"2026Q2"});
+        JiraIssueEntity projB = createIssue("PROJ-B", "PROJECT", "Project B");
+        projB.setLabels(new String[]{"2026Q1"});
+
+        JiraIssueEntity epicA = createIssue("EPIC-A1", "EPIC", "Under A");
+        epicA.setParentKey("PROJ-A");
+        JiraIssueEntity epicB = createIssue("EPIC-B1", "EPIC", "Under B");
+        epicB.setParentKey("PROJ-B");
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(projA, projB));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epicA, epicB));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2", false);
+
+        assertEquals(2, response.epics().size(), "Both epics must be returned when toggle is off");
+    }
+
+    @Test
+    void getEpicsForQuarter_standaloneEpicsAlwaysIncluded() {
+        // Standalone (no parent project) epics must survive the onlyDesired filter —
+        // they have no PM-driven context and need to remain visible to the team-lead.
+        JiraIssueEntity proj = createIssue("PROJ-A", "PROJECT", "Project A");
+        proj.setLabels(new String[]{"2026Q1"}); // desires a different quarter
+
+        JiraIssueEntity epicChild = createIssue("EPIC-A1", "EPIC", "Under A");
+        epicChild.setParentKey("PROJ-A");
+
+        JiraIssueEntity standalone = createIssue("EPIC-S", "EPIC", "Standalone tech-debt");
+        standalone.setParentKey(null); // no parent project at all
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(proj));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epicChild, standalone));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2", true);
+
+        // EPIC-A1 dropped (parent desires Q1), EPIC-S survives (standalone).
+        assertEquals(1, response.epics().size());
+        PlanningEpicDto dto = response.epics().get(0);
+        assertEquals("EPIC-S", dto.epicKey());
+        assertTrue(dto.isStandalone(), "Standalone flag must be set on epics without a parent project");
+        assertNull(dto.projectDesiredQuarter(), "No project → no desired quarter to surface");
+    }
+
+    @Test
+    void getEpicsForQuarter_projectDesiredQuarterSurfacedInDto() {
+        // Regression: when parent project has a desired_quarter different from the
+        // currently-viewed quarter we still need to expose projectDesiredQuarter
+        // on each child epic for the "PM wants Q2" badge on the team-lead view.
+        JiraIssueEntity proj = createIssue("PROJ-A", "PROJECT", "Project A");
+        proj.setLabels(new String[]{"2026Q2"}); // PM-desired
+
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        epic.setParentKey("PROJ-A");
+        epic.setLabels(new String[]{"2026Q3"}); // team committed elsewhere
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(proj));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        // Use onlyDesired=false so the epic is visible regardless of the filter.
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q3", false);
+
+        assertEquals(1, response.epics().size());
+        PlanningEpicDto dto = response.epics().get(0);
+        assertEquals("2026Q2", dto.projectDesiredQuarter(),
+                "PM-desired quarter must propagate from parent project");
+        assertEquals("2026Q3", dto.quarterLabel(), "Epic's own committed quarter is its label");
+    }
+
+    @Test
+    void getEpicsForQuarter_doesNotInheritQuarterFromProject() {
+        // F70 bug M1 regression: even when the parent project carries
+        // desired_quarter=2026Q2, an epic without its own quarter label must
+        // NOT inherit that quarter on the team-lead view. The epic must still
+        // appear in the response (onlyDesired=false), but with inQuarter=false
+        // and quarterLabel=null — its projectDesiredQuarter exposes the PM
+        // signal separately for the "PM wants Qx" badge.
+        //
+        // Live repro from QA: epic LB-9 with labels {q1-2026, roadmap} (no
+        // YYYYQn pattern) was incorrectly surfacing as inQuarter=true under
+        // parent LB-294 with desired_quarter=2026Q2.
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"}); // desired_quarter set
+
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic without quarter");
+        epic.setParentKey("PROJ-1");
+        // labels intentionally without any YYYYQn token — mirrors LB-9
+        epic.setLabels(new String[]{"q1-2026", "roadmap"});
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2", false);
+
+        PlanningEpicDto dto = response.epics().stream()
+                .filter(e -> "EPIC-1".equals(e.epicKey()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("EPIC-1 missing from response"));
+
+        assertFalse(dto.inQuarter(),
+                "Epic without committed_quarter must NOT inherit inQuarter from project's desired_quarter");
+        assertNull(dto.quarterLabel(),
+                "quarterLabel must reflect epic's own committed quarter (none here), not the project's");
+        assertEquals("2026Q2", dto.projectDesiredQuarter(),
+                "projectDesiredQuarter exposes the PM signal even when not inherited as committed");
+    }
+
+    @Test
+    void getEpicsForQuarter_onlyDesired_includesUncommittedEpicsFromDesiredProjects() {
+        // F70 contract: when the team-lead filters to "only PM-desired Q2", we
+        // include child epics of any project whose desired_quarter is Q2 —
+        // even epics that have NOT yet been committed by the team-lead. Those
+        // appear in the Backlog column (inQuarter=false) with a "PM wants Q2"
+        // badge so the team-lead can act on the PM's request.
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "PM-desired project");
+        project.setLabels(new String[]{"2026Q2"}); // PM desires Q2
+
+        JiraIssueEntity uncommitted = createIssue("EPIC-1", "EPIC", "Not yet committed");
+        uncommitted.setParentKey("PROJ-1");
+        // No YYYYQn label at all — team-lead has not committed.
+        uncommitted.setLabels(new String[]{"feature"});
+
+        JiraIssueEntity committed = createIssue("EPIC-2", "EPIC", "Already committed to Q2");
+        committed.setParentKey("PROJ-1");
+        committed.setLabels(new String[]{"2026Q2"}); // explicit commit
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(uncommitted, committed));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(workflowConfigService.isDone(anyString(), anyString())).thenReturn(false);
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2", true);
+
+        Map<String, PlanningEpicDto> byKey = response.epics().stream()
+                .collect(java.util.stream.Collectors.toMap(PlanningEpicDto::epicKey, e -> e));
+
+        assertEquals(2, response.epics().size(), "Both epics live under a PM-desired project");
+
+        PlanningEpicDto uncommittedDto = byKey.get("EPIC-1");
+        assertNotNull(uncommittedDto, "Uncommitted epic must still be returned under onlyDesired=true");
+        assertFalse(uncommittedDto.inQuarter(),
+                "Uncommitted epic stays in Backlog (inQuarter=false), surfaced only via projectDesiredQuarter");
+        assertNull(uncommittedDto.quarterLabel(), "No committed quarter → no inherited quarterLabel");
+        assertEquals("2026Q2", uncommittedDto.projectDesiredQuarter(),
+                "Uncommitted epic exposes the parent project's desired quarter for the 'PM wants Q2' badge");
+
+        PlanningEpicDto committedDto = byKey.get("EPIC-2");
+        assertTrue(committedDto.inQuarter(), "Committed epic must report inQuarter=true");
+        assertEquals("2026Q2", committedDto.quarterLabel());
+    }
+
+    private JiraIssueEntity epicForProject(String key, String parentKey, Long teamId, String quarter) {
+        JiraIssueEntity epic = createIssue(key, "EPIC", "Epic " + key);
+        epic.setParentKey(parentKey);
+        if (teamId != null) {
+            epic.setTeamId(teamId);
+        }
+        if (quarter != null) {
+            epic.setLabels(new String[]{quarter});
+        }
+        return epic;
     }
 
     // ==================== Helpers ====================
