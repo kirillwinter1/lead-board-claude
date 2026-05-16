@@ -213,7 +213,7 @@ export function BacklogColumn({
             cursor: 'pointer',
             userSelect: 'none',
           }}
-          title="Показывать только эпики из проектов, заявленных PM на этот квартал, плюс standalone-эпики"
+          title="Show only epics from projects PMs requested for this quarter, plus standalone epics"
         >
           <input
             type="checkbox"
@@ -222,7 +222,7 @@ export function BacklogColumn({
             aria-label="Only epics requested for this quarter"
             style={{ cursor: 'pointer' }}
           />
-          Только заявленные на квартал
+          Only requested for this quarter
         </label>
       </div>
 
@@ -231,7 +231,7 @@ export function BacklogColumn({
           <div style={{ padding: 24, textAlign: 'center', color: TEXT_MUTED, background: BG_SUBTLE, borderRadius: 6 }}>
             {epics.length === 0
               ? (onlyDesired
-                ? `На команду в ${targetQuarter} ничего не запланировано. Включи «Показать всё», чтобы увидеть остальные эпики.`
+                ? `Nothing is planned for this team in ${targetQuarter}. Uncheck "Only requested for this quarter" to see other epics.`
                 : 'No epics in backlog.')
               : 'No epics match your filters.'}
           </div>

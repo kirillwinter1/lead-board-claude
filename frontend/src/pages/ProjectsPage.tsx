@@ -31,7 +31,7 @@ import {
   PROGRESS_COMPLETE, PROGRESS_IN_PROGRESS, PROGRESS_TRACK,
   LINK_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_SUBTLE,
   BG_SUBTLE, BORDER_DEFAULT, AVATAR_BG,
-  ERROR_TEXT, WARNING_BG, WARNING_BORDER, SEPARATOR, BG_PANEL,
+  ERROR_TEXT, WARNING_BG, WARNING_BORDER, SEPARATOR, BG_PANEL, BG_PAGE,
   PRIMARY_LIGHT_BG, PRIMARY_LIGHT_BORDER,
 } from '../constants/colors'
 import './ProjectTimelinePage.css'
@@ -282,6 +282,22 @@ export function ProjectsPage() {
   const [allQuarters, setAllQuarters] = useState<string[]>([])
   const [commitments, setCommitments] = useState<Map<string, ProjectQuarterCommitmentDto>>(new Map())
   const [commitmentsLoading, setCommitmentsLoading] = useState<Set<string>>(new Set())
+  // H1: in-flight dedupe via ref — `commitmentsLoading` state can't dedupe
+  // synchronous bursts (e.g. Expand all forEach) because each call sees the
+  // pre-update snapshot. The ref is updated synchronously so the next call
+  // in the same tick sees the change.
+  const commitmentsInFlightRef = useRef<Set<string>>(new Set())
+  // H2: cancel state updates from in-flight commitment promises after unmount.
+  const commitmentsCancelledRef = useRef(false)
+  // Cached commitment keys — read inside `ensureCommitment` without making it
+  // depend on the Map identity (which would change on every fetch).
+  const commitmentsRef = useRef<Map<string, ProjectQuarterCommitmentDto>>(commitments)
+  commitmentsRef.current = commitments
+
+  useEffect(() => {
+    commitmentsCancelledRef.current = false
+    return () => { commitmentsCancelledRef.current = true }
+  }, [])
 
   const updateParam = useCallback((key: string, value: string | null) => {
     setSearchParams(prev => {
@@ -327,20 +343,32 @@ export function ProjectsPage() {
   }, [])
 
   // F70: lazy commitment loader. Called when a project is expanded.
+  // Deps are intentionally empty — we dedupe via `commitmentsInFlightRef`
+  // (synchronous, unlike state) and read latest cache via `commitmentsRef`.
+  // This also prevents a fresh function identity on every commitment update.
   const ensureCommitment = useCallback((projectKey: string) => {
-    if (commitments.has(projectKey) || commitmentsLoading.has(projectKey)) return
+    if (commitmentsRef.current.has(projectKey)) return
+    if (commitmentsInFlightRef.current.has(projectKey)) return
+
+    commitmentsInFlightRef.current.add(projectKey)
     setCommitmentsLoading(prev => new Set(prev).add(projectKey))
+
     quarterlyPlanningApi.getProjectCommitment(projectKey)
-      .then(c => setCommitments(prev => new Map(prev).set(projectKey, c)))
+      .then(c => {
+        if (commitmentsCancelledRef.current) return
+        setCommitments(prev => new Map(prev).set(projectKey, c))
+      })
       .catch(() => { /* commitment view will render an empty state if missing */ })
       .finally(() => {
+        commitmentsInFlightRef.current.delete(projectKey)
+        if (commitmentsCancelledRef.current) return
         setCommitmentsLoading(prev => {
           const next = new Set(prev)
           next.delete(projectKey)
           return next
         })
       })
-  }, [commitments, commitmentsLoading])
+  }, [])
 
   // Debounced smart search (semantic/substring via board search API)
   useEffect(() => {
@@ -866,12 +894,18 @@ export function ProjectsPage() {
                   {/* Project card */}
                   <div
                     onClick={() => handleToggle(p.issueKey)}
-                    onKeyDown={e => { if (e.key === 'Enter') handleToggle(p.issueKey) }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleToggle(p.issueKey)
+                      }
+                    }}
                     role="button"
                     tabIndex={0}
+                    aria-expanded={expandedKeys.has(p.issueKey)}
                     style={{
                       padding: '14px 20px',
-                      background: '#fff',
+                      background: BG_PAGE,
                       border: `1px solid ${BORDER_DEFAULT}`,
                       borderRadius: expandedKeys.has(p.issueKey) ? '8px 8px 0 0' : 8,
                       cursor: 'pointer',
@@ -1014,7 +1048,7 @@ export function ProjectsPage() {
                               padding: 12,
                               border: `1px solid ${SEPARATOR}`,
                               borderRadius: 6,
-                              background: '#fff',
+                              background: BG_PAGE,
                               display: 'flex',
                               flexDirection: 'column',
                               gap: 10,
@@ -1050,6 +1084,7 @@ export function ProjectsPage() {
                                 />
                               </div>
                               <button
+                                type="button"
                                 onClick={e => { e.stopPropagation(); setRiceModalKey(p.issueKey) }}
                                 style={{
                                   padding: '6px 14px',

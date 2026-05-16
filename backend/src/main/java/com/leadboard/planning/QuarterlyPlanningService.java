@@ -35,6 +35,16 @@ public class QuarterlyPlanningService {
      */
     private static final BigDecimal DEFAULT_RISK_BUFFER = new BigDecimal("0.2");
 
+    /** Canonical quarter-label format used throughout F67-F70 (YYYYQn, e.g. "2026Q2"). */
+    private static final Pattern QUARTER_LABEL_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
+
+    /**
+     * Synthetic team name surfaced in {@link #getProjectCommitment} for epics
+     * that lack a team mapping. Kept as a constant so the UI label is in one
+     * place rather than scattered as inline string literals.
+     */
+    private static final String UNASSIGNED_TEAM_LABEL = "Unassigned";
+
     private final JiraIssueRepository issueRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
@@ -138,13 +148,18 @@ public class QuarterlyPlanningService {
         // Build reverse index: epicKey -> projectKey (from parentKey and childEpicKeys)
         Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
 
-        // Resolve quarter labels: direct label or inherited from parent project
+        // F70: team-lead demand counts epics with an explicit committed_quarter
+        // ONLY. The team-lead's CapacityBars (F69) feed off this method, and it
+        // must stay consistent with the kanban (getEpicsForQuarter), which also
+        // uses resolveCommittedQuarter. Inheriting from the parent project's
+        // desired_quarter here would inflate the demand widget relative to the
+        // kanban — PMs see 12 epics committed, team-leads see 8 in their board.
         List<JiraIssueEntity> quarterEpics = new ArrayList<>();
         for (JiraIssueEntity epic : allEpics) {
             if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
                 continue; // Skip completed epics
             }
-            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            String epicQuarter = resolveCommittedQuarter(epic);
             if (quarterLabel.equals(epicQuarter)) {
                 quarterEpics.add(epic);
             }
@@ -400,19 +415,31 @@ public class QuarterlyPlanningService {
                     .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
                     .toList();
 
-            // Resolve quarter for each active epic
+            // F70: "project in quarter" = at least one epic explicitly committed
+            // to this quarter via its own label. The project's desired_quarter
+            // (PM-signal) is intentionally NOT used as the inQuarter indicator —
+            // pre-F70 the project label was a synonym for "project is in this
+            // quarter", but post-F70 the semantics are split:
+            //   - project label  = PM wants the quarter (desired_quarter)
+            //   - epic label     = team-lead committed (committed_quarter)
+            // Using desired_quarter here would inflate the "in scope" picture
+            // for projects PMs hope for but teams have not yet committed to.
+            //
+            // Inheritance is also dropped: only epics whose OWN labels carry a
+            // YYYYQn token count. Falling back to the project's desired_quarter
+            // for unlabelled epics would erase the "uncommitted" signal that
+            // makes the F70 model meaningful.
             List<JiraIssueEntity> quarterEpics = new ArrayList<>();
             for (JiraIssueEntity epic : activeEpics) {
-                String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+                String epicQuarter = resolveCommittedQuarter(epic);
                 if (quarterLabel.equals(epicQuarter)) {
                     quarterEpics.add(epic);
                 }
             }
 
-            // Determine if project is in quarter
-            boolean projectHasQuarterLabel = quarterLabel.equals(project.getQuarterLabel());
+            // Determine if project is in quarter — strictly based on committed epics.
             boolean hasEpicsInQuarter = !quarterEpics.isEmpty();
-            boolean inQuarter = projectHasQuarterLabel || hasEpicsInQuarter;
+            boolean inQuarter = hasEpicsInQuarter;
 
             // Use all active epics for coverage calculations if project is in quarter
             List<JiraIssueEntity> epicsForCoverage = inQuarter ? activeEpics : List.of();
@@ -1300,7 +1327,8 @@ public class QuarterlyPlanningService {
      * quarter for unlabelled epics would erase the "uncommitted" signal.</p>
      *
      * <p>Epics without a team mapping fall into a synthetic bucket with
-     * {@code teamId = 0} so the UI can render them as "Без команды".</p>
+     * {@code teamId = 0} so the UI can render them as "Unassigned"
+     * (see {@link #UNASSIGNED_TEAM_LABEL}).</p>
      */
     public ProjectQuarterCommitmentDto getProjectCommitment(String projectKey) {
         JiraIssueEntity project = findProjectOrThrow(projectKey);
@@ -1309,6 +1337,12 @@ public class QuarterlyPlanningService {
         // Collect child epics via the same two mechanisms used elsewhere in this
         // service (parentKey OR childEpicKeys on the project) so the commitment
         // view matches the rest of the planning surface.
+        // TODO(F70 review H3): loadAllEpics() is a full board_category="EPIC" table
+        //   scan run on every project-expand on ProjectsPage. With 1000+ epics
+        //   this becomes painful for a per-row UI interaction. Replace with a
+        //   narrow query — `findByParentKeyOrIssueKeyIn(projectKey, childKeySet)`
+        //   — to fetch only the epics actually attached to this project.
+        //   Tracked in ai-ru/TECH_DEBT.md (Производительность → F70).
         List<JiraIssueEntity> allEpics = loadAllEpics();
         Set<String> childKeySet = new HashSet<>();
         if (project.getChildEpicKeys() != null) {
@@ -1360,7 +1394,7 @@ public class QuarterlyPlanningService {
             String teamName;
             String teamColor;
             if (teamId == 0L) {
-                teamName = "Без команды";
+                teamName = UNASSIGNED_TEAM_LABEL;
                 teamColor = null;
             } else {
                 TeamEntity team = teamsById.get(teamId);
@@ -1638,8 +1672,6 @@ public class QuarterlyPlanningService {
             default -> coefficients.middle();
         };
     }
-
-    private static final Pattern QUARTER_LABEL_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
 
     private List<String> extractQuarterLabels() {
         List<JiraIssueEntity> withLabels = issueRepository.findByLabelsIsNotNull();

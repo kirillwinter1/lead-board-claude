@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { SingleSelectDropdown } from '../SingleSelectDropdown'
 import { quarterlyPlanningApi, ProjectQuarterCommitmentDto } from '../../api/quarterlyPlanning'
 import {
@@ -47,6 +47,17 @@ export function DesiredQuarterPicker({
 }: DesiredQuarterPickerProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // H3: track the latest user-requested quarter. When several rapid changes
+  // overlap (Q1 -> Q2 -> Q3), only the most recent one is allowed to apply
+  // its response — earlier in-flight requests are stale by the time they
+  // resolve, and applying them would clobber a fresher selection.
+  const latestTargetRef = useRef<string | null | undefined>(undefined)
+  // Cancel state updates after unmount.
+  const cancelledRef = useRef(false)
+  useEffect(() => {
+    cancelledRef.current = false
+    return () => { cancelledRef.current = true }
+  }, [])
 
   const options = availableQuarters.map(q => ({ value: q, label: q }))
 
@@ -83,15 +94,29 @@ export function DesiredQuarterPicker({
     // both null and the explicit sentinel as the same intent.
     const target = !value || value === NULL_VALUE ? null : value
     if (target === currentDesiredQuarter) return
+    // H3: mark this as the latest intended target so concurrent in-flight
+    // saves know if their response is stale.
+    latestTargetRef.current = target
     setSaving(true)
     setError(null)
     try {
       const result = await quarterlyPlanningApi.setProjectDesiredQuarter(projectKey, target)
+      // Bail if a newer change has been requested since, or if we've unmounted.
+      if (cancelledRef.current) return
+      if (latestTargetRef.current !== target) return
       onChange(result)
     } catch (err) {
+      if (cancelledRef.current) return
+      if (latestTargetRef.current !== target) return
       setError(err instanceof Error ? err.message : 'Не удалось сохранить квартал')
     } finally {
-      setSaving(false)
+      if (cancelledRef.current) return
+      // Only the most recent request should clear the saving indicator;
+      // older overlapping requests would otherwise hide the spinner while
+      // a newer save is still in flight.
+      if (latestTargetRef.current === target) {
+        setSaving(false)
+      }
     }
   }
 
@@ -114,7 +139,9 @@ export function DesiredQuarterPicker({
         <span role="alert" style={{ fontSize: 11, color: ERROR_TEXT }}>{error}</span>
       )}
       {saving && (
-        <span style={{ fontSize: 11, color: TEXT_PRIMARY }}>Сохраняем…</span>
+        <span role="status" aria-live="polite" style={{ fontSize: 11, color: TEXT_PRIMARY }}>
+          Сохраняем…
+        </span>
       )}
     </div>
   )

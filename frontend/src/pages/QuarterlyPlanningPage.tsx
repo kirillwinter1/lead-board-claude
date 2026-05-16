@@ -116,16 +116,28 @@ export function QuarterlyPlanningPage() {
 
   useEffect(() => { if (quarter) loadQuarter(quarter, onlyDesired) }, [quarter, onlyDesired, loadQuarter])
 
+  // L5: keep latest values in refs so the visibilitychange handler can be
+  // installed once. Re-subscribing on every state change (quarter/onlyDesired/
+  // refreshing) adds and removes the global listener many times per session.
+  const quarterRef = useRef(quarter)
+  const onlyDesiredRef = useRef(onlyDesired)
+  const refreshingRef = useRef(refreshing)
+  const loadQuarterRef = useRef(loadQuarter)
+  quarterRef.current = quarter
+  onlyDesiredRef.current = onlyDesired
+  refreshingRef.current = refreshing
+  loadQuarterRef.current = loadQuarter
+
   // Refresh on tab focus
   useEffect(() => {
     const handler = () => {
-      if (document.visibilityState === 'visible' && quarter && !refreshing) {
-        loadQuarter(quarter, onlyDesired)
+      if (document.visibilityState === 'visible' && quarterRef.current && !refreshingRef.current) {
+        loadQuarterRef.current(quarterRef.current, onlyDesiredRef.current)
       }
     }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
-  }, [quarter, onlyDesired, refreshing, loadQuarter])
+  }, [])
 
   // ==================== Optimistic move ====================
   const handleMove = useCallback((epicKey: string, toQuarter: string | null) => {

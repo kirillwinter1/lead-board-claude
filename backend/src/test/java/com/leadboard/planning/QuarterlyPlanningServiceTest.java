@@ -160,10 +160,12 @@ class QuarterlyPlanningServiceTest {
         project.setManualBoost(20);
         project.setLabels(new String[]{"2026Q2"});
 
-        // Create epic under project
+        // Create epic under project. F70: epic must carry its OWN committed_quarter —
+        // getTeamDemand no longer inherits the parent's desired_quarter.
         JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic One");
         epic.setParentKey("PROJ-1");
         epic.setTeamId(1L);
+        epic.setLabels(new String[]{"2026Q2"});
         epic.setRoughEstimates(Map.of("DEV", new BigDecimal("10")));
 
         when(issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", 1L))
@@ -198,6 +200,8 @@ class QuarterlyPlanningServiceTest {
         JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
         epic.setParentKey("PROJ-1");
         epic.setTeamId(1L);
+        // F70: epic must own its committed_quarter; project label is PM-only.
+        epic.setLabels(new String[]{"2026Q2"});
         epic.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
 
         when(issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", 1L))
@@ -216,21 +220,28 @@ class QuarterlyPlanningServiceTest {
         assertTrue(pd.priorityScore().compareTo(new BigDecimal("150")) <= 0);
     }
 
-    // ==================== Quarter Label Inheritance ====================
+    // ==================== Quarter Label (F70: no inheritance from project) ====================
 
     @Test
-    void testEpicInheritsQuarterFromProject() {
+    void getTeamDemand_doesNotInheritQuarterFromProject() {
+        // F70 regression (H2): pre-F70 getTeamDemand used resolveQuarterLabel
+        // (inheritance from parent project's quarter), which meant the F69
+        // CapacityBars widget counted 12 epics while the kanban (which uses
+        // resolveCommittedQuarter) showed 8. After H2 the demand widget must
+        // mirror the kanban: only epics with their own committed_quarter
+        // contribute to demand. Epics that only inherit from the parent
+        // project's desired_quarter must be excluded.
         TeamEntity team = createTeam(1L, "Alpha");
         when(teamRepository.findByIdAndActiveTrue(1L)).thenReturn(Optional.of(team));
         when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of());
 
         JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
-        project.setLabels(new String[]{"2026Q2"}); // Project has quarter label
+        project.setLabels(new String[]{"2026Q2"}); // PM-desired, not team-committed
 
         JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
         epic.setParentKey("PROJ-1");
         epic.setTeamId(1L);
-        epic.setLabels(null); // Epic has NO labels — should inherit from project
+        epic.setLabels(null); // Epic has NO committed_quarter — must NOT count
 
         when(issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", 1L))
                 .thenReturn(List.of(epic));
@@ -239,9 +250,10 @@ class QuarterlyPlanningServiceTest {
 
         QuarterlyDemandDto demand = service.getTeamDemand(1L, "2026Q2");
 
-        // Epic should be included via project's quarter label
-        assertFalse(demand.projects().isEmpty());
-        assertEquals(1, demand.projects().get(0).epics().size());
+        // Epic is excluded — neither projects nor unassigned should reference it.
+        assertTrue(demand.projects().isEmpty(),
+                "Epic without its own committed_quarter must not contribute to team demand");
+        assertTrue(demand.unassignedEpics().isEmpty());
     }
 
     // ==================== Capacity Fit ====================
@@ -257,6 +269,8 @@ class QuarterlyPlanningServiceTest {
         when(workCalendarService.countWorkdays(any(), any())).thenReturn(20);
 
         // Project with 3 epics: 8 + 8 + 8 = 24 DEV days demand (with 20% risk buffer = 9.6 + 9.6 + 9.6)
+        // F70: each epic must carry its own 2026Q2 committed_quarter — getTeamDemand
+        // no longer inherits from the parent project's desired_quarter.
         JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
         project.setLabels(new String[]{"2026Q2"});
 
@@ -264,18 +278,21 @@ class QuarterlyPlanningServiceTest {
         epic1.setParentKey("PROJ-1");
         epic1.setTeamId(1L);
         epic1.setManualOrder(1);
+        epic1.setLabels(new String[]{"2026Q2"});
         epic1.setRoughEstimates(Map.of("DEV", new BigDecimal("8")));
 
         JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic 2");
         epic2.setParentKey("PROJ-1");
         epic2.setTeamId(1L);
         epic2.setManualOrder(2);
+        epic2.setLabels(new String[]{"2026Q2"});
         epic2.setRoughEstimates(Map.of("DEV", new BigDecimal("8")));
 
         JiraIssueEntity epic3 = createIssue("EPIC-3", "EPIC", "Epic 3");
         epic3.setParentKey("PROJ-1");
         epic3.setTeamId(1L);
         epic3.setManualOrder(3);
+        epic3.setLabels(new String[]{"2026Q2"});
         epic3.setRoughEstimates(Map.of("DEV", new BigDecimal("8")));
 
         when(issueRepository.findByBoardCategoryAndTeamIdOrderByManualOrderAsc("EPIC", 1L))
@@ -340,17 +357,23 @@ class QuarterlyPlanningServiceTest {
 
     @Test
     void testProjectsOverview_readyProject() {
+        // F70 (H1): a project is "in quarter" only when at least one child epic
+        // is explicitly committed to that quarter via its own YYYYQn label.
+        // The project's own label is the PM-desired signal and no longer flips
+        // inQuarter on its own (would otherwise inflate the planning picture).
         JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Ready Project");
         project.setLabels(new String[]{"2026Q2"});
 
         JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Epic One");
         epic1.setParentKey("PROJ-1");
         epic1.setTeamId(1L);
+        epic1.setLabels(new String[]{"2026Q2"});
         epic1.setRoughEstimates(Map.of("DEV", new BigDecimal("10"), "QA", new BigDecimal("5")));
 
         JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic Two");
         epic2.setParentKey("PROJ-1");
         epic2.setTeamId(1L);
+        epic2.setLabels(new String[]{"2026Q2"});
         epic2.setRoughEstimates(Map.of("DEV", new BigDecimal("8")));
 
         when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
@@ -382,17 +405,21 @@ class QuarterlyPlanningServiceTest {
 
     @Test
     void testProjectsOverview_blockedProject() {
+        // F70: project label is PM-desired; epics must carry committed_quarter
+        // labels to count toward inQuarter and downstream blockers.
         JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Blocked Project");
         project.setLabels(new String[]{"2026Q2"});
 
         JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Epic No Estimate");
         epic1.setParentKey("PROJ-1");
         epic1.setTeamId(1L);
+        epic1.setLabels(new String[]{"2026Q2"});
         // No rough estimates
 
         JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic No Estimate 2");
         epic2.setParentKey("PROJ-1");
         epic2.setTeamId(1L);
+        epic2.setLabels(new String[]{"2026Q2"});
         // No rough estimates
 
         when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
@@ -412,24 +439,29 @@ class QuarterlyPlanningServiceTest {
 
     @Test
     void testProjectsOverview_partialProject() {
+        // F70: project label alone no longer flips inQuarter; each epic must
+        // explicitly carry the committed_quarter label to count.
         JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Partial Project");
         project.setLabels(new String[]{"2026Q2"});
 
         JiraIssueEntity epic1 = createIssue("EPIC-1", "EPIC", "Epic Estimated");
         epic1.setParentKey("PROJ-1");
         epic1.setTeamId(1L);
+        epic1.setLabels(new String[]{"2026Q2"});
         epic1.setRoughEstimates(Map.of("DEV", new BigDecimal("10")));
 
         // 2nd epic has rough estimates but no team
         JiraIssueEntity epic2 = createIssue("EPIC-2", "EPIC", "Epic No Team");
         epic2.setParentKey("PROJ-1");
         epic2.setTeamId(null); // No team
+        epic2.setLabels(new String[]{"2026Q2"});
         epic2.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
 
         // 3rd epic both have
         JiraIssueEntity epic3 = createIssue("EPIC-3", "EPIC", "Epic Full");
         epic3.setParentKey("PROJ-1");
         epic3.setTeamId(1L);
+        epic3.setLabels(new String[]{"2026Q2"});
         epic3.setRoughEstimates(Map.of("QA", new BigDecimal("3")));
 
         when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
@@ -469,6 +501,40 @@ class QuarterlyPlanningServiceTest {
         assertFalse(response.projects().isEmpty());
         assertEquals("not-added", response.projects().get(0).planningStatus());
         assertFalse(response.projects().get(0).inQuarter());
+    }
+
+    @Test
+    void testProjectsOverview_projectLabelAloneDoesNotMakeItInQuarter() {
+        // F70 regression (H1): pre-F70 a project carrying a YYYYQn label was
+        // automatically treated as "in this quarter" because the label WAS the
+        // quarter signal. Post-F70 the project label is desired_quarter (PM-side
+        // ask) — without at least one child epic explicitly committed to that
+        // quarter, the project must NOT count as in-quarter; the projects view
+        // would otherwise inflate the planning picture (PMs hope, teams haven't
+        // committed yet).
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "PM Hopes But No Commit");
+        project.setLabels(new String[]{"2026Q2"}); // desired_quarter set
+
+        // Child epic exists but carries NO YYYYQn label — team hasn't committed.
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Not yet committed");
+        epic.setParentKey("PROJ-1");
+        epic.setTeamId(1L);
+        epic.setLabels(new String[]{"roadmap"});
+        epic.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+
+        QuarterlyProjectsResponse response = service.getProjectsOverview("2026Q2");
+
+        assertEquals(0, response.inQuarterCount(),
+                "Project must NOT be in quarter when only desired_quarter is set");
+        QuarterlyProjectOverviewDto dto = response.projects().get(0);
+        assertFalse(dto.inQuarter(),
+                "desired_quarter alone is no longer enough — at least one committed epic required");
+        assertEquals("not-added", dto.planningStatus());
     }
 
     @Test
