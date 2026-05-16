@@ -69,6 +69,7 @@
 | F67 | Quarter Label & Filter on Board and Projects | 2026-03-10 | [features/F67](features/F67_QUARTER_FILTER.md) |
 | F68 | Quarterly Planning Production UI | 2026-03-16 | [features/F68](features/F68_QUARTERLY_PLANNING_PRODUCTION.md) |
 | F69 | Quarterly Planning Redesign | 2026-05-15 | [features/F69](features/F69_QUARTERLY_PLANNING_REDESIGN.md) |
+| F70 | Customer-Driven Quarter Planning | 2026-05-16 | [features/F70](features/F70_CUSTOMER_QUARTER_PLANNING.md) |
 
 ## Бэклог (BF)
 

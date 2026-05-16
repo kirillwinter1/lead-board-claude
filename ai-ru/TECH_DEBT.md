@@ -52,6 +52,7 @@
 ### Открытые
 
 - [ ] N+1 при загрузке capacity по командам в `QuarterlyPlanningService` (`getEpicsForQuarter`, `getSummary`, `getTeamsOverview`, `buildQuarterSnapshot`) — `getTeamCapacity()` зовётся в цикле по командам, каждый вызов = `findByTeamIdAndActiveTrue` + `getTeamAbsenceDates`. Решение: батч-загрузка members/absences для всех активных команд за квартал одним запросом и переиспользование в цикле. Помечено TODO-комментарием в коде (F69 review).
+- [ ] Full epic-table scan в `QuarterlyPlanningService.getProjectCommitment` (F70) — каждое раскрытие проекта на ProjectsPage вызывает `loadAllEpics()` → `findByBoardCategory("EPIC")` (полный скан таблицы) для перебора детей одного проекта. На 1000+ эпиков это болезненно при частом UI-разворачивании. Решение: подменить на `issueRepository.findByParentKeyOrIssueKeyIn(projectKey, childKeySet)` — забирать только релевантные строки (parentKey == projectKey OR issueKey IN childEpicKeys из issue-link `is parent of`). Помечено TODO-комментарием в коде (F70 review, H3).
 
 ## Frontend
 

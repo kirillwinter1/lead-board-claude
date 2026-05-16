@@ -35,6 +35,16 @@ public class QuarterlyPlanningService {
      */
     private static final BigDecimal DEFAULT_RISK_BUFFER = new BigDecimal("0.2");
 
+    /** Canonical quarter-label format used throughout F67-F70 (YYYYQn, e.g. "2026Q2"). */
+    private static final Pattern QUARTER_LABEL_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
+
+    /**
+     * Synthetic team name surfaced in {@link #getProjectCommitment} for epics
+     * that lack a team mapping. Kept as a constant so the UI label is in one
+     * place rather than scattered as inline string literals.
+     */
+    private static final String UNASSIGNED_TEAM_LABEL = "Unassigned";
+
     private final JiraIssueRepository issueRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository memberRepository;
@@ -45,6 +55,7 @@ public class QuarterlyPlanningService {
     private final WorkflowConfigService workflowConfigService;
     private final JiraClient jiraClient;
     private final EpicLabelPersistenceService epicLabelPersistenceService;
+    private final ProjectLabelPersistenceService projectLabelPersistenceService;
 
     public QuarterlyPlanningService(JiraIssueRepository issueRepository,
                                      TeamRepository teamRepository,
@@ -55,7 +66,8 @@ public class QuarterlyPlanningService {
                                      RiceAssessmentRepository riceAssessmentRepository,
                                      WorkflowConfigService workflowConfigService,
                                      JiraClient jiraClient,
-                                     EpicLabelPersistenceService epicLabelPersistenceService) {
+                                     EpicLabelPersistenceService epicLabelPersistenceService,
+                                     ProjectLabelPersistenceService projectLabelPersistenceService) {
         this.issueRepository = issueRepository;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
@@ -66,6 +78,7 @@ public class QuarterlyPlanningService {
         this.workflowConfigService = workflowConfigService;
         this.jiraClient = jiraClient;
         this.epicLabelPersistenceService = epicLabelPersistenceService;
+        this.projectLabelPersistenceService = projectLabelPersistenceService;
     }
 
     // ==================== Capacity ====================
@@ -135,13 +148,18 @@ public class QuarterlyPlanningService {
         // Build reverse index: epicKey -> projectKey (from parentKey and childEpicKeys)
         Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
 
-        // Resolve quarter labels: direct label or inherited from parent project
+        // F70: team-lead demand counts epics with an explicit committed_quarter
+        // ONLY. The team-lead's CapacityBars (F69) feed off this method, and it
+        // must stay consistent with the kanban (getEpicsForQuarter), which also
+        // uses resolveCommittedQuarter. Inheriting from the parent project's
+        // desired_quarter here would inflate the demand widget relative to the
+        // kanban — PMs see 12 epics committed, team-leads see 8 in their board.
         List<JiraIssueEntity> quarterEpics = new ArrayList<>();
         for (JiraIssueEntity epic : allEpics) {
             if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
                 continue; // Skip completed epics
             }
-            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            String epicQuarter = resolveCommittedQuarter(epic);
             if (quarterLabel.equals(epicQuarter)) {
                 quarterEpics.add(epic);
             }
@@ -397,19 +415,31 @@ public class QuarterlyPlanningService {
                     .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
                     .toList();
 
-            // Resolve quarter for each active epic
+            // F70: "project in quarter" = at least one epic explicitly committed
+            // to this quarter via its own label. The project's desired_quarter
+            // (PM-signal) is intentionally NOT used as the inQuarter indicator —
+            // pre-F70 the project label was a synonym for "project is in this
+            // quarter", but post-F70 the semantics are split:
+            //   - project label  = PM wants the quarter (desired_quarter)
+            //   - epic label     = team-lead committed (committed_quarter)
+            // Using desired_quarter here would inflate the "in scope" picture
+            // for projects PMs hope for but teams have not yet committed to.
+            //
+            // Inheritance is also dropped: only epics whose OWN labels carry a
+            // YYYYQn token count. Falling back to the project's desired_quarter
+            // for unlabelled epics would erase the "uncommitted" signal that
+            // makes the F70 model meaningful.
             List<JiraIssueEntity> quarterEpics = new ArrayList<>();
             for (JiraIssueEntity epic : activeEpics) {
-                String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+                String epicQuarter = resolveCommittedQuarter(epic);
                 if (quarterLabel.equals(epicQuarter)) {
                     quarterEpics.add(epic);
                 }
             }
 
-            // Determine if project is in quarter
-            boolean projectHasQuarterLabel = quarterLabel.equals(project.getQuarterLabel());
+            // Determine if project is in quarter — strictly based on committed epics.
             boolean hasEpicsInQuarter = !quarterEpics.isEmpty();
-            boolean inQuarter = projectHasQuarterLabel || hasEpicsInQuarter;
+            boolean inQuarter = hasEpicsInQuarter;
 
             // Use all active epics for coverage calculations if project is in quarter
             List<JiraIssueEntity> epicsForCoverage = inQuarter ? activeEpics : List.of();
@@ -679,10 +709,32 @@ public class QuarterlyPlanningService {
     // ==================== F69: Epics for Quarter (Kanban view) ====================
 
     /**
-     * Returns every epic in the system enriched with quarter membership,
-     * priority score, demand, and capacity-overload flags for the requested quarter.
+     * Backwards-compatible overload that defaults to {@code onlyDesired=true} —
+     * matches the F70 endpoint default. Use the two-argument form when the caller
+     * explicitly wants the unfiltered (F69) view.
      */
     public QuarterlyEpicsResponse getEpicsForQuarter(String quarterLabel) {
+        return getEpicsForQuarter(quarterLabel, true);
+    }
+
+    /**
+     * Returns epics enriched with quarter membership, priority score, demand,
+     * and capacity-overload flags for the requested quarter.
+     *
+     * <p>When {@code onlyDesired=true} (F70 default), the result is filtered to
+     * epics that are either:</p>
+     * <ul>
+     *   <li>Children of a project whose desired quarter matches {@code quarterLabel}, or</li>
+     *   <li>Standalone — no parent project at all (technical debt / small tasks).</li>
+     * </ul>
+     * <p>Standalone epics are <em>always</em> included regardless of the filter:
+     * they have no PM-driven project context and would otherwise disappear from
+     * the team-lead view.</p>
+     *
+     * <p>When {@code onlyDesired=false}, every active epic is returned — the
+     * original F69 behaviour for the "show everything" toggle.</p>
+     */
+    public QuarterlyEpicsResponse getEpicsForQuarter(String quarterLabel, boolean onlyDesired) {
         List<JiraIssueEntity> allEpics = loadAllEpics();
         List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
 
@@ -721,11 +773,14 @@ public class QuarterlyPlanningService {
             }
         }
 
-        // Sum demand by team for all epics currently in the requested quarter
+        // Sum demand by team for all epics currently in the requested quarter.
+        // F70: team-lead view counts only epics with an explicit committed_quarter —
+        // inheritance from the parent project's desired_quarter must NOT inflate
+        // demand (see resolveCommittedQuarter doc and F70 spec, "Наследование").
         Map<Long, Map<String, BigDecimal>> demandByTeamInQuarter = new HashMap<>();
         for (JiraIssueEntity epic : allEpics) {
             if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
-            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            String epicQuarter = resolveCommittedQuarter(epic);
             if (!quarterLabel.equals(epicQuarter)) continue;
             Long teamId = epic.getTeamId();
             if (teamId == null) continue;
@@ -757,8 +812,28 @@ public class QuarterlyPlanningService {
 
             String projectKey = epicToProjectKey.get(epic.getIssueKey());
             JiraIssueEntity project = projectKey != null ? projectsByKey.get(projectKey) : null;
+            boolean isStandalone = project == null;
+            // F70: desired_quarter is read directly off the parent project's labels —
+            // no inheritance or fallback applies here (resolveDesiredQuarter only
+            // looks at the project itself).
+            String projectDesiredQuarter = project != null ? resolveDesiredQuarter(project) : null;
 
-            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            // F70 filter: when onlyDesired=true, drop epics whose parent project does
+            // not desire the requested quarter. Standalone epics (no parent project)
+            // always pass — they are first-class technical-debt / small-task slots in
+            // the team-lead view and PM has no opinion on them.
+            if (onlyDesired && !isStandalone) {
+                if (!quarterLabel.equals(projectDesiredQuarter)) {
+                    continue;
+                }
+            }
+
+            // F70: team-lead view — "epic in quarter" means EXPLICITLY committed.
+            // No inheritance from the parent project's desired_quarter; an epic
+            // surfaces in the InQuarter column only if its own labels carry a
+            // YYYYQn token. The desired quarter is surfaced separately via
+            // projectDesiredQuarter for the "PM wants Qx" badge.
+            String epicQuarter = resolveCommittedQuarter(epic);
             boolean inQuarter = quarterLabel.equals(epicQuarter);
 
             // RICE on epic first, fall back to parent project's RICE
@@ -808,7 +883,9 @@ public class QuarterlyPlanningService {
                     totalDemand,
                     hasEstimate,
                     hasTeamMapping,
-                    epicOverloaded
+                    epicOverloaded,
+                    projectDesiredQuarter,
+                    isStandalone
             ));
         }
 
@@ -1005,7 +1082,11 @@ public class QuarterlyPlanningService {
         Map<Long, Map<String, BigDecimal>> demandByTeam = new HashMap<>();
         for (JiraIssueEntity epic : allEpics) {
             if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
-            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            // F70: snapshot serves buildPlanningEpicDto (team-lead view), so
+            // overload detection must mirror the same "committed only" rule
+            // applied in getEpicsForQuarter. Inheritance from parent project's
+            // desired_quarter is intentionally excluded.
+            String epicQuarter = resolveCommittedQuarter(epic);
             if (!quarterLabel.equals(epicQuarter)) continue;
             Long teamId = epic.getTeamId();
             if (teamId == null) continue;
@@ -1114,14 +1195,16 @@ public class QuarterlyPlanningService {
                 ? List.of(new PlanningEpicDto.TeamRef(team.getId(), team.getName(), team.getColor()))
                 : List.of();
 
-        String epicQuarter = epic.getQuarterLabel();
-        if (epicQuarter == null && project != null) epicQuarter = project.getQuarterLabel();
+        // F70: team-lead view returns the epic's OWN committed quarter only.
+        // No fallback to the parent project's quarter label — that path used to
+        // inherit the project's desired_quarter (PM-side) and incorrectly mark
+        // uncommitted epics as "in quarter". The desired_quarter is surfaced
+        // separately via projectDesiredQuarter below.
+        String epicQuarter = resolveCommittedQuarter(epic);
 
         // inQuarter semantics:
-        //   - contextQuarter == null  →  user explicitly removed the quarter; report false
-        //     even if the epic still inherits a quarter from its parent project
-        //     (otherwise the frontend keeps showing the epic in the column).
-        //   - contextQuarter != null  →  epic is "in quarter" iff its resolved quarter matches.
+        //   - contextQuarter == null  →  user explicitly removed the quarter; report false.
+        //   - contextQuarter != null  →  epic is "in quarter" iff its committed quarter matches.
         boolean inQuarter = contextQuarter != null && contextQuarter.equals(epicQuarter);
 
         // Overloaded teams: only meaningful while the epic is in a specific quarter.
@@ -1131,6 +1214,12 @@ public class QuarterlyPlanningService {
                 && snapshot.overloadedTeamIds().contains(epic.getTeamId())) {
             overloadedTeams.add(epic.getTeamId());
         }
+
+        // F70 enrichment: surface the parent project's desired_quarter so the
+        // frontend can render a "PM wants Q2" badge after a mutation. isStandalone
+        // mirrors the field used by getEpicsForQuarter (no parent project).
+        String projectDesiredQuarter = project != null ? resolveDesiredQuarter(project) : null;
+        boolean isStandalone = project == null;
 
         return new PlanningEpicDto(
                 epic.getIssueKey(),
@@ -1149,13 +1238,237 @@ public class QuarterlyPlanningService {
                 totalDemand,
                 epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty(),
                 epic.getTeamId() != null,
-                overloadedTeams
+                overloadedTeams,
+                projectDesiredQuarter,
+                isStandalone
         );
     }
 
     private List<JiraIssueEntity> loadAllEpics() {
         // Use board_category for efficiency; that is what sync sets based on isEpic()
         return issueRepository.findByBoardCategory("EPIC");
+    }
+
+    // ==================== F70: Customer-Driven Quarter Planning ====================
+
+    /**
+     * Set or clear the project's desired quarter (PM-facing mutation).
+     *
+     * <p>Mirrors the {@link #assignEpicToQuarter} flow: validates input, removes
+     * any existing {@code YYYYQn} label from the project, appends the new quarter
+     * (if non-null), writes to Jira FIRST, then mirrors locally via the dedicated
+     * {@link ProjectLabelPersistenceService} (REQUIRES_NEW) — sidestepping the
+     * Spring AOP self-invocation pitfall that bites {@code @Transactional(readOnly=true)}
+     * services.</p>
+     *
+     * @param projectKey Jira project-issue key (e.g. {@code "PROJ-1"})
+     * @param quarter target quarter label (e.g. {@code "2026Q2"}) or {@code null} to clear
+     * @return up-to-date commitment view aggregated by team
+     * @throws IllegalArgumentException on invalid quarter format
+     * @throws ProjectNotFoundException if the issue is missing or not a project
+     */
+    public ProjectQuarterCommitmentDto setProjectDesiredQuarter(String projectKey, String quarter) {
+        if (quarter != null && !QUARTER_LABEL_PATTERN.matcher(quarter).matches()) {
+            throw new IllegalArgumentException("Invalid quarter label: " + quarter);
+        }
+
+        JiraIssueEntity project = findProjectOrThrow(projectKey);
+
+        // Build the new label set: drop existing YYYYQn entries, append the new quarter (if any).
+        List<String> newLabels = new ArrayList<>();
+        if (project.getLabels() != null) {
+            for (String label : project.getLabels()) {
+                if (label != null && !QUARTER_LABEL_PATTERN.matcher(label).matches()) {
+                    newLabels.add(label);
+                }
+            }
+        }
+        if (quarter != null) {
+            newLabels.add(quarter);
+        }
+
+        // 1. Jira write — outside any DB transaction. If this throws, DB state is untouched.
+        jiraClient.updateLabels(projectKey, newLabels);
+
+        // 2. Mirror locally in a short, isolated transaction via the dedicated bean
+        //    so the proxy honours REQUIRES_NEW (and the save actually hits the DB
+        //    despite the outer read-only context).
+        try {
+            projectLabelPersistenceService.mirrorProjectLabels(projectKey, newLabels);
+        } catch (RuntimeException e) {
+            log.error("Jira label updated but DB save failed for project={}, manual reconciliation required",
+                    projectKey, e);
+            throw e;
+        }
+
+        // Sync the outer session's L1 cache with what the inner REQUIRES_NEW
+        // transaction just committed. Without this, the subsequent
+        // getProjectCommitment call would re-fetch the project via Spring Data's
+        // findByIssueKey, hit the outer session's L1 cache, and see the OLD
+        // labels (Hibernate honours object identity per session — the row read
+        // from DB is discarded in favour of the already-managed instance).
+        // The result the user receives would lie about the just-saved quarter
+        // until the next request creates a fresh session. Mutating the managed
+        // entity is safe here: the surrounding transaction is read-only with
+        // FlushMode.MANUAL, so this change is never auto-flushed back to the DB.
+        project.setLabels(newLabels.toArray(new String[0]));
+
+        return getProjectCommitment(projectKey);
+    }
+
+    /**
+     * Compute the PM-facing commitment view for a project: per-team breakdown of
+     * how many child epics are committed to the project's desired quarter, how
+     * many slipped to a different quarter, and how many remain uncommitted.
+     *
+     * <p>Epic-level resolution here is intentionally DIRECT (no inheritance from
+     * the project): the whole point of the F70 model is that PM-desired and
+     * team-committed are independent signals, so falling back to the project's
+     * quarter for unlabelled epics would erase the "uncommitted" signal.</p>
+     *
+     * <p>Epics without a team mapping fall into a synthetic bucket with
+     * {@code teamId = 0} so the UI can render them as "Unassigned"
+     * (see {@link #UNASSIGNED_TEAM_LABEL}).</p>
+     */
+    public ProjectQuarterCommitmentDto getProjectCommitment(String projectKey) {
+        JiraIssueEntity project = findProjectOrThrow(projectKey);
+        String desiredQuarter = resolveDesiredQuarter(project);
+
+        // Collect child epics via the same two mechanisms used elsewhere in this
+        // service (parentKey OR childEpicKeys on the project) so the commitment
+        // view matches the rest of the planning surface.
+        // TODO(F70 review H3): loadAllEpics() is a full board_category="EPIC" table
+        //   scan run on every project-expand on ProjectsPage. With 1000+ epics
+        //   this becomes painful for a per-row UI interaction. Replace with a
+        //   narrow query — `findByParentKeyOrIssueKeyIn(projectKey, childKeySet)`
+        //   — to fetch only the epics actually attached to this project.
+        //   Tracked in ai-ru/TECH_DEBT.md (Производительность → F70).
+        List<JiraIssueEntity> allEpics = loadAllEpics();
+        Set<String> childKeySet = new HashSet<>();
+        if (project.getChildEpicKeys() != null) {
+            Collections.addAll(childKeySet, project.getChildEpicKeys());
+        }
+        List<JiraIssueEntity> childEpics = new ArrayList<>();
+        for (JiraIssueEntity epic : allEpics) {
+            if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
+            boolean viaParent = projectKey.equals(epic.getParentKey());
+            boolean viaLink = childKeySet.contains(epic.getIssueKey());
+            if (viaParent || viaLink) {
+                childEpics.add(epic);
+            }
+        }
+
+        // Group epics by team and tally (committed / other-quarter / uncommitted).
+        // teamId == 0 is the synthetic "no team mapping" bucket.
+        Map<Long, int[]> tallyByTeam = new LinkedHashMap<>(); // [total, committed, other, uncommitted]
+        for (JiraIssueEntity epic : childEpics) {
+            long teamKey = epic.getTeamId() != null ? epic.getTeamId() : 0L;
+            int[] tally = tallyByTeam.computeIfAbsent(teamKey, k -> new int[4]);
+            tally[0]++; // total
+
+            String committed = resolveCommittedQuarter(epic);
+            if (committed == null) {
+                tally[3]++; // uncommitted
+            } else if (desiredQuarter != null && desiredQuarter.equals(committed)) {
+                tally[1]++; // committed to desired
+            } else {
+                tally[2]++; // committed elsewhere
+            }
+        }
+
+        // Resolve team metadata once. We only fetch teams that actually appear in
+        // the breakdown — avoids a teamRepository scan when the project is empty.
+        Map<Long, TeamEntity> teamsById = new HashMap<>();
+        Set<Long> realTeamIds = new HashSet<>(tallyByTeam.keySet());
+        realTeamIds.remove(0L);
+        if (!realTeamIds.isEmpty()) {
+            for (TeamEntity team : teamRepository.findAllById(realTeamIds)) {
+                teamsById.put(team.getId(), team);
+            }
+        }
+
+        List<TeamCommitmentDto> commitmentByTeam = new ArrayList<>(tallyByTeam.size());
+        for (Map.Entry<Long, int[]> entry : tallyByTeam.entrySet()) {
+            long teamId = entry.getKey();
+            int[] t = entry.getValue();
+            String teamName;
+            String teamColor;
+            if (teamId == 0L) {
+                teamName = UNASSIGNED_TEAM_LABEL;
+                teamColor = null;
+            } else {
+                TeamEntity team = teamsById.get(teamId);
+                teamName = team != null ? team.getName() : "Team #" + teamId;
+                teamColor = team != null ? team.getColor() : null;
+            }
+            commitmentByTeam.add(new TeamCommitmentDto(
+                    teamId, teamName, teamColor,
+                    t[0], t[1], t[2], t[3]
+            ));
+        }
+        // Deterministic ordering: real teams first by name, "no team" bucket last.
+        commitmentByTeam.sort((a, b) -> {
+            if (a.teamId() == 0L && b.teamId() != 0L) return 1;
+            if (a.teamId() != 0L && b.teamId() == 0L) return -1;
+            return a.teamName().compareToIgnoreCase(b.teamName());
+        });
+
+        return new ProjectQuarterCommitmentDto(
+                projectKey,
+                project.getSummary(),
+                desiredQuarter,
+                commitmentByTeam
+        );
+    }
+
+    /**
+     * Find the project entity by key, verifying its board category is PROJECT.
+     * "Not a project" is treated as 404 (same as "missing") — from the caller's
+     * perspective there is no project to operate on under that key.
+     */
+    private JiraIssueEntity findProjectOrThrow(String projectKey) {
+        JiraIssueEntity project = issueRepository.findByIssueKey(projectKey)
+                .orElseThrow(() -> new ProjectNotFoundException("Project not found: " + projectKey));
+        // Prefer the persisted board_category (set by sync via workflow config) so we
+        // don't have to re-categorise on every read; fall back to workflowConfigService
+        // when the column has not yet been populated for this row.
+        String boardCategory = project.getBoardCategory();
+        boolean isProject;
+        if (boardCategory != null) {
+            isProject = "PROJECT".equals(boardCategory);
+        } else {
+            isProject = workflowConfigService.isProject(project.getIssueType());
+        }
+        if (!isProject) {
+            throw new ProjectNotFoundException(
+                    "Issue " + projectKey + " is not a project (boardCategory=" + boardCategory + ")");
+        }
+        return project;
+    }
+
+    /**
+     * Read the direct quarter label from an epic with NO inheritance from the parent
+     * project. This is the F70-semantic "committed_quarter" — used everywhere the
+     * team-lead's explicit commitment matters (commitment view, PM badges).
+     */
+    private String resolveCommittedQuarter(JiraIssueEntity epic) {
+        String[] labels = epic.getLabels();
+        if (labels == null) return null;
+        for (String label : labels) {
+            if (label != null && QUARTER_LABEL_PATTERN.matcher(label).matches()) {
+                return label;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Read the direct quarter label from a project. Same lookup as
+     * {@link #resolveCommittedQuarter} — separate name for readability at call
+     * sites where the semantic is "what the customer wants".
+     */
+    private String resolveDesiredQuarter(JiraIssueEntity project) {
+        return resolveCommittedQuarter(project);
     }
 
     // ==================== Private Helpers ====================
@@ -1359,8 +1672,6 @@ public class QuarterlyPlanningService {
             default -> coefficients.middle();
         };
     }
-
-    private static final Pattern QUARTER_LABEL_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
 
     private List<String> extractQuarterLabels() {
         List<JiraIssueEntity> withLabels = issueRepository.findByLabelsIsNotNull();

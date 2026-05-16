@@ -168,11 +168,34 @@ export interface PlanningEpicDto {
   hasEstimate: boolean
   hasTeamMapping: boolean
   overloadedTeams: number[]
+  // F70: project-level "desired" quarter (parent project label) — null when standalone
+  projectDesiredQuarter: string | null
+  // F70: true when epic has no parent project (tech-debt / standalone work)
+  isStandalone: boolean
 }
 
 export interface QuarterlyEpicsResponse {
   quarter: string
   epics: PlanningEpicDto[]
+}
+
+// ==================== F70: Project quarter commitment ====================
+
+export interface TeamCommitmentDto {
+  teamId: number // 0 = synthetic "no team mapping" bucket
+  teamName: string
+  teamColor: string | null
+  totalEpics: number
+  committedEpics: number    // committed_quarter == project's desired_quarter
+  otherQuarterEpics: number // committed_quarter set but != desired
+  uncommittedEpics: number  // committed_quarter == null
+}
+
+export interface ProjectQuarterCommitmentDto {
+  projectKey: string
+  projectSummary: string
+  desiredQuarter: string | null
+  commitmentByTeam: TeamCommitmentDto[]
 }
 
 // ==================== API ====================
@@ -219,8 +242,17 @@ export const quarterlyPlanningApi = {
 
   // ==================== F69: Planning board endpoints ====================
 
-  async getEpicsForQuarter(quarter: string): Promise<QuarterlyEpicsResponse> {
-    const res = await axios.get(`/api/quarterly-planning/quarters/${encodeURIComponent(quarter)}/epics`)
+  /**
+   * F70: `onlyDesired` is opt-in on the wire. Pass `undefined` to leave the
+   * decision to the backend (current default = true). Pass an explicit boolean
+   * to override — this also keeps the URL clean in dev tools when not set.
+   */
+  async getEpicsForQuarter(quarter: string, onlyDesired?: boolean): Promise<QuarterlyEpicsResponse> {
+    const params = onlyDesired === undefined ? undefined : { onlyDesired }
+    const res = await axios.get(
+      `/api/quarterly-planning/quarters/${encodeURIComponent(quarter)}/epics`,
+      params ? { params } : undefined,
+    )
     return res.data
   },
 
@@ -231,6 +263,26 @@ export const quarterlyPlanningApi = {
 
   async setEpicBoost(epicKey: string, boost: number): Promise<PlanningEpicDto> {
     const res = await axios.post(`/api/quarterly-planning/epics/${encodeURIComponent(epicKey)}/boost`, { boost })
+    return res.data
+  },
+
+  // ==================== F70: Project commitment endpoints ====================
+
+  async setProjectDesiredQuarter(
+    projectKey: string,
+    quarter: string | null,
+  ): Promise<ProjectQuarterCommitmentDto> {
+    const res = await axios.post(
+      `/api/quarterly-planning/projects/${encodeURIComponent(projectKey)}/desired-quarter`,
+      { quarter },
+    )
+    return res.data
+  },
+
+  async getProjectCommitment(projectKey: string): Promise<ProjectQuarterCommitmentDto> {
+    const res = await axios.get(
+      `/api/quarterly-planning/projects/${encodeURIComponent(projectKey)}/quarter-commitment`,
+    )
     return res.data
   },
 }

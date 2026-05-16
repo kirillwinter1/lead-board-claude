@@ -6,6 +6,12 @@ import java.util.Map;
 
 /**
  * Epic view for the Quarterly Planning kanban board (Backlog ↔ In Quarter).
+ *
+ * <p>{@code projectDesiredQuarter} and {@code isStandalone} were added in F70 to
+ * carry the customer-driven quarter context: the parent project's desired quarter
+ * (so the frontend can render a "PM wants Q2" badge when committed != desired),
+ * and a flag marking epics without any parent project ("standalone" — always
+ * shown in the backlog regardless of the desired-quarter filter).</p>
  */
 public record PlanningEpicDto(
         String epicKey,
@@ -24,7 +30,9 @@ public record PlanningEpicDto(
         BigDecimal totalDemandDays,
         boolean hasEstimate,
         boolean hasTeamMapping,
-        List<Long> overloadedTeams
+        List<Long> overloadedTeams,
+        String projectDesiredQuarter,
+        boolean isStandalone
 ) {
     public record TeamRef(Long id, String name, String color) {}
 }

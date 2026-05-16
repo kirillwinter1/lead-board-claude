@@ -51,6 +51,10 @@ export function QuarterlyPlanningPage() {
   // ==================== UI state ====================
   const [publishModalOpen, setPublishModalOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  // F70: tech-lead-facing filter. true (default) = show only epics whose project
+  // desires this quarter, plus standalone (orphan) epics. false = show every
+  // epic the tech lead might want to consider (legacy F69 behaviour).
+  const [onlyDesired, setOnlyDesired] = useState(true)
   // Monotonic counter used to discard responses from stale loadQuarter calls
   // when the user switches quarters quickly or hits Refresh mid-flight.
   const loadGenerationRef = useRef(0)
@@ -77,14 +81,14 @@ export function QuarterlyPlanningPage() {
   }, [])
 
   // ==================== Data load ====================
-  const loadQuarter = useCallback(async (q: string) => {
+  const loadQuarter = useCallback(async (q: string, onlyDesiredFlag: boolean) => {
     if (!q) return
     const generation = ++loadGenerationRef.current
     setRefreshing(true)
     setError(null)
     try {
       const [epicsRes, teamsRes] = await Promise.all([
-        quarterlyPlanningApi.getEpicsForQuarter(q),
+        quarterlyPlanningApi.getEpicsForQuarter(q, onlyDesiredFlag),
         quarterlyPlanningApi.getTeamsOverview(q),
       ])
       // Stale response — a newer loadQuarter has been issued. Discard.
@@ -110,18 +114,30 @@ export function QuarterlyPlanningPage() {
     }
   }, [])
 
-  useEffect(() => { if (quarter) loadQuarter(quarter) }, [quarter, loadQuarter])
+  useEffect(() => { if (quarter) loadQuarter(quarter, onlyDesired) }, [quarter, onlyDesired, loadQuarter])
+
+  // L5: keep latest values in refs so the visibilitychange handler can be
+  // installed once. Re-subscribing on every state change (quarter/onlyDesired/
+  // refreshing) adds and removes the global listener many times per session.
+  const quarterRef = useRef(quarter)
+  const onlyDesiredRef = useRef(onlyDesired)
+  const refreshingRef = useRef(refreshing)
+  const loadQuarterRef = useRef(loadQuarter)
+  quarterRef.current = quarter
+  onlyDesiredRef.current = onlyDesired
+  refreshingRef.current = refreshing
+  loadQuarterRef.current = loadQuarter
 
   // Refresh on tab focus
   useEffect(() => {
     const handler = () => {
-      if (document.visibilityState === 'visible' && quarter && !refreshing) {
-        loadQuarter(quarter)
+      if (document.visibilityState === 'visible' && quarterRef.current && !refreshingRef.current) {
+        loadQuarterRef.current(quarterRef.current, onlyDesiredRef.current)
       }
     }
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
-  }, [quarter, refreshing, loadQuarter])
+  }, [])
 
   // ==================== Optimistic move ====================
   const handleMove = useCallback((epicKey: string, toQuarter: string | null) => {
@@ -312,10 +328,10 @@ export function QuarterlyPlanningPage() {
     }
     // After publishing, refetch to reconcile with Jira
     if (results.some(r => r.ok)) {
-      await loadQuarter(quarter)
+      await loadQuarter(quarter, onlyDesired)
     }
     return results
-  }, [pendingChanges, quarter, epics, loadQuarter])
+  }, [pendingChanges, quarter, onlyDesired, epics, loadQuarter])
 
   // ==================== Render ====================
   if (loading) {
@@ -369,7 +385,7 @@ export function QuarterlyPlanningPage() {
           />
           <button
             type="button"
-            onClick={() => loadQuarter(quarter)}
+            onClick={() => loadQuarter(quarter, onlyDesired)}
             disabled={refreshing}
             title="Reload latest from Jira"
             style={{
@@ -447,6 +463,8 @@ export function QuarterlyPlanningPage() {
           teamsById={teamsById}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
+          onlyDesired={onlyDesired}
+          onOnlyDesiredChange={setOnlyDesired}
         />
         <InQuarterColumn
           epics={inQuarterEpics}

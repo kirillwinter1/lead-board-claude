@@ -20,6 +20,11 @@ interface BacklogColumnProps {
   teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
+  // F70: when true the parent has already filtered the epic list down to
+  // "epics whose project desires this quarter ∪ standalone". The column
+  // surfaces a toggle so the tech lead can opt out of the filter.
+  onlyDesired: boolean
+  onOnlyDesiredChange: (value: boolean) => void
 }
 
 interface ProjectGroup {
@@ -39,6 +44,8 @@ export function BacklogColumn({
   teamsById,
   onMove,
   onBoostChange,
+  onlyDesired,
+  onOnlyDesiredChange,
 }: BacklogColumnProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState<Set<string>>(new Set())
@@ -157,7 +164,7 @@ export function BacklogColumn({
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
         <div style={{ flex: '1 1 240px', minWidth: 200 }}>
           <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search epics..." />
         </div>
@@ -192,12 +199,41 @@ export function BacklogColumn({
           colorMap={teamColorMap}
           renderOption={id => teamLabelMap.get(id) || id}
         />
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 10px',
+            border: `1px solid ${BORDER_DEFAULT}`,
+            borderRadius: 6,
+            background: onlyDesired ? BG_SUBTLE : BG_PAGE,
+            fontSize: 12,
+            color: TEXT_PRIMARY,
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+          title="Show only epics from projects PMs requested for this quarter, plus standalone epics"
+        >
+          <input
+            type="checkbox"
+            checked={onlyDesired}
+            onChange={e => onOnlyDesiredChange(e.target.checked)}
+            aria-label="Only epics requested for this quarter"
+            style={{ cursor: 'pointer' }}
+          />
+          Only requested for this quarter
+        </label>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {groups.length === 0 && (
           <div style={{ padding: 24, textAlign: 'center', color: TEXT_MUTED, background: BG_SUBTLE, borderRadius: 6 }}>
-            {epics.length === 0 ? 'No epics in backlog.' : 'No epics match your filters.'}
+            {epics.length === 0
+              ? (onlyDesired
+                ? `Nothing is planned for this team in ${targetQuarter}. Uncheck "Only requested for this quarter" to see other epics.`
+                : 'No epics in backlog.')
+              : 'No epics match your filters.'}
           </div>
         )}
         {groups.map(g => {
@@ -245,6 +281,7 @@ export function BacklogColumn({
                       epic={epic}
                       mode="backlog"
                       targetQuarter={targetQuarter}
+                      currentQuarter={targetQuarter}
                       jiraBaseUrl={jiraBaseUrl}
                       teamsById={teamsById}
                       onMove={onMove}

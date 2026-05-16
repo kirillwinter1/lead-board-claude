@@ -75,9 +75,23 @@ public class QuarterlyPlanningController {
 
     // ==================== F69: Quarterly Planning Redesign (Kanban) ====================
 
+    /**
+     * Backlog/in-quarter epics for the team-lead view.
+     *
+     * <p>F70 introduces the {@code onlyDesired} query parameter (default {@code true}):
+     * when enabled, only epics whose parent project has {@code desired_quarter == quarter}
+     * — plus all standalone epics (no parent project) — are returned. With {@code false}
+     * the original F69 behaviour is restored (all epics across every project).</p>
+     *
+     * <p>The default is {@code true} because the team-lead UI is the primary
+     * consumer of this endpoint and F70 makes the customer-driven filter the
+     * intended baseline.</p>
+     */
     @GetMapping("/quarters/{quarter}/epics")
-    public ResponseEntity<QuarterlyEpicsResponse> getEpicsForQuarter(@PathVariable String quarter) {
-        return ResponseEntity.ok(planningService.getEpicsForQuarter(quarter));
+    public ResponseEntity<QuarterlyEpicsResponse> getEpicsForQuarter(
+            @PathVariable String quarter,
+            @RequestParam(name = "onlyDesired", defaultValue = "true") boolean onlyDesired) {
+        return ResponseEntity.ok(planningService.getEpicsForQuarter(quarter, onlyDesired));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
@@ -102,5 +116,35 @@ public class QuarterlyPlanningController {
         }
         PlanningEpicDto result = planningService.setEpicBoost(epicKey, boost);
         return ResponseEntity.ok(result);
+    }
+
+    // ==================== F70: Customer-Driven Quarter Planning ====================
+
+    /**
+     * Set or clear the project's desired quarter (PM-facing).
+     *
+     * <p>Body: {@code { "quarter": "2026Q2" }} to set; {@code { "quarter": null }}
+     * to remove. Returns the up-to-date commitment view aggregated by team so the
+     * UI can refresh in a single round-trip.</p>
+     */
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PostMapping("/projects/{projectKey}/desired-quarter")
+    public ResponseEntity<ProjectQuarterCommitmentDto> setProjectDesiredQuarter(
+            @PathVariable String projectKey,
+            @RequestBody(required = false) Map<String, String> body) {
+        String quarter = body != null ? body.get("quarter") : null;
+        ProjectQuarterCommitmentDto result = planningService.setProjectDesiredQuarter(projectKey, quarter);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Read-only commitment view for a project: which teams have how many epics
+     * committed to the project's desired_quarter, how many moved to another
+     * quarter, and how many are uncommitted.
+     */
+    @GetMapping("/projects/{projectKey}/quarter-commitment")
+    public ResponseEntity<ProjectQuarterCommitmentDto> getProjectQuarterCommitment(
+            @PathVariable String projectKey) {
+        return ResponseEntity.ok(planningService.getProjectCommitment(projectKey));
     }
 }

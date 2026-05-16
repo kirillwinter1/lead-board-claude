@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -73,8 +74,11 @@ class IssueOrderControllerTest {
                                         .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"position\": 1}"));
         } catch (Exception e) {
-            // Expected - IllegalArgumentException wrapped in ServletException
-            assert e.getCause() instanceof IllegalArgumentException;
+            // Expected - IllegalArgumentException wrapped in ServletException.
+            // Use JUnit's assertInstanceOf instead of Java's `assert` keyword:
+            // `assert` requires -ea on the JVM, which is NOT set by default in
+            // CI/Gradle test runs — meaning a regression here would silently pass.
+            assertInstanceOf(IllegalArgumentException.class, e.getCause());
         }
     }
 
@@ -125,8 +129,10 @@ class IssueOrderControllerTest {
                                         .contentType(MediaType.APPLICATION_JSON)
                     .content("{\"position\": 1}"));
         } catch (Exception e) {
-            // Expected - IllegalArgumentException wrapped in ServletException
-            assert e.getCause() instanceof IllegalArgumentException;
+            // Expected - IllegalArgumentException wrapped in ServletException.
+            // See note in updateEpicOrder_notFound_throwsException: `assert` is
+            // unreliable without -ea; assertInstanceOf is the JUnit-idiomatic fix.
+            assertInstanceOf(IllegalArgumentException.class, e.getCause());
         }
     }
 

@@ -90,4 +90,29 @@ class QuarterlyPlanningControllerSecurityTest {
 
         verifyNoInteractions(planningService);
     }
+
+    // ==================== F70: desired-quarter ====================
+
+    @Test
+    void setProjectDesiredQuarter_unauthenticated_is4xx() throws Exception {
+        // Anonymous → @PreAuthorize("isAuthenticated()") on the class denies the call.
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().is4xxClientError());
+
+        verifyNoInteractions(planningService);
+    }
+
+    @Test
+    @WithMockUser(roles = "VIEWER")
+    void setProjectDesiredQuarter_wrongRole_isForbidden() throws Exception {
+        // VIEWER lacks ADMIN/PROJECT_MANAGER → @PreAuthorize denies with 403.
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(planningService);
+    }
 }

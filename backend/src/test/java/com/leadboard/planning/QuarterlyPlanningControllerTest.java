@@ -4,7 +4,9 @@ import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
 import com.leadboard.jira.JiraClientException;
 import com.leadboard.planning.dto.PlanningEpicDto;
+import com.leadboard.planning.dto.ProjectQuarterCommitmentDto;
 import com.leadboard.planning.dto.QuarterlyEpicsResponse;
+import com.leadboard.planning.dto.TeamCommitmentDto;
 import com.leadboard.tenant.TenantRepository;
 import com.leadboard.tenant.TenantUserRepository;
 import org.junit.jupiter.api.Test;
@@ -57,8 +59,10 @@ class QuarterlyPlanningControllerTest {
     @Test
     @WithMockUser(roles = "PROJECT_MANAGER")
     void getEpicsForQuarter_returnsEpicsList() throws Exception {
+        // F70: the controller now calls the two-arg overload with onlyDesired
+        // defaulting to true. The default semantically matches "show what PM asked for".
         PlanningEpicDto epic = sampleEpicDto("EPIC-1", "2026Q2", true, 0);
-        when(planningService.getEpicsForQuarter("2026Q2"))
+        when(planningService.getEpicsForQuarter("2026Q2", true))
                 .thenReturn(new QuarterlyEpicsResponse("2026Q2", List.of(epic)));
 
         mockMvc.perform(get("/api/quarterly-planning/quarters/2026Q2/epics"))
@@ -66,6 +70,23 @@ class QuarterlyPlanningControllerTest {
                 .andExpect(jsonPath("$.quarter").value("2026Q2"))
                 .andExpect(jsonPath("$.epics[0].epicKey").value("EPIC-1"))
                 .andExpect(jsonPath("$.epics[0].inQuarter").value(true));
+
+        verify(planningService).getEpicsForQuarter("2026Q2", true);
+    }
+
+    @Test
+    @WithMockUser(roles = "PROJECT_MANAGER")
+    void getEpicsForQuarter_onlyDesiredFalse_isPassedToService() throws Exception {
+        // The query string toggle must reach the service unchanged — frontends
+        // rely on it to render the "Show all" view.
+        PlanningEpicDto epic = sampleEpicDto("EPIC-1", "2026Q2", true, 0);
+        when(planningService.getEpicsForQuarter("2026Q2", false))
+                .thenReturn(new QuarterlyEpicsResponse("2026Q2", List.of(epic)));
+
+        mockMvc.perform(get("/api/quarterly-planning/quarters/2026Q2/epics?onlyDesired=false"))
+                .andExpect(status().isOk());
+
+        verify(planningService).getEpicsForQuarter("2026Q2", false);
     }
 
     // ==================== POST /epics/{epicKey}/quarter ====================
@@ -172,6 +193,94 @@ class QuarterlyPlanningControllerTest {
                 .andExpect(jsonPath("$.error", containsString("Boost must be in")));
     }
 
+    // ==================== F70: POST /projects/{key}/desired-quarter ====================
+
+    @Test
+    @WithMockUser(roles = "PROJECT_MANAGER")
+    void setProjectDesiredQuarter_happyPath_returnsCommitmentDto() throws Exception {
+        ProjectQuarterCommitmentDto commitment = new ProjectQuarterCommitmentDto(
+                "PROJ-1", "Project Alpha", "2026Q2",
+                List.of(new TeamCommitmentDto(1L, "Alpha", "#1558BC", 3, 2, 1, 0))
+        );
+        when(planningService.setProjectDesiredQuarter("PROJ-1", "2026Q2")).thenReturn(commitment);
+
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projectKey").value("PROJ-1"))
+                .andExpect(jsonPath("$.desiredQuarter").value("2026Q2"))
+                .andExpect(jsonPath("$.commitmentByTeam[0].teamName").value("Alpha"))
+                .andExpect(jsonPath("$.commitmentByTeam[0].committedEpics").value(2));
+
+        verify(planningService).setProjectDesiredQuarter("PROJ-1", "2026Q2");
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void setProjectDesiredQuarter_nullQuarter_clearsLabel() throws Exception {
+        // null in body clears the desired quarter; the service is responsible for
+        // dropping the YYYYQn label from Jira and the DB mirror.
+        ProjectQuarterCommitmentDto commitment = new ProjectQuarterCommitmentDto(
+                "PROJ-1", "Project Alpha", null, List.of()
+        );
+        when(planningService.setProjectDesiredQuarter("PROJ-1", null)).thenReturn(commitment);
+
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.desiredQuarter").doesNotExist());
+
+        verify(planningService).setProjectDesiredQuarter("PROJ-1", null);
+    }
+
+    @Test
+    @WithMockUser(roles = "PROJECT_MANAGER")
+    void setProjectDesiredQuarter_invalidQuarter_returnsBadRequest() throws Exception {
+        when(planningService.setProjectDesiredQuarter(anyString(), anyString()))
+                .thenThrow(new IllegalArgumentException("Invalid quarter label: not-a-quarter"));
+
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"not-a-quarter\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", containsString("Invalid quarter")));
+    }
+
+    @Test
+    @WithMockUser(roles = "PROJECT_MANAGER")
+    void setProjectDesiredQuarter_projectNotFound_returns404() throws Exception {
+        // ProjectNotFoundException carries @ResponseStatus(NOT_FOUND).
+        when(planningService.setProjectDesiredQuarter(anyString(), anyString()))
+                .thenThrow(new ProjectNotFoundException("Project not found: PROJ-X"));
+
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-X/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    // ==================== F70: GET /projects/{key}/quarter-commitment ====================
+
+    @Test
+    @WithMockUser(roles = "PROJECT_MANAGER")
+    void getQuarterCommitment_happyPath() throws Exception {
+        ProjectQuarterCommitmentDto commitment = new ProjectQuarterCommitmentDto(
+                "PROJ-1", "Project Alpha", "2026Q2",
+                List.of(
+                        new TeamCommitmentDto(1L, "Alpha", "#1558BC", 4, 3, 1, 0),
+                        new TeamCommitmentDto(2L, "Beta", "#FF0000", 2, 0, 0, 2)
+                )
+        );
+        when(planningService.getProjectCommitment("PROJ-1")).thenReturn(commitment);
+
+        mockMvc.perform(get("/api/quarterly-planning/projects/PROJ-1/quarter-commitment"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.commitmentByTeam.length()").value(2))
+                .andExpect(jsonPath("$.commitmentByTeam[1].uncommittedEpics").value(2));
+    }
+
     // ==================== Helpers ====================
 
     private PlanningEpicDto sampleEpicDto(String key, String quarter, boolean inQuarter, int boost) {
@@ -192,7 +301,9 @@ class QuarterlyPlanningControllerTest {
                 BigDecimal.ZERO,
                 false,
                 false,
-                List.of()
+                List.of(),
+                null,
+                false
         );
     }
 }
