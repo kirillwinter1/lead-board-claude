@@ -208,7 +208,14 @@ export function QuarterlyPlanningPage() {
       const demandDays = updatedDemand.totalDays
       const gapDays = team.capacityDays - demandDays
       const utilization = team.capacityDays > 0 ? Math.round((demandDays / team.capacityDays) * 100) : 0
-      const risk: 'low' | 'medium' | 'high' = utilization > 100 ? 'high' : (utilization >= 85 ? 'medium' : 'low')
+      // Risk thresholds aligned with getUtilizationColor (constants/colors.ts):
+      // green (low) 85-110, yellow (medium) 70-130, red (high) otherwise.
+      const risk: 'low' | 'medium' | 'high' =
+        utilization >= 85 && utilization <= 110
+          ? 'low'
+          : utilization >= 70 && utilization <= 130
+            ? 'medium'
+            : 'high'
       return {
         ...team,
         demandDays,

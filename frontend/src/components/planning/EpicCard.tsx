@@ -250,10 +250,13 @@ export function EpicCard({
           {orderedRoles.map(code => {
             const days = epic.demandByRole[code] || 0
             const color = getRoleColor(code)
-            // Use lightenColor (not `color + '14'`) — getRoleColor may return
-            // a 3-digit-shorthand or unknown-role fallback like `#666`, where
-            // concatenating an alpha suffix would produce invalid 5-digit CSS.
-            const bg = color.length === 7 ? lightenColor(color, 0.92) : color
+            // Only call lightenColor for full 6-digit hex (#RRGGBB). For other
+            // formats (3-digit hex `#abc`, 4-char fallback `#666`, rgb(...),
+            // CSS vars), fall back to a neutral subtle background so the chip
+            // remains visible — otherwise bg would equal text color.
+            const bg = color.startsWith('#') && color.length === 7
+              ? lightenColor(color, 0.92)
+              : BG_SUBTLE
             return (
               <span
                 key={code}

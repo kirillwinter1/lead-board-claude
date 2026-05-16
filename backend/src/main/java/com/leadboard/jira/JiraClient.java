@@ -367,7 +367,7 @@ public class JiraClient {
                     String trimmed = body != null && body.length() > 500 ? body.substring(0, 500) + "…" : body;
                     String msg = "Jira " + category + " (" + status.value() + ") for issue "
                             + issueKey + ": " + trimmed;
-                    log.warn(msg);
+                    log.warn("{}", msg);
                     return new JiraClientException(msg);
                 });
     }

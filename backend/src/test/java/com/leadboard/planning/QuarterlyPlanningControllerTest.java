@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
+import com.leadboard.jira.JiraClientException;
 import com.leadboard.planning.dto.PlanningEpicDto;
 import com.leadboard.planning.dto.QuarterlyEpicsResponse;
 import com.leadboard.tenant.TenantRepository;
@@ -112,6 +113,21 @@ class QuarterlyPlanningControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quarter\":\"2026Q2\"}"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void assignEpicToQuarter_whenJiraFails_returns502() throws Exception {
+        // JiraClientException carries @ResponseStatus(BAD_GATEWAY) — upstream Jira failure
+        // surfaces as 502, not 500, so the frontend can distinguish service bugs from
+        // upstream outages.
+        when(planningService.assignEpicToQuarter(anyString(), anyString()))
+                .thenThrow(new JiraClientException("Jira 4xx (403) for issue LB-9: forbidden"));
+
+        mockMvc.perform(post("/api/quarterly-planning/epics/LB-9/quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isBadGateway());
     }
 
     // ==================== POST /epics/{epicKey}/boost ====================

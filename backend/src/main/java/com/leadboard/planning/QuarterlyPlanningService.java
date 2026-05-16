@@ -44,6 +44,7 @@ public class QuarterlyPlanningService {
     private final RiceAssessmentRepository riceAssessmentRepository;
     private final WorkflowConfigService workflowConfigService;
     private final JiraClient jiraClient;
+    private final EpicLabelPersistenceService epicLabelPersistenceService;
 
     public QuarterlyPlanningService(JiraIssueRepository issueRepository,
                                      TeamRepository teamRepository,
@@ -53,7 +54,8 @@ public class QuarterlyPlanningService {
                                      TeamService teamService,
                                      RiceAssessmentRepository riceAssessmentRepository,
                                      WorkflowConfigService workflowConfigService,
-                                     JiraClient jiraClient) {
+                                     JiraClient jiraClient,
+                                     EpicLabelPersistenceService epicLabelPersistenceService) {
         this.issueRepository = issueRepository;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
@@ -63,6 +65,7 @@ public class QuarterlyPlanningService {
         this.riceAssessmentRepository = riceAssessmentRepository;
         this.workflowConfigService = workflowConfigService;
         this.jiraClient = jiraClient;
+        this.epicLabelPersistenceService = epicLabelPersistenceService;
     }
 
     // ==================== Capacity ====================
@@ -831,7 +834,14 @@ public class QuarterlyPlanningService {
      * project — otherwise the frontend would still see the epic in the quarter and
      * the UX would feel broken.</p>
      *
-     * <p>NOT {@code @Transactional} — see split-brain rationale above.</p>
+     * <p>This method itself carries no method-level {@code @Transactional}; the
+     * class-level {@code @Transactional(readOnly = true)} therefore applies whenever
+     * the method is reached via the Spring proxy. The actual DB write is delegated
+     * to {@link EpicLabelPersistenceService#mirrorEpicLabels(String, java.util.List)},
+     * which runs in a fresh {@code REQUIRES_NEW} writable transaction — this avoids
+     * the Spring AOP self-invocation pitfall (a {@code this.}-called {@code @Transactional}
+     * method would inherit the read-only outer transaction, and Hibernate's
+     * {@code FlushMode.MANUAL} would silently drop the save).</p>
      */
     public PlanningEpicDto assignEpicToQuarter(String epicKey, String quarter) {
         if (quarter != null && !QUARTER_LABEL_PATTERN.matcher(quarter).matches()) {
@@ -858,11 +868,13 @@ public class QuarterlyPlanningService {
         // 1. Jira write — outside any DB transaction. If this throws, DB state is untouched.
         jiraClient.updateLabels(epicKey, newLabels);
 
-        // 2. Mirror the labels locally in a short transaction. If this fails after a
-        //    successful Jira write we log loudly so an operator can reconcile manually
-        //    (next Jira sync will normally fix the drift).
+        // 2. Mirror the labels locally in a short, isolated transaction. The dedicated
+        //    bean call goes through the Spring proxy with REQUIRES_NEW, so the save
+        //    actually reaches the DB even though the outer call-site is read-only.
+        //    If this fails after a successful Jira write we log loudly so an operator
+        //    can reconcile manually (next Jira sync will normally fix the drift).
         try {
-            mirrorEpicLabelsTransactional(epicKey, newLabels);
+            epicLabelPersistenceService.mirrorEpicLabels(epicKey, newLabels);
         } catch (RuntimeException e) {
             log.error("Jira label updated but DB save failed for epic={}, manual reconciliation required",
                     epicKey, e);
@@ -880,15 +892,6 @@ public class QuarterlyPlanningService {
         List<JiraIssueEntity> allProjectsSnapshot = issueRepository.findByBoardCategory("PROJECT");
         QuarterSnapshot snapshot = buildQuarterSnapshot(contextQuarter, allProjectsSnapshot);
         return buildPlanningEpicDto(refreshed, contextQuarter, allProjectsSnapshot, snapshot);
-    }
-
-    /**
-     * @deprecated thin wrapper kept only for internal use; call
-     * {@link #assignEpicToQuarter(String, String)} with {@code null} instead.
-     */
-    @Deprecated
-    private PlanningEpicDto removeEpicFromQuarter(String epicKey) {
-        return assignEpicToQuarter(epicKey, null);
     }
 
     /**
@@ -928,19 +931,6 @@ public class QuarterlyPlanningService {
             throw new IllegalArgumentException("Issue is not an Epic: " + epicKey);
         }
         return epic;
-    }
-
-    /**
-     * Persist the new label set for an epic in a short, isolated transaction.
-     * Called only after Jira has accepted the corresponding write — see the
-     * split-brain note on {@link #assignEpicToQuarter(String, String)}.
-     */
-    @Transactional
-    protected void mirrorEpicLabelsTransactional(String epicKey, List<String> newLabels) {
-        JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
-                .orElseThrow(() -> new EpicNotFoundException("Epic not found: " + epicKey));
-        epic.setLabels(newLabels.toArray(new String[0]));
-        issueRepository.save(epic);
     }
 
     private String currentLookupQuarter(JiraIssueEntity epic) {

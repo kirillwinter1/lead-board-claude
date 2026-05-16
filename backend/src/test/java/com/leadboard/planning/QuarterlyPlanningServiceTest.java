@@ -38,6 +38,7 @@ class QuarterlyPlanningServiceTest {
     @Mock private RiceAssessmentRepository riceAssessmentRepository;
     @Mock private WorkflowConfigService workflowConfigService;
     @Mock private JiraClient jiraClient;
+    @Mock private EpicLabelPersistenceService epicLabelPersistenceService;
 
     private QuarterlyPlanningService service;
 
@@ -47,7 +48,7 @@ class QuarterlyPlanningServiceTest {
                 issueRepository, teamRepository, memberRepository,
                 absenceService, workCalendarService, teamService,
                 riceAssessmentRepository, workflowConfigService,
-                jiraClient
+                jiraClient, epicLabelPersistenceService
         );
 
         when(teamService.getPlanningConfig(anyLong())).thenReturn(PlanningConfigDto.defaults());
@@ -61,6 +62,20 @@ class QuarterlyPlanningServiceTest {
         when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of());
         when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of());
         when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+
+        // EpicLabelPersistenceService is now a separate Spring-proxied bean (extracted to
+        // dodge the self-invocation pitfall — see EpicLabelPersistenceService Javadoc).
+        // In prod it persists the new labels in a REQUIRES_NEW transaction; in unit tests
+        // we simulate that side-effect on the in-memory entity returned by the issueRepository
+        // mock, so the reload-and-DTO-build path in assignEpicToQuarter sees the post-write
+        // state. EpicLabelPersistenceServiceTest covers the persistence behaviour itself.
+        doAnswer(invocation -> {
+            String key = invocation.getArgument(0);
+            List<String> labels = invocation.getArgument(1);
+            issueRepository.findByIssueKey(key).ifPresent(e ->
+                    e.setLabels(labels.toArray(new String[0])));
+            return null;
+        }).when(epicLabelPersistenceService).mirrorEpicLabels(anyString(), anyList());
     }
 
     // ==================== Capacity Tests ====================
@@ -615,7 +630,11 @@ class QuarterlyPlanningServiceTest {
 
         verify(jiraClient).updateLabels(eq("EPIC-1"), argThat(labels ->
                 labels.contains("2026Q2") && labels.contains("some-other-label")));
-        verify(issueRepository).save(epic);
+        // DB-write is delegated to EpicLabelPersistenceService (REQUIRES_NEW, via proxy)
+        // so verify the delegation explicitly — issueRepository.save is no longer called
+        // from QuarterlyPlanningService on the assign path.
+        verify(epicLabelPersistenceService).mirrorEpicLabels(eq("EPIC-1"), argThat(labels ->
+                labels.contains("2026Q2") && labels.contains("some-other-label")));
         assertEquals("2026Q2", result.quarterLabel());
         assertTrue(result.inQuarter());
     }
