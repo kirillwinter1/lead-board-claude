@@ -6,11 +6,13 @@ import io.netty.channel.ChannelOption;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
 import java.nio.charset.StandardCharsets;
@@ -280,6 +282,25 @@ public class JiraClient {
     }
 
     /**
+     * Update labels on an issue (replaces full labels list).
+     */
+    public void updateLabels(String issueKey, List<String> labels) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        List<String> safeLabels = labels != null ? labels : List.of();
+        Map<String, Object> body = Map.of(
+                "fields", Map.of("labels", safeLabels)
+        );
+
+        if (accessToken != null && cloudId != null) {
+            updateIssueWithOAuth(issueKey, body, accessToken, cloudId);
+        } else {
+            updateIssueWithBasicAuth(issueKey, body);
+        }
+    }
+
+    /**
      * Update time estimate on an issue (in seconds)
      */
     public void updateEstimate(String issueKey, int estimateSeconds) {
@@ -309,6 +330,8 @@ public class JiraClient {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .bodyValue(body)
                 .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
                 .toBodilessEntity()
                 .block();
     }
@@ -322,8 +345,31 @@ public class JiraClient {
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(body)
                 .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
                 .toBodilessEntity()
                 .block();
+    }
+
+    /**
+     * Map a Jira non-2xx response into a {@link JiraClientException} carrying
+     * the issue key, status code and (truncated) response body.
+     * Logged with WARN since this is an upstream failure, not a service bug.
+     */
+    private Mono<JiraClientException> jiraErrorMono(
+            org.springframework.web.reactive.function.client.ClientResponse response,
+            String issueKey,
+            String category) {
+        HttpStatusCode status = response.statusCode();
+        return response.bodyToMono(String.class)
+                .defaultIfEmpty("")
+                .map(body -> {
+                    String trimmed = body != null && body.length() > 500 ? body.substring(0, 500) + "…" : body;
+                    String msg = "Jira " + category + " (" + status.value() + ") for issue "
+                            + issueKey + ": " + trimmed;
+                    log.warn("{}", msg);
+                    return new JiraClientException(msg);
+                });
     }
 
     // ============================================================

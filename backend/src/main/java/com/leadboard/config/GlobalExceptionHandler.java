@@ -1,5 +1,7 @@
 package com.leadboard.config;
 
+import com.leadboard.jira.JiraClientException;
+import com.leadboard.planning.EpicNotFoundException;
 import com.leadboard.simulation.SimulationNotFoundException;
 import com.leadboard.team.TeamService;
 import org.slf4j.Logger;
@@ -70,6 +72,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleSimulationNotFound(SimulationNotFoundException ex) {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(EpicNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleEpicNotFound(EpicNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(JiraClientException.class)
+    public ResponseEntity<Map<String, String>> handleJiraClient(JiraClientException ex) {
+        // Upstream Jira call failed — surface as 502 BAD_GATEWAY so the frontend can
+        // distinguish an integration failure from a generic server error. The message
+        // is already sanitised by JiraClient.jiraErrorMono (no stack trace, body truncated).
+        log.warn("Jira client error: {}", ex.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.BAD_GATEWAY)
                 .body(Map.of("error", ex.getMessage()));
     }
 

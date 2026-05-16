@@ -49,6 +49,10 @@
 - [x] ~~Нет индексов для частых запросов метрик~~ — 30+ индексов: idx_jira_issues_team_done, idx_changelog_transitioned_at, idx_forecast_snapshots_team_date и др.
 - [x] ~~Memory leak в sync locks~~ — SyncService не использует explicit locks (не воспроизводится)
 
+### Открытые
+
+- [ ] N+1 при загрузке capacity по командам в `QuarterlyPlanningService` (`getEpicsForQuarter`, `getSummary`, `getTeamsOverview`, `buildQuarterSnapshot`) — `getTeamCapacity()` зовётся в цикле по командам, каждый вызов = `findByTeamIdAndActiveTrue` + `getTeamAbsenceDates`. Решение: батч-загрузка members/absences для всех активных команд за квартал одним запросом и переиспользование в цикле. Помечено TODO-комментарием в коде (F69 review).
+
 ## Frontend
 
 ### Большие компоненты (требуют декомпозиции)

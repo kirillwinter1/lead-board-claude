@@ -1,0 +1,262 @@
+import { useMemo, useState } from 'react'
+import { SearchInput } from '../SearchInput'
+import { MultiSelectDropdown } from '../MultiSelectDropdown'
+import { EpicCard } from './EpicCard'
+import { PlanningEpicDto, TeamRef } from '../../api/quarterlyPlanning'
+import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './constants'
+import {
+  TEXT_PRIMARY,
+  TEXT_MUTED,
+  BG_SUBTLE,
+  BG_PAGE,
+  BORDER_DEFAULT,
+  SEPARATOR,
+} from '../../constants/colors'
+
+interface BacklogColumnProps {
+  epics: PlanningEpicDto[]
+  targetQuarter: string
+  jiraBaseUrl: string
+  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
+  onMove: (epicKey: string, toQuarter: string | null) => void
+  onBoostChange: (epicKey: string, boost: number) => void
+}
+
+interface ProjectGroup {
+  projectKey: string | null
+  projectSummary: string | null
+  epics: PlanningEpicDto[]
+}
+
+function projectKeyOrSentinel(key: string | null): string {
+  return key ?? NO_PROJECT_KEY
+}
+
+export function BacklogColumn({
+  epics,
+  targetQuarter,
+  jiraBaseUrl,
+  teamsById,
+  onMove,
+  onBoostChange,
+}: BacklogColumnProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [projectFilter, setProjectFilter] = useState<Set<string>>(new Set())
+  const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  // Build filter option lists from full epics list (so user can always find any project/team).
+  // Epics with no parent project are bucketed under a sentinel key/label so filters and sort
+  // work without crashing on null. The sentinel group is always sorted last.
+  const allProjectOptions = useMemo(() => {
+    const map = new Map<string, string>()
+    epics.forEach(e => {
+      const k = projectKeyOrSentinel(e.projectKey)
+      if (!map.has(k)) map.set(k, e.projectSummary ?? NO_PROJECT_LABEL)
+    })
+    return Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === NO_PROJECT_KEY) return 1
+      if (b === NO_PROJECT_KEY) return -1
+      return a.localeCompare(b)
+    })
+  }, [epics])
+
+  // Single-pass build of all distinct teams referenced by any epic; derived
+  // colorMap/labelMap below avoid re-iterating epics.
+  const allTeamOptions = useMemo(() => {
+    const teams = new Map<string, { id: string; name: string; color: string | null }>()
+    epics.forEach(e => e.teams.forEach(t => {
+      const id = String(t.id)
+      if (!teams.has(id)) {
+        teams.set(id, { id, name: t.name, color: t.color })
+      }
+    }))
+    return Array.from(teams.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [epics])
+
+  // Apply filters
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return epics.filter(e => {
+      if (q && !e.epicSummary.toLowerCase().includes(q) && !e.epicKey.toLowerCase().includes(q)) return false
+      if (projectFilter.size > 0 && !projectFilter.has(projectKeyOrSentinel(e.projectKey))) return false
+      if (teamFilter.size > 0) {
+        const ids = e.teams.map(t => String(t.id))
+        if (!ids.some(id => teamFilter.has(id))) return false
+      }
+      return true
+    })
+  }, [epics, searchQuery, projectFilter, teamFilter])
+
+  const groups: ProjectGroup[] = useMemo(() => {
+    const map = new Map<string, ProjectGroup>()
+    filtered.forEach(e => {
+      const k = projectKeyOrSentinel(e.projectKey)
+      let g = map.get(k)
+      if (!g) {
+        g = { projectKey: e.projectKey, projectSummary: e.projectSummary, epics: [] }
+        map.set(k, g)
+      }
+      g.epics.push(e)
+    })
+    const arr = Array.from(map.values())
+    arr.forEach(g => g.epics.sort((a, b) => b.priorityScore - a.priorityScore))
+    arr.sort((a, b) => {
+      const aMax = a.epics[0]?.priorityScore ?? 0
+      const bMax = b.epics[0]?.priorityScore ?? 0
+      return bMax - aMax
+    })
+    return arr
+  }, [filtered])
+
+  const totalCount = epics.length
+  const visibleCount = filtered.length
+  const hiddenCount = totalCount - visibleCount
+
+  const toggleGroup = (key: string) => {
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const teamColorMap = useMemo(() => {
+    const m = new Map<string, string>()
+    allTeamOptions.forEach(t => { if (t.color) m.set(t.id, t.color) })
+    return m
+  }, [allTeamOptions])
+
+  const teamLabelMap = useMemo(() => {
+    const m = new Map<string, string>()
+    allTeamOptions.forEach(t => m.set(t.id, t.name))
+    return m
+  }, [allTeamOptions])
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+        padding: 16,
+        background: BG_PAGE,
+        border: `1px solid ${BORDER_DEFAULT}`,
+        borderRadius: 8,
+        minHeight: 400,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 18, color: TEXT_PRIMARY }}>Backlog</h2>
+          <span style={{ fontSize: 12, color: TEXT_MUTED }}>
+            {visibleCount} of {totalCount} epics
+            {hiddenCount > 0 && ` (${hiddenCount} hidden)`} · sorted by priority
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ flex: '1 1 240px', minWidth: 200 }}>
+          <SearchInput value={searchQuery} onChange={setSearchQuery} placeholder="Search epics..." />
+        </div>
+        <MultiSelectDropdown
+          label="Project"
+          options={allProjectOptions.map(([k]) => k)}
+          selected={projectFilter}
+          onToggle={key => setProjectFilter(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+          })}
+          placeholder="All projects"
+          renderOption={key => {
+            if (key === NO_PROJECT_KEY) return NO_PROJECT_LABEL
+            const summary = allProjectOptions.find(([k]) => k === key)?.[1] ?? ''
+            return summary ? `${key} — ${summary}` : key
+          }}
+        />
+        <MultiSelectDropdown
+          label="Team"
+          options={allTeamOptions.map(t => t.id)}
+          selected={teamFilter}
+          onToggle={id => setTeamFilter(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+          })}
+          placeholder="All teams"
+          colorMap={teamColorMap}
+          renderOption={id => teamLabelMap.get(id) || id}
+        />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {groups.length === 0 && (
+          <div style={{ padding: 24, textAlign: 'center', color: TEXT_MUTED, background: BG_SUBTLE, borderRadius: 6 }}>
+            {epics.length === 0 ? 'No epics in backlog.' : 'No epics match your filters.'}
+          </div>
+        )}
+        {groups.map(g => {
+          const groupKey = projectKeyOrSentinel(g.projectKey)
+          const isCollapsed = collapsed.has(groupKey)
+          const displayHeader = g.projectKey ?? NO_PROJECT_LABEL
+          const headerSummary = g.projectSummary ?? ''
+          return (
+            <section key={groupKey} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => toggleGroup(groupKey)}
+                aria-expanded={!isCollapsed}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: '8px 10px',
+                  background: BG_SUBTLE,
+                  border: `1px solid ${SEPARATOR}`,
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  color: TEXT_PRIMARY,
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ display: 'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }}>
+                  ▾
+                </span>
+                <span>{displayHeader}</span>
+                {headerSummary && (
+                  <span style={{ color: TEXT_MUTED, fontWeight: 500 }}>{headerSummary}</span>
+                )}
+                <span style={{ marginLeft: 'auto', color: TEXT_MUTED, fontWeight: 600 }}>
+                  {g.epics.length} {g.epics.length === 1 ? 'epic' : 'epics'}
+                </span>
+              </button>
+              {!isCollapsed && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {g.epics.map(epic => (
+                    <EpicCard
+                      key={epic.epicKey}
+                      epic={epic}
+                      mode="backlog"
+                      targetQuarter={targetQuarter}
+                      jiraBaseUrl={jiraBaseUrl}
+                      teamsById={teamsById}
+                      onMove={onMove}
+                      onBoostChange={onBoostChange}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

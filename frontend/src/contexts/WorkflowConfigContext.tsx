@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import axios from 'axios'
 import { WorkflowRoleDto, JiraIssueTypeMetadata, JiraPriorityMetadata } from '../api/workflowConfig'
 
@@ -69,7 +69,11 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
     loadConfig()
   }, [loadConfig])
 
-  const helpers: WorkflowConfigHelpers = {
+  // Memoize helpers so reference equality is stable across renders.
+  // Without this, every render of WorkflowConfigProvider would produce new
+  // function identities, causing useMemo/useEffect deps in consumers (e.g.
+  // EpicCard's `orderedRoles`) to invalidate on unrelated renders.
+  const helpers: WorkflowConfigHelpers = useMemo(() => ({
     ...config,
     isProject: (type) => {
       if (!type) return false
@@ -114,7 +118,7 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       return config.priorityIcons[name] || null
     },
     refresh: loadConfig,
-  }
+  }), [config, loadConfig])
 
   return (
     <WorkflowConfigContext.Provider value={helpers}>

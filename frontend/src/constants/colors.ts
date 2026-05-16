@@ -66,10 +66,26 @@ export const LINK_COLOR = '#0052CC'
 
 // Error / danger
 export const ERROR_TEXT = '#DE350B'
+export const ERROR_BG = '#FFEBE6'
+export const ERROR_BORDER = '#FFBDAD'
+export const ERROR_DARK_TEXT = '#BF2600'
 
 // Warning / recommendation callout
 export const WARNING_BG = '#FFFAE6'
 export const WARNING_BORDER = '#FFE380'
+export const WARNING_TEXT = '#7B4A00'
+
+// Success (Atlassian green tones)
+export const SUCCESS_BG = '#E3FCEF'
+export const SUCCESS_TEXT = '#006644'
+
+// Info (Atlassian blue tones)
+export const INFO_BG = '#DEEBFF'
+export const INFO_TEXT = '#0747A6'
+export const INFO_BORDER = '#B3D4FF'
+
+// Page background
+export const BG_PAGE = '#ffffff'
 
 // Separator / divider
 export const SEPARATOR = '#EBECF0'

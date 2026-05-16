@@ -72,4 +72,35 @@ public class QuarterlyPlanningController {
         planningService.updateProjectBoost(key, boost);
         return ResponseEntity.ok().build();
     }
+
+    // ==================== F69: Quarterly Planning Redesign (Kanban) ====================
+
+    @GetMapping("/quarters/{quarter}/epics")
+    public ResponseEntity<QuarterlyEpicsResponse> getEpicsForQuarter(@PathVariable String quarter) {
+        return ResponseEntity.ok(planningService.getEpicsForQuarter(quarter));
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PostMapping("/epics/{epicKey}/quarter")
+    public ResponseEntity<PlanningEpicDto> assignEpicToQuarter(
+            @PathVariable String epicKey,
+            @RequestBody Map<String, String> body) {
+        // null quarter explicitly removes the YYYYQn label from Jira
+        String quarter = body != null ? body.get("quarter") : null;
+        PlanningEpicDto result = planningService.assignEpicToQuarter(epicKey, quarter);
+        return ResponseEntity.ok(result);
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PostMapping("/epics/{epicKey}/boost")
+    public ResponseEntity<PlanningEpicDto> setEpicBoost(
+            @PathVariable String epicKey,
+            @RequestBody Map<String, Integer> body) {
+        Integer boost = body != null ? body.get("boost") : null;
+        if (boost == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        PlanningEpicDto result = planningService.setEpicBoost(epicKey, boost);
+        return ResponseEntity.ok(result);
+    }
 }
