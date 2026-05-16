@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.jira.JiraClient;
 import com.leadboard.planning.dto.*;
 import com.leadboard.rice.RiceAssessmentEntity;
 import com.leadboard.rice.RiceAssessmentRepository;
@@ -11,6 +12,7 @@ import com.leadboard.team.*;
 import com.leadboard.team.dto.PlanningConfigDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,7 @@ public class QuarterlyPlanningService {
     private final TeamService teamService;
     private final RiceAssessmentRepository riceAssessmentRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final JiraClient jiraClient;
 
     public QuarterlyPlanningService(JiraIssueRepository issueRepository,
                                      TeamRepository teamRepository,
@@ -43,7 +46,8 @@ public class QuarterlyPlanningService {
                                      WorkCalendarService workCalendarService,
                                      TeamService teamService,
                                      RiceAssessmentRepository riceAssessmentRepository,
-                                     WorkflowConfigService workflowConfigService) {
+                                     WorkflowConfigService workflowConfigService,
+                                     @Autowired(required = false) JiraClient jiraClient) {
         this.issueRepository = issueRepository;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
@@ -52,6 +56,7 @@ public class QuarterlyPlanningService {
         this.teamService = teamService;
         this.riceAssessmentRepository = riceAssessmentRepository;
         this.workflowConfigService = workflowConfigService;
+        this.jiraClient = jiraClient;
     }
 
     // ==================== Capacity ====================
@@ -666,6 +671,315 @@ public class QuarterlyPlanningService {
         // Sort by utilization descending
         result.sort(Comparator.comparingInt(QuarterlyTeamOverviewDto::utilization).reversed());
         return result;
+    }
+
+    // ==================== F69: Epics for Quarter (Kanban view) ====================
+
+    /**
+     * Returns every epic in the system enriched with quarter membership,
+     * priority score, demand, and capacity-overload flags for the requested quarter.
+     */
+    public QuarterlyEpicsResponse getEpicsForQuarter(String quarterLabel) {
+        List<JiraIssueEntity> allEpics = loadAllEpics();
+        List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
+
+        Map<String, JiraIssueEntity> projectsByKey = new HashMap<>();
+        for (JiraIssueEntity p : allProjects) {
+            projectsByKey.put(p.getIssueKey(), p);
+        }
+        Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
+
+        Map<Long, TeamEntity> teamsById = new HashMap<>();
+        for (TeamEntity t : teamRepository.findByActiveTrue()) {
+            teamsById.put(t.getId(), t);
+        }
+
+        // RICE scores indexed by epic key (RICE is on epics OR projects — try epic first, fallback project)
+        Set<String> riceKeys = new HashSet<>();
+        for (JiraIssueEntity e : allEpics) riceKeys.add(e.getIssueKey());
+        riceKeys.addAll(projectsByKey.keySet());
+        Map<String, RiceAssessmentEntity> riceByKey = loadRiceScores(riceKeys);
+
+        BigDecimal defaultRiskBuffer = new BigDecimal("0.2");
+
+        // Pre-compute capacity-by-role per team for overload detection
+        Map<Long, Map<String, BigDecimal>> capacityByTeam = new HashMap<>();
+        Map<Long, BigDecimal> riskBufferByTeam = new HashMap<>();
+        for (TeamEntity team : teamsById.values()) {
+            try {
+                capacityByTeam.put(team.getId(), getTeamCapacity(team.getId(), quarterLabel).capacityByRole());
+                PlanningConfigDto cfg = teamService.getPlanningConfig(team.getId());
+                riskBufferByTeam.put(team.getId(),
+                        cfg.riskBuffer() != null ? cfg.riskBuffer() : defaultRiskBuffer);
+            } catch (Exception e) {
+                log.warn("Failed to compute capacity for team {}: {}", team.getName(), e.getMessage());
+                capacityByTeam.put(team.getId(), Map.of());
+                riskBufferByTeam.put(team.getId(), defaultRiskBuffer);
+            }
+        }
+
+        // Sum demand by team for all epics currently in the requested quarter
+        Map<Long, Map<String, BigDecimal>> demandByTeamInQuarter = new HashMap<>();
+        for (JiraIssueEntity epic : allEpics) {
+            if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
+            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            if (!quarterLabel.equals(epicQuarter)) continue;
+            Long teamId = epic.getTeamId();
+            if (teamId == null) continue;
+            BigDecimal risk = riskBufferByTeam.getOrDefault(teamId, defaultRiskBuffer);
+            Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, risk);
+            Map<String, BigDecimal> teamDemand = demandByTeamInQuarter.computeIfAbsent(teamId, k -> new LinkedHashMap<>());
+            for (Map.Entry<String, BigDecimal> e : epicDemand.entrySet()) {
+                teamDemand.merge(e.getKey(), e.getValue(), BigDecimal::add);
+            }
+        }
+
+        // Set of teams currently overloaded in this quarter
+        Set<Long> overloadedTeamIds = new HashSet<>();
+        for (Map.Entry<Long, Map<String, BigDecimal>> entry : demandByTeamInQuarter.entrySet()) {
+            Long teamId = entry.getKey();
+            Map<String, BigDecimal> capacity = capacityByTeam.getOrDefault(teamId, Map.of());
+            for (Map.Entry<String, BigDecimal> roleDemand : entry.getValue().entrySet()) {
+                BigDecimal cap = capacity.getOrDefault(roleDemand.getKey(), BigDecimal.ZERO);
+                if (roleDemand.getValue().compareTo(cap) > 0) {
+                    overloadedTeamIds.add(teamId);
+                    break;
+                }
+            }
+        }
+
+        List<PlanningEpicDto> result = new ArrayList<>();
+        for (JiraIssueEntity epic : allEpics) {
+            if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
+
+            String projectKey = epicToProjectKey.get(epic.getIssueKey());
+            JiraIssueEntity project = projectKey != null ? projectsByKey.get(projectKey) : null;
+
+            String epicQuarter = resolveQuarterLabel(epic, epicToProjectKey, projectsByKey);
+            boolean inQuarter = quarterLabel.equals(epicQuarter);
+
+            // RICE on epic first, fall back to parent project's RICE
+            RiceAssessmentEntity rice = riceByKey.get(epic.getIssueKey());
+            if (rice == null && projectKey != null) rice = riceByKey.get(projectKey);
+            BigDecimal riceScore = rice != null ? rice.getNormalizedScore() : BigDecimal.ZERO;
+            Integer boost = epic.getManualBoost() != null ? epic.getManualBoost() : 0;
+            BigDecimal priorityScore = computePriorityScore(riceScore, boost);
+
+            BigDecimal riskBuffer = epic.getTeamId() != null
+                    ? riskBufferByTeam.getOrDefault(epic.getTeamId(), defaultRiskBuffer)
+                    : defaultRiskBuffer;
+            Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
+            BigDecimal totalDemand = demand.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            boolean hasEstimate = epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty();
+            boolean hasTeamMapping = epic.getTeamId() != null;
+
+            List<PlanningEpicDto.TeamRef> epicTeams = new ArrayList<>();
+            if (epic.getTeamId() != null) {
+                TeamEntity team = teamsById.get(epic.getTeamId());
+                if (team != null) {
+                    epicTeams.add(new PlanningEpicDto.TeamRef(team.getId(), team.getName(), team.getColor()));
+                }
+            }
+
+            // Per-epic overload: only relevant if epic is currently in this quarter
+            List<Long> epicOverloaded = new ArrayList<>();
+            if (inQuarter && epic.getTeamId() != null && overloadedTeamIds.contains(epic.getTeamId())) {
+                epicOverloaded.add(epic.getTeamId());
+            }
+
+            result.add(new PlanningEpicDto(
+                    epic.getIssueKey(),
+                    epic.getSummary(),
+                    null, // iconUrl resolved by frontend via WorkflowConfigContext
+                    epic.getIssueType(),
+                    projectKey,
+                    project != null ? project.getSummary() : null,
+                    epicQuarter,
+                    inQuarter,
+                    riceScore,
+                    boost,
+                    priorityScore,
+                    epicTeams,
+                    demand,
+                    totalDemand,
+                    hasEstimate,
+                    hasTeamMapping,
+                    epicOverloaded
+            ));
+        }
+
+        // Sort by priority score descending so frontend Backlog ordering is consistent
+        result.sort(Comparator.comparing(PlanningEpicDto::priorityScore).reversed());
+
+        return new QuarterlyEpicsResponse(quarterLabel, result);
+    }
+
+    /**
+     * Assign or remove the quarter label for an epic. Writes to Jira first (source of truth),
+     * then mirrors the change in the local entity. Passing {@code null} for quarter removes
+     * any existing YYYYQn labels.
+     */
+    @Transactional
+    public PlanningEpicDto assignEpicToQuarter(String epicKey, String quarter) {
+        if (quarter != null && !QUARTER_LABEL_PATTERN.matcher(quarter).matches()) {
+            throw new IllegalArgumentException("Invalid quarter label: " + quarter);
+        }
+
+        JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
+                .orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicKey));
+        if (!workflowConfigService.isEpic(epic.getIssueType())) {
+            throw new IllegalArgumentException("Issue is not an Epic: " + epicKey);
+        }
+
+        // Build new labels: drop existing YYYYQn entries, append the new quarter (if any)
+        List<String> newLabels = new ArrayList<>();
+        if (epic.getLabels() != null) {
+            for (String label : epic.getLabels()) {
+                if (label != null && !QUARTER_LABEL_PATTERN.matcher(label).matches()) {
+                    newLabels.add(label);
+                }
+            }
+        }
+        if (quarter != null) {
+            newLabels.add(quarter);
+        }
+
+        // Jira is the source of truth — write there first, only mirror locally on success
+        if (jiraClient != null) {
+            jiraClient.updateLabels(epicKey, newLabels);
+        }
+
+        epic.setLabels(newLabels.toArray(new String[0]));
+        issueRepository.save(epic);
+
+        return buildPlanningEpicDto(epic, quarter != null ? quarter : currentLookupQuarter(epic));
+    }
+
+    @Transactional
+    public PlanningEpicDto removeEpicFromQuarter(String epicKey) {
+        return assignEpicToQuarter(epicKey, null);
+    }
+
+    /**
+     * Set the manual boost on an epic. Validates the range [-50, 50].
+     */
+    @Transactional
+    public PlanningEpicDto setEpicBoost(String epicKey, int boost) {
+        if (boost < -50 || boost > 50) {
+            throw new IllegalArgumentException("Boost must be in [-50, 50], got: " + boost);
+        }
+        JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
+                .orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicKey));
+        if (!workflowConfigService.isEpic(epic.getIssueType())) {
+            throw new IllegalArgumentException("Issue is not an Epic: " + epicKey);
+        }
+
+        epic.setManualBoost(boost);
+        issueRepository.save(epic);
+
+        return buildPlanningEpicDto(epic, currentLookupQuarter(epic));
+    }
+
+    private String currentLookupQuarter(JiraIssueEntity epic) {
+        // Resolve epic's current quarter (direct label first, otherwise inherited from parent project)
+        String direct = epic.getQuarterLabel();
+        if (direct != null) return direct;
+
+        if (epic.getParentKey() != null) {
+            JiraIssueEntity parent = issueRepository.findByIssueKey(epic.getParentKey()).orElse(null);
+            if (parent != null) return parent.getQuarterLabel();
+        }
+        return null;
+    }
+
+    private PlanningEpicDto buildPlanningEpicDto(JiraIssueEntity epic, String contextQuarter) {
+        // Lightweight DTO builder for single-epic responses after mutations.
+        // Loads parent project for project metadata; computes priority + demand without full quarter scan.
+        //
+        // Project association resolution mirrors getEpicsForQuarter:
+        //   1. epic.parentKey (Jira parent link)
+        //   2. fallback: any PROJECT whose childEpicKeys contains this epic (Jira issue link)
+        // The fallback is required because some epics are linked from the project side only
+        // (issue-link "is parent of") without a parentKey on the epic itself.
+        JiraIssueEntity project = null;
+        String parentKey = epic.getParentKey();
+        if (parentKey != null) {
+            project = issueRepository.findByIssueKey(parentKey).orElse(null);
+        }
+        if (project == null) {
+            // Reverse lookup via childEpicKeys on PROJECT entities
+            for (JiraIssueEntity candidate : issueRepository.findByBoardCategory("PROJECT")) {
+                String[] children = candidate.getChildEpicKeys();
+                if (children == null) continue;
+                for (String child : children) {
+                    if (epic.getIssueKey().equals(child)) {
+                        project = candidate;
+                        break;
+                    }
+                }
+                if (project != null) break;
+            }
+        }
+        String projectKey = project != null ? project.getIssueKey() : null;
+
+        TeamEntity team = epic.getTeamId() != null
+                ? teamRepository.findById(epic.getTeamId()).orElse(null)
+                : null;
+
+        RiceAssessmentEntity rice = riceAssessmentRepository.findByIssueKey(epic.getIssueKey()).orElse(null);
+        if (rice == null && projectKey != null) {
+            rice = riceAssessmentRepository.findByIssueKey(projectKey).orElse(null);
+        }
+        BigDecimal riceScore = rice != null ? rice.getNormalizedScore() : BigDecimal.ZERO;
+        Integer boost = epic.getManualBoost() != null ? epic.getManualBoost() : 0;
+        BigDecimal priorityScore = computePriorityScore(riceScore, boost);
+
+        BigDecimal riskBuffer = new BigDecimal("0.2");
+        if (epic.getTeamId() != null) {
+            try {
+                PlanningConfigDto cfg = teamService.getPlanningConfig(epic.getTeamId());
+                if (cfg.riskBuffer() != null) riskBuffer = cfg.riskBuffer();
+            } catch (Exception ignore) {
+                // Use default risk buffer
+            }
+        }
+        Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
+        BigDecimal totalDemand = demand.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<PlanningEpicDto.TeamRef> teamRefs = team != null
+                ? List.of(new PlanningEpicDto.TeamRef(team.getId(), team.getName(), team.getColor()))
+                : List.of();
+
+        String epicQuarter = epic.getQuarterLabel();
+        if (epicQuarter == null && project != null) epicQuarter = project.getQuarterLabel();
+
+        boolean inQuarter = contextQuarter != null && contextQuarter.equals(epicQuarter);
+
+        return new PlanningEpicDto(
+                epic.getIssueKey(),
+                epic.getSummary(),
+                null,
+                epic.getIssueType(),
+                projectKey,
+                project != null ? project.getSummary() : null,
+                epicQuarter,
+                inQuarter,
+                riceScore,
+                boost,
+                priorityScore,
+                teamRefs,
+                demand,
+                totalDemand,
+                epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty(),
+                epic.getTeamId() != null,
+                List.of()
+        );
+    }
+
+    private List<JiraIssueEntity> loadAllEpics() {
+        // Use board_category for efficiency; that is what sync sets based on isEpic()
+        return issueRepository.findByBoardCategory("EPIC");
     }
 
     // ==================== Private Helpers ====================

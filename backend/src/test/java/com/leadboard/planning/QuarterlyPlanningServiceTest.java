@@ -2,6 +2,7 @@ package com.leadboard.planning;
 
 import com.leadboard.calendar.WorkCalendarService;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.jira.JiraClient;
 import com.leadboard.planning.dto.*;
 import com.leadboard.rice.RiceAssessmentEntity;
 import com.leadboard.rice.RiceAssessmentRepository;
@@ -36,6 +37,7 @@ class QuarterlyPlanningServiceTest {
     @Mock private TeamService teamService;
     @Mock private RiceAssessmentRepository riceAssessmentRepository;
     @Mock private WorkflowConfigService workflowConfigService;
+    @Mock private JiraClient jiraClient;
 
     private QuarterlyPlanningService service;
 
@@ -44,7 +46,8 @@ class QuarterlyPlanningServiceTest {
         service = new QuarterlyPlanningService(
                 issueRepository, teamRepository, memberRepository,
                 absenceService, workCalendarService, teamService,
-                riceAssessmentRepository, workflowConfigService
+                riceAssessmentRepository, workflowConfigService,
+                jiraClient
         );
 
         when(teamService.getPlanningConfig(anyLong())).thenReturn(PlanningConfigDto.defaults());
@@ -499,6 +502,208 @@ class QuarterlyPlanningServiceTest {
         assertTrue(teamDto.utilization() > 100, "Team should be overloaded");
         assertEquals("high", teamDto.risk());
         assertTrue(teamDto.overloadedEpics() > 0);
+    }
+
+    // ==================== F69: Epics for Quarter (Kanban) ====================
+
+    @Test
+    void getEpicsForQuarter_returnsAllEpicsWithCorrectInQuarterFlag() {
+        JiraIssueEntity project = createIssue("PROJ-1", "PROJECT", "Project");
+        project.setLabels(new String[]{"2026Q2"});
+
+        JiraIssueEntity inQuarterEpic = createIssue("EPIC-1", "EPIC", "In Q2");
+        inQuarterEpic.setParentKey("PROJ-1");
+        inQuarterEpic.setLabels(new String[]{"2026Q2"});
+        inQuarterEpic.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
+        inQuarterEpic.setTeamId(1L);
+
+        JiraIssueEntity otherQuarterEpic = createIssue("EPIC-2", "EPIC", "In Q1");
+        otherQuarterEpic.setLabels(new String[]{"2026Q1"});
+        otherQuarterEpic.setRoughEstimates(Map.of("DEV", new BigDecimal("3")));
+
+        JiraIssueEntity backlogEpic = createIssue("EPIC-3", "EPIC", "Backlog");
+        backlogEpic.setLabels(null);
+        backlogEpic.setRoughEstimates(Map.of("DEV", new BigDecimal("8")));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of(project));
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(inQuarterEpic, otherQuarterEpic, backlogEpic));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2");
+
+        assertEquals("2026Q2", response.quarter());
+        assertEquals(3, response.epics().size());
+
+        Map<String, PlanningEpicDto> byKey = response.epics().stream()
+                .collect(java.util.stream.Collectors.toMap(PlanningEpicDto::epicKey, e -> e));
+        assertTrue(byKey.get("EPIC-1").inQuarter());
+        assertEquals("2026Q2", byKey.get("EPIC-1").quarterLabel());
+        assertFalse(byKey.get("EPIC-2").inQuarter());
+        assertEquals("2026Q1", byKey.get("EPIC-2").quarterLabel());
+        assertFalse(byKey.get("EPIC-3").inQuarter());
+        assertNull(byKey.get("EPIC-3").quarterLabel());
+    }
+
+    @Test
+    void getEpicsForQuarter_includesEpicsWithoutEstimate_withHasEstimateFalse() {
+        JiraIssueEntity epicNoEstimate = createIssue("EPIC-1", "EPIC", "No estimate");
+        epicNoEstimate.setLabels(new String[]{"2026Q2"});
+        // No rough estimates set
+
+        JiraIssueEntity epicNoTeam = createIssue("EPIC-2", "EPIC", "No team");
+        epicNoTeam.setLabels(new String[]{"2026Q2"});
+        epicNoTeam.setRoughEstimates(Map.of("DEV", new BigDecimal("3")));
+        epicNoTeam.setTeamId(null);
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of());
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epicNoEstimate, epicNoTeam));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of());
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2");
+
+        Map<String, PlanningEpicDto> byKey = response.epics().stream()
+                .collect(java.util.stream.Collectors.toMap(PlanningEpicDto::epicKey, e -> e));
+        assertFalse(byKey.get("EPIC-1").hasEstimate());
+        assertEquals(BigDecimal.ZERO, byKey.get("EPIC-1").totalDemandDays());
+        assertTrue(byKey.get("EPIC-2").hasEstimate());
+        assertFalse(byKey.get("EPIC-2").hasTeamMapping());
+    }
+
+    @Test
+    void getEpicsForQuarter_priorityScoreEqualsRicePlusBoostClamped() {
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Boosted");
+        epic.setLabels(new String[]{"2026Q2"});
+        epic.setManualBoost(40);
+        epic.setRoughEstimates(Map.of("DEV", new BigDecimal("5")));
+
+        RiceAssessmentEntity rice = new RiceAssessmentEntity();
+        rice.setIssueKey("EPIC-1");
+        rice.setNormalizedScore(new BigDecimal("130.0"));
+
+        when(issueRepository.findByBoardCategory("PROJECT")).thenReturn(List.of());
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of(epic));
+        when(teamRepository.findByActiveTrue()).thenReturn(List.of());
+        when(riceAssessmentRepository.findByIssueKeyIn(anyCollection())).thenReturn(List.of(rice));
+
+        QuarterlyEpicsResponse response = service.getEpicsForQuarter("2026Q2");
+
+        PlanningEpicDto dto = response.epics().get(0);
+        // 130 + 40 = 170 → clamped to 150
+        assertEquals(0, dto.priorityScore().compareTo(new BigDecimal("150.0")));
+        assertEquals(40, dto.manualBoost());
+    }
+
+    @Test
+    void assignEpicToQuarter_addsQuarterLabel_callsJiraClient() {
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        epic.setLabels(new String[]{"some-other-label"});
+
+        when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(riceAssessmentRepository.findByIssueKey(anyString())).thenReturn(Optional.empty());
+
+        PlanningEpicDto result = service.assignEpicToQuarter("EPIC-1", "2026Q2");
+
+        verify(jiraClient).updateLabels(eq("EPIC-1"), argThat(labels ->
+                labels.contains("2026Q2") && labels.contains("some-other-label")));
+        verify(issueRepository).save(epic);
+        assertEquals("2026Q2", result.quarterLabel());
+        assertTrue(result.inQuarter());
+    }
+
+    @Test
+    void assignEpicToQuarter_removesOldQuarterLabels() {
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        epic.setLabels(new String[]{"2026Q1", "feature", "2025Q4"}); // old quarters
+
+        when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(riceAssessmentRepository.findByIssueKey(anyString())).thenReturn(Optional.empty());
+
+        service.assignEpicToQuarter("EPIC-1", "2026Q2");
+
+        verify(jiraClient).updateLabels(eq("EPIC-1"), argThat(labels ->
+                labels.size() == 2 && labels.contains("2026Q2") && labels.contains("feature")));
+    }
+
+    @Test
+    void removeEpicFromQuarter_removesAllQuarterLabels() {
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        epic.setLabels(new String[]{"2026Q2", "feature"});
+
+        when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(riceAssessmentRepository.findByIssueKey(anyString())).thenReturn(Optional.empty());
+
+        PlanningEpicDto result = service.removeEpicFromQuarter("EPIC-1");
+
+        verify(jiraClient).updateLabels(eq("EPIC-1"), argThat(labels ->
+                labels.size() == 1 && labels.contains("feature") && !labels.contains("2026Q2")));
+        assertNull(result.quarterLabel());
+        assertFalse(result.inQuarter());
+    }
+
+    @Test
+    void assignEpicToQuarter_rejectsNonEpic() {
+        JiraIssueEntity story = createIssue("STORY-1", "STORY", "Not an epic");
+        when(issueRepository.findByIssueKey("STORY-1")).thenReturn(Optional.of(story));
+        when(workflowConfigService.isEpic("Story")).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.assignEpicToQuarter("STORY-1", "2026Q2"));
+        verifyNoInteractions(jiraClient);
+    }
+
+    @Test
+    void assignEpicToQuarter_rejectsInvalidQuarterLabel() {
+        // No epic lookup should happen because validation runs first
+        assertThrows(IllegalArgumentException.class,
+                () -> service.assignEpicToQuarter("EPIC-1", "not-a-quarter"));
+        verifyNoInteractions(jiraClient);
+    }
+
+    @Test
+    void setEpicBoost_rejectsOutOfRange() {
+        assertThrows(IllegalArgumentException.class, () -> service.setEpicBoost("EPIC-1", 100));
+        assertThrows(IllegalArgumentException.class, () -> service.setEpicBoost("EPIC-1", -100));
+        verifyNoInteractions(jiraClient);
+    }
+
+    @Test
+    void setEpicBoost_persistsValidValue() {
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(riceAssessmentRepository.findByIssueKey(anyString())).thenReturn(Optional.empty());
+
+        PlanningEpicDto result = service.setEpicBoost("EPIC-1", 25);
+
+        assertEquals(25, epic.getManualBoost());
+        verify(issueRepository).save(epic);
+        assertEquals(25, result.manualBoost());
+        verifyNoInteractions(jiraClient); // boost is local-only
+    }
+
+    @Test
+    void setEpicBoost_acceptsBoundaryValues() {
+        JiraIssueEntity epic = createIssue("EPIC-1", "EPIC", "Epic");
+        when(issueRepository.findByIssueKey("EPIC-1")).thenReturn(Optional.of(epic));
+        when(workflowConfigService.isEpic("Epic")).thenReturn(true);
+        when(riceAssessmentRepository.findByIssueKey(anyString())).thenReturn(Optional.empty());
+
+        service.setEpicBoost("EPIC-1", 50);
+        assertEquals(50, epic.getManualBoost());
+
+        service.setEpicBoost("EPIC-1", -50);
+        assertEquals(-50, epic.getManualBoost());
+    }
+
+    @Test
+    void setEpicBoost_rejectsMissingEpic() {
+        when(issueRepository.findByIssueKey("EPIC-MISSING")).thenReturn(Optional.empty());
+        assertThrows(IllegalArgumentException.class, () -> service.setEpicBoost("EPIC-MISSING", 10));
     }
 
     // ==================== Helpers ====================

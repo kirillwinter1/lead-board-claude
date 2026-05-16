@@ -280,6 +280,25 @@ public class JiraClient {
     }
 
     /**
+     * Update labels on an issue (replaces full labels list).
+     */
+    public void updateLabels(String issueKey, List<String> labels) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        List<String> safeLabels = labels != null ? labels : List.of();
+        Map<String, Object> body = Map.of(
+                "fields", Map.of("labels", safeLabels)
+        );
+
+        if (accessToken != null && cloudId != null) {
+            updateIssueWithOAuth(issueKey, body, accessToken, cloudId);
+        } else {
+            updateIssueWithBasicAuth(issueKey, body);
+        }
+    }
+
+    /**
      * Update time estimate on an issue (in seconds)
      */
     public void updateEstimate(String issueKey, int estimateSeconds) {
