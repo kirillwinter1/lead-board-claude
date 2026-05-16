@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-03-17
+**Последнее обновление:** 2026-05-16
 
 ---
 
@@ -47,6 +47,7 @@
 | 32 | **Metrics Redesign (CTO Dashboard)** | F66 Phase 1-4 | ✅ Проверен | 1 High, 1 Medium, 2 Low | [reports/2026-03-10_F66_METRICS_REDESIGN.md](reports/2026-03-10_F66_METRICS_REDESIGN.md) |
 
 | 33 | **Quarterly Planning Production** | F68 | ✅ Проверен | 1 Medium, 2 Low | [reports/2026-03-17_F68_QUARTERLY_PLANNING_PRODUCTION.md](reports/2026-03-17_F68_QUARTERLY_PLANNING_PRODUCTION.md) |
+| 34 | **Customer-Driven Quarter Planning** | F70 | ✅ Проверен (backend + API) | 0 Critical, 0 High, 2 Medium, 1 Low | [reports/2026-05-16_F70_CUSTOMER_QUARTER_PLANNING.md](reports/2026-05-16_F70_CUSTOMER_QUARTER_PLANNING.md) |
 
 **Прогресс: 33 / 33 модулей проверено (100%)**
 

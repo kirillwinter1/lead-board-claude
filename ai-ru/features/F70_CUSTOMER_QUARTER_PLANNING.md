@@ -1,6 +1,6 @@
 # F70: Customer-Driven Quarter Planning
 
-**Статус:** 📋 Спецификация (готова к реализации)
+**Статус:** Реализовано
 **Дата:** 2026-05-16
 **Базируется на:** F67 (quarter labels), F69 (kanban квартального планирования)
 
@@ -277,6 +277,80 @@ resolveQuarterLabelForFilter(issue, ...) {
 
 - Default team filter (BF, уже зафиксирован в backlog)
 - Notifications PM↔тимлид при изменениях desired/committed
-- Project ownership model (sейчас любой ROLE_PM может править — нужно сузить до assignee)
+- Project ownership model (сейчас любой ROLE_PM может править — нужно сузить до assignee)
 - Audit log изменений desired_quarter
 - Bulk-операции (PM ставит desired сразу нескольким проектам)
+
+## Реализация
+
+### Backend
+
+**Новые endpoints в `QuarterlyPlanningController`:**
+- `POST /api/quarterly-planning/projects/{key}/desired-quarter` (auth: `ADMIN` или `PROJECT_MANAGER`) — записывает label в Jira, зеркалит в БД через транзакцию `REQUIRES_NEW`
+- `GET /api/quarterly-planning/projects/{key}/quarter-commitment` — агрегат по командам (committed / в другом квартале / без коммита)
+- `GET /api/quarterly-planning/quarters/{q}/epics?onlyDesired={true|false}` — расширение F69 endpoint, `onlyDesired` по умолчанию `true`
+
+**Расширение `PlanningEpicDto`:**
+- Добавлены поля `projectDesiredQuarter` и `isStandalone`
+
+**Новый сервис `ProjectLabelPersistenceService`:**
+- Паттерн `REQUIRES_NEW`, аналогичен `EpicLabelPersistenceService` из F69
+
+**Новое исключение `ProjectNotFoundException`:**
+- HTTP 404, обработчик добавлен в `GlobalExceptionHandler`
+
+**Изменения в `QuarterlyPlanningService`:**
+- Новые методы: `setProjectDesiredQuarter`, `getProjectCommitment`, `findProjectOrThrow`, `resolveCommittedQuarter`, `resolveDesiredQuarter`
+- Метод `getEpicsForQuarter` рефакторен под параметр `onlyDesired`
+- Исправление L1 cache: `project.setLabels(newLabels)` в outer session перед return (чтобы избежать desync после REQUIRES_NEW write)
+
+**Тесты:**
+- 22 новых теста: Service +14, Controller +5, ControllerSecurity +2, ProjectLabelPersistenceService +3, regression +1
+
+### Frontend
+
+**Новые компоненты в `frontend/src/components/projects/`:**
+- `DesiredQuarterPicker.tsx` — dropdown selector для PM
+- `ProjectCommitmentView.tsx` — список команд с прогресс-баром и статус-иконками (✓/⚠/✗/—)
+
+**Изменения в QuarterlyPlanningPage (F69-страница):**
+- Toggle «Только заявленные на квартал» (default ON)
+- Новые бейджи на `EpicCard`: `PM желает Q2` (info-tone) и `Standalone` (neutral-tone)
+- Добавлен `neutral` tone в `WarningBadge` через токены `BG_SUBTLE / TEXT_SECONDARY / BORDER_DEFAULT`
+
+**Изменения в ProjectsPage:**
+- `useAuth` gate: `canEditDesiredQuarter = isAdmin() || isProjectManager()`
+- Lazy-загрузка `commitment` для каждой раскрытой карточки проекта
+- Expand-секция «Quarter & Priority» с `DesiredQuarterPicker` + RICE Scoring + `ProjectCommitmentView`
+
+**API client (`frontend/src/api/metrics.ts`):**
+- Новые типы: `TeamCommitmentDto`, `ProjectQuarterCommitmentDto`
+- Новые методы: `setProjectDesiredQuarter`, `getProjectCommitment`
+- `getEpicsForQuarter` принимает опциональный `onlyDesired`
+
+### Семантика — два независимых quarter label
+
+| Уровень | Label | Семантика | Кто ставит |
+|---------|-------|-----------|------------|
+| Проект (`project.labels`) | `desired_quarter` | PM хочет, чтобы работу сделали в этом квартале | ADMIN / PROJECT_MANAGER |
+| Эпик (`epic.labels`) | `committed_quarter` | Тимлид подтверждает: эпик влезает в квартал команды | ADMIN / PROJECT_MANAGER |
+
+Расхождение видимо обеим сторонам: PM — в commitment view, тимлид — в бейдже «PM желает Q2». Standalone эпики (без parent project) — first-class объект, всегда видимы в backlog тимлида.
+
+### Изменение F67 наследования
+
+- Старый `resolveQuarterLabel` (с наследованием от parent project) — оставлен для Board/Projects фильтра (backward compat F67)
+- Новый `resolveCommittedQuarter` (без наследования, прямой label эпика) — используется в тимлидском экране F69/F70
+
+### Дизайн-система
+
+- Все цвета через `constants/colors.ts` — никаких хардкод hex
+- Переиспользованы: `SingleSelectDropdown`, `TeamBadge`, `RiceScoreBadge`, `Modal`, `MultiSelectDropdown`
+- `useAuth().isAdmin()` / `isProjectManager()` для UI-gate
+
+### Известные follow-up (не блокируют release)
+
+- `getProjectCommitment` — O(N×epics_total) при раскрытии всех проектов на ProjectsPage (TODO в коде)
+- Unmount-guard на in-flight promises (pre-existing pattern в codebase)
+- `onlyDesired` toggle не персистится в URL/localStorage между перезагрузками
+- `desiredQuarter == null` bucket семантика — все committed эпики попадают в «другой квартал»; семантически их можно было бы скрывать
