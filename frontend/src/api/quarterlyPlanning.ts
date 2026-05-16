@@ -148,6 +148,33 @@ export interface QuarterlyTeamOverviewDto {
   impactingProjects: ProjectRefDto[]
 }
 
+// ==================== Planning (F69) Types ====================
+
+export interface PlanningEpicDto {
+  epicKey: string
+  epicSummary: string
+  iconUrl: string | null
+  typeName: string
+  projectKey: string | null
+  projectSummary: string | null
+  quarterLabel: string | null
+  inQuarter: boolean
+  riceScore: number
+  manualBoost: number
+  priorityScore: number
+  teams: TeamRef[]
+  demandByRole: Record<string, number>
+  totalDemandDays: number
+  hasEstimate: boolean
+  hasTeamMapping: boolean
+  overloadedTeams: number[]
+}
+
+export interface QuarterlyEpicsResponse {
+  quarter: string
+  epics: PlanningEpicDto[]
+}
+
 // ==================== API ====================
 
 export const quarterlyPlanningApi = {
@@ -187,6 +214,23 @@ export const quarterlyPlanningApi = {
 
   async getTeamsOverview(quarter: string): Promise<QuarterlyTeamOverviewDto[]> {
     const res = await axios.get('/api/quarterly-planning/teams-overview', { params: { quarter } })
+    return res.data
+  },
+
+  // ==================== F69: Planning board endpoints ====================
+
+  async getEpicsForQuarter(quarter: string): Promise<QuarterlyEpicsResponse> {
+    const res = await axios.get(`/api/quarterly-planning/quarters/${encodeURIComponent(quarter)}/epics`)
+    return res.data
+  },
+
+  async assignEpicToQuarter(epicKey: string, quarter: string | null): Promise<PlanningEpicDto> {
+    const res = await axios.post(`/api/quarterly-planning/epics/${encodeURIComponent(epicKey)}/quarter`, { quarter })
+    return res.data
+  },
+
+  async setEpicBoost(epicKey: string, boost: number): Promise<PlanningEpicDto> {
+    const res = await axios.post(`/api/quarterly-planning/epics/${encodeURIComponent(epicKey)}/boost`, { boost })
     return res.data
   },
 }
