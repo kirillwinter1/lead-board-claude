@@ -1,8 +1,12 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { projectsApi, ProjectDto, ProjectDetailDto, ProjectTimelineDto, ProjectRecommendation } from '../api/projects'
+import { quarterlyPlanningApi, ProjectQuarterCommitmentDto } from '../api/quarterlyPlanning'
 import { getStatusStyles, StatusStyle, searchBoard, BoardSearchResult } from '../api/board'
 import { getConfig } from '../api/config'
+import { useAuth } from '../contexts/AuthContext'
+import { DesiredQuarterPicker } from '../components/projects/DesiredQuarterPicker'
+import { ProjectCommitmentView } from '../components/projects/ProjectCommitmentView'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
@@ -227,6 +231,11 @@ function childEpicToForecast(e: ChildEpicDto): EpicForecast | null {
 export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  // F70: editing desired_quarter is gated to ROLE_ADMIN / ROLE_PROJECT_MANAGER.
+  // The backend enforces the same check; the UI gate is just to avoid showing
+  // a control that will 403 for viewers/members.
+  const { isAdmin, isProjectManager } = useAuth()
+  const canEditDesiredQuarter = isAdmin() || isProjectManager()
 
   // View mode
   const view: ViewMode = searchParams.get('view') === 'gantt' ? 'gantt' : 'list'
@@ -266,6 +275,14 @@ export function ProjectsPage() {
   const [searchLoading, setSearchLoading] = useState(false)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // F70: commitment data is loaded lazily per project (only when its detail
+  // panel expands) — it's a server-side aggregation that's not free, and most
+  // projects on the list will never be expanded in a session. Quarters list is
+  // fetched once on mount and shared across pickers.
+  const [allQuarters, setAllQuarters] = useState<string[]>([])
+  const [commitments, setCommitments] = useState<Map<string, ProjectQuarterCommitmentDto>>(new Map())
+  const [commitmentsLoading, setCommitmentsLoading] = useState<Set<string>>(new Set())
+
   const updateParam = useCallback((key: string, value: string | null) => {
     setSearchParams(prev => {
       const next = new URLSearchParams(prev)
@@ -299,6 +316,31 @@ export function ProjectsPage() {
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // F70: fetch the canonical list of quarters in a single shot. We deliberately
+  // do not block the main projects load — failure here only disables the
+  // desired-quarter picker, the rest of the page still renders.
+  useEffect(() => {
+    quarterlyPlanningApi.getAvailableQuarters()
+      .then(setAllQuarters)
+      .catch(() => setAllQuarters([]))
+  }, [])
+
+  // F70: lazy commitment loader. Called when a project is expanded.
+  const ensureCommitment = useCallback((projectKey: string) => {
+    if (commitments.has(projectKey) || commitmentsLoading.has(projectKey)) return
+    setCommitmentsLoading(prev => new Set(prev).add(projectKey))
+    quarterlyPlanningApi.getProjectCommitment(projectKey)
+      .then(c => setCommitments(prev => new Map(prev).set(projectKey, c)))
+      .catch(() => { /* commitment view will render an empty state if missing */ })
+      .finally(() => {
+        setCommitmentsLoading(prev => {
+          const next = new Set(prev)
+          next.delete(projectKey)
+          return next
+        })
+      })
+  }, [commitments, commitmentsLoading])
 
   // Debounced smart search (semantic/substring via board search API)
   useEffect(() => {
@@ -540,6 +582,8 @@ export function ProjectsPage() {
       return
     }
     setExpandedKeys(prev => new Set(prev).add(issueKey))
+    // F70: commitment load runs in parallel with detail/recs.
+    ensureCommitment(issueKey)
     if (!details.has(issueKey)) {
       setDetailsLoading(prev => new Set(prev).add(issueKey))
       try {
@@ -573,6 +617,8 @@ export function ProjectsPage() {
     } else {
       const keys = new Set(sortedListProjects.map(p => p.issueKey))
       setExpandedKeys(keys)
+      // F70: kick off commitment loads for any project not yet cached.
+      sortedListProjects.forEach(p => ensureCommitment(p.issueKey))
       // Load details for projects that haven't been loaded yet
       const toLoad = sortedListProjects.filter(p => !details.has(p.issueKey))
       if (toLoad.length > 0) {
@@ -953,23 +999,81 @@ export function ProjectsPage() {
                         </div>
                       )}
                       <RecommendationsBlock recommendations={recs} />
-                      <div style={{ marginTop: 12, display: 'flex', justifyContent: 'flex-end' }}>
-                        <button
-                          onClick={e => { e.stopPropagation(); setRiceModalKey(p.issueKey) }}
-                          style={{
-                            padding: '6px 14px',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            color: LINK_COLOR,
-                            background: PRIMARY_LIGHT_BG,
-                            border: `1px solid ${PRIMARY_LIGHT_BORDER}`,
-                            borderRadius: 4,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          RICE Scoring
-                        </button>
-                      </div>
+                      {/* F70: Quarter & Priority — picker + commitment + RICE */}
+                      {(() => {
+                        const commitment = commitments.get(p.issueKey)
+                        const isLoadingCommitment = commitmentsLoading.has(p.issueKey)
+                        // Source of truth for the picker. Commitment response wins (it's
+                        // the freshest after a save); fall back to project.quarterLabel
+                        // for the initial render before commitment loads.
+                        const desired = commitment?.desiredQuarter ?? p.quarterLabel ?? null
+                        return (
+                          <div
+                            style={{
+                              marginTop: 12,
+                              padding: 12,
+                              border: `1px solid ${SEPARATOR}`,
+                              borderRadius: 6,
+                              background: '#fff',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 10,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 12,
+                                flexWrap: 'wrap',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <span style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: 600 }}>
+                                  Desired quarter
+                                </span>
+                                <DesiredQuarterPicker
+                                  projectKey={p.issueKey}
+                                  currentDesiredQuarter={desired}
+                                  availableQuarters={allQuarters}
+                                  readOnly={!canEditDesiredQuarter}
+                                  onChange={updated => {
+                                    setCommitments(prev => new Map(prev).set(p.issueKey, updated))
+                                    // Reflect new desired quarter in the list row immediately
+                                    setListProjects(prev => prev.map(row =>
+                                      row.issueKey === p.issueKey
+                                        ? { ...row, quarterLabel: updated.desiredQuarter }
+                                        : row,
+                                    ))
+                                  }}
+                                />
+                              </div>
+                              <button
+                                onClick={e => { e.stopPropagation(); setRiceModalKey(p.issueKey) }}
+                                style={{
+                                  padding: '6px 14px',
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  color: LINK_COLOR,
+                                  background: PRIMARY_LIGHT_BG,
+                                  border: `1px solid ${PRIMARY_LIGHT_BORDER}`,
+                                  borderRadius: 4,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                RICE Scoring
+                              </button>
+                            </div>
+                            {isLoadingCommitment && !commitment && (
+                              <div style={{ padding: 8, fontSize: 12, color: TEXT_MUTED }}>
+                                Загружаем commitment…
+                              </div>
+                            )}
+                            {commitment && <ProjectCommitmentView commitment={commitment} />}
+                          </div>
+                        )
+                      })()}
                     </div>
                     )
                   })()}

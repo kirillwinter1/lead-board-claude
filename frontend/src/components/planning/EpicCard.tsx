@@ -32,6 +32,12 @@ interface EpicCardProps {
   epic: PlanningEpicDto
   mode: 'backlog' | 'in-quarter'
   targetQuarter: string
+  /**
+   * F70: the currently-selected quarter on the planning page. Used to decide
+   * whether to show the `PM желает {desired}` badge — we only show it when the
+   * project's desired quarter differs from the quarter the tech lead is viewing.
+   */
+  currentQuarter: string
   jiraBaseUrl: string
   teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   onMove: (epicKey: string, toQuarter: string | null) => void
@@ -52,6 +58,7 @@ export function EpicCard({
   epic,
   mode,
   targetQuarter,
+  currentQuarter,
   jiraBaseUrl,
   teamsById,
   onMove,
@@ -81,6 +88,13 @@ export function EpicCard({
 
   const overloads = mode === 'in-quarter' && overloadedTeamNames.length > 0
   const inOtherQuarter = !!epic.quarterLabel && !epic.inQuarter
+
+  // F70: PM is asking for a different quarter than the one the tech lead is viewing.
+  // We deliberately key off `currentQuarter` (the screen's selected quarter), not the
+  // epic's `committed_quarter`, because the tech lead's reference frame is the column
+  // they're planning. If desired == current quarter, no nudge is needed.
+  const pmDesiresDifferentQuarter =
+    !!epic.projectDesiredQuarter && epic.projectDesiredQuarter !== currentQuarter
 
   const handleBoostSave = () => {
     const parsed = parseInt(boostDraft, 10)
@@ -284,7 +298,12 @@ export function EpicCard({
       )}
 
       {/* Warning badges */}
-      {(!epic.hasEstimate || !epic.hasTeamMapping || inOtherQuarter || overloads) && (
+      {(!epic.hasEstimate
+        || !epic.hasTeamMapping
+        || inOtherQuarter
+        || overloads
+        || pmDesiresDifferentQuarter
+        || epic.isStandalone) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {!epic.hasEstimate && (
             <WarningBadge tone="warn">нет оценки</WarningBadge>
@@ -294,6 +313,12 @@ export function EpicCard({
           )}
           {inOtherQuarter && epic.quarterLabel && (
             <WarningBadge tone="info">в {epic.quarterLabel}</WarningBadge>
+          )}
+          {pmDesiresDifferentQuarter && (
+            <WarningBadge tone="info">PM желает {epic.projectDesiredQuarter}</WarningBadge>
+          )}
+          {epic.isStandalone && (
+            <WarningBadge tone="neutral">Standalone</WarningBadge>
           )}
           {overloads && (
             <WarningBadge tone="error">перегруз: {overloadedTeamNames.join(', ')}</WarningBadge>
@@ -325,11 +350,12 @@ export function EpicCard({
   )
 }
 
-function WarningBadge({ tone, children }: { tone: 'warn' | 'info' | 'error'; children: ReactNode }) {
+function WarningBadge({ tone, children }: { tone: 'warn' | 'info' | 'error' | 'neutral'; children: ReactNode }) {
   const map = {
     warn: { bg: WARNING_BG, color: WARNING_TEXT, border: WARNING_BORDER },
     info: { bg: INFO_BG, color: INFO_TEXT, border: INFO_BORDER },
     error: { bg: ERROR_BG, color: ERROR_TEXT, border: ERROR_BORDER },
+    neutral: { bg: BG_SUBTLE, color: TEXT_SECONDARY, border: BORDER_DEFAULT },
   }[tone]
   return (
     <span

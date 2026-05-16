@@ -233,6 +233,7 @@ export function InQuarterColumn({
                       epic={epic}
                       mode="in-quarter"
                       targetQuarter={targetQuarter}
+                      currentQuarter={targetQuarter}
                       jiraBaseUrl={jiraBaseUrl}
                       teamsById={teamsById}
                       onMove={onMove}
