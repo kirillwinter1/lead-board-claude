@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
@@ -103,18 +103,15 @@ class QuarterlyPlanningControllerTest {
 
     @Test
     @WithMockUser(roles = "PROJECT_MANAGER")
-    void assignEpicToQuarter_notFound_propagatesAsServerError() throws Exception {
+    void assignEpicToQuarter_notFound_returnsNotFound() throws Exception {
+        // EpicNotFoundException carries @ResponseStatus(NOT_FOUND) so Spring maps it to 404.
         when(planningService.assignEpicToQuarter(anyString(), anyString()))
-                .thenThrow(new IllegalArgumentException("Epic not found: EPIC-X"));
+                .thenThrow(new EpicNotFoundException("Epic not found: EPIC-X"));
 
-        try {
-            mockMvc.perform(post("/api/quarterly-planning/epics/EPIC-X/quarter")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"quarter\":\"2026Q2\"}"));
-        } catch (Exception e) {
-            // IllegalArgumentException wraps as ServletException
-            assert e.getCause() instanceof IllegalArgumentException;
-        }
+        mockMvc.perform(post("/api/quarterly-planning/epics/EPIC-X/quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isNotFound());
     }
 
     // ==================== POST /epics/{epicKey}/boost ====================
@@ -146,17 +143,17 @@ class QuarterlyPlanningControllerTest {
 
     @Test
     @WithMockUser(roles = "PROJECT_MANAGER")
-    void setEpicBoost_outOfRange_propagatesValidationError() throws Exception {
+    void setEpicBoost_outOfRange_returnsBadRequest() throws Exception {
+        // GlobalExceptionHandler maps IllegalArgumentException → 400 with a JSON body
+        // shaped as {"error": "<message>"}.
         when(planningService.setEpicBoost(anyString(), anyInt()))
                 .thenThrow(new IllegalArgumentException("Boost must be in [-50, 50], got: 999"));
 
-        try {
-            mockMvc.perform(post("/api/quarterly-planning/epics/EPIC-1/boost")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"boost\":999}"));
-        } catch (Exception e) {
-            assert e.getCause() instanceof IllegalArgumentException;
-        }
+        mockMvc.perform(post("/api/quarterly-planning/epics/EPIC-1/boost")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"boost\":999}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", containsString("Boost must be in")));
     }
 
     // ==================== Helpers ====================

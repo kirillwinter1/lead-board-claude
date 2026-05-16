@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react'
 import { SearchInput } from '../SearchInput'
 import { MultiSelectDropdown } from '../MultiSelectDropdown'
 import { EpicCard } from './EpicCard'
-import { PlanningEpicDto } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto, TeamRef } from '../../api/quarterlyPlanning'
+import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './constants'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
   BG_SUBTLE,
+  BG_PAGE,
   BORDER_DEFAULT,
   SEPARATOR,
 } from '../../constants/colors'
@@ -15,7 +17,7 @@ interface BacklogColumnProps {
   epics: PlanningEpicDto[]
   targetQuarter: string
   jiraBaseUrl: string
-  teamsById: Map<number, { id: number; name: string; color: string | null }>
+  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -25,12 +27,6 @@ interface ProjectGroup {
   projectSummary: string | null
   epics: PlanningEpicDto[]
 }
-
-// Synthetic key for epics that have no parent project. Map keys cannot be null
-// for predictable lookup, so we use a sentinel string everywhere a non-null
-// `string` is required (Map.get / Set.has / collapsed state / filter set).
-const NO_PROJECT_KEY = '__no_project__'
-const NO_PROJECT_LABEL = 'Без проекта'
 
 function projectKeyOrSentinel(key: string | null): string {
   return key ?? NO_PROJECT_KEY
@@ -65,14 +61,17 @@ export function BacklogColumn({
     })
   }, [epics])
 
+  // Single-pass build of all distinct teams referenced by any epic; derived
+  // colorMap/labelMap below avoid re-iterating epics.
   const allTeamOptions = useMemo(() => {
-    const map = new Map<string, string | null>()
-    epics.forEach(e => e.teams.forEach(t => { if (!map.has(String(t.id))) map.set(String(t.id), t.color) }))
-    const teamsForLookup = new Map<string, string>()
-    epics.forEach(e => e.teams.forEach(t => { if (!teamsForLookup.has(String(t.id))) teamsForLookup.set(String(t.id), t.name) }))
-    return Array.from(map.entries())
-      .map(([id, color]) => ({ id, name: teamsForLookup.get(id) || `Team ${id}`, color }))
-      .sort((a, b) => a.name.localeCompare(b.name))
+    const teams = new Map<string, { id: string; name: string; color: string | null }>()
+    epics.forEach(e => e.teams.forEach(t => {
+      const id = String(t.id)
+      if (!teams.has(id)) {
+        teams.set(id, { id, name: t.name, color: t.color })
+      }
+    }))
+    return Array.from(teams.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [epics])
 
   // Apply filters
@@ -142,7 +141,7 @@ export function BacklogColumn({
         flexDirection: 'column',
         gap: 12,
         padding: 16,
-        background: '#fff',
+        background: BG_PAGE,
         border: `1px solid ${BORDER_DEFAULT}`,
         borderRadius: 8,
         minHeight: 400,
@@ -204,13 +203,14 @@ export function BacklogColumn({
         {groups.map(g => {
           const groupKey = projectKeyOrSentinel(g.projectKey)
           const isCollapsed = collapsed.has(groupKey)
-          const headerKey = g.projectKey ?? NO_PROJECT_LABEL
-          const headerSummary = g.projectSummary ?? (g.projectKey == null ? '' : '')
+          const displayHeader = g.projectKey ?? NO_PROJECT_LABEL
+          const headerSummary = g.projectSummary ?? ''
           return (
             <section key={groupKey} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button
                 type="button"
                 onClick={() => toggleGroup(groupKey)}
+                aria-expanded={!isCollapsed}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -229,7 +229,7 @@ export function BacklogColumn({
                 <span style={{ display: 'inline-block', transform: isCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s' }}>
                   ▾
                 </span>
-                <span>{headerKey}</span>
+                <span>{displayHeader}</span>
                 {headerSummary && (
                   <span style={{ color: TEXT_MUTED, fontWeight: 500 }}>{headerSummary}</span>
                 )}

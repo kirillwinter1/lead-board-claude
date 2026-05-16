@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal } from '../Modal'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
   TEXT_SECONDARY,
   BG_SUBTLE,
+  BG_PAGE,
   BORDER_DEFAULT,
   LINK_COLOR,
   ERROR_TEXT,
@@ -65,6 +66,26 @@ export function PublishToJiraModal({
   const [publishing, setPublishing] = useState(false)
   const [results, setResults] = useState<PublishResultItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Tracks the success auto-close timer so we can cancel it on unmount or
+  // when the user closes the modal manually before it fires.
+  const autoCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearAutoCloseTimer = () => {
+    if (autoCloseTimerRef.current !== null) {
+      clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+  }
+
+  useEffect(() => {
+    return () => clearAutoCloseTimer()
+  }, [])
+
+  const handleReset = () => {
+    setPublishing(false)
+    setResults(null)
+    setError(null)
+  }
 
   const handleConfirm = async () => {
     setError(null)
@@ -74,8 +95,10 @@ export function PublishToJiraModal({
       setResults(res)
       const allOk = res.every(r => r.ok)
       if (allOk) {
-        // Auto-close after a short delay so user sees the success
-        setTimeout(() => {
+        // Auto-close after a short delay so user sees the success state.
+        clearAutoCloseTimer()
+        autoCloseTimerRef.current = setTimeout(() => {
+          autoCloseTimerRef.current = null
           handleReset()
           onClose()
         }, 800)
@@ -87,14 +110,9 @@ export function PublishToJiraModal({
     }
   }
 
-  const handleReset = () => {
-    setPublishing(false)
-    setResults(null)
-    setError(null)
-  }
-
   const handleClose = () => {
     if (publishing) return
+    clearAutoCloseTimer()
     handleReset()
     onClose()
   }
@@ -131,17 +149,19 @@ export function PublishToJiraModal({
               padding: 8,
             }}
           >
-            {visibleChanges.map((c, idx) => {
+            {visibleChanges.map((c) => {
               const result = results?.find(r => r.change.epicKey === c.epicKey && r.change.action === c.action)
               return (
                 <div
-                  key={`${c.epicKey}-${c.action}-${idx}`}
+                  // (epicKey, action) is unique per render — at most one
+                  // {add|remove|move} and one {boost} can be pending per epic.
+                  key={`${c.epicKey}-${c.action}`}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
                     padding: '8px 10px',
-                    background: '#fff',
+                    background: BG_PAGE,
                     border: `1px solid ${BORDER_DEFAULT}`,
                     borderRadius: 4,
                   }}
@@ -201,7 +221,7 @@ export function PublishToJiraModal({
               disabled={publishing}
               style={{
                 padding: '8px 16px',
-                background: '#fff',
+                background: BG_PAGE,
                 color: TEXT_PRIMARY,
                 border: `1px solid ${BORDER_DEFAULT}`,
                 borderRadius: 4,
@@ -218,7 +238,7 @@ export function PublishToJiraModal({
               style={{
                 padding: '8px 16px',
                 background: LINK_COLOR,
-                color: '#fff',
+                color: BG_PAGE,
                 border: 'none',
                 borderRadius: 4,
                 fontWeight: 600,

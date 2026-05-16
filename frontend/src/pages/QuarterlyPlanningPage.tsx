@@ -3,6 +3,7 @@ import {
   quarterlyPlanningApi,
   PlanningEpicDto,
   QuarterlyTeamOverviewDto,
+  TeamRef,
 } from '../api/quarterlyPlanning'
 import { getConfig } from '../api/config'
 import { CapacityBars } from '../components/planning/CapacityBars'
@@ -15,17 +16,14 @@ import {
   TEXT_MUTED,
   TEXT_SECONDARY,
   BG_SUBTLE,
+  BG_PAGE,
   BORDER_DEFAULT,
   LINK_COLOR,
   ERROR_TEXT,
+  ERROR_BG,
+  ERROR_BORDER,
 } from '../constants/colors'
 import './QuarterlyPlanningPage.css'
-
-interface TeamRef {
-  id: number
-  name: string
-  color: string | null
-}
 
 function defaultQuarter(quarters: string[]): string {
   if (quarters.length === 0) return ''
@@ -53,6 +51,9 @@ export function QuarterlyPlanningPage() {
   // ==================== UI state ====================
   const [publishModalOpen, setPublishModalOpen] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  // Monotonic counter used to discard responses from stale loadQuarter calls
+  // when the user switches quarters quickly or hits Refresh mid-flight.
+  const loadGenerationRef = useRef(0)
 
   // ==================== Initial load ====================
   useEffect(() => {
@@ -78,6 +79,7 @@ export function QuarterlyPlanningPage() {
   // ==================== Data load ====================
   const loadQuarter = useCallback(async (q: string) => {
     if (!q) return
+    const generation = ++loadGenerationRef.current
     setRefreshing(true)
     setError(null)
     try {
@@ -85,6 +87,8 @@ export function QuarterlyPlanningPage() {
         quarterlyPlanningApi.getEpicsForQuarter(q),
         quarterlyPlanningApi.getTeamsOverview(q),
       ])
+      // Stale response — a newer loadQuarter has been issued. Discard.
+      if (generation !== loadGenerationRef.current) return
       setEpics(epicsRes.epics)
       setTeamsOverview(teamsRes)
       const baseline = new Map<string, { inQuarter: boolean; quarterLabel: string | null; boost: number }>()
@@ -97,9 +101,12 @@ export function QuarterlyPlanningPage() {
       })
       baselineRef.current = baseline
     } catch (err) {
+      if (generation !== loadGenerationRef.current) return
       setError(err instanceof Error ? err.message : 'Failed to load planning data')
     } finally {
-      setRefreshing(false)
+      if (generation === loadGenerationRef.current) {
+        setRefreshing(false)
+      }
     }
   }, [])
 
@@ -160,15 +167,25 @@ export function QuarterlyPlanningPage() {
 
   // Optimistically recompute team utilization based on current in-quarter epics
   const derivedTeams = useMemo<QuarterlyTeamOverviewDto[]>(() => {
-    // demandByRole and demandDays per team derived from in-quarter epics with estimate + team mapping
+    // demandByRole and demandDays per team derived from in-quarter epics with estimate + team mapping.
+    // For multi-team epics, demand is split EVENLY across all assigned teams to avoid double-counting:
+    // an epic on 2 teams would otherwise inflate both teams' utilization with the full epic estimate,
+    // producing spurious "overload" red bars in CapacityBars.
     const demandByTeam = new Map<number, { totalDays: number; byRole: Record<string, number> }>()
 
     inQuarterEpics.forEach(e => {
       if (!e.hasEstimate || !e.hasTeamMapping) return
+      const teamCount = e.teams.length
+      if (teamCount === 0) return
+      const shareTotal = e.totalDemandDays / teamCount
+      const shareByRole: Record<string, number> = {}
+      Object.entries(e.demandByRole).forEach(([role, days]) => {
+        shareByRole[role] = days / teamCount
+      })
       e.teams.forEach(t => {
         const existing = demandByTeam.get(t.id) || { totalDays: 0, byRole: {} }
-        existing.totalDays += e.totalDemandDays
-        Object.entries(e.demandByRole).forEach(([role, days]) => {
+        existing.totalDays += shareTotal
+        Object.entries(shareByRole).forEach(([role, days]) => {
           existing.byRole[role] = (existing.byRole[role] || 0) + days
         })
         demandByTeam.set(t.id, existing)
@@ -210,10 +227,7 @@ export function QuarterlyPlanningPage() {
     epics.forEach(e => {
       const base = baselineRef.current.get(e.epicKey)
       if (!base) return
-      // Quarter changes
-      const baseQuarter = base.inQuarter ? base.quarterLabel : (base.quarterLabel ?? null)
-      const currentQuarter = e.inQuarter ? quarter : null
-      // We treat the move based on inQuarter for THIS quarter
+      // Quarter changes — treated based on inQuarter for THIS quarter
       if (base.inQuarter !== e.inQuarter) {
         if (e.inQuarter) {
           // Adding to this quarter
@@ -244,8 +258,6 @@ export function QuarterlyPlanningPage() {
             toQuarter: null,
           })
         }
-      } else if (baseQuarter !== currentQuarter && e.inQuarter) {
-        // safety: shouldn't happen but keep consistent
       }
 
       // Boost changes
@@ -355,7 +367,7 @@ export function QuarterlyPlanningPage() {
             title="Reload latest from Jira"
             style={{
               padding: '8px 12px',
-              background: '#fff',
+              background: BG_PAGE,
               border: `1px solid ${BORDER_DEFAULT}`,
               color: TEXT_PRIMARY,
               borderRadius: 4,
@@ -373,7 +385,7 @@ export function QuarterlyPlanningPage() {
               padding: '8px 14px',
               background: pendingCount > 0 ? LINK_COLOR : BG_SUBTLE,
               border: `1px solid ${pendingCount > 0 ? LINK_COLOR : BORDER_DEFAULT}`,
-              color: pendingCount > 0 ? '#fff' : TEXT_MUTED,
+              color: pendingCount > 0 ? BG_PAGE : TEXT_MUTED,
               borderRadius: 4,
               fontWeight: 700,
               cursor: pendingCount > 0 ? 'pointer' : 'not-allowed',
@@ -386,10 +398,12 @@ export function QuarterlyPlanningPage() {
 
       {error && (
         <div
+          role="alert"
+          aria-live="polite"
           style={{
             padding: '10px 14px',
-            background: '#FFEBE6',
-            border: `1px solid #FFBDAD`,
+            background: ERROR_BG,
+            border: `1px solid ${ERROR_BORDER}`,
             color: ERROR_TEXT,
             borderRadius: 6,
             marginBottom: 12,
@@ -401,18 +415,22 @@ export function QuarterlyPlanningPage() {
       )}
 
       {/* Capacity bars sticky header */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 5, background: '#fff', paddingBottom: 12, marginBottom: 12 }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 5, background: BG_PAGE, paddingBottom: 12, marginBottom: 12 }}>
         <CapacityBars teams={derivedTeams} />
       </div>
 
-      {/* Two columns */}
+      {/* Two columns — dimmed while refreshing to signal stale data */}
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
           gap: 16,
           alignItems: 'start',
+          opacity: refreshing ? 0.6 : 1,
+          pointerEvents: refreshing ? 'none' : 'auto',
+          transition: 'opacity 0.15s ease',
         }}
+        aria-busy={refreshing}
         className="planning-board-grid"
       >
         <BacklogColumn

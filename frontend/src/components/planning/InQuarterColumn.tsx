@@ -1,11 +1,18 @@
 import { useMemo, useState } from 'react'
 import { TeamBadge } from '../TeamBadge'
 import { EpicCard } from './EpicCard'
-import { PlanningEpicDto } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto, TeamRef } from '../../api/quarterlyPlanning'
+import {
+  NO_PROJECT_KEY,
+  NO_PROJECT_LABEL,
+  UNASSIGNED_KEY,
+  UNASSIGNED_LABEL,
+} from './constants'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
   BG_SUBTLE,
+  BG_PAGE,
   BORDER_DEFAULT,
   SEPARATOR,
   LINK_COLOR,
@@ -17,7 +24,7 @@ interface InQuarterColumnProps {
   epics: PlanningEpicDto[]
   targetQuarter: string
   jiraBaseUrl: string
-  teamsById: Map<number, { id: number; name: string; color: string | null }>
+  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -29,10 +36,6 @@ interface Group {
   epics: PlanningEpicDto[]
   totalEstimated: number
 }
-
-const UNASSIGNED_KEY = '__unassigned__'
-const NO_PROJECT_KEY = '__no_project__'
-const NO_PROJECT_LABEL = 'Без проекта'
 
 export function InQuarterColumn({
   epics,
@@ -87,7 +90,7 @@ export function InQuarterColumn({
       if (e.teams.length === 0) {
         let g = map.get(UNASSIGNED_KEY)
         if (!g) {
-          g = { key: UNASSIGNED_KEY, title: 'Не назначены', color: null, epics: [], totalEstimated: 0 }
+          g = { key: UNASSIGNED_KEY, title: UNASSIGNED_LABEL, color: null, epics: [], totalEstimated: 0 }
           map.set(UNASSIGNED_KEY, g)
         }
         g.epics.push(e)
@@ -131,7 +134,7 @@ export function InQuarterColumn({
         flexDirection: 'column',
         gap: 12,
         padding: 16,
-        background: '#fff',
+        background: BG_PAGE,
         border: `1px solid ${BORDER_DEFAULT}`,
         borderRadius: 8,
         minHeight: 400,
@@ -152,8 +155,8 @@ export function InQuarterColumn({
             onClick={() => setGroupMode('project')}
             style={{
               padding: '6px 12px',
-              background: groupMode === 'project' ? LINK_COLOR : '#fff',
-              color: groupMode === 'project' ? '#fff' : TEXT_PRIMARY,
+              background: groupMode === 'project' ? LINK_COLOR : BG_PAGE,
+              color: groupMode === 'project' ? BG_PAGE : TEXT_PRIMARY,
               border: 'none',
               cursor: 'pointer',
               fontSize: 12,
@@ -167,8 +170,8 @@ export function InQuarterColumn({
             onClick={() => setGroupMode('team')}
             style={{
               padding: '6px 12px',
-              background: groupMode === 'team' ? LINK_COLOR : '#fff',
-              color: groupMode === 'team' ? '#fff' : TEXT_PRIMARY,
+              background: groupMode === 'team' ? LINK_COLOR : BG_PAGE,
+              color: groupMode === 'team' ? BG_PAGE : TEXT_PRIMARY,
               border: 'none',
               borderLeft: `1px solid ${BORDER_DEFAULT}`,
               cursor: 'pointer',
@@ -194,6 +197,7 @@ export function InQuarterColumn({
               <button
                 type="button"
                 onClick={() => toggleGroup(g.key)}
+                aria-expanded={!isCollapsed}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

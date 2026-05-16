@@ -4,6 +4,7 @@ import {
   TEXT_PRIMARY,
   TEXT_MUTED,
   BG_SUBTLE,
+  BG_PAGE,
   BORDER_DEFAULT,
   getUtilizationColor,
   DSR_GREEN,
@@ -15,10 +16,14 @@ interface CapacityBarsProps {
   teams: QuarterlyTeamOverviewDto[]
 }
 
+// Status glyph thresholds MUST mirror getUtilizationColor() in constants/colors.ts:
+//   green  85..110   -> ✓ ok
+//   yellow 70..130   -> !  near limit
+//   red    otherwise -> ‼ overloaded (distinct glyph from yellow for color-blind users)
 function statusGlyph(utilization: number): { glyph: string; color: string; label: string } {
-  if (utilization > 100) return { glyph: '!', color: DSR_RED, label: 'overloaded' }
-  if (utilization >= 85) return { glyph: '!', color: DSR_YELLOW, label: 'near limit' }
-  return { glyph: '✓', color: DSR_GREEN, label: 'ok' }
+  if (utilization >= 85 && utilization <= 110) return { glyph: '✓', color: DSR_GREEN, label: 'ok' }
+  if (utilization >= 70 && utilization <= 130) return { glyph: '!', color: DSR_YELLOW, label: 'near limit' }
+  return { glyph: '‼', color: DSR_RED, label: 'overloaded' }
 }
 
 export function CapacityBars({ teams }: CapacityBarsProps) {
@@ -44,7 +49,7 @@ export function CapacityBars({ teams }: CapacityBarsProps) {
         gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
         gap: 10,
         padding: 12,
-        background: '#fff',
+        background: BG_PAGE,
         border: `1px solid ${BORDER_DEFAULT}`,
         borderRadius: 6,
       }}
@@ -61,6 +66,7 @@ export function CapacityBars({ teams }: CapacityBarsProps) {
               </div>
               <span
                 title={status.label}
+                aria-label={`Status: ${status.label}`}
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -69,7 +75,7 @@ export function CapacityBars({ teams }: CapacityBarsProps) {
                   height: 18,
                   borderRadius: '50%',
                   background: status.color,
-                  color: '#fff',
+                  color: BG_PAGE,
                   fontSize: 11,
                   fontWeight: 800,
                 }}

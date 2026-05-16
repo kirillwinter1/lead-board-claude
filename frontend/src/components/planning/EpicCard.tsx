@@ -1,20 +1,31 @@
-import { useState, useRef, useEffect, KeyboardEvent, ReactNode } from 'react'
+import { useState, useRef, useEffect, useMemo, KeyboardEvent, ReactNode } from 'react'
 import { TeamBadge } from '../TeamBadge'
 import { RiceScoreBadge } from '../rice/RiceScoreBadge'
 import { getIssueIcon } from '../board/helpers'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
-import { PlanningEpicDto } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto, TeamRef } from '../../api/quarterlyPlanning'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
   TEXT_SECONDARY,
   ERROR_TEXT,
+  ERROR_DARK_TEXT,
+  ERROR_BG,
+  ERROR_BORDER,
   LINK_COLOR,
   BG_SUBTLE,
+  BG_PAGE,
   BORDER_DEFAULT,
   WARNING_BG,
   WARNING_BORDER,
+  WARNING_TEXT,
+  SUCCESS_BG,
+  SUCCESS_TEXT,
+  INFO_BG,
+  INFO_TEXT,
+  INFO_BORDER,
   DSR_RED,
+  lightenColor,
 } from '../../constants/colors'
 
 interface EpicCardProps {
@@ -22,7 +33,7 @@ interface EpicCardProps {
   mode: 'backlog' | 'in-quarter'
   targetQuarter: string
   jiraBaseUrl: string
-  teamsById: Map<number, { id: number; name: string; color: string | null }>
+  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -92,14 +103,14 @@ export function EpicCard({
   }
 
   // Build a stable order of roles based on workflow config
-  const orderedRoles: string[] = (() => {
+  const orderedRoles: string[] = useMemo(() => {
     const codes = getRoleCodes()
     const present = new Set(Object.keys(epic.demandByRole))
     const ordered: string[] = []
     codes.forEach(code => { if (present.has(code)) ordered.push(code) })
     present.forEach(code => { if (!codes.includes(code)) ordered.push(code) })
     return ordered.filter(code => (epic.demandByRole[code] || 0) > 0)
-  })()
+  }, [epic.demandByRole, getRoleCodes])
 
   const moveAction = mode === 'backlog'
     ? { label: 'В квартал →', handler: () => onMove(epic.epicKey, targetQuarter) }
@@ -114,7 +125,7 @@ export function EpicCard({
         flexDirection: 'column',
         gap: 10,
         padding: 12,
-        background: '#fff',
+        background: BG_PAGE,
         border: `1px solid ${overloads ? DSR_RED : BORDER_DEFAULT}`,
         borderLeft: overloads ? `4px solid ${DSR_RED}` : `1px solid ${BORDER_DEFAULT}`,
         borderRadius: 8,
@@ -174,8 +185,8 @@ export function EpicCard({
                 title="Boost: -50..+50"
                 style={{
                   cursor: 'pointer',
-                  background: epic.manualBoost === 0 ? BG_SUBTLE : (epic.manualBoost > 0 ? '#E3FCEF' : '#FFEBE6'),
-                  color: epic.manualBoost === 0 ? TEXT_MUTED : (epic.manualBoost > 0 ? '#006644' : '#BF2600'),
+                  background: epic.manualBoost === 0 ? BG_SUBTLE : (epic.manualBoost > 0 ? SUCCESS_BG : ERROR_BG),
+                  color: epic.manualBoost === 0 ? TEXT_MUTED : (epic.manualBoost > 0 ? SUCCESS_TEXT : ERROR_DARK_TEXT),
                   border: 'none',
                   borderRadius: 3,
                   padding: '2px 6px',
@@ -239,6 +250,10 @@ export function EpicCard({
           {orderedRoles.map(code => {
             const days = epic.demandByRole[code] || 0
             const color = getRoleColor(code)
+            // Use lightenColor (not `color + '14'`) — getRoleColor may return
+            // a 3-digit-shorthand or unknown-role fallback like `#666`, where
+            // concatenating an alpha suffix would produce invalid 5-digit CSS.
+            const bg = color.length === 7 ? lightenColor(color, 0.92) : color
             return (
               <span
                 key={code}
@@ -251,7 +266,7 @@ export function EpicCard({
                   fontSize: 11,
                   fontWeight: 700,
                   color,
-                  background: color + '14',
+                  background: bg,
                   borderLeft: `2px solid ${color}`,
                 }}
               >
@@ -293,8 +308,8 @@ export function EpicCard({
             padding: '6px 12px',
             border: `1px solid ${LINK_COLOR}`,
             borderRadius: 4,
-            background: mode === 'backlog' ? LINK_COLOR : '#fff',
-            color: mode === 'backlog' ? '#fff' : LINK_COLOR,
+            background: mode === 'backlog' ? LINK_COLOR : BG_PAGE,
+            color: mode === 'backlog' ? BG_PAGE : LINK_COLOR,
             fontSize: 12,
             fontWeight: 700,
             cursor: 'pointer',
@@ -309,9 +324,9 @@ export function EpicCard({
 
 function WarningBadge({ tone, children }: { tone: 'warn' | 'info' | 'error'; children: ReactNode }) {
   const map = {
-    warn: { bg: WARNING_BG, color: '#7B4A00', border: WARNING_BORDER },
-    info: { bg: '#DEEBFF', color: '#0747A6', border: '#B3D4FF' },
-    error: { bg: '#FFEBE6', color: ERROR_TEXT, border: '#FFBDAD' },
+    warn: { bg: WARNING_BG, color: WARNING_TEXT, border: WARNING_BORDER },
+    info: { bg: INFO_BG, color: INFO_TEXT, border: INFO_BORDER },
+    error: { bg: ERROR_BG, color: ERROR_TEXT, border: ERROR_BORDER },
   }[tone]
   return (
     <span
