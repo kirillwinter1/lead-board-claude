@@ -55,7 +55,7 @@ class FullSyncE2ETest extends IntegrationTestBase {
 
         // ===== Step 2: Verify Board API =====
         var boardResponse = restTemplate.getForEntity(
-                "/api/board?teamId=" + team.getId(),
+                "/api/board?teamIds=" + team.getId(),
                 BoardResponse.class);
 
         assertEquals(HttpStatus.OK, boardResponse.getStatusCode());
@@ -113,7 +113,7 @@ class FullSyncE2ETest extends IntegrationTestBase {
 
         // ===== Verify Board returns sorted by priority =====
         var boardResponse = restTemplate.getForEntity(
-                "/api/board?teamId=" + team.getId(),
+                "/api/board?teamIds=" + team.getId(),
                 BoardResponse.class);
 
         assertEquals(HttpStatus.OK, boardResponse.getStatusCode());

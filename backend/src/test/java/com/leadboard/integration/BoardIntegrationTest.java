@@ -35,7 +35,7 @@ class BoardIntegrationTest extends IntegrationTestBase {
 
         // When
         var response = restTemplate.getForEntity(
-                "/api/board?teamId=" + team.getId(),
+                "/api/board?teamIds=" + team.getId(),
                 BoardResponse.class);
 
         // Then
@@ -69,7 +69,7 @@ class BoardIntegrationTest extends IntegrationTestBase {
 
         // When
         var response = restTemplate.getForEntity(
-                "/api/board?teamId=" + team.getId(),
+                "/api/board?teamIds=" + team.getId(),
                 BoardResponse.class);
 
         // Then
@@ -94,7 +94,7 @@ class BoardIntegrationTest extends IntegrationTestBase {
 
         // When - get board for team1
         var response1 = restTemplate.getForEntity(
-                "/api/board?teamId=" + team1.getId(),
+                "/api/board?teamIds=" + team1.getId(),
                 BoardResponse.class);
 
         // Then
@@ -107,7 +107,7 @@ class BoardIntegrationTest extends IntegrationTestBase {
 
         // When - get board for team2
         var response2 = restTemplate.getForEntity(
-                "/api/board?teamId=" + team2.getId(),
+                "/api/board?teamIds=" + team2.getId(),
                 BoardResponse.class);
 
         // Then
@@ -130,7 +130,7 @@ class BoardIntegrationTest extends IntegrationTestBase {
 
         // When
         var response = restTemplate.getForEntity(
-                "/api/board?teamId=" + team.getId(),
+                "/api/board?teamIds=" + team.getId(),
                 BoardResponse.class);
 
         // Then - should be sorted by autoScore descending
@@ -151,7 +151,7 @@ class BoardIntegrationTest extends IntegrationTestBase {
 
         // When
         var response = restTemplate.getForEntity(
-                "/api/board?teamId=" + team.getId(),
+                "/api/board?teamIds=" + team.getId(),
                 BoardResponse.class);
 
         // Then
