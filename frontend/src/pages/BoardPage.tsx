@@ -18,6 +18,7 @@ export function BoardPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
   const [timelineRefreshToken, setTimelineRefreshToken] = useState(0)
+  const [includeArchived, setIncludeArchived] = useState(false)
 
   useEffect(() => {
     getStatusStyles().then(setStatusStyles).catch(() => {})
@@ -34,7 +35,7 @@ export function BoardPage() {
     fetchBoard,
     triggerSync,
     handleRoughEstimateUpdate,
-  } = useBoardData()
+  } = useBoardData(includeArchived)
 
   const {
     searchKey,
@@ -55,9 +56,7 @@ export function BoardPage() {
     searchMode,
     searchLoading,
     hideNew,
-    hideDone,
     setHideNew,
-    setHideDone,
     handleStatusToggle,
     handleTeamToggle,
     handleProjectToggle,
@@ -202,9 +201,9 @@ export function BoardPage() {
             searchMode={searchMode}
             searchLoading={searchLoading}
             hideNew={hideNew}
-            hideDone={hideDone}
+            includeArchived={includeArchived}
             onHideNewToggle={() => setHideNew(v => !v)}
-            onHideDoneToggle={() => setHideDone(v => !v)}
+            onIncludeArchivedToggle={() => setIncludeArchived(v => !v)}
             epicTitles={useMemo(() => board.map(e => e.title), [board])}
           />
         </div>
