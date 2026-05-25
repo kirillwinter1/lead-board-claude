@@ -5,7 +5,7 @@ import { searchBoard, type BoardSearchResult } from '../api/board'
 import { useAuth } from '../contexts/AuthContext'
 
 export function useBoardFilters(board: BoardNode[]) {
-  const { canManageTeam } = useAuth()
+  const { canManageTeam, loading: authLoading, teamScopeLoading } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
@@ -219,7 +219,16 @@ export function useBoardFilters(board: BoardNode[]) {
   // current user can manage that team — mirrors the backend rule in
   // IssueOrderService.requireTeamAccess. A TEAM_LEAD reordering another
   // team's backlog would otherwise hit 403 only after the drop.
-  const canReorder = selectedTeamId !== null && canManageTeam(selectedTeamId)
+  //
+  // We must wait for both auth and team-scope fetches to resolve: while
+  // teamScopeLoading is true, `canManageTeam` returns false for non-admin
+  // users (the team set is still empty), which would briefly disable drag
+  // for legitimate managers on every page load.
+  const canReorder =
+    !authLoading &&
+    !teamScopeLoading &&
+    selectedTeamId !== null &&
+    canManageTeam(selectedTeamId)
 
   const handleStatusToggle = (status: string) => {
     setSelectedStatuses(prev => {
