@@ -44,60 +44,73 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
             paddingLeft: `${level * 20}px`,
           }}
         >
-          {(isEpicRow || isStoryRow) && canReorder && dragHandleProps && (
-            <span
-              className="drag-handle"
-              role="button"
-              aria-label={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
-              title={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
-              style={{ cursor: 'grab', touchAction: 'none' }}
-              {...dragHandleProps}
-            >⋮⋮</span>
+          <div className="name-row-main">
+            {(isEpicRow || isStoryRow) && canReorder && dragHandleProps && (
+              <span
+                className="drag-handle"
+                role="button"
+                aria-label={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
+                title={isStoryRow ? "Drag to reorder within epic" : "Drag to reorder"}
+                style={{ cursor: 'grab', touchAction: 'none' }}
+                {...dragHandleProps}
+              >⋮⋮</span>
+            )}
+            <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType))} alt={node.issueType} className="issue-type-icon" />
+            <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
+              {node.issueKey}
+            </a>
+            {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
+            <span className="issue-title">{node.title}</span>
+          </div>
+          {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel) && (
+            <div className="name-row-labels">
+              {node.priority && priorityIconUrl && (
+                <img
+                  src={priorityIconUrl}
+                  alt={node.priority}
+                  title={node.priority}
+                  className="priority-icon"
+                  width={16}
+                  height={16}
+                />
+              )}
+              {node.parentProjectKey && (
+                <a
+                  href={node.jiraUrl.replace(/\/browse\/[^/]+$/, `/browse/${node.parentProjectKey}`)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={node.parentProjectTitle || node.parentProjectKey}
+                  style={{
+                    fontSize: 10,
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    background: '#DEEBFF',
+                    color: '#0747A6',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap',
+                    lineHeight: '16px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {node.parentProjectKey}
+                </a>
+              )}
+              {node.quarterLabel && (
+                <span style={{
+                  fontSize: 10,
+                  padding: '1px 5px',
+                  borderRadius: 3,
+                  background: '#E3FCEF',
+                  color: '#006644',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                  lineHeight: '16px',
+                }}>
+                  {node.quarterLabel}
+                </span>
+              )}
+            </div>
           )}
-          <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType))} alt={node.issueType} className="issue-type-icon" />
-          {node.priority && priorityIconUrl && (
-            <img
-              src={priorityIconUrl}
-              alt={node.priority}
-              title={node.priority}
-              className="priority-icon"
-              width={16}
-              height={16}
-            />
-          )}
-          <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-            {node.issueKey}
-          </a>
-          {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
-          {node.parentProjectKey && (
-            <span style={{
-              fontSize: 10,
-              padding: '1px 5px',
-              borderRadius: 3,
-              background: '#DEEBFF',
-              color: '#0747A6',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-              lineHeight: '16px',
-            }}>
-              {node.parentProjectKey}
-            </span>
-          )}
-          {node.quarterLabel && (
-            <span style={{
-              fontSize: 10,
-              padding: '1px 5px',
-              borderRadius: 3,
-              background: '#E3FCEF',
-              color: '#006644',
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-              lineHeight: '16px',
-            }}>
-              {node.quarterLabel}
-            </span>
-          )}
-          <span className="issue-title">{node.title}</span>
         </div>
       </div>
       <div className="cell cell-team"><TeamBadge name={node.teamName} color={node.teamColor} /></div>
