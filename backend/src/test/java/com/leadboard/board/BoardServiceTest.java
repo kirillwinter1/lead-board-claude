@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -542,6 +543,32 @@ class BoardServiceTest {
             assertEquals(0, response.getTotal());
             assertTrue(response.getItems().isEmpty());
         }
+    }
+
+    // ==================== F71: doneAt exposure ====================
+
+    @Test
+    @DisplayName("should expose doneAt on Epic BoardNode")
+    void shouldExposeDoneAtOnEpicNode() {
+        OffsetDateTime sixDaysAgo = OffsetDateTime.now().minusDays(6);
+        JiraIssueEntity epic = new JiraIssueEntity();
+        epic.setIssueKey("LB-100");
+        epic.setSummary("Recently done epic");
+        epic.setStatus("ГОТОВО");
+        epic.setIssueType("Эпик");
+        epic.setProjectKey("LB");
+        epic.setBoardCategory("EPIC");
+        epic.setDoneAt(sixDaysAgo);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic));
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        BoardNode node = response.getItems().get(0);
+        assertEquals(sixDaysAgo, node.getDoneAt());
     }
 
     // ==================== Helper Methods ====================

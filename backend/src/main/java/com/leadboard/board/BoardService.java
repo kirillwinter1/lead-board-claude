@@ -339,6 +339,7 @@ public class BoardService {
             boolean epicInTodo = workflowConfigService.isAllowedForRoughEstimate(entity.getStatus());
             node.setEpicInTodo(epicInTodo);
             node.setEpicDone(workflowConfigService.isDone(entity.getStatus(), entity.getIssueType(), pk));
+            node.setDoneAt(entity.getDoneAt());
 
             // Dynamic rough estimates
             node.setRoughEstimates(entity.getRoughEstimates());
