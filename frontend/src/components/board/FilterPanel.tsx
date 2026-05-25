@@ -29,9 +29,9 @@ interface FilterPanelProps {
   searchMode?: 'semantic' | 'substring' | null
   searchLoading?: boolean
   hideNew?: boolean
-  hideDone?: boolean
+  includeArchived?: boolean
   onHideNewToggle?: () => void
-  onHideDoneToggle?: () => void
+  onIncludeArchivedToggle?: () => void
   epicTitles?: string[]
 }
 
@@ -70,9 +70,9 @@ export function FilterPanel({
   searchMode,
   searchLoading,
   hideNew,
-  hideDone,
+  includeArchived,
   onHideNewToggle,
-  onHideDoneToggle,
+  onIncludeArchivedToggle,
   epicTitles,
 }: FilterPanelProps) {
   const statusStyles = useStatusStyles()
@@ -124,14 +124,14 @@ export function FilterPanel({
     if (hideNew) {
       result.push({ category: 'Filter', value: 'Hide NEW', onRemove: () => onHideNewToggle?.() })
     }
-    if (hideDone) {
-      result.push({ category: 'Filter', value: 'Hide DONE', onRemove: () => onHideDoneToggle?.() })
+    if (includeArchived) {
+      result.push({ category: 'Filter', value: 'Showing archived', onRemove: () => onIncludeArchivedToggle?.() })
     }
     if (searchKey) {
       result.push({ category: 'Search', value: `"${searchKey}"`, onRemove: () => onSearchKeyChange('') })
     }
     return result
-  }, [selectedProjects, selectedQuarters, selectedTeams, selectedStatuses, hideNew, hideDone, searchKey, teamColorMap, statusColorMap, onProjectToggle, onQuarterToggle, onTeamToggle, onStatusToggle, onHideNewToggle, onHideDoneToggle, onSearchKeyChange])
+  }, [selectedProjects, selectedQuarters, selectedTeams, selectedStatuses, hideNew, includeArchived, searchKey, teamColorMap, statusColorMap, onProjectToggle, onQuarterToggle, onTeamToggle, onStatusToggle, onHideNewToggle, onIncludeArchivedToggle, onSearchKeyChange])
 
   const searchBadge = searchMode
     ? { label: searchMode === 'semantic' ? 'AI' : 'TXT', variant: (searchMode === 'semantic' ? 'ai' : 'text') as 'ai' | 'text' }
@@ -222,12 +222,13 @@ export function FilterPanel({
           Hide NEW
         </button>
       )}
-      {onHideDoneToggle && (
+      {onIncludeArchivedToggle && (
         <button
-          className={`btn btn-sm btn-toggle ${hideDone ? 'btn-toggle-active' : ''}`}
-          onClick={onHideDoneToggle}
+          className={`btn btn-sm btn-toggle ${includeArchived ? 'btn-toggle-active' : ''}`}
+          onClick={onIncludeArchivedToggle}
+          title="Закрытые эпики старше 14 дней"
         >
-          Hide DONE
+          Show archived
         </button>
       )}
     </FilterBar>

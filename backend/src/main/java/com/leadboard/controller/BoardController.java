@@ -50,8 +50,9 @@ public class BoardController {
             @RequestParam(required = false) List<Long> teamIds,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
-            @RequestParam(defaultValue = "false") boolean includeDQ) {
-        BoardResponse response = boardService.getBoard(query, statuses, teamIds, page, size, includeDQ);
+            @RequestParam(defaultValue = "false") boolean includeDQ,
+            @RequestParam(defaultValue = "false") boolean includeArchived) {
+        BoardResponse response = boardService.getBoard(query, statuses, teamIds, page, size, includeDQ, includeArchived);
         return ResponseEntity.ok(response);
     }
 

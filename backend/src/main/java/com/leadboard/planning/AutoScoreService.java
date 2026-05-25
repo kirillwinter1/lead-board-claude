@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.project.ProjectAlignmentService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -25,13 +26,16 @@ public class AutoScoreService {
     private final AutoScoreCalculator calculator;
     private final JiraIssueRepository issueRepository;
     private final ProjectAlignmentService projectAlignmentService;
+    private final WorkflowConfigService workflowConfigService;
 
     public AutoScoreService(AutoScoreCalculator calculator,
                             JiraIssueRepository issueRepository,
-                            ProjectAlignmentService projectAlignmentService) {
+                            ProjectAlignmentService projectAlignmentService,
+                            WorkflowConfigService workflowConfigService) {
         this.calculator = calculator;
         this.issueRepository = issueRepository;
         this.projectAlignmentService = projectAlignmentService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**
@@ -41,7 +45,9 @@ public class AutoScoreService {
      */
     @Transactional
     public int recalculateAll() {
-        List<JiraIssueEntity> epics = issueRepository.findByBoardCategory("EPIC");
+        List<JiraIssueEntity> epics = issueRepository.findByBoardCategory("EPIC").stream()
+                .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType(), e.getProjectKey()))
+                .toList();
 
         calculator.preloadRiceData(epics);
         calculator.preloadAlignmentData(projectAlignmentService.preloadAlignmentData(epics));
@@ -58,7 +64,7 @@ public class AutoScoreService {
             calculator.clearAlignmentData();
         }
 
-        log.info("Recalculated AutoScore for {} epics", epics.size());
+        log.info("Recalculated AutoScore for {} active epics (Done epics skipped)", epics.size());
         return epics.size();
     }
 
@@ -70,7 +76,9 @@ public class AutoScoreService {
      */
     @Transactional
     public int recalculateForTeam(Long teamId) {
-        List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
+        List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId).stream()
+                .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType(), e.getProjectKey()))
+                .toList();
 
         calculator.preloadRiceData(epics);
         calculator.preloadAlignmentData(projectAlignmentService.preloadAlignmentData(epics));
@@ -87,7 +95,7 @@ public class AutoScoreService {
             calculator.clearAlignmentData();
         }
 
-        log.info("Recalculated AutoScore for {} epics of team {}", epics.size(), teamId);
+        log.info("Recalculated AutoScore for {} active epics of team {} (Done epics skipped)", epics.size(), teamId);
         return epics.size();
     }
 
@@ -106,6 +114,11 @@ public class AutoScoreService {
         }
 
         JiraIssueEntity epic = epicOpt.get();
+        if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType(), epic.getProjectKey())) {
+            log.debug("Skipping AutoScore for Done epic {} (recalculateForEpic)", epicKey);
+            return epic.getAutoScore();
+        }
+
         BigDecimal score = calculator.calculate(epic);
         epic.setAutoScore(score);
         epic.setAutoScoreCalculatedAt(OffsetDateTime.now());

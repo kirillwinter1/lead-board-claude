@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.project.ProjectAlignmentService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -38,11 +39,14 @@ class AutoScoreServiceTest {
     @Mock
     private ProjectAlignmentService projectAlignmentService;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private AutoScoreService autoScoreService;
 
     @BeforeEach
     void setUp() {
-        autoScoreService = new AutoScoreService(calculator, issueRepository, projectAlignmentService);
+        autoScoreService = new AutoScoreService(calculator, issueRepository, projectAlignmentService, workflowConfigService);
     }
 
     // ==================== recalculateAll() Tests ====================
@@ -107,6 +111,38 @@ class AutoScoreServiceTest {
 
             assertEquals(2, count);
         }
+
+        @Test
+        @DisplayName("should skip Done epics so they do not participate in autoscoring")
+        void shouldSkipDoneEpics() {
+            JiraIssueEntity active1 = createEpic("LB-1", "Active 1");
+            active1.setStatus("DEVELOPING");
+            active1.setIssueType("Epic");
+            active1.setProjectKey("LB");
+            JiraIssueEntity active2 = createEpic("LB-2", "Active 2");
+            active2.setStatus("REQUIREMENTS");
+            active2.setIssueType("Epic");
+            active2.setProjectKey("LB");
+            JiraIssueEntity done = createEpic("LB-3", "Done epic");
+            done.setStatus("ГОТОВО");
+            done.setIssueType("Epic");
+            done.setProjectKey("LB");
+
+            when(issueRepository.findByBoardCategory("EPIC"))
+                    .thenReturn(List.of(active1, active2, done));
+            when(workflowConfigService.isDone("DEVELOPING", "Epic", "LB")).thenReturn(false);
+            when(workflowConfigService.isDone("REQUIREMENTS", "Epic", "LB")).thenReturn(false);
+            when(workflowConfigService.isDone("ГОТОВО", "Epic", "LB")).thenReturn(true);
+            when(calculator.calculate(active1)).thenReturn(BigDecimal.valueOf(70));
+            when(calculator.calculate(active2)).thenReturn(BigDecimal.valueOf(40));
+
+            int count = autoScoreService.recalculateAll();
+
+            assertEquals(2, count, "Done epic should not be counted as recalculated");
+            verify(calculator).calculate(active1);
+            verify(calculator).calculate(active2);
+            verify(calculator, never()).calculate(done);
+        }
     }
 
     // ==================== recalculateForTeam() Tests ====================
@@ -155,6 +191,34 @@ class AutoScoreServiceTest {
 
             assertEquals(0, count);
         }
+
+        @Test
+        @DisplayName("should skip Done epics for the given team")
+        void shouldSkipDoneEpicsForTeam() {
+            Long teamId = 99L;
+            JiraIssueEntity active = createEpic("LB-10", "Active");
+            active.setStatus("DEVELOPING");
+            active.setIssueType("Epic");
+            active.setProjectKey("LB");
+            active.setTeamId(teamId);
+            JiraIssueEntity done = createEpic("LB-11", "Done");
+            done.setStatus("ГОТОВО");
+            done.setIssueType("Epic");
+            done.setProjectKey("LB");
+            done.setTeamId(teamId);
+
+            when(issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId))
+                    .thenReturn(List.of(active, done));
+            when(workflowConfigService.isDone("DEVELOPING", "Epic", "LB")).thenReturn(false);
+            when(workflowConfigService.isDone("ГОТОВО", "Epic", "LB")).thenReturn(true);
+            when(calculator.calculate(active)).thenReturn(BigDecimal.valueOf(60));
+
+            int count = autoScoreService.recalculateForTeam(teamId);
+
+            assertEquals(1, count);
+            verify(calculator).calculate(active);
+            verify(calculator, never()).calculate(done);
+        }
     }
 
     // ==================== recalculateForEpic() Tests ====================
@@ -202,6 +266,25 @@ class AutoScoreServiceTest {
             BigDecimal score = autoScoreService.recalculateForEpic("LB-999");
 
             assertNull(score);
+            verify(calculator, never()).calculate(any());
+            verify(issueRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should skip Done epic and return existing autoScore")
+        void shouldSkipDoneEpicReturningExistingScore() {
+            JiraIssueEntity done = createEpic("LB-DONE", "Done");
+            done.setStatus("ГОТОВО");
+            done.setIssueType("Epic");
+            done.setProjectKey("LB");
+            done.setAutoScore(new BigDecimal("33"));
+
+            when(issueRepository.findByIssueKey("LB-DONE")).thenReturn(Optional.of(done));
+            when(workflowConfigService.isDone("ГОТОВО", "Epic", "LB")).thenReturn(true);
+
+            BigDecimal result = autoScoreService.recalculateForEpic("LB-DONE");
+
+            assertEquals(new BigDecimal("33"), result);
             verify(calculator, never()).calculate(any());
             verify(issueRepository, never()).save(any());
         }

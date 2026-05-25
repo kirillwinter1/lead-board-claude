@@ -34,6 +34,7 @@ export interface BoardNode {
   roleProgress: RoleProgress | null
   epicInTodo: boolean
   epicDone: boolean
+  doneAt?: string  // ISO-8601 timestamp when epic transitioned to Done
   roughEstimates: Record<string, number> | null
   alerts: DataQualityViolation[]
   autoScore: number | null

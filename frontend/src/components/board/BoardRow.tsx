@@ -19,7 +19,10 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
   const justDroppedEffects = isJustDropped ? 'just-dropped' : ''
 
   return (
-    <div className={`board-row level-${level} ${node.flagged ? 'flagged' : ''} ${justDroppedEffects}`}>
+    <div
+      className={`board-row level-${level} ${node.flagged ? 'flagged' : ''} ${justDroppedEffects}`}
+      style={isEpicRow && node.epicDone ? { opacity: 0.6 } : undefined}
+    >
       <div className="cell cell-expander">
         {hasChildren ? (
           <button

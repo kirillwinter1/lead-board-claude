@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -544,7 +545,201 @@ class BoardServiceTest {
         }
     }
 
+    // ==================== F71: doneAt exposure ====================
+
+    @Test
+    @DisplayName("should expose doneAt on Epic BoardNode")
+    void shouldExposeDoneAtOnEpicNode() {
+        OffsetDateTime sixDaysAgo = OffsetDateTime.now().minusDays(6);
+        JiraIssueEntity epic = new JiraIssueEntity();
+        epic.setIssueKey("LB-100");
+        epic.setSummary("Recently done epic");
+        epic.setStatus("ГОТОВО");
+        epic.setIssueType("Эпик");
+        epic.setProjectKey("LB");
+        epic.setBoardCategory("EPIC");
+        epic.setDoneAt(sixDaysAgo);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(epic));
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        BoardNode node = response.getItems().get(0);
+        assertEquals(sixDaysAgo, node.getDoneAt());
+    }
+
+    @Test
+    @DisplayName("should sort recently Done epics ABOVE active epics, most recent first")
+    void shouldSortDoneEpicsAtTopOfBoard() {
+        JiraIssueEntity active = new JiraIssueEntity();
+        active.setIssueKey("LB-400");
+        active.setSummary("Active");
+        active.setStatus("DEVELOPING");
+        active.setIssueType("Эпик");
+        active.setProjectKey("LB");
+        active.setBoardCategory("EPIC");
+        active.setManualOrder(1);
+
+        JiraIssueEntity done2dAgo = new JiraIssueEntity();
+        done2dAgo.setIssueKey("LB-401");
+        done2dAgo.setSummary("Done 2d ago");
+        done2dAgo.setStatus("ГОТОВО");
+        done2dAgo.setIssueType("Эпик");
+        done2dAgo.setProjectKey("LB");
+        done2dAgo.setBoardCategory("EPIC");
+        done2dAgo.setDoneAt(OffsetDateTime.now().minusDays(2));
+
+        JiraIssueEntity done10dAgo = new JiraIssueEntity();
+        done10dAgo.setIssueKey("LB-402");
+        done10dAgo.setSummary("Done 10d ago");
+        done10dAgo.setStatus("ГОТОВО");
+        done10dAgo.setIssueType("Эпик");
+        done10dAgo.setProjectKey("LB");
+        done10dAgo.setBoardCategory("EPIC");
+        done10dAgo.setDoneAt(OffsetDateTime.now().minusDays(10));
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB")))
+                .thenReturn(List.of(active, done2dAgo, done10dAgo));
+        when(workflowConfigService.isDone("DEVELOPING", "Эпик", "LB")).thenReturn(false);
+        when(workflowConfigService.isAllowedForRoughEstimate("DEVELOPING")).thenReturn(true);
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(3, response.getItems().size());
+        assertEquals("LB-401", response.getItems().get(0).getIssueKey(), "Most recently Done epic should be first");
+        assertEquals("LB-402", response.getItems().get(1).getIssueKey(), "Older Done epic should be second");
+        assertEquals("LB-400", response.getItems().get(2).getIssueKey(), "Active epic should be last");
+    }
+
+    @Test
+    @DisplayName("should NOT expose stale auto_score for Done Epic on board response")
+    void shouldNotExposeAutoScoreForDoneEpic() {
+        JiraIssueEntity done = new JiraIssueEntity();
+        done.setIssueKey("LB-301");
+        done.setSummary("Done epic with stale score");
+        done.setStatus("ГОТОВО");
+        done.setIssueType("Эпик");
+        done.setProjectKey("LB");
+        done.setBoardCategory("EPIC");
+        done.setDoneAt(OffsetDateTime.now().minusDays(3));
+        done.setAutoScore(new BigDecimal("42"));
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(done));
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        BoardNode node = response.getItems().get(0);
+        assertTrue(node.isEpicDone());
+        assertNull(node.getAutoScore(), "Done epic should not surface stale auto_score on the board");
+    }
+
+    // ==================== F71: Done Epic Filter (14-day window) ====================
+
+    @Test
+    @DisplayName("should exclude Done epics older than 14 days from default board view")
+    void shouldExcludeDoneEpicsOlderThan14Days() {
+        OffsetDateTime old = OffsetDateTime.now().minusDays(15);
+        JiraIssueEntity oldDone = makeDoneEpic("LB-200", "Old", old);
+        JiraIssueEntity active = makeActiveEpic("LB-201", "Active");
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(oldDone, active));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("LB-201", response.getItems().get(0).getIssueKey());
+    }
+
+    @Test
+    @DisplayName("should include Done epics within the last 14 days")
+    void shouldIncludeRecentlyDoneEpics() {
+        OffsetDateTime recent = OffsetDateTime.now().minusDays(7);
+        JiraIssueEntity recentDone = makeDoneEpic("LB-202", "Recent", recent);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(recentDone));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        assertTrue(response.getItems().get(0).isEpicDone());
+    }
+
+    @Test
+    @DisplayName("should include all Done epics when includeArchived=true")
+    void shouldIncludeArchivedWhenFlagSet() {
+        OffsetDateTime old = OffsetDateTime.now().minusDays(60);
+        JiraIssueEntity oldDone = makeDoneEpic("LB-203", "Very old", old);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(oldDone));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false, true);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("LB-203", response.getItems().get(0).getIssueKey());
+    }
+
+    @Test
+    @DisplayName("should show Done epic when doneAt is null (legacy data)")
+    void shouldShowDoneEpicWithNullDoneAt() {
+        JiraIssueEntity legacyDone = makeDoneEpic("LB-204", "Legacy", null);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(legacyDone));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("LB-204", response.getItems().get(0).getIssueKey());
+    }
+
+    @Test
+    @DisplayName("should include Done epic at exactly 14-day boundary (not before)")
+    void shouldShowDoneEpicAtBoundary() {
+        OffsetDateTime exactly14 = OffsetDateTime.now().minusDays(14).plusSeconds(1);
+        JiraIssueEntity boundary = makeDoneEpic("LB-205", "Boundary", exactly14);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(boundary));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+    }
+
     // ==================== Helper Methods ====================
+
+    private JiraIssueEntity makeActiveEpic(String key, String summary) {
+        JiraIssueEntity e = new JiraIssueEntity();
+        e.setIssueKey(key);
+        e.setSummary(summary);
+        e.setStatus("DEVELOPING");
+        e.setIssueType("Эпик");
+        e.setProjectKey("LB");
+        e.setBoardCategory("EPIC");
+        when(workflowConfigService.isDone("DEVELOPING", "Эпик", "LB")).thenReturn(false);
+        when(workflowConfigService.isAllowedForRoughEstimate("DEVELOPING")).thenReturn(true);
+        return e;
+    }
+
+    private JiraIssueEntity makeDoneEpic(String key, String summary, OffsetDateTime doneAt) {
+        JiraIssueEntity e = new JiraIssueEntity();
+        e.setIssueKey(key);
+        e.setSummary(summary);
+        e.setStatus("ГОТОВО");
+        e.setIssueType("Эпик");
+        e.setProjectKey("LB");
+        e.setBoardCategory("EPIC");
+        e.setDoneAt(doneAt);
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+        return e;
+    }
 
     private JiraIssueEntity createEpic(String key, String summary, String status, Long teamId) {
         JiraIssueEntity entity = new JiraIssueEntity();

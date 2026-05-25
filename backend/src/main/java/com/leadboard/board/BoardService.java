@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ public class BoardService {
     private static final Logger log = LoggerFactory.getLogger(BoardService.class);
     private static final long SECONDS_PER_DAY = 8 * 3600; // 8 hours per day
     private static final long BOARD_CACHE_TTL_MS = 15_000; // 15 seconds
+    private static final int DONE_EPIC_VISIBILITY_DAYS = 14;
 
     private final JiraIssueRepository issueRepository;
     private final JiraConfigResolver jiraConfigResolver;
@@ -69,7 +71,8 @@ public class BoardService {
         boardCache.clear();
     }
 
-    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size, boolean includeDQ) {
+    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds,
+                                  int page, int size, boolean includeDQ, boolean includeArchived) {
         List<String> allProjectKeys = jiraConfigResolver.getActiveProjectKeys();
         String baseUrl = jiraConfigResolver.getBaseUrl();
 
@@ -78,7 +81,7 @@ public class BoardService {
         }
 
         // Check board response cache
-        String cacheKey = buildCacheKey(String.join(",", allProjectKeys), query, statuses, teamIds, page, size, includeDQ);
+        String cacheKey = buildCacheKey(String.join(",", allProjectKeys), query, statuses, teamIds, page, size, includeDQ, includeArchived);
         CachedBoard cached = boardCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
             return cached.response();
@@ -159,6 +162,9 @@ public class BoardService {
                     .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
 
             // Apply filters to epics (teamIds already applied in SQL for fast path)
+            // Capture archive cutoff once so every epic is judged against the same instant —
+            // avoids drift across the stream and prevents flaky tests around the boundary.
+            OffsetDateTime archiveCutoff = OffsetDateTime.now().minusDays(DONE_EPIC_VISIBILITY_DAYS);
             List<JiraIssueEntity> filteredEpics = epics.stream()
                     .filter(epic -> {
                         if (query != null && !query.isEmpty()) {
@@ -175,6 +181,14 @@ public class BoardService {
                         }
                         if (!hasTeamFilter && teamIds != null && !teamIds.isEmpty()) {
                             if (epic.getTeamId() == null || !teamIds.contains(epic.getTeamId())) {
+                                return false;
+                            }
+                        }
+                        if (!includeArchived) {
+                            String pk = epic.getProjectKey();
+                            boolean isDone = workflowConfigService.isDone(epic.getStatus(), epic.getIssueType(), pk);
+                            if (isDone && epic.getDoneAt() != null
+                                    && epic.getDoneAt().isBefore(archiveCutoff)) {
                                 return false;
                             }
                         }
@@ -271,9 +285,22 @@ public class BoardService {
                 }
             }
 
-            // Sort epics by manualOrder
+            // Sort epics: Done epics first (recent at top), then active epics by manualOrder/autoScore.
+            // F71: recently completed work surfaces above active work — gives teams a celebratory
+            // "what we just shipped" band before the in-flight backlog. Active sort logic unchanged.
             List<BoardNode> items = new ArrayList<>(epicMap.values());
             items.sort((a, b) -> {
+                if (a.isEpicDone() != b.isEpicDone()) {
+                    return a.isEpicDone() ? -1 : 1;
+                }
+                if (a.isEpicDone()) {
+                    OffsetDateTime doneA = a.getDoneAt();
+                    OffsetDateTime doneB = b.getDoneAt();
+                    if (doneA != null && doneB != null) return doneB.compareTo(doneA);
+                    if (doneA != null) return -1;
+                    if (doneB != null) return 1;
+                    return 0;
+                }
                 Integer orderA = a.getManualOrder();
                 Integer orderB = b.getManualOrder();
                 if (orderA != null && orderB != null) return orderA.compareTo(orderB);
@@ -304,8 +331,13 @@ public class BoardService {
         }
     }
 
+    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds,
+                                  int page, int size, boolean includeDQ) {
+        return getBoard(query, statuses, teamIds, page, size, includeDQ, false);
+    }
+
     public BoardResponse getBoard() {
-        return getBoard(null, null, null, 0, 50, false);
+        return getBoard(null, null, null, 0, 50, false, false);
     }
 
     private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames,
@@ -339,6 +371,7 @@ public class BoardService {
             boolean epicInTodo = workflowConfigService.isAllowedForRoughEstimate(entity.getStatus());
             node.setEpicInTodo(epicInTodo);
             node.setEpicDone(workflowConfigService.isDone(entity.getStatus(), entity.getIssueType(), pk));
+            node.setDoneAt(entity.getDoneAt());
 
             // Dynamic rough estimates
             node.setRoughEstimates(entity.getRoughEstimates());
@@ -361,7 +394,13 @@ public class BoardService {
             }
 
             node.setFlagged(entity.getFlagged());
-            node.setAutoScore(entity.getAutoScore());
+            // Don't expose stale auto_score for Done epics — AutoScoreService no
+            // longer recalculates them, so the DB value is frozen at the moment
+            // the epic transitioned to Done. Surfacing it would let archived
+            // work compete with active epics in Priority sort and in the UI.
+            if (!node.isEpicDone()) {
+                node.setAutoScore(entity.getAutoScore());
+            }
             node.setManualOrder(entity.getManualOrder());
         } else if (workflowConfigService.isStoryOrBug(entity.getIssueType(), pk)) {
             node.setAutoScore(entity.getAutoScore());
@@ -561,13 +600,15 @@ public class BoardService {
     }
 
     private String buildCacheKey(String projectKey, String query, List<String> statuses,
-                                  List<Long> teamIds, int page, int size, boolean includeDQ) {
+                                  List<Long> teamIds, int page, int size, boolean includeDQ,
+                                  boolean includeArchived) {
         StringBuilder sb = new StringBuilder(projectKey);
         sb.append('|').append(query != null ? query : "");
         sb.append('|').append(statuses != null ? statuses : "");
         sb.append('|').append(teamIds != null ? teamIds : "");
         sb.append('|').append(page).append('|').append(size);
         sb.append('|').append(includeDQ);
+        sb.append('|').append(includeArchived);
         return sb.toString();
     }
 
