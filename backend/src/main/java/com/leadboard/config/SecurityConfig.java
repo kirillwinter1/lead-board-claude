@@ -61,6 +61,13 @@ public class SecurityConfig {
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()
 
+                // Jira metadata is read-only (issue types/statuses/icons) and is
+                // needed by every authenticated user — the board, planning and
+                // metrics pages all resolve icons via these endpoints. Must come
+                // BEFORE the generic /api/admin/** rule below so the ADMIN-only
+                // guard doesn't shadow it.
+                .requestMatchers(HttpMethod.GET, "/api/admin/jira-metadata/**").authenticated()
+
                 // Admin endpoints - require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 

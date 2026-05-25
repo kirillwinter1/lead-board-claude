@@ -1,11 +1,13 @@
 package com.leadboard.planning;
 
+import com.leadboard.auth.AuthorizationService;
 import com.leadboard.board.BoardService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,13 +25,30 @@ public class IssueOrderService {
     private final WorkflowConfigService workflowConfigService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final BoardService boardService;
+    private final AuthorizationService authorizationService;
 
     public IssueOrderService(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService,
-                             UnifiedPlanningService unifiedPlanningService, BoardService boardService) {
+                             UnifiedPlanningService unifiedPlanningService, BoardService boardService,
+                             AuthorizationService authorizationService) {
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
         this.unifiedPlanningService = unifiedPlanningService;
         this.boardService = boardService;
+        this.authorizationService = authorizationService;
+    }
+
+    /**
+     * Caller must be allowed to manage the given team — ADMIN passes through,
+     * TEAM_LEAD must be a member of that team. Throws 403 otherwise. Called
+     * from reorder/priority endpoints so a tech lead cannot reshuffle another
+     * team's backlog.
+     */
+    private void requireTeamAccess(Long teamId, String issueKey) {
+        if (teamId == null) return;
+        if (!authorizationService.canManageTeam(teamId)) {
+            throw new AccessDeniedException(
+                    "Not allowed to modify issues of team " + teamId + " (issue " + issueKey + ")");
+        }
     }
 
     /**
@@ -52,6 +71,7 @@ public class IssueOrderService {
         if (teamId == null) {
             throw new IllegalArgumentException("Epic has no team: " + epicKey);
         }
+        requireTeamAccess(teamId, epicKey);
 
         Integer currentOrder = epic.getManualOrder();
         if (currentOrder == null) {
@@ -110,6 +130,15 @@ public class IssueOrderService {
         if (parentKey == null) {
             throw new IllegalArgumentException("Story has no parent: " + storyKey);
         }
+        // Resolve team via the story itself (preferred — set on sync), falling
+        // back to the parent epic if the story has no teamId yet.
+        Long storyTeamId = story.getTeamId();
+        if (storyTeamId == null) {
+            storyTeamId = issueRepository.findByIssueKey(parentKey)
+                    .map(JiraIssueEntity::getTeamId)
+                    .orElse(null);
+        }
+        requireTeamAccess(storyTeamId, storyKey);
 
         Integer currentOrder = story.getManualOrder();
         if (currentOrder == null) {

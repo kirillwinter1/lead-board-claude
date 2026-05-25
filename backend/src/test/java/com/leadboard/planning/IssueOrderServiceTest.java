@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.auth.AuthorizationService;
 import com.leadboard.board.BoardService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
@@ -35,11 +36,17 @@ class IssueOrderServiceTest {
     @Mock
     private BoardService boardService;
 
+    @Mock
+    private AuthorizationService authorizationService;
+
     private IssueOrderService service;
 
     @BeforeEach
     void setUp() {
-        service = new IssueOrderService(issueRepository, workflowConfigService, unifiedPlanningService, boardService);
+        service = new IssueOrderService(issueRepository, workflowConfigService, unifiedPlanningService, boardService, authorizationService);
+        // Default to authorising every team — existing tests don't care about
+        // team scoping; the new scoping check has its own dedicated case below.
+        lenient().when(authorizationService.canManageTeam(anyLong())).thenReturn(true);
 
         // Default type categorization
         lenient().when(workflowConfigService.isEpic("Epic")).thenReturn(true);
@@ -62,6 +69,23 @@ class IssueOrderServiceTest {
 
     @Nested
     class ReorderEpicTests {
+
+        @Test
+        void reorderEpic_throwsAccessDenied_whenCallerCannotManageTeam() {
+            // TEAM_LEAD trying to reorder an epic of a team they don't belong to.
+            // canManageTeam returns false → AccessDeniedException, no shifts/saves.
+            Long teamId = 99L;
+            JiraIssueEntity epic = createEpic("EPIC-X", teamId, 3);
+            when(issueRepository.findByIssueKey("EPIC-X")).thenReturn(Optional.of(epic));
+            when(authorizationService.canManageTeam(teamId)).thenReturn(false);
+
+            assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                    () -> service.reorderEpic("EPIC-X", 1));
+
+            verify(issueRepository, never()).save(any());
+            verify(issueRepository, never()).shiftEpicOrdersDown(anyLong(), anyInt(), anyInt());
+            verify(issueRepository, never()).shiftEpicOrdersUp(anyLong(), anyInt(), anyInt());
+        }
 
         @Test
         void reorderEpic_moveUp_shiftsOthersDown() {

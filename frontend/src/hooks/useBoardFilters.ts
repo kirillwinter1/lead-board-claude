@@ -2,8 +2,10 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { BoardNode } from '../components/board/types'
 import { searchBoard, type BoardSearchResult } from '../api/board'
+import { useAuth } from '../contexts/AuthContext'
 
 export function useBoardFilters(board: BoardNode[]) {
+  const { canManageTeam } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
@@ -213,8 +215,11 @@ export function useBoardFilters(board: BoardNode[]) {
     return epic?.teamId || null
   }, [selectedTeams, board])
 
-  // Drag & drop is enabled when exactly one team is selected
-  const canReorder = selectedTeamId !== null
+  // Drag & drop is enabled only when exactly one team is selected AND the
+  // current user can manage that team — mirrors the backend rule in
+  // IssueOrderService.requireTeamAccess. A TEAM_LEAD reordering another
+  // team's backlog would otherwise hit 403 only after the drop.
+  const canReorder = selectedTeamId !== null && canManageTeam(selectedTeamId)
 
   const handleStatusToggle = (status: string) => {
     setSelectedStatuses(prev => {
