@@ -11,7 +11,6 @@ export function useBoardFilters(board: BoardNode[]) {
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set())
   const [selectedQuarters, setSelectedQuarters] = useState<Set<string>>(new Set())
   const [hideNew, setHideNew] = useState(false)
-  const [hideDone, setHideDone] = useState(false)
   const [urlTeamInitialized, setUrlTeamInitialized] = useState(false)
   const [urlProjectInitialized, setUrlProjectInitialized] = useState(false)
   const [searchResult, setSearchResult] = useState<BoardSearchResult | null>(null)
@@ -185,9 +184,6 @@ export function useBoardFilters(board: BoardNode[]) {
       if (hideNew && epic.epicInTodo) {
         return false
       }
-      if (hideDone && epic.epicDone) {
-        return false
-      }
       if (selectedStatuses.size > 0 && !selectedStatuses.has(epic.status)) {
         return false
       }
@@ -203,7 +199,7 @@ export function useBoardFilters(board: BoardNode[]) {
       }
       return true
     })
-  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams, selectedProjects, selectedQuarters, hideNew, hideDone])
+  }, [board, searchKey, searchResult, selectedStatuses, selectedTeams, selectedProjects, selectedQuarters, hideNew])
 
   // Get selected team ID for forecast loading
   const selectedTeamId = useMemo(() => {
@@ -272,7 +268,6 @@ export function useBoardFilters(board: BoardNode[]) {
     setSelectedProjects(new Set())
     setSelectedQuarters(new Set())
     setHideNew(false)
-    setHideDone(false)
   }
 
   const searchMode = searchResult?.searchMode ?? null
@@ -296,9 +291,7 @@ export function useBoardFilters(board: BoardNode[]) {
     searchMode,
     searchLoading,
     hideNew,
-    hideDone,
     setHideNew,
-    setHideDone,
     handleStatusToggle,
     handleTeamToggle,
     handleProjectToggle,
