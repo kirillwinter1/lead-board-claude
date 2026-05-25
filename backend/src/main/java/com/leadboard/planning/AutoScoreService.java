@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.project.ProjectAlignmentService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -25,13 +26,16 @@ public class AutoScoreService {
     private final AutoScoreCalculator calculator;
     private final JiraIssueRepository issueRepository;
     private final ProjectAlignmentService projectAlignmentService;
+    private final WorkflowConfigService workflowConfigService;
 
     public AutoScoreService(AutoScoreCalculator calculator,
                             JiraIssueRepository issueRepository,
-                            ProjectAlignmentService projectAlignmentService) {
+                            ProjectAlignmentService projectAlignmentService,
+                            WorkflowConfigService workflowConfigService) {
         this.calculator = calculator;
         this.issueRepository = issueRepository;
         this.projectAlignmentService = projectAlignmentService;
+        this.workflowConfigService = workflowConfigService;
     }
 
     /**

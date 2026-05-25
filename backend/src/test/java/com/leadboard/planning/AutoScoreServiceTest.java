@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.project.ProjectAlignmentService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -38,11 +39,14 @@ class AutoScoreServiceTest {
     @Mock
     private ProjectAlignmentService projectAlignmentService;
 
+    @Mock
+    private WorkflowConfigService workflowConfigService;
+
     private AutoScoreService autoScoreService;
 
     @BeforeEach
     void setUp() {
-        autoScoreService = new AutoScoreService(calculator, issueRepository, projectAlignmentService);
+        autoScoreService = new AutoScoreService(calculator, issueRepository, projectAlignmentService, workflowConfigService);
     }
 
     // ==================== recalculateAll() Tests ====================
