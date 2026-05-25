@@ -378,7 +378,13 @@ public class BoardService {
             }
 
             node.setFlagged(entity.getFlagged());
-            node.setAutoScore(entity.getAutoScore());
+            // Don't expose stale auto_score for Done epics — AutoScoreService no
+            // longer recalculates them, so the DB value is frozen at the moment
+            // the epic transitioned to Done. Surfacing it would let archived
+            // work compete with active epics in Priority sort and in the UI.
+            if (!node.isEpicDone()) {
+                node.setAutoScore(entity.getAutoScore());
+            }
             node.setManualOrder(entity.getManualOrder());
         } else if (workflowConfigService.isStoryOrBug(entity.getIssueType(), pk)) {
             node.setAutoScore(entity.getAutoScore());

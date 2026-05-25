@@ -571,6 +571,31 @@ class BoardServiceTest {
         assertEquals(sixDaysAgo, node.getDoneAt());
     }
 
+    @Test
+    @DisplayName("should NOT expose stale auto_score for Done Epic on board response")
+    void shouldNotExposeAutoScoreForDoneEpic() {
+        JiraIssueEntity done = new JiraIssueEntity();
+        done.setIssueKey("LB-301");
+        done.setSummary("Done epic with stale score");
+        done.setStatus("ГОТОВО");
+        done.setIssueType("Эпик");
+        done.setProjectKey("LB");
+        done.setBoardCategory("EPIC");
+        done.setDoneAt(OffsetDateTime.now().minusDays(3));
+        done.setAutoScore(new BigDecimal("42"));
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(done));
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        BoardNode node = response.getItems().get(0);
+        assertTrue(node.isEpicDone());
+        assertNull(node.getAutoScore(), "Done epic should not surface stale auto_score on the board");
+    }
+
     // ==================== F71: Done Epic Filter (14-day window) ====================
 
     @Test
