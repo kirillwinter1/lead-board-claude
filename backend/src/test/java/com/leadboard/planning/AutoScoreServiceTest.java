@@ -111,6 +111,38 @@ class AutoScoreServiceTest {
 
             assertEquals(2, count);
         }
+
+        @Test
+        @DisplayName("should skip Done epics so they do not participate in autoscoring")
+        void shouldSkipDoneEpics() {
+            JiraIssueEntity active1 = createEpic("LB-1", "Active 1");
+            active1.setStatus("DEVELOPING");
+            active1.setIssueType("Epic");
+            active1.setProjectKey("LB");
+            JiraIssueEntity active2 = createEpic("LB-2", "Active 2");
+            active2.setStatus("REQUIREMENTS");
+            active2.setIssueType("Epic");
+            active2.setProjectKey("LB");
+            JiraIssueEntity done = createEpic("LB-3", "Done epic");
+            done.setStatus("ГОТОВО");
+            done.setIssueType("Epic");
+            done.setProjectKey("LB");
+
+            when(issueRepository.findByBoardCategory("EPIC"))
+                    .thenReturn(List.of(active1, active2, done));
+            when(workflowConfigService.isDone("DEVELOPING", "Epic", "LB")).thenReturn(false);
+            when(workflowConfigService.isDone("REQUIREMENTS", "Epic", "LB")).thenReturn(false);
+            when(workflowConfigService.isDone("ГОТОВО", "Epic", "LB")).thenReturn(true);
+            when(calculator.calculate(active1)).thenReturn(BigDecimal.valueOf(70));
+            when(calculator.calculate(active2)).thenReturn(BigDecimal.valueOf(40));
+
+            int count = autoScoreService.recalculateAll();
+
+            assertEquals(2, count, "Done epic should not be counted as recalculated");
+            verify(calculator).calculate(active1);
+            verify(calculator).calculate(active2);
+            verify(calculator, never()).calculate(done);
+        }
     }
 
     // ==================== recalculateForTeam() Tests ====================
