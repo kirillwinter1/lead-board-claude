@@ -408,7 +408,7 @@ public class JiraClient {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
 
         webClient.post()
-                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/transitions?notifyUsers=false")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .bodyValue(Map.of("transition", Map.of("id", transitionId)))
                 .retrieve()
@@ -426,7 +426,7 @@ public class JiraClient {
         String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
 
         webClient.post()
-                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog")
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
                 .bodyValue(Map.of(
                         "timeSpentSeconds", timeSpentSeconds,
@@ -475,7 +475,7 @@ public class JiraClient {
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         webClient.post()
-                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions?notifyUsers=false")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(Map.of("transition", Map.of("id", transitionId)))
                 .retrieve()
@@ -491,7 +491,7 @@ public class JiraClient {
         String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         webClient.put()
-                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/assignee")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/assignee?notifyUsers=false")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(Map.of("accountId", accountId))
                 .retrieve()
@@ -509,7 +509,7 @@ public class JiraClient {
         String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
 
         webClient.post()
-                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog")
+                .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
                 .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
                 .bodyValue(Map.of(
                         "timeSpentSeconds", timeSpentSeconds,
