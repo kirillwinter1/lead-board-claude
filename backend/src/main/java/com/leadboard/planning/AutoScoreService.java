@@ -114,6 +114,11 @@ public class AutoScoreService {
         }
 
         JiraIssueEntity epic = epicOpt.get();
+        if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType(), epic.getProjectKey())) {
+            log.debug("Skipping AutoScore for Done epic {} (recalculateForEpic)", epicKey);
+            return epic.getAutoScore();
+        }
+
         BigDecimal score = calculator.calculate(epic);
         epic.setAutoScore(score);
         epic.setAutoScoreCalculatedAt(OffsetDateTime.now());

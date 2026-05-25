@@ -269,6 +269,25 @@ class AutoScoreServiceTest {
             verify(calculator, never()).calculate(any());
             verify(issueRepository, never()).save(any());
         }
+
+        @Test
+        @DisplayName("should skip Done epic and return existing autoScore")
+        void shouldSkipDoneEpicReturningExistingScore() {
+            JiraIssueEntity done = createEpic("LB-DONE", "Done");
+            done.setStatus("ГОТОВО");
+            done.setIssueType("Epic");
+            done.setProjectKey("LB");
+            done.setAutoScore(new BigDecimal("33"));
+
+            when(issueRepository.findByIssueKey("LB-DONE")).thenReturn(Optional.of(done));
+            when(workflowConfigService.isDone("ГОТОВО", "Epic", "LB")).thenReturn(true);
+
+            BigDecimal result = autoScoreService.recalculateForEpic("LB-DONE");
+
+            assertEquals(new BigDecimal("33"), result);
+            verify(calculator, never()).calculate(any());
+            verify(issueRepository, never()).save(any());
+        }
     }
 
     // ==================== getScoreDetails() Tests ====================

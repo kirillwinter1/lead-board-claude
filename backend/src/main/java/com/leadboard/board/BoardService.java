@@ -162,6 +162,9 @@ public class BoardService {
                     .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
 
             // Apply filters to epics (teamIds already applied in SQL for fast path)
+            // Capture archive cutoff once so every epic is judged against the same instant —
+            // avoids drift across the stream and prevents flaky tests around the boundary.
+            OffsetDateTime archiveCutoff = OffsetDateTime.now().minusDays(DONE_EPIC_VISIBILITY_DAYS);
             List<JiraIssueEntity> filteredEpics = epics.stream()
                     .filter(epic -> {
                         if (query != null && !query.isEmpty()) {
@@ -185,7 +188,7 @@ public class BoardService {
                             String pk = epic.getProjectKey();
                             boolean isDone = workflowConfigService.isDone(epic.getStatus(), epic.getIssueType(), pk);
                             if (isDone && epic.getDoneAt() != null
-                                    && epic.getDoneAt().isBefore(OffsetDateTime.now().minusDays(DONE_EPIC_VISIBILITY_DAYS))) {
+                                    && epic.getDoneAt().isBefore(archiveCutoff)) {
                                 return false;
                             }
                         }
@@ -291,8 +294,8 @@ public class BoardService {
                     return a.isEpicDone() ? -1 : 1;
                 }
                 if (a.isEpicDone()) {
-                    java.time.OffsetDateTime doneA = a.getDoneAt();
-                    java.time.OffsetDateTime doneB = b.getDoneAt();
+                    OffsetDateTime doneA = a.getDoneAt();
+                    OffsetDateTime doneB = b.getDoneAt();
                     if (doneA != null && doneB != null) return doneB.compareTo(doneA);
                     if (doneA != null) return -1;
                     if (doneB != null) return 1;
