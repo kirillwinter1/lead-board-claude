@@ -191,6 +191,34 @@ class AutoScoreServiceTest {
 
             assertEquals(0, count);
         }
+
+        @Test
+        @DisplayName("should skip Done epics for the given team")
+        void shouldSkipDoneEpicsForTeam() {
+            Long teamId = 99L;
+            JiraIssueEntity active = createEpic("LB-10", "Active");
+            active.setStatus("DEVELOPING");
+            active.setIssueType("Epic");
+            active.setProjectKey("LB");
+            active.setTeamId(teamId);
+            JiraIssueEntity done = createEpic("LB-11", "Done");
+            done.setStatus("ГОТОВО");
+            done.setIssueType("Epic");
+            done.setProjectKey("LB");
+            done.setTeamId(teamId);
+
+            when(issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId))
+                    .thenReturn(List.of(active, done));
+            when(workflowConfigService.isDone("DEVELOPING", "Epic", "LB")).thenReturn(false);
+            when(workflowConfigService.isDone("ГОТОВО", "Epic", "LB")).thenReturn(true);
+            when(calculator.calculate(active)).thenReturn(BigDecimal.valueOf(60));
+
+            int count = autoScoreService.recalculateForTeam(teamId);
+
+            assertEquals(1, count);
+            verify(calculator).calculate(active);
+            verify(calculator, never()).calculate(done);
+        }
     }
 
     // ==================== recalculateForEpic() Tests ====================

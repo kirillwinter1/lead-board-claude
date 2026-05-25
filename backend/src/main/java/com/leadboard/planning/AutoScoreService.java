@@ -76,7 +76,9 @@ public class AutoScoreService {
      */
     @Transactional
     public int recalculateForTeam(Long teamId) {
-        List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
+        List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId).stream()
+                .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType(), e.getProjectKey()))
+                .toList();
 
         calculator.preloadRiceData(epics);
         calculator.preloadAlignmentData(projectAlignmentService.preloadAlignmentData(epics));
@@ -93,7 +95,7 @@ public class AutoScoreService {
             calculator.clearAlignmentData();
         }
 
-        log.info("Recalculated AutoScore for {} epics of team {}", epics.size(), teamId);
+        log.info("Recalculated AutoScore for {} active epics of team {} (Done epics skipped)", epics.size(), teamId);
         return epics.size();
     }
 
