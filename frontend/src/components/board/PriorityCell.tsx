@@ -124,6 +124,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
     age: 'Age',
     riceBoost: 'RICE Score',
     alignmentBoost: 'Alignment',
+    quarter: 'Quarter',
   }
 
   return (
