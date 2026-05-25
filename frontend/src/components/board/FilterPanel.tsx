@@ -5,6 +5,7 @@ import { FilterBar } from '../FilterBar'
 import { FilterChip } from '../FilterChips'
 import { useStatusStyles } from './StatusStylesContext'
 import { SyncStatus } from './types'
+import { useAuth } from '../../contexts/AuthContext'
 
 interface FilterPanelProps {
   searchKey: string
@@ -76,6 +77,15 @@ export function FilterPanel({
   epicTitles,
 }: FilterPanelProps) {
   const statusStyles = useStatusStyles()
+  // Only ADMIN can trigger a sync — the backend endpoint requires ROLE_ADMIN
+  // and returns 403 for everyone else. Hide the button instead of letting
+  // non-admins click it and see a confusing "Request failed 403" toast.
+  //
+  // Wait for `loading` to settle before evaluating isAdmin() — until the auth
+  // fetch resolves, `role` is empty and the helper returns false, which would
+  // flash the button as hidden on every page load for admins.
+  const { isAdmin, loading: authLoading } = useAuth()
+  const canTriggerSync = !authLoading && isAdmin()
 
   const statusColorMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -156,13 +166,15 @@ export function FilterPanel({
               Last sync: {formatSyncTime(syncStatus.lastSyncCompletedAt)}
             </span>
           )}
-          <button
-            className={`btn btn-primary btn-refresh ${syncing ? 'syncing' : ''}`}
-            onClick={onSync}
-            disabled={syncing}
-          >
-            {syncing ? 'Syncing...' : 'Refresh'}
-          </button>
+          {canTriggerSync && (
+            <button
+              className={`btn btn-primary btn-refresh ${syncing ? 'syncing' : ''}`}
+              onClick={onSync}
+              disabled={syncing}
+            >
+              {syncing ? 'Syncing...' : 'Refresh'}
+            </button>
+          )}
         </div>
       }
     >
