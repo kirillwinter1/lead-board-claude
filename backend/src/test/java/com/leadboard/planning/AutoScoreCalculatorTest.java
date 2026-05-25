@@ -847,15 +847,23 @@ class AutoScoreCalculatorTest {
     }
 
     @Test
-    void quarterFactorWithoutQuarterLabelGivesZero() {
+    void quarterFactorWithoutMatchingQuarterLabelGivesZero() {
         JiraIssueEntity epic = createBasicEpic();
         epic.setLabels(new String[] { "tech-debt", "frontend" });
-        Map<String, BigDecimal> factorsNoMatchingLabels = calculator.calculateFactors(epic);
-        assertEquals(BigDecimal.ZERO, factorsNoMatchingLabels.get("quarter"));
 
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("quarter"));
+    }
+
+    @Test
+    void quarterFactorWithNullLabelsGivesZero() {
+        JiraIssueEntity epic = createBasicEpic();
         epic.setLabels(null);
-        Map<String, BigDecimal> factorsNullLabels = calculator.calculateFactors(epic);
-        assertEquals(BigDecimal.ZERO, factorsNullLabels.get("quarter"));
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("quarter"));
     }
 
     // ==================== Helper Methods ====================
