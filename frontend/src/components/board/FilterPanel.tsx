@@ -80,8 +80,12 @@ export function FilterPanel({
   // Only ADMIN can trigger a sync — the backend endpoint requires ROLE_ADMIN
   // and returns 403 for everyone else. Hide the button instead of letting
   // non-admins click it and see a confusing "Request failed 403" toast.
-  const { isAdmin } = useAuth()
-  const canTriggerSync = isAdmin()
+  //
+  // Wait for `loading` to settle before evaluating isAdmin() — until the auth
+  // fetch resolves, `role` is empty and the helper returns false, which would
+  // flash the button as hidden on every page load for admins.
+  const { isAdmin, loading: authLoading } = useAuth()
+  const canTriggerSync = !authLoading && isAdmin()
 
   const statusColorMap = useMemo(() => {
     const map = new Map<string, string>()
