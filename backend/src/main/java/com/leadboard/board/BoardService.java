@@ -209,19 +209,25 @@ public class BoardService {
             Map<String, String> epicToProjectKey = buildEpicToProjectMapping(
                     projectIssues, filteredEpics, issueMap);
 
-            // Set parentProjectKey on epic nodes
-            for (Map.Entry<String, BoardNode> entry : epicMap.entrySet()) {
-                String projKey = epicToProjectKey.get(entry.getKey());
-                if (projKey != null) {
-                    entry.getValue().setParentProjectKey(projKey);
-                }
-            }
-
-            // Set quarterLabel on epic nodes (with parent project inheritance)
+            // Build projects index (used for title + quarter inheritance)
             Map<String, JiraIssueEntity> projectsByKey = new HashMap<>();
             for (JiraIssueEntity proj : projectIssues) {
                 projectsByKey.put(proj.getIssueKey(), proj);
             }
+
+            // Set parentProjectKey + parentProjectTitle on epic nodes
+            for (Map.Entry<String, BoardNode> entry : epicMap.entrySet()) {
+                String projKey = epicToProjectKey.get(entry.getKey());
+                if (projKey != null) {
+                    entry.getValue().setParentProjectKey(projKey);
+                    JiraIssueEntity projEntity = projectsByKey.get(projKey);
+                    if (projEntity != null) {
+                        entry.getValue().setParentProjectTitle(projEntity.getSummary());
+                    }
+                }
+            }
+
+            // Set quarterLabel on epic nodes (with parent project inheritance)
             for (JiraIssueEntity epic : filteredEpics) {
                 BoardNode node = epicMap.get(epic.getIssueKey());
                 if (node != null) {

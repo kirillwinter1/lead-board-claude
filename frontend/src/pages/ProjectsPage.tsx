@@ -203,6 +203,7 @@ function childEpicToBoardNode(e: ChildEpicDto, jiraBaseUrl: string): BoardNode {
     assigneeDisplayName: null,
     projectKey: null,
     parentProjectKey: null,
+    parentProjectTitle: null,
     quarterLabel: null,
     children: [],
   }
