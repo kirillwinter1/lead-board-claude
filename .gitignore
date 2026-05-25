@@ -42,6 +42,12 @@ frontend/test-results/
 docs/superpowers/
 output/
 
-# Ad-hoc screenshots in root
+# Ad-hoc screenshots in root (QA, planning, debug captures)
 /velocity_*.png
 /worklog_*.png
+/qa-*.png
+/qa_*.png
+/qp-*.png
+/qp_*.png
+/screenshot*.png
+/screen-*.png
