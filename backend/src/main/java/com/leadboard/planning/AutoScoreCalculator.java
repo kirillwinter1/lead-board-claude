@@ -35,6 +35,7 @@ import java.util.*;
  * - Прогресс (10): процент выполнения (logged/estimate)
  * - Размер (5): инверсия от estimate (меньше = выше, без оценки = -5)
  * - Возраст (5): логарифм от дней с создания
+ * - Quarter (10): эпик в label'ах текущего квартала (YYYYQN) → +10, иначе 0
  * - Flagged (-100): штраф за приостановку работы
  *
  * Порядок эпиков определяется полем manual_order (drag & drop).
@@ -71,6 +72,7 @@ public class AutoScoreCalculator {
     private static final BigDecimal WEIGHT_RICE = new BigDecimal("15");
     private static final BigDecimal WEIGHT_ALIGNMENT_PER_DAY = BigDecimal.ONE;
     private static final BigDecimal MAX_ALIGNMENT_BOOST = new BigDecimal("10");
+    private static final BigDecimal WEIGHT_QUARTER = new BigDecimal("10");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     /**
@@ -103,6 +105,7 @@ public class AutoScoreCalculator {
         factors.put("age", calculateAgeScore(epic));
         factors.put("riceBoost", calculateRiceBoost(epic));
         factors.put("alignmentBoost", calculateAlignmentBoost(epic));
+        factors.put("quarter", calculateQuarterBoost(epic));
         factors.put("flagged", calculateFlaggedPenalty(epic));
 
         return factors;
@@ -434,6 +437,19 @@ public class AutoScoreCalculator {
         }
         BigDecimal boost = BigDecimal.valueOf(delayDays).multiply(WEIGHT_ALIGNMENT_PER_DAY);
         return boost.min(MAX_ALIGNMENT_BOOST).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Quarter Boost: +10, если quarter-label эпика совпадает с текущим календарным кварталом.
+     * Лейбл прошлого/будущего квартала или его отсутствие → 0 (штрафа нет).
+     */
+    private BigDecimal calculateQuarterBoost(JiraIssueEntity epic) {
+        String epicQuarter = epic.getQuarterLabel();
+        if (epicQuarter == null) {
+            return BigDecimal.ZERO;
+        }
+        String currentQuarter = QuarterlyPlanningService.getCurrentQuarterLabel(LocalDate.now());
+        return epicQuarter.equals(currentQuarter) ? WEIGHT_QUARTER : BigDecimal.ZERO;
     }
 
     /**
