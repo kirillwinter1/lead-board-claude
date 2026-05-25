@@ -44,6 +44,9 @@ class QuarterlyPlanningControllerTest {
     private QuarterlyPlanningService planningService;
 
     @MockBean
+    private com.leadboard.auth.AuthorizationService authorizationService;
+
+    @MockBean
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
@@ -62,7 +65,7 @@ class QuarterlyPlanningControllerTest {
         // F70: the controller now calls the two-arg overload with onlyDesired
         // defaulting to true. The default semantically matches "show what PM asked for".
         PlanningEpicDto epic = sampleEpicDto("EPIC-1", "2026Q2", true, 0);
-        when(planningService.getEpicsForQuarter("2026Q2", true))
+        when(planningService.getEpicsForQuarter("2026Q2", true, null))
                 .thenReturn(new QuarterlyEpicsResponse("2026Q2", List.of(epic)));
 
         mockMvc.perform(get("/api/quarterly-planning/quarters/2026Q2/epics"))
@@ -71,7 +74,7 @@ class QuarterlyPlanningControllerTest {
                 .andExpect(jsonPath("$.epics[0].epicKey").value("EPIC-1"))
                 .andExpect(jsonPath("$.epics[0].inQuarter").value(true));
 
-        verify(planningService).getEpicsForQuarter("2026Q2", true);
+        verify(planningService).getEpicsForQuarter("2026Q2", true, null);
     }
 
     @Test
@@ -80,13 +83,46 @@ class QuarterlyPlanningControllerTest {
         // The query string toggle must reach the service unchanged — frontends
         // rely on it to render the "Show all" view.
         PlanningEpicDto epic = sampleEpicDto("EPIC-1", "2026Q2", true, 0);
-        when(planningService.getEpicsForQuarter("2026Q2", false))
+        when(planningService.getEpicsForQuarter("2026Q2", false, null))
                 .thenReturn(new QuarterlyEpicsResponse("2026Q2", List.of(epic)));
 
         mockMvc.perform(get("/api/quarterly-planning/quarters/2026Q2/epics?onlyDesired=false"))
                 .andExpect(status().isOk());
 
-        verify(planningService).getEpicsForQuarter("2026Q2", false);
+        verify(planningService).getEpicsForQuarter("2026Q2", false, null);
+    }
+
+    @Test
+    @WithMockUser(roles = "TEAM_LEAD")
+    void getEpicsForQuarter_teamLead_isScopedToUserTeams() throws Exception {
+        // TEAM_LEAD callers must see only epics from their own team(s). The
+        // controller derives the scope from AuthorizationService and forwards
+        // it to the service layer — the service applies the filter.
+        java.util.Set<Long> teams = java.util.Set.of(1L, 2L);
+        when(authorizationService.isTeamLead()).thenReturn(true);
+        when(authorizationService.getUserTeamIds()).thenReturn(teams);
+        when(planningService.getEpicsForQuarter("2026Q2", true, teams))
+                .thenReturn(new QuarterlyEpicsResponse("2026Q2", List.of()));
+
+        mockMvc.perform(get("/api/quarterly-planning/quarters/2026Q2/epics"))
+                .andExpect(status().isOk());
+
+        verify(planningService).getEpicsForQuarter("2026Q2", true, teams);
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void getEpicsForQuarter_admin_isNotScoped() throws Exception {
+        // ADMIN must keep the cross-team view — controller must NOT call
+        // getUserTeamIds() and must pass null to the service.
+        when(authorizationService.isTeamLead()).thenReturn(false);
+        when(planningService.getEpicsForQuarter("2026Q2", true, null))
+                .thenReturn(new QuarterlyEpicsResponse("2026Q2", List.of()));
+
+        mockMvc.perform(get("/api/quarterly-planning/quarters/2026Q2/epics"))
+                .andExpect(status().isOk());
+
+        verify(planningService).getEpicsForQuarter("2026Q2", true, null);
     }
 
     // ==================== POST /epics/{epicKey}/quarter ====================

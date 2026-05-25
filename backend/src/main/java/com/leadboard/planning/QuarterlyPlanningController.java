@@ -1,5 +1,6 @@
 package com.leadboard.planning;
 
+import com.leadboard.auth.AuthorizationService;
 import com.leadboard.planning.dto.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -7,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/quarterly-planning")
@@ -14,9 +16,31 @@ import java.util.Map;
 public class QuarterlyPlanningController {
 
     private final QuarterlyPlanningService planningService;
+    private final AuthorizationService authorizationService;
 
-    public QuarterlyPlanningController(QuarterlyPlanningService planningService) {
+    public QuarterlyPlanningController(QuarterlyPlanningService planningService,
+                                       AuthorizationService authorizationService) {
         this.planningService = planningService;
+        this.authorizationService = authorizationService;
+    }
+
+    /**
+     * Returns the set of team ids the current user is allowed to see on the
+     * planning board, or {@code null} for "no scope — show every team".
+     *
+     * <p>Only TEAM_LEAD is scoped. ADMIN/PROJECT_MANAGER need a cross-team view
+     * to balance capacity; MEMBER/VIEWER keep the unscoped view by design
+     * (the page is read-only for them anyway via the mutate-endpoint guards).</p>
+     *
+     * <p>A TEAM_LEAD without any team membership receives an empty set, which
+     * makes both team-overview and epic queries return empty lists — the
+     * intentional outcome until the user is added to a team.</p>
+     */
+    private Set<Long> scopedTeamIds() {
+        if (authorizationService.isTeamLead()) {
+            return authorizationService.getUserTeamIds();
+        }
+        return null;
     }
 
     @GetMapping("/capacity")
@@ -57,7 +81,7 @@ public class QuarterlyPlanningController {
 
     @GetMapping("/teams-overview")
     public ResponseEntity<List<QuarterlyTeamOverviewDto>> getTeamsOverview(@RequestParam String quarter) {
-        return ResponseEntity.ok(planningService.getTeamsOverview(quarter));
+        return ResponseEntity.ok(planningService.getTeamsOverview(quarter, scopedTeamIds()));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
@@ -91,7 +115,7 @@ public class QuarterlyPlanningController {
     public ResponseEntity<QuarterlyEpicsResponse> getEpicsForQuarter(
             @PathVariable String quarter,
             @RequestParam(name = "onlyDesired", defaultValue = "true") boolean onlyDesired) {
-        return ResponseEntity.ok(planningService.getEpicsForQuarter(quarter, onlyDesired));
+        return ResponseEntity.ok(planningService.getEpicsForQuarter(quarter, onlyDesired, scopedTeamIds()));
     }
 
     @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")

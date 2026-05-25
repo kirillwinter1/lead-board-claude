@@ -602,7 +602,23 @@ public class QuarterlyPlanningService {
     // ==================== Teams Overview ====================
 
     public List<QuarterlyTeamOverviewDto> getTeamsOverview(String quarterLabel) {
+        return getTeamsOverview(quarterLabel, null);
+    }
+
+    /**
+     * Same as {@link #getTeamsOverview(String)} but only returns teams whose id
+     * is in {@code scopedTeamIds}. Pass {@code null} to opt out of scoping.
+     *
+     * <p>An empty (non-null) set returns an empty list — the controller uses
+     * this to enforce "TEAM_LEAD with no team membership sees nothing".</p>
+     */
+    public List<QuarterlyTeamOverviewDto> getTeamsOverview(String quarterLabel, Set<Long> scopedTeamIds) {
         List<TeamEntity> teams = teamRepository.findByActiveTrue();
+        if (scopedTeamIds != null) {
+            teams = teams.stream()
+                    .filter(t -> scopedTeamIds.contains(t.getId()))
+                    .toList();
+        }
         List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
         List<JiraIssueEntity> allEpics = issueRepository.findByBoardCategory("EPIC");
         Map<String, String> epicToProjectKey = buildEpicToProjectIndex(allProjects, allEpics);
@@ -714,7 +730,7 @@ public class QuarterlyPlanningService {
      * explicitly wants the unfiltered (F69) view.
      */
     public QuarterlyEpicsResponse getEpicsForQuarter(String quarterLabel) {
-        return getEpicsForQuarter(quarterLabel, true);
+        return getEpicsForQuarter(quarterLabel, true, null);
     }
 
     /**
@@ -735,6 +751,19 @@ public class QuarterlyPlanningService {
      * original F69 behaviour for the "show everything" toggle.</p>
      */
     public QuarterlyEpicsResponse getEpicsForQuarter(String quarterLabel, boolean onlyDesired) {
+        return getEpicsForQuarter(quarterLabel, onlyDesired, null);
+    }
+
+    /**
+     * Same as {@link #getEpicsForQuarter(String, boolean)} but only returns
+     * epics mapped to a team in {@code scopedTeamIds}. Pass {@code null} for
+     * the unscoped view.
+     *
+     * <p>Epics with no team mapping ({@code teamId == null}) are excluded when
+     * scoping is active — a TEAM_LEAD has nothing actionable to do with an
+     * unmapped epic and seeing it would only add noise.</p>
+     */
+    public QuarterlyEpicsResponse getEpicsForQuarter(String quarterLabel, boolean onlyDesired, Set<Long> scopedTeamIds) {
         List<JiraIssueEntity> allEpics = loadAllEpics();
         List<JiraIssueEntity> allProjects = issueRepository.findByBoardCategory("PROJECT");
 
@@ -809,6 +838,14 @@ public class QuarterlyPlanningService {
         List<PlanningEpicDto> result = new ArrayList<>();
         for (JiraIssueEntity epic : allEpics) {
             if (workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) continue;
+
+            // Team-lead scoping: drop epics outside the caller's team(s).
+            // Unmapped epics (teamId == null) are also dropped — they are not
+            // actionable for a team lead and would add noise.
+            if (scopedTeamIds != null) {
+                Long epicTeamId = epic.getTeamId();
+                if (epicTeamId == null || !scopedTeamIds.contains(epicTeamId)) continue;
+            }
 
             String projectKey = epicToProjectKey.get(epic.getIssueKey());
             JiraIssueEntity project = projectKey != null ? projectsByKey.get(projectKey) : null;

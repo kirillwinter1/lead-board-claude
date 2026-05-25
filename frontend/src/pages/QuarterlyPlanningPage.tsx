@@ -25,10 +25,23 @@ import {
 } from '../constants/colors'
 import './QuarterlyPlanningPage.css'
 
+function currentQuarterLabel(now: Date = new Date()): string {
+  return `${now.getFullYear()}Q${Math.floor(now.getMonth() / 3) + 1}`
+}
+
+/**
+ * Filter the server-returned list to "plannable" quarters — current and future
+ * only. Quarter labels are YYYYQn, which sort lexicographically by chronology,
+ * so a string comparison against the current quarter is enough.
+ */
+function plannableQuarters(quarters: string[]): string[] {
+  const current = currentQuarterLabel()
+  return quarters.filter(q => q >= current)
+}
+
 function defaultQuarter(quarters: string[]): string {
   if (quarters.length === 0) return ''
-  const now = new Date()
-  const currentQ = `${now.getFullYear()}Q${Math.floor(now.getMonth() / 3) + 1}`
+  const currentQ = currentQuarterLabel()
   return quarters.includes(currentQ) ? currentQ : quarters[0]
 }
 
@@ -55,6 +68,11 @@ export function QuarterlyPlanningPage() {
   // desires this quarter, plus standalone (orphan) epics. false = show every
   // epic the tech lead might want to consider (legacy F69 behaviour).
   const [onlyDesired, setOnlyDesired] = useState(true)
+  // Page-level team filter — always one team. Initialised lazily from the
+  // first team that appears in the overview (see effect below). Page is
+  // unusable until at least one team exists, which matches the empty-state
+  // guard already present in CapacityBars.
+  const [teamFilter, setTeamFilter] = useState<string>('')
   // Monotonic counter used to discard responses from stale loadQuarter calls
   // when the user switches quarters quickly or hits Refresh mid-flight.
   const loadGenerationRef = useRef(0)
@@ -68,8 +86,12 @@ export function QuarterlyPlanningPage() {
       getConfig().then(c => c.jiraBaseUrl || '').catch(() => ''),
     ]).then(([qs, baseUrl]) => {
       if (cancelled) return
-      setAvailableQuarters(qs)
-      setQuarter(defaultQuarter(qs))
+      // Planning is forward-looking: hide past quarters from the dropdown so
+      // a user cannot accidentally schedule work into a quarter that already
+      // ended. The current quarter is always retained (backend guarantees it).
+      const plannable = plannableQuarters(qs)
+      setAvailableQuarters(plannable)
+      setQuarter(defaultQuarter(plannable))
       setJiraBaseUrl(baseUrl)
       setLoading(false)
     }).catch(err => {
@@ -178,8 +200,49 @@ export function QuarterlyPlanningPage() {
     return m
   }, [teamsOverview, epics])
 
-  const backlogEpics = useMemo(() => epics.filter(e => !e.inQuarter), [epics])
-  const inQuarterEpics = useMemo(() => epics.filter(e => e.inQuarter), [epics])
+  // Single-select Team dropdown options. Sorted by name for stable order;
+  // color is shown as a colored dot inside the dropdown.
+  const teamFilterOptions = useMemo(
+    () => Array.from(teamsById.values())
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(t => ({ value: String(t.id), label: t.name, color: t.color ?? undefined })),
+    [teamsById],
+  )
+
+  // Snap teamFilter to a valid option whenever the option list changes:
+  //   - empty selection on first load → pick the first team
+  //   - currently-selected team disappeared (e.g. switched quarter) → pick first
+  // The dropdown has no "All teams" choice so we always keep one selected.
+  useEffect(() => {
+    if (teamFilterOptions.length === 0) return
+    const stillValid = teamFilterOptions.some(o => o.value === teamFilter)
+    if (!stillValid) setTeamFilter(teamFilterOptions[0].value)
+  }, [teamFilterOptions, teamFilter])
+
+  // Page-level team filter. Applied to both backlog and in-quarter so
+  // CapacityBars + columns stay consistent.
+  const epicMatchesTeamFilter = useCallback((e: PlanningEpicDto) => {
+    if (!teamFilter) return true
+    return e.teams.some(t => String(t.id) === teamFilter)
+  }, [teamFilter])
+
+  const backlogEpics = useMemo(
+    () => epics.filter(e => !e.inQuarter && epicMatchesTeamFilter(e)),
+    [epics, epicMatchesTeamFilter],
+  )
+  const inQuarterEpics = useMemo(
+    () => epics.filter(e => e.inQuarter && epicMatchesTeamFilter(e)),
+    [epics, epicMatchesTeamFilter],
+  )
+
+  // Visible teams: full overview narrowed to the selected team. The dropdown
+  // always keeps one team selected, but during the brief window before the
+  // initial team is picked (teamFilter === '') we render the full overview so
+  // the page is never empty.
+  const visibleTeamsOverview = useMemo<QuarterlyTeamOverviewDto[]>(() => {
+    if (!teamFilter) return teamsOverview
+    return teamsOverview.filter(t => String(t.teamId) === teamFilter)
+  }, [teamsOverview, teamFilter])
 
   // Optimistically recompute team utilization based on current in-quarter epics
   const derivedTeams = useMemo<QuarterlyTeamOverviewDto[]>(() => {
@@ -208,7 +271,7 @@ export function QuarterlyPlanningPage() {
       })
     })
 
-    return teamsOverview.map(team => {
+    return visibleTeamsOverview.map(team => {
       const updatedDemand = demandByTeam.get(team.teamId)
       if (!updatedDemand) {
         // No in-quarter epics for this team — demand is 0
@@ -225,11 +288,11 @@ export function QuarterlyPlanningPage() {
       const gapDays = team.capacityDays - demandDays
       const utilization = team.capacityDays > 0 ? Math.round((demandDays / team.capacityDays) * 100) : 0
       // Risk thresholds aligned with getUtilizationColor (constants/colors.ts):
-      // green (low) 85-110, yellow (medium) 70-130, red (high) otherwise.
+      // <80% low (green), 80..100% medium (yellow), >100% high (red).
       const risk: 'low' | 'medium' | 'high' =
-        utilization >= 85 && utilization <= 110
+        utilization < 80
           ? 'low'
-          : utilization >= 70 && utilization <= 130
+          : utilization <= 100
             ? 'medium'
             : 'high'
       return {
@@ -241,7 +304,7 @@ export function QuarterlyPlanningPage() {
         risk,
       }
     })
-  }, [teamsOverview, inQuarterEpics])
+  }, [visibleTeamsOverview, inQuarterEpics])
 
   // ==================== Pending changes ====================
 
@@ -381,6 +444,14 @@ export function QuarterlyPlanningPage() {
             selected={quarter}
             onChange={(value) => { if (value) setQuarter(value) }}
             placeholder="Select quarter"
+            allowClear={false}
+          />
+          <SingleSelectDropdown
+            label="Team"
+            options={teamFilterOptions}
+            selected={teamFilter}
+            onChange={(value) => { if (value) setTeamFilter(value) }}
+            placeholder="Select team"
             allowClear={false}
           />
           <button

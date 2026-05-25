@@ -20,10 +20,11 @@ export function getAccuracyColor(ratio: number): string {
   return DSR_RED
 }
 
-// Helper: get utilization color by percent
+// Helper: get utilization color by percent.
+// Thresholds: <80% green, 80..100% yellow, >100% red.
 export function getUtilizationColor(percent: number): string {
-  if (percent >= 85 && percent <= 110) return DSR_GREEN
-  if (percent >= 70 && percent <= 130) return DSR_YELLOW
+  if (percent < 80) return DSR_GREEN
+  if (percent <= 100) return DSR_YELLOW
   return DSR_RED
 }
 

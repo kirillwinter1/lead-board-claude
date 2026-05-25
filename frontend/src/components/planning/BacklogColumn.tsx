@@ -49,7 +49,6 @@ export function BacklogColumn({
 }: BacklogColumnProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState<Set<string>>(new Set())
-  const [teamFilter, setTeamFilter] = useState<Set<string>>(new Set())
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   // Build filter option lists from full epics list (so user can always find any project/team).
@@ -68,32 +67,16 @@ export function BacklogColumn({
     })
   }, [epics])
 
-  // Single-pass build of all distinct teams referenced by any epic; derived
-  // colorMap/labelMap below avoid re-iterating epics.
-  const allTeamOptions = useMemo(() => {
-    const teams = new Map<string, { id: string; name: string; color: string | null }>()
-    epics.forEach(e => e.teams.forEach(t => {
-      const id = String(t.id)
-      if (!teams.has(id)) {
-        teams.set(id, { id, name: t.name, color: t.color })
-      }
-    }))
-    return Array.from(teams.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [epics])
-
-  // Apply filters
+  // Apply local search + project filters. The page already pre-filtered by
+  // teamFilter so we do not re-apply it here.
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return epics.filter(e => {
       if (q && !e.epicSummary.toLowerCase().includes(q) && !e.epicKey.toLowerCase().includes(q)) return false
       if (projectFilter.size > 0 && !projectFilter.has(projectKeyOrSentinel(e.projectKey))) return false
-      if (teamFilter.size > 0) {
-        const ids = e.teams.map(t => String(t.id))
-        if (!ids.some(id => teamFilter.has(id))) return false
-      }
       return true
     })
-  }, [epics, searchQuery, projectFilter, teamFilter])
+  }, [epics, searchQuery, projectFilter])
 
   const groups: ProjectGroup[] = useMemo(() => {
     const map = new Map<string, ProjectGroup>()
@@ -128,18 +111,6 @@ export function BacklogColumn({
       return next
     })
   }
-
-  const teamColorMap = useMemo(() => {
-    const m = new Map<string, string>()
-    allTeamOptions.forEach(t => { if (t.color) m.set(t.id, t.color) })
-    return m
-  }, [allTeamOptions])
-
-  const teamLabelMap = useMemo(() => {
-    const m = new Map<string, string>()
-    allTeamOptions.forEach(t => m.set(t.id, t.name))
-    return m
-  }, [allTeamOptions])
 
   return (
     <div
@@ -184,20 +155,6 @@ export function BacklogColumn({
             const summary = allProjectOptions.find(([k]) => k === key)?.[1] ?? ''
             return summary ? `${key} — ${summary}` : key
           }}
-        />
-        <MultiSelectDropdown
-          label="Team"
-          options={allTeamOptions.map(t => t.id)}
-          selected={teamFilter}
-          onToggle={id => setTeamFilter(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) next.delete(id)
-            else next.add(id)
-            return next
-          })}
-          placeholder="All teams"
-          colorMap={teamColorMap}
-          renderOption={id => teamLabelMap.get(id) || id}
         />
         <label
           style={{
