@@ -282,9 +282,22 @@ public class BoardService {
                 }
             }
 
-            // Sort epics by manualOrder
+            // Sort epics: Done epics first (recent at top), then active epics by manualOrder/autoScore.
+            // F71: recently completed work surfaces above active work — gives teams a celebratory
+            // "what we just shipped" band before the in-flight backlog. Active sort logic unchanged.
             List<BoardNode> items = new ArrayList<>(epicMap.values());
             items.sort((a, b) -> {
+                if (a.isEpicDone() != b.isEpicDone()) {
+                    return a.isEpicDone() ? -1 : 1;
+                }
+                if (a.isEpicDone()) {
+                    java.time.OffsetDateTime doneA = a.getDoneAt();
+                    java.time.OffsetDateTime doneB = b.getDoneAt();
+                    if (doneA != null && doneB != null) return doneB.compareTo(doneA);
+                    if (doneA != null) return -1;
+                    if (doneB != null) return 1;
+                    return 0;
+                }
                 Integer orderA = a.getManualOrder();
                 Integer orderB = b.getManualOrder();
                 if (orderA != null && orderB != null) return orderA.compareTo(orderB);

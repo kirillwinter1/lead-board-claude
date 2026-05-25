@@ -572,6 +572,51 @@ class BoardServiceTest {
     }
 
     @Test
+    @DisplayName("should sort recently Done epics ABOVE active epics, most recent first")
+    void shouldSortDoneEpicsAtTopOfBoard() {
+        JiraIssueEntity active = new JiraIssueEntity();
+        active.setIssueKey("LB-400");
+        active.setSummary("Active");
+        active.setStatus("DEVELOPING");
+        active.setIssueType("Эпик");
+        active.setProjectKey("LB");
+        active.setBoardCategory("EPIC");
+        active.setManualOrder(1);
+
+        JiraIssueEntity done2dAgo = new JiraIssueEntity();
+        done2dAgo.setIssueKey("LB-401");
+        done2dAgo.setSummary("Done 2d ago");
+        done2dAgo.setStatus("ГОТОВО");
+        done2dAgo.setIssueType("Эпик");
+        done2dAgo.setProjectKey("LB");
+        done2dAgo.setBoardCategory("EPIC");
+        done2dAgo.setDoneAt(OffsetDateTime.now().minusDays(2));
+
+        JiraIssueEntity done10dAgo = new JiraIssueEntity();
+        done10dAgo.setIssueKey("LB-402");
+        done10dAgo.setSummary("Done 10d ago");
+        done10dAgo.setStatus("ГОТОВО");
+        done10dAgo.setIssueType("Эпик");
+        done10dAgo.setProjectKey("LB");
+        done10dAgo.setBoardCategory("EPIC");
+        done10dAgo.setDoneAt(OffsetDateTime.now().minusDays(10));
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB")))
+                .thenReturn(List.of(active, done2dAgo, done10dAgo));
+        when(workflowConfigService.isDone("DEVELOPING", "Эпик", "LB")).thenReturn(false);
+        when(workflowConfigService.isAllowedForRoughEstimate("DEVELOPING")).thenReturn(true);
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(3, response.getItems().size());
+        assertEquals("LB-401", response.getItems().get(0).getIssueKey(), "Most recently Done epic should be first");
+        assertEquals("LB-402", response.getItems().get(1).getIssueKey(), "Older Done epic should be second");
+        assertEquals("LB-400", response.getItems().get(2).getIssueKey(), "Active epic should be last");
+    }
+
+    @Test
     @DisplayName("should NOT expose stale auto_score for Done Epic on board response")
     void shouldNotExposeAutoScoreForDoneEpic() {
         JiraIssueEntity done = new JiraIssueEntity();
