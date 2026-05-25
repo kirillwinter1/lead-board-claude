@@ -1309,4 +1309,41 @@ class QuarterlyPlanningServiceTest {
         entity.setManualBoost(0);
         return entity;
     }
+
+    // --- getCurrentQuarterLabel helper (F72) ---
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ1ForJanuary() {
+        assertEquals("2026Q1", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 1, 15)));
+    }
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ1ForMarch() {
+        assertEquals("2026Q1", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 3, 31)));
+    }
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ2ForApril() {
+        assertEquals("2026Q2", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 4, 1)));
+    }
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ2ForMay() {
+        assertEquals("2026Q2", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 5, 25)));
+    }
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ3ForSeptember() {
+        assertEquals("2026Q3", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 9, 30)));
+    }
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ4ForOctober() {
+        assertEquals("2026Q4", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 10, 1)));
+    }
+
+    @Test
+    void getCurrentQuarterLabelReturnsQ4ForDecember() {
+        assertEquals("2026Q4", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 12, 31)));
+    }
 }
