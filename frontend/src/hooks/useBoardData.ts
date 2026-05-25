@@ -4,10 +4,10 @@ import { getRoughEstimateConfig, updateRoughEstimate } from '../api/epics'
 import type { BoardNode, BoardResponse, SyncStatus, RoughEstimateConfig } from '../components/board/types'
 import { getApiCache, setApiCache } from './useApiCache'
 
-const BOARD_CACHE_KEY = 'board-data'
+const buildBoardCacheKey = (includeArchived: boolean) => `board-data-${includeArchived ? 'archived' : 'active'}`
 
 export function useBoardData(includeArchived: boolean = false) {
-  const cached = getApiCache<BoardNode[]>(BOARD_CACHE_KEY)
+  const cached = getApiCache<BoardNode[]>(buildBoardCacheKey(includeArchived))
   const [board, setBoard] = useState<BoardNode[]>(cached ?? [])
   const [loading, setLoading] = useState(!cached)
   const [error, setError] = useState<string | null>(null)
@@ -22,7 +22,7 @@ export function useBoardData(includeArchived: boolean = false) {
         params: { includeDQ: true, includeArchived },
       })
       setBoard(response.data.items)
-      setApiCache(BOARD_CACHE_KEY, response.data.items)
+      setApiCache(buildBoardCacheKey(includeArchived), response.data.items)
     } catch (err: unknown) {
       if (!silent) setError(err instanceof Error ? err.message : 'Failed to load board')
     } finally {

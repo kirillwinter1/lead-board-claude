@@ -62,7 +62,7 @@ export function BoardPage() {
     handleProjectToggle,
     handleQuarterToggle,
     clearFilters,
-  } = useBoardFilters(board)
+  } = useBoardFilters(board, () => setIncludeArchived(false))
 
   const {
     forecastMap,

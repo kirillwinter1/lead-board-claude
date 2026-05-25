@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import type { BoardNode } from '../components/board/types'
 import { searchBoard, type BoardSearchResult } from '../api/board'
 
-export function useBoardFilters(board: BoardNode[]) {
+export function useBoardFilters(board: BoardNode[], onResetIncludeArchived?: () => void) {
   const [searchParams, setSearchParams] = useSearchParams()
   const [searchKey, setSearchKey] = useState('')
   const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(new Set())
@@ -268,6 +268,7 @@ export function useBoardFilters(board: BoardNode[]) {
     setSelectedProjects(new Set())
     setSelectedQuarters(new Set())
     setHideNew(false)
+    onResetIncludeArchived?.()
   }
 
   const searchMode = searchResult?.searchMode ?? null
