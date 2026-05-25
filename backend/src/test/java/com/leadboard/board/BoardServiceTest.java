@@ -571,7 +571,105 @@ class BoardServiceTest {
         assertEquals(sixDaysAgo, node.getDoneAt());
     }
 
+    // ==================== F71: Done Epic Filter (14-day window) ====================
+
+    @Test
+    @DisplayName("should exclude Done epics older than 14 days from default board view")
+    void shouldExcludeDoneEpicsOlderThan14Days() {
+        OffsetDateTime old = OffsetDateTime.now().minusDays(15);
+        JiraIssueEntity oldDone = makeDoneEpic("LB-200", "Old", old);
+        JiraIssueEntity active = makeActiveEpic("LB-201", "Active");
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(oldDone, active));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("LB-201", response.getItems().get(0).getIssueKey());
+    }
+
+    @Test
+    @DisplayName("should include Done epics within the last 14 days")
+    void shouldIncludeRecentlyDoneEpics() {
+        OffsetDateTime recent = OffsetDateTime.now().minusDays(7);
+        JiraIssueEntity recentDone = makeDoneEpic("LB-202", "Recent", recent);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(recentDone));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        assertTrue(response.getItems().get(0).isEpicDone());
+    }
+
+    @Test
+    @DisplayName("should include all Done epics when includeArchived=true")
+    void shouldIncludeArchivedWhenFlagSet() {
+        OffsetDateTime old = OffsetDateTime.now().minusDays(60);
+        JiraIssueEntity oldDone = makeDoneEpic("LB-203", "Very old", old);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(oldDone));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false, true);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("LB-203", response.getItems().get(0).getIssueKey());
+    }
+
+    @Test
+    @DisplayName("should show Done epic when doneAt is null (legacy data)")
+    void shouldShowDoneEpicWithNullDoneAt() {
+        JiraIssueEntity legacyDone = makeDoneEpic("LB-204", "Legacy", null);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(legacyDone));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+        assertEquals("LB-204", response.getItems().get(0).getIssueKey());
+    }
+
+    @Test
+    @DisplayName("should include Done epic at exactly 14-day boundary (not before)")
+    void shouldShowDoneEpicAtBoundary() {
+        OffsetDateTime exactly14 = OffsetDateTime.now().minusDays(14).plusSeconds(1);
+        JiraIssueEntity boundary = makeDoneEpic("LB-205", "Boundary", exactly14);
+
+        when(issueRepository.findByProjectKeyIn(List.of("LB"))).thenReturn(List.of(boundary));
+
+        BoardResponse response = boardService.getBoard(null, null, null, 0, 50, false);
+
+        assertEquals(1, response.getItems().size());
+    }
+
     // ==================== Helper Methods ====================
+
+    private JiraIssueEntity makeActiveEpic(String key, String summary) {
+        JiraIssueEntity e = new JiraIssueEntity();
+        e.setIssueKey(key);
+        e.setSummary(summary);
+        e.setStatus("DEVELOPING");
+        e.setIssueType("Эпик");
+        e.setProjectKey("LB");
+        e.setBoardCategory("EPIC");
+        when(workflowConfigService.isDone("DEVELOPING", "Эпик", "LB")).thenReturn(false);
+        when(workflowConfigService.isAllowedForRoughEstimate("DEVELOPING")).thenReturn(true);
+        return e;
+    }
+
+    private JiraIssueEntity makeDoneEpic(String key, String summary, OffsetDateTime doneAt) {
+        JiraIssueEntity e = new JiraIssueEntity();
+        e.setIssueKey(key);
+        e.setSummary(summary);
+        e.setStatus("ГОТОВО");
+        e.setIssueType("Эпик");
+        e.setProjectKey("LB");
+        e.setBoardCategory("EPIC");
+        e.setDoneAt(doneAt);
+        when(workflowConfigService.isDone("ГОТОВО", "Эпик", "LB")).thenReturn(true);
+        when(workflowConfigService.isAllowedForRoughEstimate("ГОТОВО")).thenReturn(false);
+        return e;
+    }
 
     private JiraIssueEntity createEpic(String key, String summary, String status, Long teamId) {
         JiraIssueEntity entity = new JiraIssueEntity();

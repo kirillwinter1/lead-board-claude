@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ public class BoardService {
     private static final Logger log = LoggerFactory.getLogger(BoardService.class);
     private static final long SECONDS_PER_DAY = 8 * 3600; // 8 hours per day
     private static final long BOARD_CACHE_TTL_MS = 15_000; // 15 seconds
+    private static final int DONE_EPIC_VISIBILITY_DAYS = 14;
 
     private final JiraIssueRepository issueRepository;
     private final JiraConfigResolver jiraConfigResolver;
@@ -69,7 +71,8 @@ public class BoardService {
         boardCache.clear();
     }
 
-    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds, int page, int size, boolean includeDQ) {
+    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds,
+                                  int page, int size, boolean includeDQ, boolean includeArchived) {
         List<String> allProjectKeys = jiraConfigResolver.getActiveProjectKeys();
         String baseUrl = jiraConfigResolver.getBaseUrl();
 
@@ -78,7 +81,7 @@ public class BoardService {
         }
 
         // Check board response cache
-        String cacheKey = buildCacheKey(String.join(",", allProjectKeys), query, statuses, teamIds, page, size, includeDQ);
+        String cacheKey = buildCacheKey(String.join(",", allProjectKeys), query, statuses, teamIds, page, size, includeDQ, includeArchived);
         CachedBoard cached = boardCache.get(cacheKey);
         if (cached != null && !cached.isExpired()) {
             return cached.response();
@@ -175,6 +178,14 @@ public class BoardService {
                         }
                         if (!hasTeamFilter && teamIds != null && !teamIds.isEmpty()) {
                             if (epic.getTeamId() == null || !teamIds.contains(epic.getTeamId())) {
+                                return false;
+                            }
+                        }
+                        if (!includeArchived) {
+                            String pk = epic.getProjectKey();
+                            boolean isDone = workflowConfigService.isDone(epic.getStatus(), epic.getIssueType(), pk);
+                            if (isDone && epic.getDoneAt() != null
+                                    && epic.getDoneAt().isBefore(OffsetDateTime.now().minusDays(DONE_EPIC_VISIBILITY_DAYS))) {
                                 return false;
                             }
                         }
@@ -304,8 +315,13 @@ public class BoardService {
         }
     }
 
+    public BoardResponse getBoard(String query, List<String> statuses, List<Long> teamIds,
+                                  int page, int size, boolean includeDQ) {
+        return getBoard(query, statuses, teamIds, page, size, includeDQ, false);
+    }
+
     public BoardResponse getBoard() {
-        return getBoard(null, null, null, 0, 50, false);
+        return getBoard(null, null, null, 0, 50, false, false);
     }
 
     private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames,
@@ -562,13 +578,15 @@ public class BoardService {
     }
 
     private String buildCacheKey(String projectKey, String query, List<String> statuses,
-                                  List<Long> teamIds, int page, int size, boolean includeDQ) {
+                                  List<Long> teamIds, int page, int size, boolean includeDQ,
+                                  boolean includeArchived) {
         StringBuilder sb = new StringBuilder(projectKey);
         sb.append('|').append(query != null ? query : "");
         sb.append('|').append(statuses != null ? statuses : "");
         sb.append('|').append(teamIds != null ? teamIds : "");
         sb.append('|').append(page).append('|').append(size);
         sb.append('|').append(includeDQ);
+        sb.append('|').append(includeArchived);
         return sb.toString();
     }
 
