@@ -6,7 +6,7 @@ import { getApiCache, setApiCache } from './useApiCache'
 
 const BOARD_CACHE_KEY = 'board-data'
 
-export function useBoardData() {
+export function useBoardData(includeArchived: boolean = false) {
   const cached = getApiCache<BoardNode[]>(BOARD_CACHE_KEY)
   const [board, setBoard] = useState<BoardNode[]>(cached ?? [])
   const [loading, setLoading] = useState(!cached)
@@ -18,7 +18,9 @@ export function useBoardData() {
   const fetchBoard = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const response = await axios.get<BoardResponse>('/api/board', { params: { includeDQ: true } })
+      const response = await axios.get<BoardResponse>('/api/board', {
+        params: { includeDQ: true, includeArchived },
+      })
       setBoard(response.data.items)
       setApiCache(BOARD_CACHE_KEY, response.data.items)
     } catch (err: unknown) {
@@ -26,7 +28,7 @@ export function useBoardData() {
     } finally {
       if (!silent) setLoading(false)
     }
-  }, [])
+  }, [includeArchived])
 
   const fetchRoughEstimateConfig = useCallback(() => {
     getRoughEstimateConfig()
