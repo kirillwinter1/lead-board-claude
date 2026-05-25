@@ -1,14 +1,11 @@
 package com.leadboard.auth;
 
-import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Service for authorization checks beyond simple role-based access.
@@ -120,29 +117,23 @@ public class AuthorizationService {
     }
 
     /**
-     * Get the set of team IDs the current user belongs to.
+     * Get the set of team IDs the current user belongs to. Uses a JPQL
+     * projection so we don't fan-out into N LAZY {@code team} proxy SELECTs.
      */
     public Set<Long> getUserTeamIds() {
         LeadBoardAuthentication auth = getCurrentAuth();
         if (auth == null) {
             return Set.of();
         }
-
-        List<TeamMemberEntity> memberships = teamMemberRepository.findAllByJiraAccountIdAndActiveTrue(
-                auth.getAtlassianAccountId()
-        );
-
-        return memberships.stream()
-                .map(m -> m.getTeam().getId())
-                .collect(Collectors.toSet());
+        return teamMemberRepository.findTeamIdsByJiraAccountIdAndActiveTrue(auth.getAtlassianAccountId());
     }
 
     /**
-     * Check if a user is a member of the given team.
+     * Check if a user is a member of the given team. Uses a direct existence
+     * check rather than loading memberships and walking the LAZY {@code team}
+     * proxy (which caused an N+1 SELECT pattern on every reorder/sync call).
      */
     private boolean isUserInTeam(String atlassianAccountId, Long teamId) {
-        List<TeamMemberEntity> memberships = teamMemberRepository.findAllByJiraAccountIdAndActiveTrue(atlassianAccountId);
-        return memberships.stream()
-                .anyMatch(m -> m.getTeam().getId().equals(teamId));
+        return teamMemberRepository.existsByJiraAccountIdAndTeamIdAndActiveTrue(atlassianAccountId, teamId);
     }
 }

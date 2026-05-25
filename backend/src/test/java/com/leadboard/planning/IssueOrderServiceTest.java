@@ -234,6 +234,49 @@ class IssueOrderServiceTest {
     class ReorderStoryTests {
 
         @Test
+        void reorderStory_throwsAccessDenied_whenCallerCannotManageTeam() {
+            // Story carries teamId directly. TEAM_LEAD can't manage that team →
+            // AccessDeniedException, no shifts/saves.
+            String parentKey = "EPIC-1";
+            Long teamId = 99L;
+            JiraIssueEntity story = createStory("STORY-X", parentKey, 3);
+            story.setTeamId(teamId);
+
+            when(issueRepository.findByIssueKey("STORY-X")).thenReturn(Optional.of(story));
+            when(authorizationService.canManageTeam(teamId)).thenReturn(false);
+
+            assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                    () -> service.reorderStory("STORY-X", 1));
+
+            verify(issueRepository, never()).save(any());
+            verify(issueRepository, never()).shiftStoryOrdersDown(anyString(), anyInt(), anyInt());
+            verify(issueRepository, never()).shiftStoryOrdersUp(anyString(), anyInt(), anyInt());
+        }
+
+        @Test
+        void reorderStory_throwsAccessDenied_whenParentEpicTeamCannotBeManaged() {
+            // Story has no teamId of its own; team is resolved from the parent
+            // epic. Caller can't manage that team → AccessDeniedException.
+            String parentKey = "EPIC-1";
+            Long parentTeamId = 77L;
+            JiraIssueEntity story = createStory("STORY-Y", parentKey, 2);
+            story.setTeamId(null);
+
+            JiraIssueEntity parentEpic = createEpic(parentKey, parentTeamId, 1);
+
+            when(issueRepository.findByIssueKey("STORY-Y")).thenReturn(Optional.of(story));
+            when(issueRepository.findByIssueKey(parentKey)).thenReturn(Optional.of(parentEpic));
+            when(authorizationService.canManageTeam(parentTeamId)).thenReturn(false);
+
+            assertThrows(org.springframework.security.access.AccessDeniedException.class,
+                    () -> service.reorderStory("STORY-Y", 1));
+
+            verify(issueRepository, never()).save(any());
+            verify(issueRepository, never()).shiftStoryOrdersDown(anyString(), anyInt(), anyInt());
+            verify(issueRepository, never()).shiftStoryOrdersUp(anyString(), anyInt(), anyInt());
+        }
+
+        @Test
         void reorderStory_moveUp_shiftsOthersDown() {
             // Given: 4 stories in epic, moving story at position 4 to position 2
             String parentKey = "EPIC-1";
