@@ -61,6 +61,14 @@ public class SecurityConfig {
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()
 
+                // Issue types are needed by every authenticated user — board,
+                // planning and metrics pages all resolve icons via this endpoint.
+                // Other jira-metadata endpoints (statuses, link-types, priorities,
+                // custom-fields) are config/admin tooling and fall through to the
+                // ADMIN-only rule below. Must come BEFORE the generic /api/admin/**
+                // rule so the ADMIN-only guard doesn't shadow this carve-out.
+                .requestMatchers(HttpMethod.GET, "/api/admin/jira-metadata/issue-types").authenticated()
+
                 // Admin endpoints - require ADMIN role
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
