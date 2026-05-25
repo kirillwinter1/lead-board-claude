@@ -4,6 +4,7 @@ import com.leadboard.quality.DataQualityViolation;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,6 +27,7 @@ public class BoardNode {
     private Map<String, RoleMetrics> roleProgress; // dynamic role progress by role code
     private boolean epicInTodo; // true if Epic is in Backlog/To Do status (for UI styling)
     private boolean epicDone; // true if Epic is in Done status
+    private OffsetDateTime doneAt; // timestamp when epic transitioned to Done (Epic only)
     private Map<String, BigDecimal> roughEstimates; // dynamic rough estimates by role code
     private BigDecimal autoScore; // AutoScore for prioritization (Epic and Story)
     private Integer manualOrder; // Manual order position (1 = first)
@@ -171,6 +173,14 @@ public class BoardNode {
 
     public void setEpicDone(boolean epicDone) {
         this.epicDone = epicDone;
+    }
+
+    public OffsetDateTime getDoneAt() {
+        return doneAt;
+    }
+
+    public void setDoneAt(OffsetDateTime doneAt) {
+        this.doneAt = doneAt;
     }
 
     public Map<String, BigDecimal> getRoughEstimates() {
