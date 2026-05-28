@@ -39,6 +39,15 @@ public class QuarterlyPlanningService {
     private static final Pattern QUARTER_LABEL_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
 
     /**
+     * Returns the quarter label string (e.g. "2026Q2") for the given date.
+     * Used by AutoScoreCalculator to compare epic's quarter label with the active quarter.
+     */
+    public static String getCurrentQuarterLabel(LocalDate today) {
+        int quarter = (today.getMonthValue() - 1) / 3 + 1;
+        return today.getYear() + "Q" + quarter;
+    }
+
+    /**
      * Synthetic team name surfaced in {@link #getProjectCommitment} for epics
      * that lack a team mapping. Kept as a constant so the UI label is in one
      * place rather than scattered as inline string literals.

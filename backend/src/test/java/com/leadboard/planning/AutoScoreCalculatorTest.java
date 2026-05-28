@@ -813,6 +813,59 @@ class AutoScoreCalculatorTest {
         assertTrue(factors.containsKey("alignmentBoost"));
     }
 
+    // ==================== Quarter Factor Tests (F72) ====================
+
+    @Test
+    void quarterLabelMatchingCurrentQuarterGivesTen() {
+        JiraIssueEntity epic = createBasicEpic();
+        String currentQuarter = QuarterlyPlanningService.getCurrentQuarterLabel(LocalDate.now());
+        epic.setLabels(new String[] { currentQuarter });
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(new BigDecimal("10"), factors.get("quarter"));
+    }
+
+    @Test
+    void quarterLabelForPastQuarterGivesZero() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setLabels(new String[] { "1999Q1" });
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("quarter"));
+    }
+
+    @Test
+    void quarterLabelForFutureQuarterGivesZero() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setLabels(new String[] { "2999Q4" });
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("quarter"));
+    }
+
+    @Test
+    void quarterFactorWithoutMatchingQuarterLabelGivesZero() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setLabels(new String[] { "tech-debt", "frontend" });
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("quarter"));
+    }
+
+    @Test
+    void quarterFactorWithNullLabelsGivesZero() {
+        JiraIssueEntity epic = createBasicEpic();
+        epic.setLabels(null);
+
+        Map<String, BigDecimal> factors = calculator.calculateFactors(epic);
+
+        assertEquals(BigDecimal.ZERO, factors.get("quarter"));
+    }
+
     // ==================== Helper Methods ====================
 
     private JiraIssueEntity createBasicEpic() {

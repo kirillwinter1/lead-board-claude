@@ -71,6 +71,7 @@
 | F69 | Quarterly Planning Redesign | 2026-05-15 | [features/F69](features/F69_QUARTERLY_PLANNING_REDESIGN.md) |
 | F70 | Customer-Driven Quarter Planning | 2026-05-16 | [features/F70](features/F70_CUSTOMER_QUARTER_PLANNING.md) |
 | F71 | Done Epic Filter on Board | 2026-05-25 | [features/F71](features/F71_DONE_EPIC_FILTER.md) |
+| F72 | Current Quarter Boost in AutoScore | 2026-05-25 | [features/F72](features/F72_QUARTER_AUTOSCORE_BOOST.md) |
 
 ## Бэклог (BF)
 
