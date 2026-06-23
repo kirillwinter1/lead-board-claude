@@ -35,6 +35,9 @@ class QuarterlyPlanningControllerSecurityTest {
     private QuarterlyPlanningService planningService;
 
     @MockBean
+    private com.leadboard.auth.AuthorizationService authorizationService;
+
+    @MockBean
     private SessionRepository sessionRepository;
     @MockBean
     private AppProperties appProperties;
