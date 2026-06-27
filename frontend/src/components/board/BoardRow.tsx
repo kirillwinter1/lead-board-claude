@@ -56,15 +56,17 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
               >⋮⋮</span>
             )}
             <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType), getIssueTypeCategory(node.issueType))} alt={node.issueType} className="issue-type-icon" />
-            <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-              {node.issueKey}
-            </a>
-            {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
-            <span className="issue-title">{node.title}</span>
-          </div>
-          {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel) && (
-            <div className="name-row-labels">
-              {node.priority && priorityIconUrl && (
+            <div className="name-text">
+              <div className="name-text-line">
+                <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
+                  {node.issueKey}
+                </a>
+                {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
+                <span className="issue-title">{node.title}</span>
+              </div>
+              {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel) && (
+                <div className="name-row-labels">
+                  {node.priority && priorityIconUrl && (
                 <img
                   src={priorityIconUrl}
                   alt={node.priority}
@@ -109,8 +111,10 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   {node.quarterLabel}
                 </span>
               )}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
       <div className="cell cell-team"><TeamBadge name={node.teamName} color={node.teamColor} /></div>
