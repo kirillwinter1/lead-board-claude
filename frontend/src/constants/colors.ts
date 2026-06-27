@@ -48,6 +48,12 @@ export const CHART_AXIS = '#dfe1e6'
 export const CHART_TICK = '#6b778c'
 export const CHART_TOOLTIP_BG = '#172b4d'
 
+// Throughput chart series colors
+export const THROUGHPUT_EPIC = '#6554c0'   // epic throughput line
+export const THROUGHPUT_STORY = '#0065ff'  // story throughput line
+export const THROUGHPUT_TOTAL = '#0065ff'  // single-type / total throughput line
+export const THROUGHPUT_MA = '#ff5630'     // moving-average line
+
 // Progress bar
 export const PROGRESS_COMPLETE = '#36B37E'
 export const PROGRESS_IN_PROGRESS = '#0065FF'

@@ -1,8 +1,10 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { teamsApi, Team } from '../api/teams'
-import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getDsr, DsrResponse, DeliveryHealth } from '../api/metrics'
+import { getMetricsSummary, TeamMetricsSummary, getForecastAccuracy, ForecastAccuracyResponse, getDsr, DsrResponse, DeliveryHealth, getThroughput } from '../api/metrics'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { getConfig } from '../api/config'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { THROUGHPUT_EPIC, THROUGHPUT_STORY, THROUGHPUT_TOTAL } from '../constants/colors'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { FilterBar } from '../components/FilterBar'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
@@ -13,7 +15,7 @@ import { ExecutiveSummaryRow } from '../components/metrics/ExecutiveSummaryRow'
 import { DeliveryHealthBadge } from '../components/metrics/DeliveryHealthBadge'
 import { AlertStrip } from '../components/metrics/AlertStrip'
 import { MetricsSection } from '../components/metrics/MetricsSection'
-import { ThroughputChart } from '../components/metrics/ThroughputChart'
+import { ThroughputChart, ThroughputSeries, ThroughputModeOption } from '../components/metrics/ThroughputChart'
 import { TimeInStatusTable } from '../components/metrics/TimeInStatusTable'
 import { AssigneeTable } from '../components/metrics/AssigneeTable'
 import { ForecastAccuracyChart } from '../components/metrics/ForecastAccuracyChart'
@@ -33,8 +35,13 @@ export function TeamMetricsPage() {
   )
 }
 
+// Throughput selector modes that are not concrete issue types.
+const THROUGHPUT_MODE_EPICS_STORIES = 'epics-stories'
+const THROUGHPUT_MODE_ALL = 'all'
+
 function TeamMetricsPageContent() {
   const { teamId: selectedTeamId, from, to, setTeamId: setSelectedTeamId } = useMetricsFilter()
+  const { issueTypeCategories } = useWorkflowConfig()
   const [teams, setTeams] = useState<Team[]>([])
   const [metrics, setMetrics] = useState<TeamMetricsSummary | null>(null)
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
@@ -46,6 +53,41 @@ function TeamMetricsPageContent() {
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
   const [alerts, setAlerts] = useState<DeliveryHealth['alerts']>([])
   const initialTeamIdRef = useRef(selectedTeamId)
+
+  // ---- Throughput chart: issue-type selector + resolved series ----
+  const [throughputMode, setThroughputMode] = useState<string>(THROUGHPUT_MODE_EPICS_STORIES)
+  const [throughputSeries, setThroughputSeries] = useState<ThroughputSeries[]>([])
+  const [throughputLoading, setThroughputLoading] = useState(false)
+
+  // Resolve epic/story type names from categories (localization-agnostic).
+  const epicTypeName = useMemo(
+    () => Object.keys(issueTypeCategories).find(name => issueTypeCategories[name] === 'EPIC'),
+    [issueTypeCategories]
+  )
+  const storyTypeName = useMemo(
+    () => Object.keys(issueTypeCategories).find(name => issueTypeCategories[name] === 'STORY'),
+    [issueTypeCategories]
+  )
+
+  const throughputModeOptions = useMemo<ThroughputModeOption[]>(() => [
+    { value: THROUGHPUT_MODE_EPICS_STORIES, label: 'Epics & Stories' },
+    { value: THROUGHPUT_MODE_ALL, label: 'All (total)' },
+    // Only meaningful work-unit types for throughput; hide PROJECT and SUBTASK.
+    ...Object.keys(issueTypeCategories)
+      .filter(name => issueTypeCategories[name] !== 'PROJECT' && issueTypeCategories[name] !== 'SUBTASK')
+      .map(name => ({ value: name, label: name })),
+  ], [issueTypeCategories])
+
+  // "all" mode reuses the already-loaded summary — no extra request.
+  const allModeSeries = useMemo<ThroughputSeries[]>(() => {
+    if (!metrics) return []
+    return [{
+      key: 'total',
+      name: 'Total',
+      color: THROUGHPUT_TOTAL,
+      points: metrics.throughput.byPeriod.map(p => ({ periodStart: p.periodStart, value: p.total })),
+    }]
+  }, [metrics])
 
   // Load config for Jira URL + status styles
   useEffect(() => {
@@ -104,6 +146,59 @@ function TeamMetricsPageContent() {
     return () => controller.abort()
   }, [selectedTeamId, from, to])
 
+  // Fetch throughput series for issue-type and epics-stories modes. "all" mode
+  // is derived from the summary (allModeSeries) and needs no request here.
+  useEffect(() => {
+    if (!selectedTeamId || throughputMode === THROUGHPUT_MODE_ALL) return
+
+    const controller = new AbortController()
+    setThroughputLoading(true)
+
+    const toSeries = (key: string, name: string, color: string, byPeriod: { periodStart: string; total: number }[]): ThroughputSeries => ({
+      key,
+      name,
+      color,
+      points: byPeriod.map(p => ({ periodStart: p.periodStart, value: p.total })),
+    })
+
+    let request: Promise<ThroughputSeries[]>
+    if (throughputMode === THROUGHPUT_MODE_EPICS_STORIES) {
+      if (!epicTypeName || !storyTypeName) {
+        setThroughputSeries([])
+        setThroughputLoading(false)
+        return () => controller.abort()
+      }
+      request = Promise.all([
+        getThroughput(selectedTeamId, from, to, epicTypeName),
+        getThroughput(selectedTeamId, from, to, storyTypeName),
+      ]).then(([epicRes, storyRes]) => [
+        toSeries('epics', epicTypeName, THROUGHPUT_EPIC, epicRes.byPeriod),
+        toSeries('stories', storyTypeName, THROUGHPUT_STORY, storyRes.byPeriod),
+      ])
+    } else {
+      const typeName = throughputMode
+      request = getThroughput(selectedTeamId, from, to, typeName)
+        .then(res => [toSeries('type', typeName, THROUGHPUT_TOTAL, res.byPeriod)])
+    }
+
+    request
+      .then(resolved => {
+        if (controller.signal.aborted) return
+        setThroughputSeries(resolved)
+        setThroughputLoading(false)
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setThroughputSeries([])
+        setThroughputLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [throughputMode, selectedTeamId, from, to, epicTypeName, storyTypeName])
+
+  const displayedThroughputSeries = throughputMode === THROUGHPUT_MODE_ALL ? allModeSeries : throughputSeries
+  const displayedThroughputMA = throughputMode === THROUGHPUT_MODE_ALL ? metrics?.throughput.movingAverage : undefined
+
   return (
     <StatusStylesProvider value={statusStyles}>
     <main className="main-content">
@@ -157,8 +252,12 @@ function TeamMetricsPageContent() {
               {/* Diagnostics Section */}
               <MetricsSection id="diagnostics" title="Diagnostics" defaultExpanded={true}>
                 <ThroughputChart
-                  data={metrics.throughput.byPeriod}
-                  movingAverage={metrics.throughput.movingAverage}
+                  series={displayedThroughputSeries}
+                  movingAverage={displayedThroughputMA}
+                  mode={throughputMode}
+                  modeOptions={throughputModeOptions}
+                  onModeChange={setThroughputMode}
+                  loading={throughputLoading}
                 />
                 <DsrTrendChart teamId={selectedTeamId} />
                 <TimeInStatusTable data={metrics.timeInStatuses} />

@@ -16,6 +16,17 @@ vi.mock('../api/metrics', () => ({
   getMetricsSummary: vi.fn(),
   getForecastAccuracy: vi.fn(),
   getDsr: vi.fn(),
+  getThroughput: vi.fn().mockResolvedValue({
+    totalEpics: 0,
+    totalStories: 0,
+    totalSubtasks: 0,
+    totalBugs: 0,
+    total: 0,
+    byPeriod: [
+      { periodStart: '2024-01-01', periodEnd: '2024-01-07', epics: 0, stories: 0, subtasks: 0, bugs: 0, total: 3 },
+    ],
+    movingAverage: [],
+  }),
   getVelocity: vi.fn(),
   getEpicBurndown: vi.fn(),
   getEpicsForBurndown: vi.fn(),
@@ -92,8 +103,15 @@ vi.mock('../contexts/WorkflowConfigContext', () => ({
 }))
 
 // Mock heavy / API-driven chart components that aren't the subject under test.
+// The throughput mock exposes the mode callback so we can drive the page's
+// fetching logic without rendering the real chart/dropdown.
 vi.mock('../components/metrics/ThroughputChart', () => ({
-  ThroughputChart: () => <div data-testid="throughput-chart">ThroughputChart</div>,
+  ThroughputChart: ({ onModeChange }: { onModeChange: (mode: string) => void }) => (
+    <div data-testid="throughput-chart">
+      <button onClick={() => onModeChange('Story')}>set-mode-story</button>
+      <button onClick={() => onModeChange('all')}>set-mode-all</button>
+    </div>
+  ),
 }))
 
 vi.mock('../components/metrics/AssigneeTable', () => ({
@@ -337,6 +355,52 @@ describe('TeamMetricsPage', () => {
           expect.any(String)
         )
       })
+    })
+  })
+
+  describe('Throughput type selector', () => {
+    it('fetches epic and story throughput in the default "Epics & Stories" mode', async () => {
+      renderTeamMetricsPage()
+
+      // Epic + Story type names are resolved from issueTypeCategories ('Epic'→EPIC, 'Story'→STORY).
+      await waitFor(() => {
+        expect(metricsApi.getThroughput).toHaveBeenCalledWith(1, expect.any(String), expect.any(String), 'Epic')
+        expect(metricsApi.getThroughput).toHaveBeenCalledWith(1, expect.any(String), expect.any(String), 'Story')
+      })
+    })
+
+    it('refetches a single type when the mode switches to one issue type', async () => {
+      renderTeamMetricsPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('throughput-chart')).toBeInTheDocument()
+      })
+
+      vi.mocked(metricsApi.getThroughput).mockClear()
+      fireEvent.click(screen.getByText('set-mode-story'))
+
+      await waitFor(() => {
+        expect(metricsApi.getThroughput).toHaveBeenCalledWith(1, expect.any(String), expect.any(String), 'Story')
+      })
+      // Single-type mode issues exactly one request (not the two-series epic+story pair).
+      expect(metricsApi.getThroughput).toHaveBeenCalledTimes(1)
+    })
+
+    it('does not refetch when switching to "All (total)" — it reuses the summary', async () => {
+      renderTeamMetricsPage()
+
+      await waitFor(() => {
+        expect(screen.getByTestId('throughput-chart')).toBeInTheDocument()
+      })
+
+      vi.mocked(metricsApi.getThroughput).mockClear()
+      fireEvent.click(screen.getByText('set-mode-all'))
+
+      // "all" mode derives its series from the already-loaded summary — no request.
+      await waitFor(() => {
+        expect(screen.getByTestId('throughput-chart')).toBeInTheDocument()
+      })
+      expect(metricsApi.getThroughput).not.toHaveBeenCalled()
     })
   })
 
