@@ -21,6 +21,7 @@ interface WorkflowConfigHelpers extends WorkflowConfig {
   getRoleDisplayName: (code: string) => string
   getRoleCodes: () => string[]
   getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
+  getIssueTypeCategory: (typeName: string | null | undefined) => string | null
   getPriorityIconUrl: (name: string | null | undefined) => string | null
   refresh: () => void
 }
@@ -113,6 +114,10 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       if (!typeName) return null
       return config.issueTypeIcons[typeName] || null
     },
+    getIssueTypeCategory: (typeName) => {
+      if (!typeName) return null
+      return config.issueTypeCategories[typeName] || null
+    },
     getPriorityIconUrl: (name) => {
       if (!name) return null
       return config.priorityIcons[name] || null
@@ -147,6 +152,7 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       getRoleDisplayName: (code) => code,
       getRoleCodes: () => [],
       getIssueTypeIconUrl: () => null,
+      getIssueTypeCategory: () => null,
       getPriorityIconUrl: () => null,
       refresh: () => {},
     }

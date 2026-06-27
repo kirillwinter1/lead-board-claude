@@ -64,7 +64,7 @@ export function EpicCard({
   onMove,
   onBoostChange,
 }: EpicCardProps) {
-  const { getIssueTypeIconUrl, getRoleColor, getRoleCodes } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor, getRoleCodes } = useWorkflowConfig()
   const [editingBoost, setEditingBoost] = useState(false)
   const [boostDraft, setBoostDraft] = useState<string>(String(epic.manualBoost))
   const boostInputRef = useRef<HTMLInputElement>(null)
@@ -80,7 +80,7 @@ export function EpicCard({
     }
   }, [editingBoost])
 
-  const iconUrl = getIssueIcon(epic.typeName, epic.iconUrl ?? getIssueTypeIconUrl(epic.typeName))
+  const iconUrl = getIssueIcon(epic.typeName, epic.iconUrl ?? getIssueTypeIconUrl(epic.typeName), getIssueTypeCategory(epic.typeName))
 
   const overloadedTeamNames: string[] = epic.overloadedTeams
     .map(id => teamsById.get(id)?.name)

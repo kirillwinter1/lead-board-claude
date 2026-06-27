@@ -252,7 +252,7 @@ export interface ProjectGanttViewProps {
 }
 
 export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onToggleProject }: ProjectGanttViewProps) {
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const [hoveredEpic, setHoveredEpic] = useState<EpicTimelineDto | null>(null)
   const [hoveredProject, setHoveredProject] = useState<ProjectTimelineDto | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
@@ -436,7 +436,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                 <div key={p.issueKey} className="pt-project-label" onClick={() => onToggleProject(p.issueKey)}>
                   <span className={`pt-project-chevron ${isExp ? 'expanded' : ''}`}>&#9654;</span>
                   <img
-                    src={getIssueIcon(p.issueType || 'Project', getIssueTypeIconUrl(p.issueType))}
+                    src={getIssueIcon(p.issueType || 'Project', getIssueTypeIconUrl(p.issueType), getIssueTypeCategory(p.issueType))}
                     alt={p.issueType || 'Project'}
                     style={{ width: 16, height: 16, flexShrink: 0 }}
                   />
@@ -469,7 +469,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
               return (
                 <div key={`${row.projectKey}-${e.epicKey}`} className="pt-epic-label">
                   <img
-                    src={getIssueIcon(e.issueType || 'Epic', getIssueTypeIconUrl(e.issueType))}
+                    src={getIssueIcon(e.issueType || 'Epic', getIssueTypeIconUrl(e.issueType), getIssueTypeCategory(e.issueType))}
                     alt={e.issueType || 'Epic'}
                     style={{ width: 16, height: 16, flexShrink: 0 }}
                   />

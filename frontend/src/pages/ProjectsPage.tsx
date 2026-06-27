@@ -230,7 +230,7 @@ function childEpicToForecast(e: ChildEpicDto): EpicForecast | null {
 
 export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   // F70: editing desired_quarter is gated to ROLE_ADMIN / ROLE_PROJECT_MANAGER.
   // The backend enforces the same check; the UI gate is just to avoid showing
   // a control that will 403 for viewers/members.
@@ -916,7 +916,7 @@ export function ProjectsPage() {
                   >
                     {/* Top row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                      <img src={getIssueIcon(p.issueType, getIssueTypeIconUrl(p.issueType))} alt={p.issueType} style={{ width: 16, height: 16, flexShrink: 0 }} />
+                      <img src={getIssueIcon(p.issueType, getIssueTypeIconUrl(p.issueType), getIssueTypeCategory(p.issueType))} alt={p.issueType} style={{ width: 16, height: 16, flexShrink: 0 }} />
                       <JiraLink issueKey={p.issueKey} jiraBaseUrl={jiraBaseUrl} />
                       <span style={{ flex: 1, fontSize: 14, color: TEXT_PRIMARY, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {p.summary}
