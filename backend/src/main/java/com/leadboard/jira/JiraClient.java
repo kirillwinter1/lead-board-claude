@@ -3,6 +3,7 @@ package com.leadboard.jira;
 import com.leadboard.auth.OAuthService;
 import com.leadboard.config.JiraConfigResolver;
 import io.netty.channel.ChannelOption;
+import io.netty.resolver.DefaultAddressResolverGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -44,8 +45,11 @@ public class JiraClient {
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(MAX_BUFFER_SIZE))
                 .build();
 
-        // BUG-48: Configure connection and response timeouts
+        // BUG-48: Configure connection and response timeouts.
+        // Use the JDK/OS DNS resolver instead of Netty's native UDP resolver, which
+        // fails to resolve Atlassian hosts on some networks (UnknownHostException).
         HttpClient httpClient = HttpClient.create()
+                .resolver(DefaultAddressResolverGroup.INSTANCE)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10_000)
                 .responseTimeout(Duration.ofSeconds(30));
 

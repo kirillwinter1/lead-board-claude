@@ -15,9 +15,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
+import io.netty.resolver.DefaultAddressResolverGroup;
+import reactor.netty.http.client.HttpClient;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -55,7 +58,13 @@ public class OAuthService {
         this.tokenRepository = tokenRepository;
         this.sessionRepository = sessionRepository;
         this.tenantService = tenantService;
-        this.webClient = WebClient.builder().build();
+        // Use the JDK/OS DNS resolver instead of Netty's native UDP resolver, which
+        // fails to resolve auth.atlassian.com on some networks (UnknownHostException)
+        // and breaks the OAuth token exchange.
+        HttpClient httpClient = HttpClient.create().resolver(DefaultAddressResolverGroup.INSTANCE);
+        this.webClient = WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
+                .build();
     }
 
     private record OAuthState(Instant expiry, Long tenantId) {}
