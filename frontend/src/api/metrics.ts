@@ -448,3 +448,28 @@ export async function getDeliveryHealth(
   const response = await axios.get(`/api/metrics/delivery-health?${params}`)
   return response.data
 }
+
+// ==================== Sparklines ====================
+
+export interface SparklinePoint {
+  period: string  // "YYYY-MM-DD" — weekly bucket start
+  value: number
+}
+
+export interface SparklineData {
+  throughput: SparklinePoint[]
+  cycleTimeMedian: SparklinePoint[]
+  leadTimeMedian: SparklinePoint[]
+  predictability: SparklinePoint[]
+  utilization: SparklinePoint[]
+}
+
+export async function getSparklines(
+  teamId: number,
+  from: string,
+  to: string
+): Promise<SparklineData> {
+  const params = new URLSearchParams({ teamId: String(teamId), from, to })
+  const response = await axios.get(`/api/metrics/sparklines?${params}`)
+  return response.data
+}

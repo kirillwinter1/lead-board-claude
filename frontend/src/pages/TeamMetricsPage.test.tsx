@@ -55,6 +55,13 @@ vi.mock('../api/metrics', () => ({
       }
     })()
   ),
+  getSparklines: vi.fn().mockResolvedValue({
+    throughput: [],
+    cycleTimeMedian: [],
+    leadTimeMedian: [],
+    predictability: [],
+    utilization: [],
+  }),
 }))
 
 vi.mock('../api/forecast', () => ({

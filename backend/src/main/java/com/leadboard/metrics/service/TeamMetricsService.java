@@ -592,6 +592,90 @@ public class TeamMetricsService {
     }
 
     /**
+     * Weekly time-series (sparklines) for the Executive Summary KPIs.
+     * Period: 10 weeks back from 'from'. STORY-scoped weekly throughput / cycle / lead time.
+     */
+    public SparklineResponse getSparklines(Long teamId, LocalDate from, LocalDate to,
+                                            DsrService dsrService, VelocityService velocityService) {
+        // Sparkline period: 10 weeks back from 'from'
+        LocalDate sparkFrom = from.minusWeeks(10);
+        OffsetDateTime sparkFromDt = sparkFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
+        OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+
+        // 1. Throughput (weekly STORY count)
+        List<SparklineResponse.SparklinePoint> throughputPoints = new ArrayList<>();
+        try {
+            List<Object[]> rows = metricsRepository.getWeeklyStoryThroughput(teamId, sparkFromDt, toDt);
+            for (Object[] row : rows) {
+                LocalDate period = parseLocalDate(row[0]);
+                if (period != null) {
+                    throughputPoints.add(new SparklineResponse.SparklinePoint(
+                            period, BigDecimal.valueOf(((Number) row[1]).longValue())));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get throughput sparkline", e);
+        }
+
+        // 2. Cycle Time median (weekly)
+        List<SparklineResponse.SparklinePoint> cyclePoints = new ArrayList<>();
+        try {
+            List<Object[]> rows = metricsRepository.getWeeklyCycleTimeMedian(teamId, sparkFromDt, toDt);
+            for (Object[] row : rows) {
+                LocalDate period = parseLocalDate(row[0]);
+                BigDecimal median = row[1] != null ? new BigDecimal(row[1].toString()).setScale(1, RoundingMode.HALF_UP) : null;
+                if (period != null && median != null) {
+                    cyclePoints.add(new SparklineResponse.SparklinePoint(period, median));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get cycle time sparkline", e);
+        }
+
+        // 3. Lead Time median (weekly)
+        List<SparklineResponse.SparklinePoint> leadPoints = new ArrayList<>();
+        try {
+            List<Object[]> rows = metricsRepository.getWeeklyLeadTimeMedian(teamId, sparkFromDt, toDt);
+            for (Object[] row : rows) {
+                LocalDate period = parseLocalDate(row[0]);
+                BigDecimal median = row[1] != null ? new BigDecimal(row[1].toString()).setScale(1, RoundingMode.HALF_UP) : null;
+                if (period != null && median != null) {
+                    leadPoints.add(new SparklineResponse.SparklinePoint(period, median));
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get lead time sparkline", e);
+        }
+
+        // 4. Predictability (monthly on-time rate)
+        List<SparklineResponse.SparklinePoint> predictPoints = new ArrayList<>();
+        try {
+            var monthlyDsr = dsrService.calculateMonthlyDsr(teamId, 3);
+            for (var month : monthlyDsr.months()) {
+                LocalDate monthDate = LocalDate.parse(month.month() + "-01");
+                predictPoints.add(new SparklineResponse.SparklinePoint(
+                        monthDate, month.onTimeRate()));
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get predictability sparkline", e);
+        }
+
+        // 5. Utilization (weekly)
+        List<SparklineResponse.SparklinePoint> utilPoints = new ArrayList<>();
+        try {
+            var velocity = velocityService.calculateVelocity(teamId, sparkFrom, to);
+            for (var week : velocity.byWeek()) {
+                utilPoints.add(new SparklineResponse.SparklinePoint(
+                        week.weekStart(), week.utilizationPercent()));
+            }
+        } catch (Exception e) {
+            log.debug("Failed to get utilization sparkline", e);
+        }
+
+        return new SparklineResponse(throughputPoints, cyclePoints, leadPoints, predictPoints, utilPoints);
+    }
+
+    /**
      * Parse LocalDate from various database types (Timestamp, Instant, OffsetDateTime).
      */
     private LocalDate parseLocalDate(Object value) {

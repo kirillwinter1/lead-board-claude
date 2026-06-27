@@ -217,4 +217,68 @@ public interface MetricsQueryRepository extends org.springframework.data.reposit
             OffsetDateTime from,
             OffsetDateTime to,
             OffsetDateTime prevFrom);
+
+    /**
+     * Weekly STORY throughput for sparklines.
+     */
+    @Query(value = """
+        SELECT
+            DATE_TRUNC('week', done_at) as period_start,
+            COUNT(*) as count
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+          AND board_category = 'STORY'
+        GROUP BY DATE_TRUNC('week', done_at)
+        ORDER BY period_start
+        """, nativeQuery = true)
+    List<Object[]> getWeeklyStoryThroughput(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Weekly median cycle time (STORY only) for sparklines.
+     */
+    @Query(value = """
+        SELECT
+            DATE_TRUNC('week', done_at) as period_start,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (done_at - COALESCE(started_at, jira_created_at))) / 86400.0
+            ) as median_days
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+          AND done_at IS NOT NULL
+          AND board_category = 'STORY'
+        GROUP BY DATE_TRUNC('week', done_at)
+        ORDER BY period_start
+        """, nativeQuery = true)
+    List<Object[]> getWeeklyCycleTimeMedian(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
+
+    /**
+     * Weekly median lead time (STORY only) for sparklines.
+     */
+    @Query(value = """
+        SELECT
+            DATE_TRUNC('week', done_at) as period_start,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (
+                ORDER BY EXTRACT(EPOCH FROM (done_at - jira_created_at)) / 86400.0
+            ) as median_days
+        FROM jira_issues
+        WHERE team_id = :teamId
+          AND done_at BETWEEN :from AND :to
+          AND done_at IS NOT NULL
+          AND jira_created_at IS NOT NULL
+          AND board_category = 'STORY'
+        GROUP BY DATE_TRUNC('week', done_at)
+        ORDER BY period_start
+        """, nativeQuery = true)
+    List<Object[]> getWeeklyLeadTimeMedian(
+            @Param("teamId") Long teamId,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to);
 }

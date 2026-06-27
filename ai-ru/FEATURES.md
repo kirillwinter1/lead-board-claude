@@ -74,6 +74,7 @@
 | F72 | Current Quarter Boost in AutoScore | 2026-05-25 | [features/F72](features/F72_QUARTER_AUTOSCORE_BOOST.md) |
 | F73 | Delivery Guide (process methodology) | 2026-06-27 | [features/F73](features/F73_DELIVERY_GUIDE.md) |
 | F74 | Simulation Resilience (Circuit Breaker + Timeout) | 2026-06-27 | [features/F74](features/F74_SIMULATION_RESILIENCE.md) |
+| F75 | Metrics Sparklines (KPI Trend Mini-Charts) | 2026-06-27 | [features/F75](features/F75_METRICS_SPARKLINES.md) |
 
 ## Бэклог (BF)
 
