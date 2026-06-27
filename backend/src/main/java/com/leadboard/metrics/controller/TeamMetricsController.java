@@ -187,6 +187,15 @@ public class TeamMetricsController {
         return metricsService.getExecutiveSummary(teamId, from, to, dsrService, velocityService);
     }
 
+    @GetMapping("/sparklines")
+    public SparklineResponse getSparklines(
+            @RequestParam Long teamId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        validateDateRange(from, to);
+        return metricsService.getSparklines(teamId, from, to, dsrService, velocityService);
+    }
+
     @GetMapping("/delivery-health")
     public DeliveryHealth getDeliveryHealth(
             @RequestParam Long teamId,

@@ -44,6 +44,12 @@ class TeamMetricsServiceTest {
     @Mock
     private SyncService syncService;
 
+    @Mock
+    private DsrService dsrService;
+
+    @Mock
+    private VelocityService velocityService;
+
     private TeamMetricsService service;
 
     @BeforeEach
@@ -391,5 +397,80 @@ class TeamMetricsServiceTest {
 
         assertEquals(0, result.issuesInScope());
         assertEquals(BigDecimal.ZERO, result.dataCoveragePercent());
+    }
+
+    @Test
+    void getSparklines_buildsAllSeriesFromWeeklyQueries() {
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 3, 1);
+        LocalDate to = LocalDate.of(2024, 3, 31);
+
+        Timestamp week1 = Timestamp.valueOf("2024-02-26 00:00:00");
+        Timestamp week2 = Timestamp.valueOf("2024-03-04 00:00:00");
+
+        // 1. Weekly STORY throughput
+        when(metricsRepository.getWeeklyStoryThroughput(eq(teamId), any(), any()))
+                .thenReturn(Arrays.asList(
+                        new Object[]{week1, 4L},
+                        new Object[]{week2, 7L}
+                ));
+
+        // 2. Weekly cycle time median
+        when(metricsRepository.getWeeklyCycleTimeMedian(eq(teamId), any(), any()))
+                .thenReturn(Arrays.asList(
+                        new Object[]{week1, 3.25},
+                        new Object[]{week2, 5.0}
+                ));
+
+        // 3. Weekly lead time median
+        when(metricsRepository.getWeeklyLeadTimeMedian(eq(teamId), any(), any()))
+                .thenReturn(Collections.singletonList(
+                        new Object[]{week1, 8.04}
+                ));
+
+        // 4. Predictability — monthly on-time rate
+        var monthlyDsr = new MonthlyDsrResponse(teamId, List.of(
+                new MonthlyDsrResponse.MonthlyDsrPoint(
+                        "2024-03", new BigDecimal("1.0"), new BigDecimal("1.0"),
+                        5, 4, new BigDecimal("80.0"))
+        ));
+        when(dsrService.calculateMonthlyDsr(teamId, 3)).thenReturn(monthlyDsr);
+
+        // 5. Utilization — weekly velocity
+        var velocity = new VelocityResponse(teamId, from, to,
+                BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("75.0"),
+                List.of(new VelocityResponse.WeeklyVelocity(
+                        LocalDate.of(2024, 2, 26), new BigDecimal("40.0"),
+                        new BigDecimal("30.0"), new BigDecimal("75.0"))));
+        when(velocityService.calculateVelocity(eq(teamId), any(), eq(to))).thenReturn(velocity);
+
+        SparklineResponse result = service.getSparklines(teamId, from, to, dsrService, velocityService);
+
+        assertNotNull(result);
+
+        // Throughput points
+        assertEquals(2, result.throughput().size());
+        assertEquals(LocalDate.of(2024, 2, 26), result.throughput().get(0).period());
+        assertEquals(0, result.throughput().get(0).value().compareTo(new BigDecimal("4")));
+        assertEquals(0, result.throughput().get(1).value().compareTo(new BigDecimal("7")));
+
+        // Cycle time median — rounded to 1 decimal
+        assertEquals(2, result.cycleTimeMedian().size());
+        assertEquals(new BigDecimal("3.3"), result.cycleTimeMedian().get(0).value());
+        assertEquals(new BigDecimal("5.0"), result.cycleTimeMedian().get(1).value());
+
+        // Lead time median — single point, rounded
+        assertEquals(1, result.leadTimeMedian().size());
+        assertEquals(new BigDecimal("8.0"), result.leadTimeMedian().get(0).value());
+
+        // Predictability from monthly DSR on-time rate
+        assertEquals(1, result.predictability().size());
+        assertEquals(LocalDate.of(2024, 3, 1), result.predictability().get(0).period());
+        assertEquals(new BigDecimal("80.0"), result.predictability().get(0).value());
+
+        // Utilization from weekly velocity
+        assertEquals(1, result.utilization().size());
+        assertEquals(LocalDate.of(2024, 2, 26), result.utilization().get(0).period());
+        assertEquals(new BigDecimal("75.0"), result.utilization().get(0).value());
     }
 }

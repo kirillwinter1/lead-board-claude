@@ -42,3 +42,21 @@
   padding: 24px;
   color: #6b778c;
 }
+
+/* Inline trend sparkline below each KPI value */
+.kpi-sparkline-area {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #EBECF0;
+}
+
+.kpi-sparkline-svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.kpi-sparkline-hint {
+  font-size: 10px;
+  margin-top: 4px;
+  font-style: italic;
+}
