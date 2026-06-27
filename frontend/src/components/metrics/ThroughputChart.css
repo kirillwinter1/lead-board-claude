@@ -14,6 +14,19 @@
   color: #172b4d;
 }
 
+/* Header row: title on the left, type selector on the right */
+.throughput-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.throughput-chart-header h3 {
+  margin: 0;
+}
+
 .chart-empty {
   text-align: center;
   color: #6b778c;
