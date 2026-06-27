@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
 import java.util.Optional;
@@ -25,13 +26,18 @@ public class TenantJiraConfigController {
     private final TenantJiraConfigRepository configRepository;
     private final JiraConfigResolver jiraConfigResolver;
     private final JiraMetadataService metadataService;
+    private final WebClient webClient;
 
     public TenantJiraConfigController(TenantJiraConfigRepository configRepository,
                                        JiraConfigResolver jiraConfigResolver,
-                                       JiraMetadataService metadataService) {
+                                       JiraMetadataService metadataService,
+                                       WebClient.Builder webClientBuilder) {
         this.configRepository = configRepository;
         this.jiraConfigResolver = jiraConfigResolver;
         this.metadataService = metadataService;
+        // Build from the Spring-managed builder so the global OS-resolver
+        // WebClientCustomizer applies (avoids reactor-netty native DNS failures).
+        this.webClient = webClientBuilder.build();
     }
 
     @GetMapping
@@ -155,7 +161,6 @@ public class TenantJiraConfigController {
 
         try {
             // Try a lightweight API call to verify credentials
-            var webClient = org.springframework.web.reactive.function.client.WebClient.builder().build();
             String auth = request.jiraEmail() + ":" + request.jiraApiToken();
             String encodedAuth = java.util.Base64.getEncoder()
                     .encodeToString(auth.getBytes(java.nio.charset.StandardCharsets.UTF_8));

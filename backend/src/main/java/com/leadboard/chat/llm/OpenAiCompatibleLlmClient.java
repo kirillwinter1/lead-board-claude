@@ -30,10 +30,13 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    public OpenAiCompatibleLlmClient(ChatProperties chatProperties, ObjectMapper objectMapper) {
+    public OpenAiCompatibleLlmClient(ChatProperties chatProperties, ObjectMapper objectMapper,
+                                     WebClient.Builder webClientBuilder) {
         this.chatProperties = chatProperties;
         this.objectMapper = objectMapper;
-        this.webClient = WebClient.builder()
+        // Build from the Spring-managed builder so the global OS-resolver
+        // WebClientCustomizer applies (avoids reactor-netty native DNS failures).
+        this.webClient = webClientBuilder
                 .baseUrl(chatProperties.getBaseUrl())
                 .defaultHeader("Content-Type", "application/json")
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
