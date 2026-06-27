@@ -22,7 +22,8 @@ public class OpenAiEmbeddingClient implements EmbeddingClient {
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    public OpenAiEmbeddingClient(ChatProperties chatProperties, ObjectMapper objectMapper) {
+    public OpenAiEmbeddingClient(ChatProperties chatProperties, ObjectMapper objectMapper,
+                                 WebClient.Builder webClientBuilder) {
         this.chatProperties = chatProperties;
         this.objectMapper = objectMapper;
 
@@ -31,7 +32,9 @@ public class OpenAiEmbeddingClient implements EmbeddingClient {
                 ? chatProperties.getEmbeddingBaseUrl()
                 : chatProperties.getBaseUrl();
 
-        this.webClient = WebClient.builder()
+        // Build from the Spring-managed builder so the global OS-resolver
+        // WebClientCustomizer applies (avoids reactor-netty native DNS failures).
+        this.webClient = webClientBuilder
                 .baseUrl(baseUrl)
                 .defaultHeader("Content-Type", "application/json")
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(2 * 1024 * 1024))
