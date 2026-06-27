@@ -17,8 +17,21 @@ import { useStatusStyles } from '../board/StatusStylesContext'
 import {
   DSR_GREEN, DSR_YELLOW, DSR_RED, ESTIMATE_BLUE, FLAGGED_GREY,
   getDsrColor, TEXT_PRIMARY, TEXT_MUTED, TEXT_DISABLED, TEXT_SECONDARY,
-  CHART_AXIS, CHART_GRID, CHART_TOOLTIP_BG
+  CHART_AXIS, CHART_GRID, CHART_TOOLTIP_BG, LINK_COLOR
 } from '../../constants/colors'
+
+// --- Layout constants shared by the left label column and the right chart ---
+// Each epic occupies exactly ROW_HEIGHT px in BOTH columns so labels line up
+// with their bar groups. The chart's plot area is sized to N * ROW_HEIGHT and
+// the left column is padded by the chart's top margin / bottom (margin + axis).
+// A hidden category <YAxis> (see render) forces Recharts to build a real band
+// scale over that plot area, so band height === ROW_HEIGHT and band i is
+// centred at margin.top + (i + 0.5) * ROW_HEIGHT — matching the left rows.
+const ROW_HEIGHT = 56
+const CHART_MARGIN_TOP = 8
+const CHART_MARGIN_BOTTOM = 8
+const X_AXIS_HEIGHT = 30
+const LABEL_COL_WIDTH = 320
 
 interface DsrBreakdownChartProps {
   epics: EpicDsr[]
@@ -78,70 +91,56 @@ function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<
   )
 }
 
-function getContrastColor(hex: string): string {
-  const c = hex.replace('#', '')
-  const r = parseInt(c.substring(0, 2), 16)
-  const g = parseInt(c.substring(2, 4), 16)
-  const b = parseInt(c.substring(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? TEXT_PRIMARY : '#ffffff'
-}
-
-interface CustomYTickProps {
-  x: string | number
-  y: string | number
-  payload: { index: number }
-  chartData: ChartRow[]
-  jiraBaseUrl: string | undefined
-}
-
-function CustomYTick({ x, y, payload, chartData, jiraBaseUrl }: CustomYTickProps) {
-  const index = payload?.index ?? 0
-  const row = chartData[index]
-  if (!row) return <g />
-
-  const badgeBg = row.statusColor || CHART_AXIS
-  const badgeText = row.statusColor ? getContrastColor(row.statusColor) : TEXT_SECONDARY
-
+// --- Left-column epic label (plain HTML, Design-System primitives) ---
+// Renders one fixed-height row per epic, vertically centered so it lines up
+// with the matching bar group in the right-hand chart.
+function DsrEpicLabel({ row, jiraBaseUrl }: { row: ChartRow; jiraBaseUrl?: string }) {
   const maxSummary = 38
   const shortSummary = row.summary.length > maxSummary
     ? row.summary.substring(0, maxSummary) + '...'
     : row.summary
 
-  const labelWidth = 320
-
   return (
-    <g transform={`translate(${x},${y})`}>
-      <foreignObject x={-labelWidth} y={-22} width={labelWidth - 10} height={44}>
-        <div
-          style={{ display: 'flex', flexDirection: 'column', gap: 2, cursor: jiraBaseUrl ? 'pointer' : 'default' }}
-          onClick={() => jiraBaseUrl && window.open(`${jiraBaseUrl}${row.epicKey}`, '_blank', 'noopener,noreferrer')}
-        >
-          {/* Row 1: Icon + Key + indicator | Status badge */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <img src={row.iconUrl} alt="" style={{ width: 16, height: 16 }} />
-              <span style={{ fontWeight: 600, fontSize: 12, color: TEXT_PRIMARY }}>{row.epicKey}</span>
-            </div>
-            <span style={{
-              backgroundColor: badgeBg,
-              color: badgeText,
-              padding: '1px 5px',
-              borderRadius: 3,
-              fontSize: 9,
-              fontWeight: 500,
-              whiteSpace: 'nowrap',
-            }}>
-              {row.status}
+    <div
+      style={{
+        height: ROW_HEIGHT,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        gap: 3,
+        paddingRight: 12,
+        boxSizing: 'border-box',
+      }}
+    >
+      {/* Row 1: Icon + Key (link) | Status badge */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+          <img src={row.iconUrl} alt="" style={{ width: 16, height: 16, flexShrink: 0 }} />
+          {jiraBaseUrl ? (
+            <a
+              href={`${jiraBaseUrl}${row.epicKey}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontWeight: 600, fontSize: 12, color: LINK_COLOR, textDecoration: 'none', whiteSpace: 'nowrap' }}
+            >
+              {row.epicKey}
+            </a>
+          ) : (
+            <span style={{ fontWeight: 600, fontSize: 12, color: TEXT_PRIMARY, whiteSpace: 'nowrap' }}>
+              {row.epicKey}
             </span>
-          </div>
-          {/* Row 2: Summary */}
-          <div style={{ fontSize: 11, color: TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {shortSummary}
-          </div>
+          )}
         </div>
-      </foreignObject>
-    </g>
+        <StatusBadge status={row.status} color={row.statusColor} />
+      </div>
+      {/* Row 2: Summary */}
+      <div
+        style={{ fontSize: 11, color: TEXT_MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        title={row.summary}
+      >
+        {shortSummary}
+      </div>
+    </div>
   )
 }
 
@@ -179,8 +178,9 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
     )
   }
 
-  const rowHeight = 64
-  const chartHeight = Math.max(chartData.length * rowHeight + 80, 180)
+  // Chart plot area must equal N * ROW_HEIGHT so each category band lines up
+  // with its left-column label row. Add top/bottom margins + XAxis height.
+  const chartHeight = chartData.length * ROW_HEIGHT + CHART_MARGIN_TOP + CHART_MARGIN_BOTTOM + X_AXIS_HEIGHT
   const maxValue = Math.max(...chartData.map(d => Math.max(d.estimate, d.effective + d.flagged)))
 
   const renderDsrLabel = (props: LabelProps & { index?: number }): ReactElement | null => {
@@ -224,74 +224,96 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
         <span style={{ color: DSR_RED, fontWeight: 600 }}>&#9632;</span> &gt; 1.5.
       </p>
 
-      <ResponsiveContainer width="100%" height={chartHeight}>
-        <BarChart
-          data={chartData}
-          layout="vertical"
-          margin={{ top: 8, right: 80, left: 10, bottom: 8 }}
-          barGap={2}
-          barCategoryGap="25%"
-        >
-          <XAxis
-            type="number"
-            tick={{ fontSize: 11, fill: TEXT_MUTED }}
-            tickLine={false}
-            axisLine={{ stroke: CHART_AXIS }}
-            domain={[0, Math.ceil(maxValue * 1.15)]}
-            label={{ value: 'Days', position: 'insideBottomRight', offset: -5, fontSize: 11, fill: TEXT_MUTED }}
-          />
-          <YAxis
-            type="category"
-            dataKey="epicKey"
-            tick={(props) => (
-              <CustomYTick {...props} chartData={chartData} jiraBaseUrl={jiraBaseUrl} />
-            )}
-            tickLine={false}
-            axisLine={false}
-            width={320}
-          />
-          <Tooltip
-            content={<CustomTooltip />}
-            cursor={{ fill: 'rgba(0,0,0,0.04)' }}
-          />
+      {/* Two-column layout: left = rich HTML labels, right = Recharts (no YAxis) */}
+      <div style={{ display: 'flex', alignItems: 'stretch' }}>
+        {/* LEFT: label column. Top spacer matches chart top margin; bottom
+            spacer matches chart bottom margin + XAxis so row N aligns with bars N. */}
+        <div style={{ width: LABEL_COL_WIDTH, flexShrink: 0 }}>
+          <div style={{ height: CHART_MARGIN_TOP }} />
+          {chartData.map(row => (
+            <DsrEpicLabel key={row.epicKey} row={row} jiraBaseUrl={jiraBaseUrl} />
+          ))}
+          <div style={{ height: CHART_MARGIN_BOTTOM + X_AXIS_HEIGHT }} />
+        </div>
 
-          {/* Estimate bar (blue) */}
-          <Bar
-            dataKey="estimate"
-            name="Estimate"
-            fill={ESTIMATE_BLUE}
-            radius={[0, 3, 3, 0]}
-            barSize={12}
-            style={{ cursor: jiraBaseUrl ? 'pointer' : 'default' }}
-            onClick={handleBarClick}
-          />
+        {/* RIGHT: chart without YAxis */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <ResponsiveContainer width="100%" height={chartHeight}>
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: CHART_MARGIN_TOP, right: 80, left: 10, bottom: CHART_MARGIN_BOTTOM }}
+              barGap={2}
+              barCategoryGap="25%"
+            >
+              {/* Hidden category axis. It draws nothing (hide) and reserves no
+                  width (width=0), but it forces Recharts to build a proper
+                  band scale: bandHeight = plotArea / N = ROW_HEIGHT, with a
+                  half-band of padding at top/bottom and margin.top respected.
+                  Without it Recharts degenerates to an edge-to-edge point
+                  scale (band 0 center at SVG y=0, bars overflowing above) and
+                  the fixed-height left rows cannot line up. */}
+              <YAxis
+                type="category"
+                dataKey="epicKey"
+                hide
+                width={0}
+                tickLine={false}
+                axisLine={false}
+              />
+              <XAxis
+                type="number"
+                height={X_AXIS_HEIGHT}
+                tick={{ fontSize: 11, fill: TEXT_MUTED }}
+                tickLine={false}
+                axisLine={{ stroke: CHART_AXIS }}
+                domain={[0, Math.ceil(maxValue * 1.15)]}
+                label={{ value: 'Days', position: 'insideBottomRight', offset: -5, fontSize: 11, fill: TEXT_MUTED }}
+              />
+              <Tooltip
+                content={<CustomTooltip />}
+                cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+              />
 
-          {/* Effective working days bar (colored by DSR) */}
-          <Bar
-            dataKey="effective"
-            name="Actual"
-            radius={[0, 3, 3, 0]}
-            barSize={12}
-            label={renderDsrLabel}
-            style={{ cursor: jiraBaseUrl ? 'pointer' : 'default' }}
-            onClick={handleBarClick}
-          >
-            {chartData.map((row, idx) => (
-              <Cell key={idx} fill={getDsrColor(row.dsr)} />
-            ))}
-          </Bar>
+              {/* Estimate bar (blue) */}
+              <Bar
+                dataKey="estimate"
+                name="Estimate"
+                fill={ESTIMATE_BLUE}
+                radius={[0, 3, 3, 0]}
+                barSize={12}
+                style={{ cursor: jiraBaseUrl ? 'pointer' : 'default' }}
+                onClick={handleBarClick}
+              />
 
-          {/* Flagged/pause days bar */}
-          <Bar
-            dataKey="flagged"
-            name="Pause"
-            fill={FLAGGED_GREY}
-            radius={[0, 3, 3, 0]}
-            barSize={12}
-            style={{ opacity: 0.6 }}
-          />
-        </BarChart>
-      </ResponsiveContainer>
+              {/* Effective working days bar (colored by DSR) */}
+              <Bar
+                dataKey="effective"
+                name="Actual"
+                radius={[0, 3, 3, 0]}
+                barSize={12}
+                label={renderDsrLabel}
+                style={{ cursor: jiraBaseUrl ? 'pointer' : 'default' }}
+                onClick={handleBarClick}
+              >
+                {chartData.map((row, idx) => (
+                  <Cell key={idx} fill={getDsrColor(row.dsr)} />
+                ))}
+              </Bar>
+
+              {/* Flagged/pause days bar */}
+              <Bar
+                dataKey="flagged"
+                name="Pause"
+                fill={FLAGGED_GREY}
+                radius={[0, 3, 3, 0]}
+                barSize={12}
+                style={{ opacity: 0.6 }}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
 
       {/* Legend */}
       <div style={{
