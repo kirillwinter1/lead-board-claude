@@ -140,6 +140,11 @@ public class JiraIssueEntity {
     @Column(name = "manual_boost")
     private Integer manualBoost = 0;
 
+    // F77: Eisenhower Matrix quadrant (P1/P2/P3/P4 or null). Lead Board-owned,
+    // set via manual triage — NOT sourced from Jira, so sync must never reset it.
+    @Column(name = "eisenhower_quadrant", length = 10)
+    private String eisenhowerQuadrant;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -299,6 +304,9 @@ public class JiraIssueEntity {
 
     public Integer getManualBoost() { return manualBoost; }
     public void setManualBoost(Integer manualBoost) { this.manualBoost = manualBoost; }
+
+    public String getEisenhowerQuadrant() { return eisenhowerQuadrant; }
+    public void setEisenhowerQuadrant(String eisenhowerQuadrant) { this.eisenhowerQuadrant = eisenhowerQuadrant; }
 
     // ==================== Quarter Label Helper ====================
 

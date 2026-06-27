@@ -310,6 +310,15 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
            "COALESCE(e.doneAt, e.startedAt) DESC")
     List<JiraIssueEntity> findEpicsForBurndown(@Param("teamId") Long teamId);
 
+    // ==================== F77: Eisenhower Matrix (orphan tasks) ====================
+
+    /**
+     * Orphan tasks for a team: top-level Story/Task/Bug (board_category STORY)
+     * with no parent. "Done" filtering is applied in-service via
+     * {@code WorkflowConfigService.isDone(...)}, not in SQL.
+     */
+    List<JiraIssueEntity> findByTeamIdAndParentKeyIsNullAndBoardCategory(Long teamId, String boardCategory);
+
     // ==================== Simulation: stuck subtasks ====================
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +

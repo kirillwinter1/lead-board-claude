@@ -115,6 +115,24 @@ export const TOOLTIP_SUCCESS = '#22c55e'
 export const TOOLTIP_VALUE = '#e5e7eb'
 export const TOOLTIP_ACCENT = '#FFD700'
 
+// Eisenhower Matrix quadrant colors (F77) — used in MatrixQuadrant / MatrixUnassigned.
+// P1 important+urgent (red), P2 important/not urgent (amber), P3 not important/urgent (purple),
+// P4 not important/not urgent (green). Each entry: accent (header/border), bg (zone fill).
+export interface QuadrantColor {
+  accent: string
+  bg: string
+}
+
+export const QUADRANT_COLORS: Record<'P1' | 'P2' | 'P3' | 'P4', QuadrantColor> = {
+  P1: { accent: '#FF5630', bg: '#FFF1EE' },
+  P2: { accent: '#FFAB00', bg: '#FFFAE6' },
+  P3: { accent: '#6554C0', bg: '#F3F0FF' },
+  P4: { accent: '#36B37E', bg: '#E9FBF2' },
+}
+
+// Unassigned zone — neutral grey tone.
+export const QUADRANT_UNASSIGNED: QuadrantColor = { accent: '#6b778c', bg: '#F4F5F7' }
+
 // Helper: lighten a hex color by a factor (0 = original, 1 = white)
 export function lightenColor(hex: string, factor: number): string {
   const r = parseInt(hex.slice(1, 3), 16)
