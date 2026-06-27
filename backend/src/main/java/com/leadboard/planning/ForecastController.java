@@ -14,6 +14,7 @@ import com.leadboard.planning.dto.WipHistoryResponse.WipRoleData;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -75,6 +76,7 @@ public class ForecastController {
     }
 
     @PostMapping("/recalculate")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<Map<String, Object>> recalculate(
             @RequestParam(required = false) Long teamId) {
         int epicsUpdated;
@@ -126,6 +128,7 @@ public class ForecastController {
     }
 
     @PostMapping("/wip-snapshot")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<Map<String, Object>> createWipSnapshot(@RequestParam Long teamId) {
         WipSnapshotEntity snapshot = wipSnapshotService.createSnapshot(teamId);
         return ResponseEntity.ok(Map.of(

@@ -3,6 +3,7 @@ package com.leadboard.planning;
 import com.leadboard.planning.dto.AutoScoreDto;
 import com.leadboard.sync.JiraIssueEntity;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -72,6 +73,7 @@ public class AutoScoreController {
      * Пересчитывает AutoScore для всех эпиков.
      */
     @PostMapping("/recalculate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> recalculateAll() {
         int count = autoScoreService.recalculateAll();
         return ResponseEntity.ok(Map.of(
@@ -84,6 +86,7 @@ public class AutoScoreController {
      * Пересчитывает AutoScore для эпиков команды.
      */
     @PostMapping("/teams/{teamId}/recalculate")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<Map<String, Object>> recalculateForTeam(@PathVariable Long teamId) {
         int count = autoScoreService.recalculateForTeam(teamId);
         return ResponseEntity.ok(Map.of(
@@ -97,6 +100,7 @@ public class AutoScoreController {
      * Пересчитывает AutoScore для одного эпика.
      */
     @PostMapping("/epics/{epicKey}/recalculate")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<Map<String, Object>> recalculateForEpic(@PathVariable String epicKey) {
         BigDecimal score = autoScoreService.recalculateForEpic(epicKey);
         if (score == null) {

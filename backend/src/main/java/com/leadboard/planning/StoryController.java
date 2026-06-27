@@ -3,6 +3,7 @@ package com.leadboard.planning;
 import com.leadboard.planning.dto.RecalculateResponse;
 import com.leadboard.planning.dto.StoriesResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -35,6 +36,7 @@ public class StoryController {
      * POST /api/planning/recalculate-stories?epicKey=LB-100
      */
     @PostMapping("/planning/recalculate-stories")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<RecalculateResponse> recalculateStories(
             @RequestParam(required = false) String epicKey
     ) {
