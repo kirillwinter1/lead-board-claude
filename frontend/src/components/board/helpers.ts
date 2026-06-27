@@ -35,8 +35,19 @@ export const issueTypeIcons: Record<string, string> = {
   'Testing': subtaskIcon,
 }
 
-export function getIssueIcon(issueType: string, jiraIconUrl?: string | null): string {
+// Fallback icons keyed by workflow category, so localized/custom type names
+// (e.g. 'Эпик', 'История') still get the right icon when Jira metadata is missing.
+// No local PROJECT icon exists — PROJECT/unknown falls through to the name map.
+export const categoryIcons: Record<string, string> = {
+  EPIC: epicIcon,
+  STORY: storyIcon,
+  BUG: bugIcon,
+  SUBTASK: subtaskIcon,
+}
+
+export function getIssueIcon(issueType: string, jiraIconUrl?: string | null, category?: string | null): string {
   if (jiraIconUrl) return jiraIconUrl
+  if (category && categoryIcons[category]) return categoryIcons[category]
   return issueTypeIcons[issueType] || storyIcon
 }
 

@@ -11,7 +11,7 @@ import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
-  const { getIssueTypeIconUrl, getPriorityIconUrl, isStoryOrBug, isEpic } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getIssueTypeCategory, getPriorityIconUrl, isStoryOrBug, isEpic } = useWorkflowConfig()
   const priorityIconUrl = getPriorityIconUrl(node.priority)
   const isEpicRow = isEpic(node.issueType) && level === 0
   const isStoryRow = isStoryOrBug(node.issueType) && level === 1
@@ -54,7 +54,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
               {...dragHandleProps}
             >⋮⋮</span>
           )}
-          <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType))} alt={node.issueType} className="issue-type-icon" />
+          <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType), getIssueTypeCategory(node.issueType))} alt={node.issueType} className="issue-type-icon" />
           {node.priority && priorityIconUrl && (
             <img
               src={priorityIconUrl}

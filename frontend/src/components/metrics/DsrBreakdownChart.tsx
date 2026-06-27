@@ -145,7 +145,7 @@ function DsrEpicLabel({ row, jiraBaseUrl }: { row: ChartRow; jiraBaseUrl?: strin
 }
 
 export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps) {
-  const { getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const statusStyles = useStatusStyles()
 
   const chartData = useMemo<ChartRow[]>(() => {
@@ -160,10 +160,10 @@ export function DsrBreakdownChart({ epics, jiraBaseUrl }: DsrBreakdownChartProps
         effective: e.effectiveWorkingDays,
         flagged: e.flaggedDays,
         dsr: e.dsrActual,
-        iconUrl: getIssueIcon(e.issueType, getIssueTypeIconUrl(e.issueType)),
+        iconUrl: getIssueIcon(e.issueType, getIssueTypeIconUrl(e.issueType), getIssueTypeCategory(e.issueType)),
         statusColor: statusStyles[e.status]?.color || null
       }))
-  }, [epics, getIssueTypeIconUrl, statusStyles])
+  }, [epics, getIssueTypeIconUrl, getIssueTypeCategory, statusStyles])
 
   if (chartData.length === 0) {
     return (

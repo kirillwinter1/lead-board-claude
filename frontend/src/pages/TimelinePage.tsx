@@ -825,7 +825,7 @@ interface StoryBarsProps {
 }
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const statusStyles = useStatusStyles()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
@@ -888,7 +888,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <img
-                src={getIssueIcon(hoveredStory.issueType || 'Story', getIssueTypeIconUrl(hoveredStory.issueType))}
+                src={getIssueIcon(hoveredStory.issueType || 'Story', getIssueTypeIconUrl(hoveredStory.issueType), getIssueTypeCategory(hoveredStory.issueType))}
                 alt={hoveredStory.issueType || 'Story'}
                 style={{ width: '16px', height: '16px' }}
               />

@@ -93,7 +93,7 @@ function SummaryCard({ title, value, color }: { title: string; value: number; co
 }
 
 function ViolationRow({ issue }: { issue: IssueViolations }) {
-  const { getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const iconUrl = getIssueTypeIconUrl(issue.issueType)
   const [expanded, setExpanded] = useState(false)
   const maxSeverity = issue.violations.reduce((max, v) => {
@@ -119,7 +119,7 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
         </td>
         <td className="cell-type">
           <span className="issue-type-cell">
-            <img src={getIssueIcon(issue.issueType, iconUrl)} alt={issue.issueType} className="issue-type-icon" />
+            <img src={getIssueIcon(issue.issueType, iconUrl, getIssueTypeCategory(issue.issueType))} alt={issue.issueType} className="issue-type-icon" />
             {issue.issueType}
           </span>
         </td>
