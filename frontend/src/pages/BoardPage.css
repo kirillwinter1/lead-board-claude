@@ -131,6 +131,8 @@
   padding: 12px 24px;
   display: flex;
   align-items: center;
+  min-height: 64px;
+  box-sizing: border-box;
 }
 
 .board-row .cell-progress {
@@ -237,8 +239,24 @@
 
 .name-content {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.name-row-main {
+  display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.name-row-labels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-left: 24px;
 }
 
 .issue-type-icon {

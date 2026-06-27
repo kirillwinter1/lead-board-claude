@@ -48,6 +48,7 @@ export interface BoardNode {
   priority: string | null
   projectKey: string | null
   parentProjectKey: string | null
+  parentProjectTitle: string | null
   quarterLabel: string | null
   children: BoardNode[]
 }
