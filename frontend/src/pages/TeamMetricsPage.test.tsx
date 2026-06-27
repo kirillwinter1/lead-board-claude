@@ -4,7 +4,6 @@ import { BrowserRouter } from 'react-router-dom'
 import { TeamMetricsPage } from './TeamMetricsPage'
 import { teamsApi } from '../api/teams'
 import * as metricsApi from '../api/metrics'
-import * as forecastApi from '../api/forecast'
 import * as configApi from '../api/config'
 
 vi.mock('../api/teams', () => ({
@@ -20,6 +19,42 @@ vi.mock('../api/metrics', () => ({
   getVelocity: vi.fn(),
   getEpicBurndown: vi.fn(),
   getEpicsForBurndown: vi.fn(),
+  getMetricsDataStatus: vi.fn().mockResolvedValue({
+    lastSyncCompletedAt: null,
+    syncInProgress: false,
+    issuesInScope: 0,
+    issuesWithChangelog: 0,
+    dataCoveragePercent: 0,
+  }),
+  getDeliveryHealth: vi.fn().mockResolvedValue({
+    score: 0,
+    grade: 'N/A',
+    dimensions: [],
+    alerts: [],
+  }),
+  getMonthlyDsr: vi.fn().mockResolvedValue({ teamId: 0, months: [] }),
+  getExecutiveSummary: vi.fn().mockResolvedValue(
+    (() => {
+      const kpi = (label: string) => ({
+        label,
+        value: '0',
+        rawValue: 0,
+        prevValue: null,
+        deltaPercent: null,
+        trend: 'STABLE',
+        sampleSize: 0,
+        target: null,
+      })
+      return {
+        throughput: kpi('Throughput'),
+        cycleTimeMedian: kpi('Cycle Time'),
+        leadTimeMedian: kpi('Lead Time'),
+        predictability: kpi('Predictability'),
+        capacityUtilization: kpi('Capacity'),
+        blockedRisk: kpi('Blocked/Aging'),
+      }
+    })()
+  ),
 }))
 
 vi.mock('../api/forecast', () => ({
@@ -49,32 +84,9 @@ vi.mock('../contexts/WorkflowConfigContext', () => ({
   }),
 }))
 
-// Mock chart components
-vi.mock('../components/metrics/MetricCard', () => ({
-  MetricCard: ({ title, value, subtitle }: { title: string; value: string | number; subtitle: string }) => (
-    <div data-testid={`metric-card-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div>{title}</div>
-      <div>{value}</div>
-      <div>{subtitle}</div>
-    </div>
-  ),
-}))
-
-vi.mock('../components/metrics/DsrGauge', () => ({
-  DsrGauge: ({ title, value }: { title: string; value: number | null }) => (
-    <div data-testid={`dsr-gauge-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div>{title}</div>
-      <div>{value ?? 'N/A'}</div>
-    </div>
-  ),
-}))
-
+// Mock heavy / API-driven chart components that aren't the subject under test.
 vi.mock('../components/metrics/ThroughputChart', () => ({
   ThroughputChart: () => <div data-testid="throughput-chart">ThroughputChart</div>,
-}))
-
-vi.mock('../components/metrics/TimeInStatusChart', () => ({
-  TimeInStatusChart: () => <div data-testid="time-in-status-chart">TimeInStatusChart</div>,
 }))
 
 vi.mock('../components/metrics/AssigneeTable', () => ({
@@ -95,6 +107,10 @@ vi.mock('../components/metrics/EpicBurndownChart', () => ({
 
 vi.mock('../components/metrics/RoleLoadBlock', () => ({
   RoleLoadBlock: () => <div data-testid="role-load-block">RoleLoadBlock</div>,
+}))
+
+vi.mock('../components/WorklogTimeline', () => ({
+  WorklogTimeline: () => <div data-testid="worklog-timeline">WorklogTimeline</div>,
 }))
 
 const mockTeams = [
@@ -150,9 +166,29 @@ const renderTeamMetricsPage = () => {
   )
 }
 
+// Opens the custom team SingleSelectDropdown (there is exactly one on the page).
+const openTeamDropdown = (container: HTMLElement) => {
+  const trigger = container.querySelector('.filter-dropdown-trigger')
+  expect(trigger).not.toBeNull()
+  fireEvent.click(trigger!)
+}
+
+// Expands a collapsed <MetricsSection> by clicking its header button.
+const expandSection = (title: string) => {
+  const header = screen.getByText(title).closest('button')
+  expect(header).not.toBeNull()
+  fireEvent.click(header!)
+}
+
 describe('TeamMetricsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // MetricsSection persists expand/collapse state in localStorage — reset so
+    // each test starts from the component's defaultExpanded values.
+    localStorage.clear()
+    // BrowserRouter shares window.location across tests; selecting a team writes
+    // ?teamId=… to the URL. Reset it so each test starts with no team in the URL.
+    window.history.pushState({}, '', '/')
     vi.mocked(teamsApi.getAll).mockResolvedValue(mockTeams)
     vi.mocked(metricsApi.getMetricsSummary).mockResolvedValue(mockMetrics)
     vi.mocked(metricsApi.getDsr).mockResolvedValue(mockDsr)
@@ -175,63 +211,66 @@ describe('TeamMetricsPage', () => {
       expect(screen.getByText('Loading...')).toBeInTheDocument()
     })
 
-    it('should render team selector', async () => {
-      renderTeamMetricsPage()
+    it('should render team options in the dropdown', async () => {
+      const { container } = renderTeamMetricsPage()
 
+      // First team is auto-selected and shown in the trigger.
       await waitFor(() => {
         expect(screen.getByText('Team Alpha')).toBeInTheDocument()
-        expect(screen.getByText('Team Beta')).toBeInTheDocument()
       })
+
+      openTeamDropdown(container)
+
+      // Both teams are listed once the menu is open.
+      expect(screen.getByText('Team Beta')).toBeInTheDocument()
+      expect(screen.getAllByText('Team Alpha').length).toBeGreaterThan(0)
     })
 
-    it('should render period selector', async () => {
+    it('should render the date range picker presets', async () => {
       renderTeamMetricsPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Last 7 days')).toBeInTheDocument()
-        expect(screen.getByText('Last 30 days')).toBeInTheDocument()
-        expect(screen.getByText('Last 90 days')).toBeInTheDocument()
+        expect(screen.getByText('Team Metrics')).toBeInTheDocument()
       })
-    })
 
-    it('should render issue type filter', async () => {
+      expect(screen.getByText('30d')).toBeInTheDocument()
+      expect(screen.getByText('90d')).toBeInTheDocument()
+      expect(screen.getByText('180d')).toBeInTheDocument()
+      expect(screen.getByText('1y')).toBeInTheDocument()
+    })
+  })
+
+  describe('Executive summary', () => {
+    it('should render the executive summary KPI cards', async () => {
       renderTeamMetricsPage()
 
       await waitFor(() => {
-        expect(screen.getByText('All')).toBeInTheDocument()
-        expect(screen.getByText('Epic (Epics)')).toBeInTheDocument()
-        expect(screen.getByText('Story (Stories)')).toBeInTheDocument()
+        expect(screen.getByText('Throughput')).toBeInTheDocument()
+        expect(screen.getByText('Predictability')).toBeInTheDocument()
+        expect(screen.getByText('Capacity')).toBeInTheDocument()
+        expect(screen.getByText('Blocked/Aging')).toBeInTheDocument()
+      })
+    })
+
+    it('should render the delivery health grade and score', async () => {
+      vi.mocked(metricsApi.getDeliveryHealth).mockResolvedValue({
+        score: 85,
+        grade: 'B',
+        dimensions: [],
+        alerts: [],
+      })
+
+      renderTeamMetricsPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('B')).toBeInTheDocument()
+        expect(screen.getByText('85')).toBeInTheDocument()
       })
     })
   })
 
   describe('Metrics display', () => {
-    it('should render DSR gauges', async () => {
-      renderTeamMetricsPage()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('dsr-gauge-dsr-actual')).toBeInTheDocument()
-        expect(screen.getByTestId('dsr-gauge-dsr-forecast')).toBeInTheDocument()
-      })
-    })
-
-    it('should render throughput metric card', async () => {
-      renderTeamMetricsPage()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('metric-card-throughput')).toBeInTheDocument()
-      })
-    })
-
-    it('should render on-time rate metric card', async () => {
-      renderTeamMetricsPage()
-
-      await waitFor(() => {
-        expect(screen.getByTestId('metric-card-on-time-rate')).toBeInTheDocument()
-      })
-    })
-
-    it('should render throughput chart', async () => {
+    it('should render the throughput chart', async () => {
       renderTeamMetricsPage()
 
       await waitFor(() => {
@@ -239,24 +278,31 @@ describe('TeamMetricsPage', () => {
       })
     })
 
-    it('should render time in status chart', async () => {
+    it('should render the assignee table when the Drilldown section is expanded', async () => {
       renderTeamMetricsPage()
 
+      // Drilldown is collapsed by default — its children are not mounted.
       await waitFor(() => {
-        expect(screen.getByTestId('time-in-status-chart')).toBeInTheDocument()
+        expect(screen.getByText('Drilldown')).toBeInTheDocument()
       })
-    })
+      expect(screen.queryByTestId('assignee-table')).not.toBeInTheDocument()
 
-    it('should render assignee table', async () => {
-      renderTeamMetricsPage()
+      expandSection('Drilldown')
 
       await waitFor(() => {
         expect(screen.getByTestId('assignee-table')).toBeInTheDocument()
       })
     })
 
-    it('should render forecast accuracy chart', async () => {
+    it('should render the forecast accuracy chart when the Drilldown section is expanded', async () => {
       renderTeamMetricsPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Drilldown')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('forecast-accuracy-chart')).not.toBeInTheDocument()
+
+      expandSection('Drilldown')
 
       await waitFor(() => {
         expect(screen.getByTestId('forecast-accuracy-chart')).toBeInTheDocument()
@@ -265,69 +311,30 @@ describe('TeamMetricsPage', () => {
   })
 
   describe('Filter interactions', () => {
-    it('should change team on selection', async () => {
-      renderTeamMetricsPage()
+    it('should refetch metrics for the newly selected team', async () => {
+      const { container } = renderTeamMetricsPage()
 
       await waitFor(() => {
         expect(screen.getByText('Team Alpha')).toBeInTheDocument()
       })
 
-      // Find all selects and use the first one (team)
-      const selects = screen.getAllByRole('combobox')
-      fireEvent.change(selects[0], { target: { value: '2' } })
+      vi.mocked(metricsApi.getMetricsSummary).mockClear()
+
+      openTeamDropdown(container)
+      fireEvent.click(screen.getByText('Team Beta'))
 
       await waitFor(() => {
         expect(metricsApi.getMetricsSummary).toHaveBeenCalledWith(
           2,
           expect.any(String),
-          expect.any(String),
-          undefined
+          expect.any(String)
         )
-      })
-    })
-
-    it('should change period on selection', async () => {
-      renderTeamMetricsPage()
-
-      await waitFor(() => {
-        expect(screen.getByText('Team Alpha')).toBeInTheDocument()
-      })
-
-      // Find all selects and use the second one (period)
-      const selects = screen.getAllByRole('combobox')
-      fireEvent.change(selects[1], { target: { value: '7' } })
-
-      await waitFor(() => {
-        // API should be called with new date range
-        expect(metricsApi.getMetricsSummary).toHaveBeenCalled()
-      })
-    })
-
-    it('should change issue type on selection', async () => {
-      renderTeamMetricsPage()
-
-      await waitFor(() => {
-        expect(screen.getByText('Team Alpha')).toBeInTheDocument()
-      })
-
-      // Clear previous calls
-      vi.mocked(metricsApi.getMetricsSummary).mockClear()
-
-      // Find all selects and use the third one (issue type)
-      const selects = screen.getAllByRole('combobox')
-      fireEvent.change(selects[2], { target: { value: 'Story' } })
-
-      await waitFor(() => {
-        // Check that getMetricsSummary was called (may be called multiple times due to re-renders)
-        const calls = vi.mocked(metricsApi.getMetricsSummary).mock.calls
-        const hasStoryCall = calls.some(call => call[3] === 'Story')
-        expect(hasStoryCall).toBe(true)
       })
     })
   })
 
   describe('Empty state', () => {
-    it('should show message when no teams', async () => {
+    it('should show placeholder when there are no teams', async () => {
       vi.mocked(teamsApi.getAll).mockResolvedValue([])
 
       renderTeamMetricsPage()
@@ -336,9 +343,8 @@ describe('TeamMetricsPage', () => {
         expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
       })
 
-      // When there are no teams and no selected team, check for empty or selection message
+      // The team dropdown falls back to its placeholder when nothing is selected.
       await waitFor(() => {
-        // The page shows "Select team..." placeholder when no teams
         expect(screen.getByText('Select team...')).toBeInTheDocument()
       })
     })
@@ -376,7 +382,7 @@ describe('TeamMetricsPage', () => {
         expect(screen.getByText('Team Alpha')).toBeInTheDocument()
       })
 
-      // After loading, the first team should be selected and metrics loaded
+      // After loading, the first team should be selected and metrics loaded.
       await waitFor(() => {
         expect(metricsApi.getMetricsSummary).toHaveBeenCalled()
       })
