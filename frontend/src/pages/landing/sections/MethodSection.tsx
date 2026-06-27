@@ -59,7 +59,7 @@ export function MethodSection({ onRequestDemo }: MethodSectionProps) {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            Как OneLane делает поставку управляемой
+            Как LeadBoard делает поставку управляемой
           </motion.h2>
 
           <div className="landing-method-tabs landing-method-tabs-left">

@@ -22,7 +22,7 @@ export function HeroSection({ onRequestAudit }: HeroSectionProps) {
             <span>предсказуемыми</span>
           </h1>
           <p className="landing-hero-subtitle landing-hero-subtitle-left">
-            OneLane интегрируется с вашей Jira по API и превращает данные в наглядный дашборд:
+            LeadBoard интегрируется с вашей Jira по API и превращает данные в наглядный дашборд:
             прогресс по эпикам, прогноз сроков, загрузка по ролям и рекомендации для принятия решений.
           </p>
           <ul className="landing-hero-features">
