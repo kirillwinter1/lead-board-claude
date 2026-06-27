@@ -55,6 +55,7 @@ class SimulationSchedulerTest {
     @DisplayName("BUG-77: sets TenantContext per tenant and clears it afterwards")
     void shouldSetTenantContextPerTenant() {
         when(properties.getTeamIds()).thenReturn(List.of(1L));
+        when(properties.getTimeoutMinutes()).thenReturn(5);
         when(tenantRepository.findAllActive()).thenReturn(List.of(
                 tenant(10L, "schema_a", "tenant-a"),
                 tenant(20L, "schema_b", "tenant-b")
@@ -79,6 +80,7 @@ class SimulationSchedulerTest {
     @DisplayName("single-tenant fallback: runs once without TenantContext when no active tenants")
     void shouldRunSingleTenantFallbackWithoutContext() {
         when(properties.getTeamIds()).thenReturn(List.of(1L));
+        when(properties.getTimeoutMinutes()).thenReturn(5);
         when(tenantRepository.findAllActive()).thenReturn(List.of());
 
         List<Long> seenTenantIds = new ArrayList<>();
@@ -99,6 +101,7 @@ class SimulationSchedulerTest {
     @DisplayName("tenant failure is isolated: loop continues and context is cleared in finally")
     void shouldIsolateTenantFailureAndClearContext() {
         when(properties.getTeamIds()).thenReturn(List.of(1L));
+        when(properties.getTimeoutMinutes()).thenReturn(5);
         when(tenantRepository.findAllActive()).thenReturn(List.of(
                 tenant(10L, "schema_a", "tenant-a"),
                 tenant(20L, "schema_b", "tenant-b")
