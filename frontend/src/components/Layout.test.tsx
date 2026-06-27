@@ -33,6 +33,9 @@ const syncCompletedResponse = {
     lastSyncCompletedAt: '2024-01-01T00:00:00Z',
     issuesCount: 100,
     error: null,
+    // setupCompleted gates the SetupWizard vs. the navigation (Layout.tsx:37).
+    // Without it `setupRequired` becomes true and the wizard hides the nav tabs.
+    setupCompleted: true,
   },
 }
 
@@ -73,13 +76,13 @@ describe('Layout', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Board')).toBeInTheDocument()
-        expect(screen.getByText('Timeline')).toBeInTheDocument()
         expect(screen.getByText('Metrics')).toBeInTheDocument()
         expect(screen.getByText('Data Quality')).toBeInTheDocument()
+        expect(screen.getByText('Bugs')).toBeInTheDocument()
         expect(screen.getByText('Poker')).toBeInTheDocument()
         expect(screen.getByText('Teams')).toBeInTheDocument()
         expect(screen.getByText('Projects')).toBeInTheDocument()
-        expect(screen.getByText('Project Timeline')).toBeInTheDocument()
+        expect(screen.getByText('Planning')).toBeInTheDocument()
         expect(screen.getByText('Settings')).toBeInTheDocument()
       })
     })
@@ -88,7 +91,7 @@ describe('Layout', () => {
       renderLayout()
 
       await waitFor(() => {
-        const logo = screen.getByAltText('OneLane')
+        const logo = screen.getByAltText('LeadBoard')
         expect(logo).toBeInTheDocument()
       })
     })
@@ -100,8 +103,8 @@ describe('Layout', () => {
         const boardLink = screen.getByText('Board').closest('a')
         expect(boardLink).toHaveAttribute('href', '/?teamId=5')
 
-        const timelineLink = screen.getByText('Timeline').closest('a')
-        expect(timelineLink).toHaveAttribute('href', '/timeline?teamId=5')
+        const metricsLink = screen.getByText('Metrics').closest('a')
+        expect(metricsLink).toHaveAttribute('href', '/metrics?teamId=5')
       })
     })
 
@@ -147,9 +150,11 @@ describe('Layout', () => {
     it('should redirect to OAuth on login click', async () => {
       // Mock window.location.href
       const originalLocation = window.location
+      // hostname is required: handleLogin → getTenantSlug() reads
+      // window.location.hostname (tenant.ts:15). Omitting it throws on .split('.').
       Object.defineProperty(window, 'location', {
         writable: true,
-        value: { href: '' },
+        value: { href: '', hostname: 'localhost' },
       })
 
       renderLayout()

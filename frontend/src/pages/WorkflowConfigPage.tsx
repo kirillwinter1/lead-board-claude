@@ -1348,7 +1348,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Сопоставьте типы задач Jira с категориями OneLane:
+          Сопоставьте типы задач Jira с категориями LeadBoard:
           {' '}<strong>EPIC</strong> — фичи,
           {' '}<strong>STORY</strong> — рабочие задачи,
           {' '}<strong>SUBTASK</strong> — подзадачи с привязкой к роли,
@@ -1448,7 +1448,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       <>
         <div className="wizard-info-block">
           Роли отражают типы работ в команде (анализ, разработка, тестирование).
-          OneLane использует роли для расчёта прогресса и прогноза сроков.
+          LeadBoard использует роли для расчёта прогресса и прогноза сроков.
           <br /><br />
           <strong>Sort order defines the pipeline sequence</strong> — tasks are processed in this order (e.g. Analysis → Development → Testing).
         </div>
@@ -1534,7 +1534,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Сопоставьте статусы Jira с категориями OneLane:
+          Сопоставьте статусы Jira с категориями LeadBoard:
           <br /><br />
           <strong>NEW</strong> — задача не начата,
           <strong> REQUIREMENTS</strong> — сбор требований (эпики),
@@ -1691,7 +1691,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Проверьте конфигурацию перед сохранением. OneLane будет использовать
+          Проверьте конфигурацию перед сохранением. LeadBoard будет использовать
           эти маппинги для доски, метрик и прогнозов.
         </div>
         <div className="wizard-review">

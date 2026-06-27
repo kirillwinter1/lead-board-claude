@@ -60,7 +60,7 @@ export function Layout() {
       <header className="header">
         <div className="header-left">
           <NavLink to="/" className="logo-link">
-            <img src={logo} alt="OneLane" className="header-logo" />
+            <img src={logo} alt="LeadBoard" className="header-logo" />
           </NavLink>
           {showNav && (
             <nav className="nav-tabs">

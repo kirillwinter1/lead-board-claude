@@ -77,7 +77,7 @@ export default function RegistrationPage() {
         <div style={{ maxWidth: 480, margin: '80px auto', padding: 24 }}>
             <h1 style={{ marginBottom: 8 }}>Create your workspace</h1>
             <p style={{ color: '#666', marginBottom: 32 }}>
-                Get started with OneLane. Free 14-day trial.
+                Get started with LeadBoard. Free 14-day trial.
             </p>
 
             <form onSubmit={handleSubmit}>

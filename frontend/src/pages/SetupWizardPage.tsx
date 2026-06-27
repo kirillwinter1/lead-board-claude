@@ -246,7 +246,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
   const renderStepJira = () => (
     <div className="wizard-card">
       <h2>Connect to Jira</h2>
-      <p>Enter your Jira Cloud credentials to connect OneLane to your project.</p>
+      <p>Enter your Jira Cloud credentials to connect LeadBoard to your project.</p>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
         <div>
