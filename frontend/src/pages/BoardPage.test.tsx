@@ -24,6 +24,27 @@ vi.mock('../api/board', () => ({
 vi.mock('axios', () => ({
   default: {
     get: vi.fn().mockImplementation((url: string) => {
+      // BoardPage -> useBoardFilters -> useAuth needs an authenticated user.
+      // AuthProvider fetches these two endpoints on mount.
+      if (url.includes('/oauth/atlassian/status')) {
+        return Promise.resolve({
+          data: {
+            authenticated: true,
+            user: {
+              id: 1,
+              accountId: 'acc-123',
+              displayName: 'John Doe',
+              email: 'john@example.com',
+              avatarUrl: null,
+              role: 'ADMIN',
+              permissions: ['board:view'],
+            },
+          },
+        })
+      }
+      if (url.includes('/api/auth/my-teams')) {
+        return Promise.resolve({ data: { admin: true, teamIds: [] } })
+      }
       if (url.includes('/api/board')) {
         return Promise.resolve({
           data: {
@@ -95,11 +116,14 @@ vi.mock('axios', () => ({
 
 // Import after mocks
 import { BoardPage } from './BoardPage'
+import { AuthProvider } from '../contexts/AuthContext'
 
 const renderBoardPage = () => {
   return render(
     <BrowserRouter>
-      <BoardPage />
+      <AuthProvider>
+        <BoardPage />
+      </AuthProvider>
     </BrowserRouter>
   )
 }

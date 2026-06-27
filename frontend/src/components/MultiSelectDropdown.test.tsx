@@ -113,8 +113,8 @@ describe('MultiSelectDropdown', () => {
       expect(onToggle).toHaveBeenCalledWith('To Do')
     })
 
-    it('should show checkbox as checked for selected options', () => {
-      render(
+    it('should mark selected options as selected', () => {
+      const { container } = render(
         <MultiSelectDropdown
           {...defaultProps}
           selected={new Set(['To Do', 'Done'])}
@@ -123,20 +123,20 @@ describe('MultiSelectDropdown', () => {
 
       fireEvent.click(screen.getByRole('button'))
 
-      const checkboxes = screen.getAllByRole('checkbox')
-      expect(checkboxes[0]).toBeChecked() // To Do
-      expect(checkboxes[1]).not.toBeChecked() // In Progress
-      expect(checkboxes[2]).toBeChecked() // Done
+      const items = container.querySelectorAll('.filter-dropdown-item')
+      expect(items[0]).toHaveClass('filter-dropdown-item-selected') // To Do
+      expect(items[1]).not.toHaveClass('filter-dropdown-item-selected') // In Progress
+      expect(items[2]).toHaveClass('filter-dropdown-item-selected') // Done
     })
 
-    it('should toggle checkbox when clicking label', () => {
+    it('should toggle selection when clicking an option row', () => {
       const onToggle = vi.fn()
       render(<MultiSelectDropdown {...defaultProps} onToggle={onToggle} />)
 
       fireEvent.click(screen.getByRole('button'))
 
-      const label = screen.getByText('In Progress').closest('label')!
-      fireEvent.click(label)
+      const item = screen.getByText('In Progress').closest('.filter-dropdown-item')!
+      fireEvent.click(item)
 
       expect(onToggle).toHaveBeenCalledWith('In Progress')
     })
