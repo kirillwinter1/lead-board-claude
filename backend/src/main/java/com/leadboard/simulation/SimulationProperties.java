@@ -12,6 +12,8 @@ public class SimulationProperties {
     private boolean enabled = false;
     private String cron = "0 0 19 * * MON-FRI";
     private List<Long> teamIds = List.of();
+    private int maxConsecutiveFailures = 3;
+    private int timeoutMinutes = 5;
     private DeviationConfig deviation = new DeviationConfig();
 
     public boolean isEnabled() {
@@ -36,6 +38,22 @@ public class SimulationProperties {
 
     public void setTeamIds(List<Long> teamIds) {
         this.teamIds = teamIds;
+    }
+
+    public int getMaxConsecutiveFailures() {
+        return maxConsecutiveFailures;
+    }
+
+    public void setMaxConsecutiveFailures(int maxConsecutiveFailures) {
+        this.maxConsecutiveFailures = maxConsecutiveFailures;
+    }
+
+    public int getTimeoutMinutes() {
+        return timeoutMinutes;
+    }
+
+    public void setTimeoutMinutes(int timeoutMinutes) {
+        this.timeoutMinutes = timeoutMinutes;
     }
 
     public DeviationConfig getDeviation() {

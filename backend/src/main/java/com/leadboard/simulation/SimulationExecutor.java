@@ -22,11 +22,14 @@ public class SimulationExecutor {
 
     private final JiraClient jiraClient;
     private final WorkflowConfigService workflowConfigService;
+    private final SimulationProperties properties;
 
     public SimulationExecutor(JiraClient jiraClient,
-                              WorkflowConfigService workflowConfigService) {
+                              WorkflowConfigService workflowConfigService,
+                              SimulationProperties properties) {
         this.jiraClient = jiraClient;
         this.workflowConfigService = workflowConfigService;
+        this.properties = properties;
     }
 
     /**
@@ -35,11 +38,14 @@ public class SimulationExecutor {
      */
     public List<SimulationAction> execute(List<SimulationAction> plannedActions, LocalDate simDate, Long teamId) {
         List<SimulationAction> results = new ArrayList<>();
+        int consecutiveFailures = 0;
+        int maxFailures = properties.getMaxConsecutiveFailures();
 
         for (SimulationAction action : plannedActions) {
             try {
                 SimulationAction result = executeAction(action, simDate);
                 results.add(result);
+                consecutiveFailures = 0; // reset on success
                 Thread.sleep(RATE_LIMIT_DELAY_MS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -49,6 +55,17 @@ public class SimulationExecutor {
                 log.error("Failed to execute action {} on {}: {}",
                         action.type(), action.issueKey(), e.getMessage());
                 results.add(action.withError(e.getMessage()));
+                consecutiveFailures++;
+
+                if (consecutiveFailures >= maxFailures) {
+                    log.warn("Circuit breaker: {} consecutive failures — aborting remaining {} actions (Jira may be unreachable)",
+                            consecutiveFailures, plannedActions.size() - results.size());
+                    for (int i = results.size(); i < plannedActions.size(); i++) {
+                        results.add(plannedActions.get(i).withError(
+                                "Skipped: circuit breaker after " + consecutiveFailures + " consecutive failures"));
+                    }
+                    break;
+                }
             }
         }
 

@@ -28,13 +28,16 @@ class SimulationExecutorTest {
     @Mock private WorkflowConfigService workflowConfigService;
 
     private SimulationExecutor executor;
+    private SimulationProperties properties;
 
     private static final Long TEAM_ID = 1L;
     private static final LocalDate SIM_DATE = LocalDate.of(2025, 6, 2);
 
     @BeforeEach
     void setUp() {
-        executor = new SimulationExecutor(jiraClient, workflowConfigService);
+        properties = new SimulationProperties();
+        properties.setMaxConsecutiveFailures(3);
+        executor = new SimulationExecutor(jiraClient, workflowConfigService, properties);
     }
 
     @Test
@@ -188,6 +191,64 @@ class SimulationExecutorTest {
         // Should have transitioned twice: first to "Проверка", then to "Готово"
         verify(jiraClient).transitionIssueBasicAuth("PROJ-11", "41");
         verify(jiraClient).transitionIssueBasicAuth("PROJ-11", "51");
+    }
+
+    @Test
+    void execute_circuitBreaker_abortsAfterConsecutiveFailures() {
+        properties.setMaxConsecutiveFailures(2);
+
+        when(jiraClient.getTransitionsBasicAuth(anyString()))
+                .thenThrow(new RuntimeException("connection timed out"));
+
+        List<SimulationAction> actions = List.of(
+                SimulationAction.transition("PROJ-1", "Sub-task", "Dev", "New", "In Progress", ""),
+                SimulationAction.transition("PROJ-2", "Sub-task", "Dev", "New", "In Progress", ""),
+                SimulationAction.transition("PROJ-3", "Sub-task", "Dev", "New", "In Progress", ""),
+                SimulationAction.transition("PROJ-4", "Sub-task", "Dev", "New", "In Progress", "")
+        );
+
+        List<SimulationAction> results = executor.execute(actions, SIM_DATE, TEAM_ID);
+
+        assertEquals(4, results.size());
+        // First 2 failed normally
+        assertTrue(results.get(0).error().contains("connection timed out"));
+        assertTrue(results.get(1).error().contains("connection timed out"));
+        // Last 2 skipped by circuit breaker
+        assertTrue(results.get(2).error().contains("circuit breaker"));
+        assertTrue(results.get(3).error().contains("circuit breaker"));
+        // Only 2 actual Jira calls made (not 4)
+        verify(jiraClient, times(2)).getTransitionsBasicAuth(anyString());
+    }
+
+    @Test
+    void execute_circuitBreaker_resetsOnSuccess() {
+        properties.setMaxConsecutiveFailures(2);
+
+        JiraTransition transition = new JiraTransition("21", "In Progress",
+                new JiraTransition.TransitionTarget("3", "In Progress", null));
+
+        // Fail, succeed, fail — should NOT trigger circuit breaker
+        when(jiraClient.getTransitionsBasicAuth("PROJ-1"))
+                .thenThrow(new RuntimeException("timeout"));
+        when(jiraClient.getTransitionsBasicAuth("PROJ-2"))
+                .thenReturn(List.of(transition));
+        when(jiraClient.getTransitionsBasicAuth("PROJ-3"))
+                .thenThrow(new RuntimeException("timeout"));
+
+        List<SimulationAction> actions = List.of(
+                SimulationAction.transition("PROJ-1", "Sub-task", "Dev", "New", "In Progress", ""),
+                SimulationAction.transition("PROJ-2", "Sub-task", "Dev", "New", "In Progress", ""),
+                SimulationAction.transition("PROJ-3", "Sub-task", "Dev", "New", "In Progress", "")
+        );
+
+        List<SimulationAction> results = executor.execute(actions, SIM_DATE, TEAM_ID);
+
+        assertEquals(3, results.size());
+        assertNotNull(results.get(0).error());
+        assertTrue(results.get(1).executed());
+        assertNotNull(results.get(2).error());
+        // All 3 actually executed (no circuit breaker)
+        assertFalse(results.get(2).error().contains("circuit breaker"));
     }
 
     @Test
