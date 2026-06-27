@@ -5,6 +5,7 @@ import com.leadboard.chat.dto.ChatSseEvent;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 
@@ -23,6 +24,7 @@ public class ChatController {
     }
 
     @PostMapping(value = "/message", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PreAuthorize("isAuthenticated()")
     public Flux<ServerSentEvent<ChatSseEvent>> sendMessage(@RequestBody ChatMessageRequest request) {
         String sessionId = request.sessionId() != null ? request.sessionId() : UUID.randomUUID().toString();
 
@@ -35,6 +37,7 @@ public class ChatController {
     }
 
     @DeleteMapping("/session/{sessionId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> clearSession(@PathVariable String sessionId) {
         chatService.clearSession(sessionId);
         return ResponseEntity.ok().build();

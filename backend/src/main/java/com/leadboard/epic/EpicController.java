@@ -1,6 +1,7 @@
 package com.leadboard.epic;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -21,6 +22,7 @@ public class EpicController {
     }
 
     @PatchMapping("/{epicKey}/rough-estimate/{role}")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<?> updateRoughEstimate(
             @PathVariable String epicKey,
             @PathVariable String role,

@@ -6,6 +6,7 @@ import com.leadboard.planning.dto.ForecastResponse;
 import com.leadboard.planning.dto.UnifiedPlanningResult;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -74,6 +75,7 @@ public class ForecastSnapshotController {
      * @param teamId Team ID
      */
     @PostMapping("/create")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<Map<String, Object>> createSnapshot(@RequestParam Long teamId) {
         ForecastSnapshotEntity snapshot = snapshotService.createSnapshot(teamId);
 
@@ -98,6 +100,7 @@ public class ForecastSnapshotController {
      * @param date   Target date
      */
     @PostMapping("/create-for-date")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<Map<String, Object>> createSnapshotForDate(
             @RequestParam Long teamId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -115,6 +118,7 @@ public class ForecastSnapshotController {
      * Trigger daily snapshot creation for all teams (admin endpoint).
      */
     @PostMapping("/trigger-daily")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> triggerDailySnapshots() {
         snapshotService.createDailySnapshots();
         return ResponseEntity.ok(Map.of(

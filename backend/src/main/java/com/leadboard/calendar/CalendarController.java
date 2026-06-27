@@ -3,6 +3,7 @@ package com.leadboard.calendar;
 import com.leadboard.calendar.dto.WorkdaysResponseDto;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -136,6 +137,7 @@ public class CalendarController {
      * @param country код страны (по умолчанию RU)
      */
     @PostMapping("/refresh")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> refreshCache(
             @RequestParam int year,
             @RequestParam(required = false) String country
