@@ -2,7 +2,9 @@
 
 **Цель:** подготовить борду к реальному запуску как multi-tenant SaaS.
 
-**Последнее обновление:** 2026-02-23
+**Последнее обновление:** 2026-06-27 (статусы пере-сверены с кодом)
+
+> **Сверка 2026-06-27.** Прежний план (от 2026-02-23) устарел на ~4 месяца: половина «Planned» уже реализована (L7/L9/L10/L11), а часть «P0-багов» (tenant-aware scheduled jobs, BUG-94/95/76/77) исправлена. Единственный подтверждённый по коду остаточный блокер — **RBAC enforcement (L6)**. Статусы ниже отражают фактическое состояние кода.
 
 ---
 
@@ -11,20 +13,22 @@
 | # | Задача | Приоритет | Статус | Зависимости |
 |---|--------|-----------|--------|-------------|
 | L1 | [Мультитенантность](#l1-мультитенантность) | **P0** | ✅ Done (F44) | — |
-| L2 | [QA: дотестировать оставшиеся экраны](#l2-qa-дотестировать-оставшиеся-экраны) | **P0** | 🚧 В работе (63%) | — |
-| L3 | [Фикс выявленных багов](#l3-фикс-выявленных-багов) | **P0** | 🚧 В работе (12 open) | L2 |
+| L2 | [QA: дотестировать оставшиеся экраны](#l2-qa-дотестировать-оставшиеся-экраны) | **P0** | ✅ Done (QA_STATUS 34/34) | — |
+| L3 | [Фикс выявленных багов](#l3-фикс-выявленных-багов) | **P0** | 🚧 Re-triage (см. ниже) | L2 |
 | L4 | [Security hardening](#l4-security-hardening) | **P0** | ✅ Done (F46) | L1 |
 | L5 | [Sync стабильность](#l5-sync-стабильность) | **P1** | ✅ QA done, bugs fixed | — |
-| L6 | [RBAC — тест от разных ролей](#l6-rbac--тест-от-разных-ролей) | **P1** | 📋 Planned | L1 |
-| L7 | [Setup Wizard — полный флоу](#l7-setup-wizard--полный-флоу) | **P1** | 📋 Planned | L1 |
-| L8 | [Backup стратегия + rollback plan](#l8-backup-стратегия--rollback-plan) | **P1** | 📋 Planned | L1 |
-| L9 | [Нагрузочное тестирование](#l9-нагрузочное-тестирование) | **P1** | 📋 Planned | L1, L3 |
-| L10 | [DB оптимизация + Jira rate limits](#l10-db-оптимизация--jira-rate-limits) | **P1** | 📋 Planned | L1 |
-| L11 | [Мониторинг и алертинг](#l11-мониторинг-и-алертинг) | **P1** | 📋 Planned | — |
-| L12 | [Graceful degradation](#l12-graceful-degradation) | **P2** | 📋 Planned | — |
-| L13 | [Ручное тестирование по всем фичам](#l13-ручное-тестирование-по-всем-фичам) | **P2** | 📋 Planned | L2, L3 |
-| L14 | [Подсказки + документация для пользователей](#l14-подсказки--документация-для-пользователей) | **P2** | 📋 Planned | — |
-| L15 | [Кроссбраузерность + мобильная адаптивность](#l15-кроссбраузерность--мобильная-адаптивность) | **P3** | 📋 Planned | — |
+| L6 | [RBAC enforcement + тест ролей](#l6-rbac--тест-от-разных-ролей) | **P1** | 🔴 Остаток — enforcement (РЕАЛЬНЫЙ блокер) | L1 |
+| L7 | [Setup Wizard — полный флоу](#l7-setup-wizard--полный-флоу) | **P1** | ✅ Done (F33) | L1 |
+| L8 | [Backup стратегия + rollback plan](#l8-backup-стратегия--rollback-plan) | **P1** | ❌ Не сделано | L1 |
+| L9 | [Нагрузочное тестирование](#l9-нагрузочное-тестирование) | **P1** | ✅ Done (F50, k6) | L1, L3 |
+| L10 | [DB оптимизация + Jira rate limits](#l10-db-оптимизация--jira-rate-limits) | **P1** | ✅ Done (F50/F51/F46) | L1 |
+| L11 | [Мониторинг и алертинг](#l11-мониторинг-и-алертинг) | **P1** | ✅ Done (F49 + F60) | — |
+| L12 | [Graceful degradation](#l12-graceful-degradation) | **P2** | ❌ Не сделано | — |
+| L13 | [Ручное тестирование по всем фичам](#l13-ручное-тестирование-по-всем-фичам) | **P2** | 🚧 Чек-листы есть, нет CI smoke | L2, L3 |
+| L14 | [Подсказки + документация для пользователей](#l14-подсказки--документация-для-пользователей) | **P2** | ❌ Не сделано (BF21) | — |
+| L15 | [Кроссбраузерность + мобильная адаптивность](#l15-кроссбраузерность--мобильная-адаптивность) | **P3** | ❌ Не сделано | — |
+
+**Остаток до запуска (по приоритету):** 🔴 L6 RBAC enforcement (P0/P1) → L8 Backup (P1) → L12/L13/L14/L15 (P2–P3).
 
 ---
 
@@ -32,7 +36,7 @@
 
 ### L1. Мультитенантность
 
-**Приоритет:** P0 | **Статус:** 📋 Planned | **Фича:** BF19
+**Приоритет:** P0 | **Статус:** ✅ Done (реализована как F44) | **Фича:** BF19
 
 Полноценная multi-tenant архитектура.
 
@@ -59,43 +63,24 @@
 
 ### L2. QA: дотестировать оставшиеся экраны
 
-**Приоритет:** P0 | **Статус:** 🚧 В работе | **Прогресс:** 12/19 экранов (63%)
+**Приоритет:** P0 | **Статус:** ✅ Done — QA пройден по всем модулям
 
-Оставшиеся экраны для QA-агента (см. [QA_STATUS.md](testing/QA_STATUS.md)):
-
-| Приоритет | Экран | Фичи | Статус |
-|-----------|-------|------|--------|
-| P1 | AutoScore / Planning | F13, F19, F20, F21 | ❌ |
-| P1 | Workflow Config | F17, F29, F38 | ❌ |
-| P2 | Timeline | F14 | ❌ |
-| P2 | Simulation | F28 | ❌ |
-| P3 | Member Profile | F30 | ❌ |
-| P3 | Setup Wizard | F33 | ❌ |
-| P3 | Auth / OAuth | F4, F27 | ❌ |
+По [QA_STATUS.md](testing/QA_STATUS.md) (обновление 2026-05-16) покрыто **34/34 модуля** (все экраны + cross-cutting). Прежняя оценка «19 экранов / 63%» была заниженной. Экраны из старого списка (AutoScore/Planning, Workflow Config, Timeline, Simulation, Member Profile, Setup Wizard, Auth/OAuth) — ✅ протестированы.
 
 ---
 
 ### L3. Фикс выявленных багов
 
-**Приоритет:** P0 | **Статус:** 🚧 В работе
+**Приоритет:** P0 | **Статус:** 🚧 Re-triage (старый список устарел)
 
-**Открытые баги: 12** (из 49 найденных, 37 исправлено)
+**Сверка 2026-06-27.** Старый список «12 открытых багов» (и более широкий бэклог в QA_STATUS.md) **не отражает текущий код** — несколько «открытых» багов фактически закрыты:
+- BUG-94/95/76/77 (изоляция тенантов, simulation race) — ✅ исправлены (проверено по коду).
+- Tenant-aware scheduled jobs (ForecastSnapshotService/WipSnapshotService) — ✅ исправлены.
+- BUG-4/BUG-10 (сломанные frontend-тесты) — ✅ закрыто (фронт-сьют 231/231 зелёный).
 
-| Bug ID | Severity | Описание | Экран |
-|--------|----------|----------|-------|
-| BUG-4 | High | 53/240 frontend тестов падают (missing mock) | Team Metrics |
-| BUG-10 | High | 24 frontend теста сломаны (регрессия F35/F36/F37) | Projects |
-| BUG-13 | Medium | Нет тестов для TeamService color methods | Teams |
-| BUG-14 | Medium | Нет controller-тестов для ProjectController/RiceController | Projects |
-| BUG-19 | High | 0 frontend тестов для AbsenceTimeline/AbsenceModal | Absences |
-| BUG-22 | Medium | 0 controller-level тестов для absence endpoints | Absences |
-| BUG-24 | Medium | Нет @DisplayName в backend тестах (absences) | Absences |
-| BUG-25 | Medium | Несогласованность формата createdAt (offset vs UTC) | Absences |
-| BUG-35 | Medium | Hardcoded PRIORITY_COLORS в BugSlaSettingsPage | Bug SLA |
-| BUG-37 | Low | Hardcoded score colors в PriorityCell | Board |
-| BUG-38 | Low | Hardcoded severity labels/rule names в AlertIcon | Board |
+**Подтверждённый по коду остаточный блокер:** RBAC enforcement — см. [L6](#l6-rbac--тест-от-разных-ролей). Это единственный реальный P0/P1-блокер.
 
-**Примечание:** BUG-4 и BUG-10 — по сути одна проблема (сломанные frontend тесты).
+**Возможно ещё открыто (требует точечной сверки, не подтверждено):** хардкод цветов (BUG-35/37/38 — Design System долг), кэш-инвалидация борда (L10). Перед запуском QA_STATUS.md стоит пере-триажить целиком против текущего кода.
 
 ---
 
@@ -132,7 +117,20 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L6. RBAC — тест от разных ролей
 
-**Приоритет:** P1 | **Статус:** 📋 Planned
+**Приоритет:** P1 | **Статус:** 🔴 Остаток — enforcement неполный (РЕАЛЬНЫЙ блокер к запуску)
+
+**Сверка 2026-06-27 (по коду).** RBAC реализован (F27) и фильтр грузит per-tenant роль из `tenant_users` на каждый запрос (BUG-94 исправлен). НО `SecurityConfig` имеет `.anyRequest().permitAll()` → авторизация целиком на method-level `@PreAuthorize`, а его **нет на мутирующих эндпоинтах** у ряда контроллеров:
+- 🔴 `WorkflowConfigController` (`/api/admin/workflow-config`) — **9 write-эндпоинтов, `@PreAuthorize=0`** (любой авторизованный, даже VIEWER, может переписать конфиг workflow тенанта).
+- `ForecastSnapshotController`, `AutoScoreController`, `ForecastController`, `EpicController`, `StoryController`, `CompetencyController`, `CalendarController`, `AuditRequestController` — мутации без авторизации.
+- Частично: `PokerController` (8 мутаций / 1 `@PreAuthorize`), `JiraProjectController` (3/1), `TenantJiraConfigController` (3/1).
+- ⚠️ WebSocket: `PokerWebSocketConfig` — raw WS без channel-интерсептора аутентификации (вторично, только Poker).
+
+**Остаётся:**
+- [ ] Матрица доступа: endpoint × role → allow/deny
+- [ ] Проставить `@PreAuthorize` на мутирующие эндпоинты (старт с `WorkflowConfigController`)
+- [ ] WebSocket: auth-интерсептор на handshake/channel
+- [ ] Тест UI: скрытие управления для read-only ролей
+- [ ] Тест API: 403 на запрещённые endpoints
 
 Ручное тестирование всех экранов от лица каждой роли:
 
@@ -152,9 +150,9 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L7. Setup Wizard — полный флоу
 
-**Приоритет:** P1 | **Статус:** 📋 Planned
+**Приоритет:** P1 | **Статус:** ✅ Done (F33 Setup Wizard, QA 2026-02-25)
 
-Полный end-to-end тест подключения нового тенанта:
+Реализован 4-шаговый мастер (Period → Sync → Workflow → Done), `SetupWizardPage.tsx` + `SyncController`. Полный end-to-end флоу подключения тенанта:
 
 - [ ] Регистрация / создание компании
 - [ ] OAuth подключение к Jira
@@ -168,7 +166,7 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L8. Backup стратегия + rollback plan
 
-**Приоритет:** P1 | **Статус:** 📋 Planned
+**Приоритет:** P1 | **Статус:** ❌ Не сделано (нет автобэкапа/протестированного отката; DEPLOY.md описывает только ручной docker save/load)
 
 - [ ] Автоматический бэкап PostgreSQL (pg_dump, cron, retention)
 - [ ] Бэкап перед каждым деплоем
@@ -180,7 +178,7 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L9. Нагрузочное тестирование
 
-**Приоритет:** P1 | **Статус:** 📋 Planned | **Зависимости:** L1, L3
+**Приоритет:** P1 | **Статус:** ✅ Done (F50 — k6-сьют, 7 сценариев, seed 183K issues; результаты в PERF_RESULTS.md) | **Зависимости:** L1, L3
 
 - [ ] Инструмент: k6 / JMeter / Gatling
 - [ ] Сценарии:
@@ -196,9 +194,11 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L10. DB оптимизация + Jira rate limits
 
-**Приоритет:** P1 | **Статус:** 📋 Planned
+**Приоритет:** P1 | **Статус:** ✅ Done (DB), 🚧 проверить кэш-инвалидацию
 
-- [ ] Анализ индексов: `EXPLAIN ANALYZE` на основные запросы
+DB-оптимизация выполнена (F50 индексы/T5-миграция, HikariCP-тюнинг, F51 early-exit 5–8s → 89ms, N+1-фиксы). Jira rate limits — `RateLimitFilter` (F46) с обработкой 429/backoff. Открытый вопрос: инвалидация кэша борда при смене состава команды (если подтвердится в коде).
+
+- [x] Анализ индексов: `EXPLAIN ANALYZE` на основные запросы
 - [ ] Slow query log: включить pg_stat_statements
 - [ ] Connection pooling: проверить HikariCP настройки per-tenant
 - [ ] Jira rate limits: retry с backoff, мониторинг оставшегося лимита
@@ -208,9 +208,11 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L11. Мониторинг и алертинг
 
-**Приоритет:** P1 | **Статус:** 📋 Planned
+**Приоритет:** P1 | **Статус:** ✅ Done (F49 Observability + F60 Production Monitoring)
 
-- [ ] Health endpoint: `/api/health` — статус DB, Jira, sync
+Стек: Prometheus + Grafana + Micrometer (F49); Alertmanager + Telegram-алерты (F60: Backend down, Sync failed, High error rate, High memory). Настройка в DEPLOY.md.
+
+- [x] Health endpoint: `/api/health` — статус DB, Jira, sync
 - [ ] Metrics: Prometheus / Micrometer (запросы, latency, errors)
 - [ ] Logging: structured logs (JSON), ротация
 - [ ] Alerts:
@@ -225,7 +227,7 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L12. Graceful degradation
 
-**Приоритет:** P2 | **Статус:** 📋 Planned
+**Приоритет:** P2 | **Статус:** ❌ Не сделано (нет circuit breaker / error boundaries; есть лишь точечные fallback'и)
 
 - [ ] Jira недоступна → борда работает на кэшированных данных + баннер
 - [ ] Sync fail → retry + уведомление, борда не ломается
@@ -236,7 +238,7 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L13. Ручное тестирование по всем фичам
 
-**Приоритет:** P2 | **Статус:** 📋 Planned
+**Приоритет:** P2 | **Статус:** 🚧 Чек-листы готовы (TEST_PLAN.md S1–S14 + X1–X5), нет CI smoke/regression
 
 Подготовить чек-лист для ручного тестирования каждого экрана. Основа: [TEST_PLAN.md](testing/TEST_PLAN.md).
 
@@ -248,7 +250,7 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L14. Подсказки + документация для пользователей
 
-**Приоритет:** P2 | **Статус:** 📋 Planned
+**Приоритет:** P2 | **Статус:** ❌ Не сделано (BF21 не реализован; спека BF21 отсутствует)
 
 - [ ] Onboarding tooltips: первый визит → подсказки по основным элементам
 - [ ] Help page / Knowledge base: как подключить Jira, что значат метрики
@@ -260,7 +262,7 @@ QA проведён 2026-02-21. Найдено 10 багов (2 Critical, 2 High
 
 ### L15. Кроссбраузерность + мобильная адаптивность
 
-**Приоритет:** P3 | **Статус:** 📋 Planned
+**Приоритет:** P3 | **Статус:** ❌ Не сделано (нет систематической кроссбраузерной/мобильной проверки)
 
 - [ ] Браузеры: Chrome, Firefox, Safari, Edge
 - [ ] Responsive: минимум read-only просмотр Board с мобильного
