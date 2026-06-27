@@ -30,7 +30,9 @@
       "Bash(psql *)",
       "Agent(*)",
       "WebFetch(*)",
-      "mcp__*"
+      "mcp__context7__*",
+      "mcp__playwright__*",
+      "mcp__chrome-devtools__*"
     ],
     "deny": [
       "Read(backend/.env)"
