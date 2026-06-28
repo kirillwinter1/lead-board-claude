@@ -34,6 +34,7 @@ vi.mock('../api/teams', () => ({
 vi.mock('../api/matrixApi', () => ({
   getMatrix: vi.fn(),
   triage: vi.fn(),
+  getRecommendations: vi.fn().mockResolvedValue({ zeroBugPolicy: { openBugCount: 0, bugs: [] }, roles: [] }),
 }))
 
 vi.mock('../api/config', () => ({
