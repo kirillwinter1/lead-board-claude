@@ -33,3 +33,46 @@ export async function triage(issueKey: string, quadrant: Quadrant | null): Promi
   const response = await axios.put<MatrixCard>('/api/matrix/triage', { issueKey, quadrant })
   return response.data
 }
+
+// ---- F78: autoplanner recommendations ----
+
+// A recommendation card (superset of MatrixCard). For bugs, quadrant is null and
+// the role/cumulative fields are null; for "ready" story cards they are populated.
+export interface RecCard {
+  issueKey: string
+  summary: string
+  issueType: string
+  priority: string | null
+  estimateHours: number | null
+  assigneeDisplayName: string | null
+  status: string
+  quadrant: Quadrant | null
+  workflowRole: string | null
+  roleSubtaskKey: string | null
+  roleEstimateHours: number | null
+  cumulativeHours: number | null
+  fitsInIdle: boolean | null
+}
+
+export interface ZeroBugPolicy {
+  openBugCount: number
+  bugs: RecCard[]
+}
+
+export interface RoleRecommendation {
+  roleCode: string
+  idleHours: number
+  ready: RecCard[]
+  needsEstimation: RecCard[]
+}
+
+export interface RecommendationView {
+  zeroBugPolicy: ZeroBugPolicy
+  roles: RoleRecommendation[]
+}
+
+// Idle-role recommendations + Zero Bug Policy for a team.
+export async function getRecommendations(teamId: number): Promise<RecommendationView> {
+  const response = await axios.get<RecommendationView>('/api/matrix/recommendations', { params: { teamId } })
+  return response.data
+}
