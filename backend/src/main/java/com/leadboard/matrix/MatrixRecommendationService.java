@@ -66,10 +66,8 @@ public class MatrixRecommendationService {
         // F79: compute "days in status" once for every issue we card (stories + bugs).
         List<JiraIssueEntity> carded = new ArrayList<>(triagedStories);
         carded.addAll(openBugs);
-        Map<String, StatusAge> statusAges = statusAgeService.compute(carded);
-        if (statusAges == null) {
-            statusAges = Map.of();
-        }
+        Map<String, StatusAge> computed = statusAgeService.compute(carded);
+        Map<String, StatusAge> statusAges = computed != null ? computed : Map.of();
 
         List<RecCard> bugCards = openBugs.stream().map(b -> card(b, statusAges)).toList();
         ZeroBugPolicy zeroBugPolicy = new ZeroBugPolicy(bugCards.size(), bugCards);

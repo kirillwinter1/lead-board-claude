@@ -4,6 +4,8 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.matrix.RecommendationDtos.RecommendationViewDto;
 import com.leadboard.matrix.RecommendationDtos.RoleSlice;
 import com.leadboard.matrix.RecommendationDtos.StoryRec;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.Test;
@@ -27,10 +29,11 @@ class MatrixRecommendationServiceTest {
 
     @Mock private JiraIssueRepository issueRepository;
     @Mock private WorkflowConfigService workflowConfigService;
+    @Mock private StatusAgeService statusAgeService;
 
     private MatrixRecommendationService build() {
-        MatrixService matrixService = new MatrixService(issueRepository, workflowConfigService);
-        return new MatrixRecommendationService(issueRepository, matrixService);
+        MatrixService matrixService = new MatrixService(issueRepository, workflowConfigService, statusAgeService);
+        return new MatrixRecommendationService(issueRepository, matrixService, statusAgeService);
     }
 
     private JiraIssueEntity story(String key, String quadrant, String type) {
@@ -150,6 +153,32 @@ class MatrixRecommendationServiceTest {
         RecommendationViewDto view = build().getRecommendations(TEAM_ID);
 
         assertThat(view.recommended()).extracting(StoryRec::issueKey).containsExactly("PROJ-1");
+    }
+
+    @Test
+    void statusAge_isMappedOntoStoryRecAndBugCard() {
+        JiraIssueEntity s1 = story("PROJ-1", "P1", "Story");
+        JiraIssueEntity bug = story("PROJ-9", null, "Bug");
+        bug.setBoardCategory(BUG);
+        stubOrphans(List.of(s1), List.of(bug));
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of(
+                subtask("PROJ-1-1", "PROJ-1", "DEV", 3600L)));
+        when(statusAgeService.compute(anyList())).thenReturn(java.util.Map.of(
+                "PROJ-1", new StatusAge(12, StatusAge.CRITICAL, "12д в статусе"),
+                "PROJ-9", new StatusAge(4, StatusAge.WARNING, "4д в статусе")));
+
+        RecommendationViewDto view = build().getRecommendations(TEAM_ID);
+
+        StoryRec rec = view.recommended().get(0);
+        assertThat(rec.daysInStatus()).isEqualTo(12);
+        assertThat(rec.statusAgeLevel()).isEqualTo("CRITICAL");
+        assertThat(rec.statusAgeReason()).isEqualTo("12д в статусе");
+
+        RecCard bugCard = view.zeroBugPolicy().bugs().get(0);
+        assertThat(bugCard.daysInStatus()).isEqualTo(4);
+        assertThat(bugCard.statusAgeLevel()).isEqualTo("WARNING");
     }
 
     @Test

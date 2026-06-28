@@ -156,7 +156,7 @@ class MatrixControllerSecurityTest {
     @WithMockUser(roles = "TEAM_LEAD")
     void triage_teamLead_isOk() throws Exception {
         when(matrixService.triage("PROJ-1", "P1"))
-                .thenReturn(new MatrixCardDto("PROJ-1", "S", "Task", null, null, null, "To Do", "P1"));
+                .thenReturn(new MatrixCardDto("PROJ-1", "S", "Task", null, null, null, "To Do", "P1", null, "NORMAL", null));
 
         mockMvc.perform(put("/api/matrix/triage").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -168,7 +168,7 @@ class MatrixControllerSecurityTest {
     @WithMockUser(roles = "ADMIN")
     void triage_admin_isOk() throws Exception {
         when(matrixService.triage("PROJ-1", "P1"))
-                .thenReturn(new MatrixCardDto("PROJ-1", "S", "Task", null, null, null, "To Do", "P1"));
+                .thenReturn(new MatrixCardDto("PROJ-1", "S", "Task", null, null, null, "To Do", "P1", null, "NORMAL", null));
 
         mockMvc.perform(put("/api/matrix/triage").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

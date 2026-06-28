@@ -94,6 +94,29 @@ class QuarterlyPlanningControllerSecurityTest {
         verifyNoInteractions(planningService);
     }
 
+    // ==================== TEAM_LEAD on the F69 kanban board ====================
+    // The team-lead view is the primary consumer of the planning board, so the
+    // epic-level mutations it publishes (assign-to-quarter, boost) must be allowed
+    // for TEAM_LEAD — not only ADMIN/PROJECT_MANAGER.
+
+    @Test
+    @WithMockUser(roles = "TEAM_LEAD")
+    void assignEpicToQuarter_teamLead_isAllowed() throws Exception {
+        mockMvc.perform(post("/api/quarterly-planning/epics/EPIC-1/quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "TEAM_LEAD")
+    void setEpicBoost_teamLead_isAllowed() throws Exception {
+        mockMvc.perform(post("/api/quarterly-planning/epics/EPIC-1/boost")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"boost\":10}"))
+                .andExpect(status().isOk());
+    }
+
     // ==================== F70: desired-quarter ====================
 
     @Test
@@ -111,6 +134,19 @@ class QuarterlyPlanningControllerSecurityTest {
     @WithMockUser(roles = "VIEWER")
     void setProjectDesiredQuarter_wrongRole_isForbidden() throws Exception {
         // VIEWER lacks ADMIN/PROJECT_MANAGER → @PreAuthorize denies with 403.
+        mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quarter\":\"2026Q2\"}"))
+                .andExpect(status().isForbidden());
+
+        verifyNoInteractions(planningService);
+    }
+
+    @Test
+    @WithMockUser(roles = "TEAM_LEAD")
+    void setProjectDesiredQuarter_teamLead_isForbidden() throws Exception {
+        // desired-quarter is a PM-level decision (F70) — deliberately NOT broadened
+        // to TEAM_LEAD even though the epic-level kanban mutations are.
         mockMvc.perform(post("/api/quarterly-planning/projects/PROJ-1/desired-quarter")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quarter\":\"2026Q2\"}"))

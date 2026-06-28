@@ -1,6 +1,8 @@
 package com.leadboard.matrix;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +19,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -34,6 +37,9 @@ class MatrixServiceTest {
 
     @Mock
     private WorkflowConfigService workflowConfigService;
+
+    @Mock
+    private StatusAgeService statusAgeService;
 
     @InjectMocks
     private MatrixService matrixService;
@@ -142,6 +148,41 @@ class MatrixServiceTest {
         assertThat(view.p1()).hasSize(2);
         assertThat(view.p1().get(0).estimateHours()).isEqualTo(2.0);
         assertThat(view.p1().get(1).estimateHours()).isNull();
+    }
+
+    @Test
+    void getMatrix_populatesStatusAgeFields_fromStatusAgeService() {
+        JiraIssueEntity issue = issue("PROJ-1", "P1");
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of(issue));
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(statusAgeService.compute(anyList()))
+                .thenReturn(java.util.Map.of("PROJ-1", new StatusAge(9, StatusAge.WARNING, "9д в статусе")));
+
+        MatrixViewDto view = matrixService.getMatrix(TEAM_ID);
+
+        MatrixCardDto card = view.p1().get(0);
+        assertThat(card.daysInStatus()).isEqualTo(9);
+        assertThat(card.statusAgeLevel()).isEqualTo("WARNING");
+        assertThat(card.statusAgeReason()).isEqualTo("9д в статусе");
+    }
+
+    @Test
+    void getMatrix_defaultsToNormal_whenStatusAgeMissing() {
+        JiraIssueEntity issue = issue("PROJ-1", "P1");
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of(issue));
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(statusAgeService.compute(anyList())).thenReturn(java.util.Map.of()); // no entry for PROJ-1
+
+        MatrixViewDto view = matrixService.getMatrix(TEAM_ID);
+
+        MatrixCardDto card = view.p1().get(0);
+        assertThat(card.daysInStatus()).isNull();
+        assertThat(card.statusAgeLevel()).isEqualTo("NORMAL");
+        assertThat(card.statusAgeReason()).isNull();
     }
 
     // ==================== triage ====================
