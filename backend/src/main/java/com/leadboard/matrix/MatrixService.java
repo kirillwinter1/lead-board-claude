@@ -41,8 +41,7 @@ public class MatrixService {
      */
     @Transactional(readOnly = true)
     public MatrixViewDto getMatrix(Long teamId) {
-        List<JiraIssueEntity> orphans =
-                issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(teamId, STORY_CATEGORY);
+        List<JiraIssueEntity> orphans = loadOrphans(teamId);
 
         List<MatrixCardDto> p1 = new ArrayList<>();
         List<MatrixCardDto> p2 = new ArrayList<>();
@@ -51,8 +50,9 @@ public class MatrixService {
         List<MatrixCardDto> unassigned = new ArrayList<>();
 
         for (JiraIssueEntity issue : orphans) {
-            // "Done" filtering is in-service (config-driven), never in SQL.
-            if (workflowConfigService.isDone(issue.getStatus(), issue.getIssueType(), issue.getProjectKey())) {
+            // "Done" and bug filtering are in-service (config-driven), never in SQL.
+            // Bugs are not triaged in the matrix (F78) — they live in recommendations only.
+            if (isDone(issue) || isBug(issue)) {
                 continue;
             }
             MatrixCardDto card = toCard(issue);
@@ -122,5 +122,20 @@ public class MatrixService {
                 issue.getStatus(),
                 issue.getEisenhowerQuadrant()
         );
+    }
+
+    /** Loads top-level orphan tasks (board_category=STORY, no parent) for the team. */
+    List<JiraIssueEntity> loadOrphans(Long teamId) {
+        return issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(teamId, STORY_CATEGORY);
+    }
+
+    /** Config-driven "done" check for an issue. */
+    boolean isDone(JiraIssueEntity issue) {
+        return workflowConfigService.isDone(issue.getStatus(), issue.getIssueType(), issue.getProjectKey());
+    }
+
+    /** Config-driven "bug" check for an issue (never hardcode the type name). */
+    boolean isBug(JiraIssueEntity issue) {
+        return workflowConfigService.isBug(issue.getIssueType());
     }
 }

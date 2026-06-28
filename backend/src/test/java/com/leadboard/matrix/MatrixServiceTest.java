@@ -74,6 +74,22 @@ class MatrixServiceTest {
     }
 
     @Test
+    void getMatrix_excludesBugs() {
+        JiraIssueEntity story = issue("PROJ-1", "P1");
+        JiraIssueEntity bug = issue("PROJ-2", "P1");
+        bug.setIssueType("Bug");
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of(story, bug));
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isBug("Task")).thenReturn(false);
+        when(workflowConfigService.isBug("Bug")).thenReturn(true);
+
+        MatrixViewDto view = matrixService.getMatrix(TEAM_ID);
+
+        assertThat(view.p1()).extracting(MatrixCardDto::issueKey).containsExactly("PROJ-1");
+    }
+
+    @Test
     void getMatrix_filtersOutDoneTasks() {
         JiraIssueEntity open = issue("PROJ-1", "P1");
         JiraIssueEntity done = issue("PROJ-2", "P1");
