@@ -81,11 +81,15 @@ class MatrixRecommendationServiceTest {
 
     @Test
     void zeroBugPolicy_collectsOpenOrphanBugs_excludingDone() {
-        when(workflowConfigService.isBug("Bug")).thenReturn(true);
+        // Bugs are their own board category (BUG), loaded separately from STORY orphans.
         JiraIssueEntity bug1 = story("PROJ-9", null, "Bug");
+        bug1.setBoardCategory("BUG");
         JiraIssueEntity bug2done = story("PROJ-8", null, "Bug");
+        bug2done.setBoardCategory("BUG");
         bug2done.setStatus("Done");
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of());
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
                 .thenReturn(List.of(bug1, bug2done));
         when(workflowConfigService.isDone("To Do", "Bug", "PROJ")).thenReturn(false);
         when(workflowConfigService.isDone("Done", "Bug", "PROJ")).thenReturn(true);
@@ -98,6 +102,28 @@ class MatrixRecommendationServiceTest {
     }
 
     @Test
+    void zeroBugPolicy_loadsBugsFromBugCategory_notFromStoryOrphans() {
+        // Regression: bugs are board_category=BUG and must be picked up even when the
+        // STORY orphan set has its own (non-bug) issues. Previously the bug set was
+        // (wrongly) derived from the STORY orphans and stayed empty.
+        JiraIssueEntity storyOrphan = story("PROJ-1", "P1", "Story");
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of(storyOrphan));
+        JiraIssueEntity bug = story("PROJ-9", null, "Bug");
+        bug.setBoardCategory("BUG");
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
+                .thenReturn(List.of(bug));
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of());
+        when(roleLoadService.calculateRoleLoad(TEAM_ID)).thenReturn(load(Map.of()));
+
+        RecommendationViewDto view = build().getRecommendations(TEAM_ID);
+
+        assertThat(view.zeroBugPolicy().bugs()).extracting(RecCard::issueKey).containsExactly("PROJ-9");
+    }
+
+    @Test
     void readyVsNeedsEstimation_splitByRoleSubtaskEstimate() {
         when(workflowConfigService.isBug(anyString())).thenReturn(false);
         JiraIssueEntity s1 = story("PROJ-1", "P1", "Story");
@@ -105,6 +131,8 @@ class MatrixRecommendationServiceTest {
         JiraIssueEntity s3 = story("PROJ-3", "P3", "Story");
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(s1, s2, s3));
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
+                .thenReturn(List.of());
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
         when(issueRepository.findByParentKeyIn(anyList()))
                 .thenReturn(List.of(
@@ -135,6 +163,8 @@ class MatrixRecommendationServiceTest {
         JiraIssueEntity p1 = story("PROJ-1", "P1", "Story");
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(p2, p1));
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
+                .thenReturn(List.of());
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
         when(issueRepository.findByParentKeyIn(anyList()))
                 .thenReturn(List.of(
@@ -160,6 +190,8 @@ class MatrixRecommendationServiceTest {
         JiraIssueEntity untriaged = story("PROJ-2", null, "Story"); // null quadrant -> must not crash
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(triaged, untriaged));
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
+                .thenReturn(List.of());
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
         when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
                 .thenReturn(List.of(subtask("PROJ-1-1", "PROJ-1", "DEV", 3600L)));
@@ -177,6 +209,8 @@ class MatrixRecommendationServiceTest {
         // Orphan list is empty, so isBug is never consulted — keep the stub lenient.
         lenient().when(workflowConfigService.isBug(anyString())).thenReturn(false);
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of());
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
                 .thenReturn(List.of());
         when(roleLoadService.calculateRoleLoad(TEAM_ID))
                 .thenReturn(load(Map.of("DEV", normal())));

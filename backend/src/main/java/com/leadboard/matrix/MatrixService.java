@@ -1,5 +1,6 @@
 package com.leadboard.matrix;
 
+import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -128,6 +129,14 @@ public class MatrixService {
     /** Loads top-level orphan tasks (board_category=STORY, no parent) for the team. */
     List<JiraIssueEntity> loadOrphans(Long teamId) {
         return issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(teamId, STORY_CATEGORY);
+    }
+
+    /**
+     * Loads top-level orphan bugs for the team. Bugs are their own board category
+     * (not STORY), so they are queried separately — used by Zero Bug Policy (F78).
+     */
+    List<JiraIssueEntity> loadOrphanBugs(Long teamId) {
+        return issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(teamId, BoardCategory.BUG.name());
     }
 
     /** Config-driven "done" check for an issue. */

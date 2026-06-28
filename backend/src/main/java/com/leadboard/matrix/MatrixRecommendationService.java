@@ -52,7 +52,7 @@ public class MatrixRecommendationService {
                 .filter(i -> !matrixService.isDone(i))
                 .toList();
 
-        ZeroBugPolicy zeroBugPolicy = buildZeroBugPolicy(active);
+        ZeroBugPolicy zeroBugPolicy = buildZeroBugPolicy(teamId);
 
         List<JiraIssueEntity> triagedStories = active.stream()
                 .filter(i -> !matrixService.isBug(i))
@@ -76,9 +76,14 @@ public class MatrixRecommendationService {
         return new RecommendationViewDto(zeroBugPolicy, roles);
     }
 
-    private ZeroBugPolicy buildZeroBugPolicy(List<JiraIssueEntity> active) {
-        List<RecCard> bugs = active.stream()
-                .filter(matrixService::isBug)
+    /**
+     * Zero Bug Policy: all open (non-done) orphan bugs of the team. Bugs are their
+     * own board category (not STORY), so they are loaded separately — never via the
+     * triaged-stories set.
+     */
+    private ZeroBugPolicy buildZeroBugPolicy(Long teamId) {
+        List<RecCard> bugs = matrixService.loadOrphanBugs(teamId).stream()
+                .filter(b -> !matrixService.isDone(b))
                 .sorted(Comparator.comparing(JiraIssueEntity::getIssueKey))
                 .map(this::bugCard)
                 .toList();
