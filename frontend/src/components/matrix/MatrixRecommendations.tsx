@@ -9,6 +9,12 @@ interface Props {
   jiraBaseUrl: string
 }
 
+// Hours come from seconds/3600 and can be long decimals; show at most 1 decimal,
+// dropping a trailing ".0" (e.g. 16 -> "16", 1.6667 -> "1.7").
+function fmtHours(n: number): string {
+  return String(Math.round(n * 10) / 10)
+}
+
 export function MatrixRecommendations({ data, jiraBaseUrl }: Props) {
   if (!data) return null
   const { zeroBugPolicy, roles } = data
@@ -52,7 +58,7 @@ function RoleSection({ role, jiraBaseUrl }: { role: RoleRecommendation; jiraBase
   return (
     <div className="rec-block" style={{ borderLeftColor: accent }}>
       <div className="rec-block-head" style={{ color: accent }}>
-        {getRoleDisplayName(role.roleCode)} — простой {role.idleHours}ч
+        {getRoleDisplayName(role.roleCode)} — простой {fmtHours(role.idleHours)}ч
       </div>
 
       <div className="rec-subhead">Готово взять</div>
@@ -83,8 +89,8 @@ function RoleSection({ role, jiraBaseUrl }: { role: RoleRecommendation; jiraBase
 function RecCardView({ card, jiraBaseUrl, dimmed, warn }: { card: RecCard; jiraBaseUrl: string; dimmed?: boolean; warn?: boolean }) {
   const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor } = useWorkflowConfig()
   const quadrant = card.quadrant
-  const roleHours = card.roleEstimateHours != null ? `${card.roleEstimateHours}ч` : null
-  const estimateLabel = card.estimateHours != null ? `${card.estimateHours}ч` : 'не оценён'
+  const roleHours = card.roleEstimateHours != null ? `${fmtHours(card.roleEstimateHours)}ч` : null
+  const estimateLabel = card.estimateHours != null ? `${fmtHours(card.estimateHours)}ч` : 'не оценён'
 
   return (
     <div className={`rec-card ${dimmed ? 'rec-card-dimmed' : ''} ${warn ? 'rec-card-warn' : ''}`}>
@@ -116,7 +122,7 @@ function RecCardView({ card, jiraBaseUrl, dimmed, warn }: { card: RecCard; jiraB
       <div className="rec-card-summary" title={card.summary}>{card.summary}</div>
       <div className="rec-card-meta">
         <span>{roleHours ?? estimateLabel}</span>
-        {card.cumulativeHours != null && <span className="rec-card-cumulative">Σ {card.cumulativeHours}ч</span>}
+        {card.cumulativeHours != null && <span className="rec-card-cumulative">Σ {fmtHours(card.cumulativeHours)}ч</span>}
       </div>
     </div>
   )
