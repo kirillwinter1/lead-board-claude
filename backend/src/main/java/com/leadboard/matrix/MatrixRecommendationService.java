@@ -1,6 +1,5 @@
 package com.leadboard.matrix;
 
-import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.matrix.RecommendationDtos.RecommendationViewDto;
 import com.leadboard.matrix.RecommendationDtos.RoleRecommendation;
 import com.leadboard.matrix.RecommendationDtos.ZeroBugPolicy;
@@ -36,16 +35,13 @@ public class MatrixRecommendationService {
             Map.of("P1", 1, "P2", 2, "P3", 3, "P4", 4);
 
     private final JiraIssueRepository issueRepository;
-    private final WorkflowConfigService workflowConfigService;
     private final RoleLoadService roleLoadService;
     private final MatrixService matrixService;
 
     public MatrixRecommendationService(JiraIssueRepository issueRepository,
-                                       WorkflowConfigService workflowConfigService,
                                        RoleLoadService roleLoadService,
                                        MatrixService matrixService) {
         this.issueRepository = issueRepository;
-        this.workflowConfigService = workflowConfigService;
         this.roleLoadService = roleLoadService;
         this.matrixService = matrixService;
     }
@@ -60,7 +56,8 @@ public class MatrixRecommendationService {
 
         List<JiraIssueEntity> triagedStories = active.stream()
                 .filter(i -> !matrixService.isBug(i))
-                .filter(i -> QUADRANT_RANK.containsKey(i.getEisenhowerQuadrant()))
+                .filter(i -> i.getEisenhowerQuadrant() != null
+                          && QUADRANT_RANK.containsKey(i.getEisenhowerQuadrant()))
                 .sorted(storyOrder())
                 .toList();
 

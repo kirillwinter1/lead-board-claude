@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
@@ -38,7 +39,7 @@ class MatrixRecommendationServiceTest {
 
     private MatrixRecommendationService build() {
         matrixService = new MatrixService(issueRepository, workflowConfigService);
-        return new MatrixRecommendationService(issueRepository, workflowConfigService, roleLoadService, matrixService);
+        return new MatrixRecommendationService(issueRepository, roleLoadService, matrixService);
     }
 
     private JiraIssueEntity story(String key, String quadrant, String type) {
@@ -105,7 +106,7 @@ class MatrixRecommendationServiceTest {
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(s1, s2, s3));
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
-        when(issueRepository.findByParentKeyIn(List.of("PROJ-1", "PROJ-2", "PROJ-3")))
+        when(issueRepository.findByParentKeyIn(anyList()))
                 .thenReturn(List.of(
                         subtask("PROJ-1-1", "PROJ-1", "QA", 7200L),
                         subtask("PROJ-2-1", "PROJ-2", "QA", null),
@@ -135,7 +136,7 @@ class MatrixRecommendationServiceTest {
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(p2, p1));
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
-        when(issueRepository.findByParentKeyIn(List.of("PROJ-1", "PROJ-2")))
+        when(issueRepository.findByParentKeyIn(anyList()))
                 .thenReturn(List.of(
                         subtask("PROJ-1-1", "PROJ-1", "DEV", 18000L),
                         subtask("PROJ-2-1", "PROJ-2", "DEV", 18000L)));
@@ -150,6 +151,25 @@ class MatrixRecommendationServiceTest {
         assertThat(dev.ready().get(0).fitsInIdle()).isTrue();
         assertThat(dev.ready().get(1).cumulativeHours()).isEqualTo(10.0);
         assertThat(dev.ready().get(1).fitsInIdle()).isFalse();
+    }
+
+    @Test
+    void untriagedStories_areExcluded_noNpeOnNullQuadrant() {
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        JiraIssueEntity triaged = story("PROJ-1", "P1", "Story");
+        JiraIssueEntity untriaged = story("PROJ-2", null, "Story"); // null quadrant -> must not crash
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
+                .thenReturn(List.of(triaged, untriaged));
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
+                .thenReturn(List.of(subtask("PROJ-1-1", "PROJ-1", "DEV", 3600L)));
+        when(roleLoadService.calculateRoleLoad(TEAM_ID)).thenReturn(load(Map.of("DEV", idle(8, 0))));
+
+        RecommendationViewDto view = build().getRecommendations(TEAM_ID);
+
+        RoleRecommendation dev = view.roles().get(0);
+        assertThat(dev.ready()).extracting(RecCard::issueKey).containsExactly("PROJ-1");
+        assertThat(dev.needsEstimation()).isEmpty();
     }
 
     @Test
