@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.leadboard"
-version = "0.78.0"
+version = "0.79.0"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
