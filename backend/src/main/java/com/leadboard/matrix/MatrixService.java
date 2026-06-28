@@ -13,9 +13,10 @@ import java.util.Set;
 /**
  * F77 Eisenhower Matrix MVP — backlog triage of orphan tasks.
  *
- * <p>An "orphan" task is a top-level Story/Task/Bug ({@code board_category = STORY},
+ * <p>An "orphan" task is a top-level Story/Task ({@code board_category = STORY},
  * {@code parent_key IS NULL}) that is not yet "done". Subtasks and epics never appear
- * in the matrix. Tasks are grouped by their manually-assigned Eisenhower quadrant
+ * in the matrix; bugs are excluded too (F78 — they are handled by recommendations,
+ * not triaged here). Tasks are grouped by their manually-assigned Eisenhower quadrant
  * (P1/P2/P3/P4) or land in {@code unassigned} when no quadrant is set.</p>
  *
  * <p>Multi-tenancy: queries run against the tenant schema selected by

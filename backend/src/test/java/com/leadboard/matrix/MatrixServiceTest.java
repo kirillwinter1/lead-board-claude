@@ -63,6 +63,7 @@ class MatrixServiceTest {
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(p1, p2, p3, p4, none));
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
 
         MatrixViewDto view = matrixService.getMatrix(TEAM_ID);
 
@@ -87,6 +88,11 @@ class MatrixServiceTest {
         MatrixViewDto view = matrixService.getMatrix(TEAM_ID);
 
         assertThat(view.p1()).extracting(MatrixCardDto::issueKey).containsExactly("PROJ-1");
+        // The bug must not leak into any other bucket either.
+        assertThat(view.p2()).isEmpty();
+        assertThat(view.p3()).isEmpty();
+        assertThat(view.p4()).isEmpty();
+        assertThat(view.unassigned()).isEmpty();
     }
 
     @Test
@@ -98,6 +104,7 @@ class MatrixServiceTest {
                 .thenReturn(List.of(open, done));
         when(workflowConfigService.isDone("To Do", "Task", "PROJ")).thenReturn(false);
         when(workflowConfigService.isDone("Done", "Task", "PROJ")).thenReturn(true);
+        lenient().when(workflowConfigService.isBug(anyString())).thenReturn(false);
 
         MatrixViewDto view = matrixService.getMatrix(TEAM_ID);
 
@@ -125,6 +132,7 @@ class MatrixServiceTest {
         withEstimate.setOriginalEstimateSeconds(7200L); // 2h
         JiraIssueEntity noEstimate = issue("PROJ-2", "P1");
         noEstimate.setOriginalEstimateSeconds(null);
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
         when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
                 .thenReturn(List.of(withEstimate, noEstimate));
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
