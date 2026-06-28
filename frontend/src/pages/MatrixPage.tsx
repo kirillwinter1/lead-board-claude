@@ -8,11 +8,12 @@ import {
 } from '@dnd-kit/core'
 import { teamsApi, Team } from '../api/teams'
 import { getConfig } from '../api/config'
-import { getMatrix, triage, MatrixView, MatrixCard as MatrixCardData, Quadrant } from '../api/matrixApi'
+import { getMatrix, triage, getRecommendations, MatrixView, MatrixCard as MatrixCardData, Quadrant, RecommendationView } from '../api/matrixApi'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { FilterBar } from '../components/FilterBar'
 import { MatrixQuadrant } from '../components/matrix/MatrixQuadrant'
 import { MatrixUnassigned, UNASSIGNED_ZONE_ID } from '../components/matrix/MatrixUnassigned'
+import { MatrixRecommendations } from '../components/matrix/MatrixRecommendations'
 import './MatrixPage.css'
 
 const EMPTY_VIEW: MatrixView = { p1: [], p2: [], p3: [], p4: [], unassigned: [] }
@@ -55,6 +56,7 @@ export function MatrixPage() {
   const [matrixLoading, setMatrixLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [triageError, setTriageError] = useState<string | null>(null)
+  const [recommendations, setRecommendations] = useState<RecommendationView | null>(null)
   const initialTeamIdRef = useRef(selectedTeamId)
 
   const sensors = useSensors(
@@ -93,6 +95,7 @@ export function MatrixPage() {
     setMatrixLoading(true)
     setError(null)
     setTriageError(null)
+    setRecommendations(null)
 
     getMatrix(selectedTeamId)
       .then(data => {
@@ -105,6 +108,16 @@ export function MatrixPage() {
         setError('Failed to load matrix: ' + (err instanceof Error ? err.message : 'Unknown error'))
         setView(EMPTY_VIEW)
         setMatrixLoading(false)
+      })
+
+    getRecommendations(selectedTeamId)
+      .then(data => {
+        if (controller.signal.aborted) return
+        setRecommendations(data)
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setRecommendations(null)
       })
 
     return () => controller.abort()
@@ -162,6 +175,7 @@ export function MatrixPage() {
         matrixLoading ? (
           <div className="loading">Loading matrix...</div>
         ) : (
+          <>
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <div className="matrix-grid">
               <MatrixQuadrant
@@ -195,6 +209,8 @@ export function MatrixPage() {
             </div>
             <MatrixUnassigned cards={view.unassigned} jiraBaseUrl={jiraBaseUrl} />
           </DndContext>
+          <MatrixRecommendations data={recommendations} jiraBaseUrl={jiraBaseUrl} />
+          </>
         )
       )}
     </main>
