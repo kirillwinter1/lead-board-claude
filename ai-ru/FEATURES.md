@@ -77,6 +77,7 @@
 | F75 | Metrics Sparklines (KPI Trend Mini-Charts) | 2026-06-27 | [features/F75](features/F75_METRICS_SPARKLINES.md) |
 | F76 | Throughput by Period — type selector + epic/story split | 2026-06-27 | [features/F76](features/F76_THROUGHPUT_TYPE_SELECTOR.md) |
 | F77 | Eisenhower Matrix — MVP (backlog triage) | 2026-06-27 | [features/F77](features/F77_EISENHOWER_MATRIX_MVP.md) |
+| F78 | Рекомендации автопланера из матрицы (Фаза A) | 2026-06-28 | [features/F78](features/F78_MATRIX_RECOMMENDATIONS.md) |
 
 ## Бэклог (BF)
 

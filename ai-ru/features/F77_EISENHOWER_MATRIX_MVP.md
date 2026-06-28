@@ -13,6 +13,9 @@ Issues команды, у которых: `parent_key IS NULL` AND `board_catego
 (`WorkflowConfigService.isDone(status, issueType, projectKey)` == false).
 Subtask — не самостоятельная задача, в матрице не участвует.
 
+> **Обновлено F78:** баги исключены из триажа матрицы (грид — Story/Task без
+> багов). Баги обрабатываются в рекомендациях (Zero Bug Policy), не в квадрантах.
+
 ## Данные
 Tenant-миграция **T12** (`db/tenant/`):
 ```sql
