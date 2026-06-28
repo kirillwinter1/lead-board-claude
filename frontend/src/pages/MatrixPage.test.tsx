@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within, act } from '@testing-library/react'
+import { render, screen, waitFor, within, act, configure } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
+
+// F78 added an extra async getRecommendations fetch on team change; under parallel
+// test runs on a loaded machine the default 1s waitFor can time out. Raise it for
+// this file's async assertions (does not weaken any expectation).
+configure({ asyncUtilTimeout: 5000 })
 import { MatrixPage } from './MatrixPage'
 import { teamsApi } from '../api/teams'
 import * as matrixApi from '../api/matrixApi'
@@ -111,8 +116,10 @@ describe('MatrixPage', () => {
 
   it('places cards in the correct zones from the getMatrix response', async () => {
     renderPage()
+    // Wait for the card data (not just the zone chrome, which renders immediately
+    // with the empty view) so the synchronous assertions below are deterministic.
     await waitFor(() => {
-      expect(screen.getByTestId('matrix-zone-unassigned')).toBeInTheDocument()
+      expect(screen.getByText('LB-1')).toBeInTheDocument()
     })
 
     const unassigned = screen.getByTestId('matrix-zone-unassigned')
@@ -126,7 +133,7 @@ describe('MatrixPage', () => {
   it('calls triage with the target quadrant and optimistically moves the card', async () => {
     renderPage()
     await waitFor(() => {
-      expect(screen.getByTestId('matrix-zone-unassigned')).toBeInTheDocument()
+      expect(screen.getByText('LB-1')).toBeInTheDocument()
     })
 
     // Simulate dropping LB-1 from the unassigned zone into P2.
@@ -149,7 +156,7 @@ describe('MatrixPage', () => {
     vi.mocked(matrixApi.triage).mockRejectedValue(new Error('boom'))
     renderPage()
     await waitFor(() => {
-      expect(screen.getByTestId('matrix-zone-unassigned')).toBeInTheDocument()
+      expect(screen.getByText('LB-1')).toBeInTheDocument()
     })
 
     await act(async () => {
@@ -169,7 +176,7 @@ describe('MatrixPage', () => {
   it('triages a card back to unassigned (null quadrant)', async () => {
     renderPage()
     await waitFor(() => {
-      expect(screen.getByTestId('matrix-zone-P1')).toBeInTheDocument()
+      expect(screen.getByText('LB-10')).toBeInTheDocument()
     })
 
     await act(async () => {
