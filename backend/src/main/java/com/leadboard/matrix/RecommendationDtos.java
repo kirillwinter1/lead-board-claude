@@ -4,32 +4,49 @@ import java.util.List;
 
 /**
  * F78 recommendation API payloads (they change together, so they share a file).
+ *
+ * <p>A recommended story is shown once as a whole work item: a story is executed by
+ * the full SA→DEV→QA pipeline, so roles are its <em>composition</em>, not separate
+ * tasks. There is no per-role grouping.</p>
  */
 public final class RecommendationDtos {
 
     private RecommendationDtos() {
     }
 
-    /** Top-level response: Zero Bug Policy section + per-idle-role recommendations. */
+    /** Top-level response: Zero Bug Policy + prioritised stories + the "needs estimation" warning list. */
     public record RecommendationViewDto(
             ZeroBugPolicy zeroBugPolicy,
-            List<RoleRecommendation> roles
+            List<StoryRec> recommended,
+            List<RecCard> needsEstimation
     ) {
     }
 
-    /** All open orphan bugs of the team — always shown, independent of idle roles. */
+    /** All open orphan bugs of the team — always shown, independent of stories. */
     public record ZeroBugPolicy(
             int openBugCount,
             List<RecCard> bugs
     ) {
     }
 
-    /** Recommendations for one underloaded role. */
-    public record RoleRecommendation(
+    /** One recommended (triaged, fully-estimated) orphan story with its role composition. */
+    public record StoryRec(
+            String issueKey,
+            String summary,
+            String issueType,
+            String priority,
+            String status,
+            String quadrant,
+            List<RoleSlice> roles,
+            double totalHours
+    ) {
+    }
+
+    /** One role's share of a story (its subtask + estimate). */
+    public record RoleSlice(
             String roleCode,
-            double idleHours,
-            List<RecCard> ready,
-            List<RecCard> needsEstimation
+            String subtaskKey,
+            double hours
     ) {
     }
 }

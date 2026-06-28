@@ -1,7 +1,7 @@
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../board/helpers'
 import { QUADRANT_COLORS } from '../../constants/colors'
-import type { RecCard, RecommendationView, RoleRecommendation } from '../../api/matrixApi'
+import type { RecCard, RecommendationView, StoryRec } from '../../api/matrixApi'
 import './MatrixRecommendations.css'
 
 interface Props {
@@ -17,19 +17,31 @@ function fmtHours(n: number): string {
 
 export function MatrixRecommendations({ data, jiraBaseUrl }: Props) {
   if (!data) return null
-  const { zeroBugPolicy, roles } = data
+  const { zeroBugPolicy, recommended = [], needsEstimation = [] } = data
 
   return (
     <section className="matrix-recommendations">
       <ZeroBugSection bugs={zeroBugPolicy.bugs} count={zeroBugPolicy.openBugCount} jiraBaseUrl={jiraBaseUrl} />
 
-      {roles.length === 0 ? (
-        <div className="rec-empty">Все роли загружены — рекомендаций нет</div>
-      ) : (
-        roles.map(role => (
-          <RoleSection key={role.roleCode} role={role} jiraBaseUrl={jiraBaseUrl} />
-        ))
-      )}
+      <div className="rec-block">
+        <div className="rec-block-head">Рекомендуем взять из техдолга</div>
+        {recommended.length === 0 ? (
+          <div className="rec-empty-line">Нет распределённых задач — разложите техдолг по квадрантам матрицы.</div>
+        ) : (
+          <div className="rec-cards">
+            {recommended.map(s => <StoryCard key={s.issueKey} story={s} jiraBaseUrl={jiraBaseUrl} />)}
+          </div>
+        )}
+
+        {needsEstimation.length > 0 && (
+          <>
+            <div className="rec-subhead rec-subhead-warn">Требует нарезки / оценки</div>
+            <div className="rec-cards">
+              {needsEstimation.map(c => <WarnCard key={c.issueKey} card={c} jiraBaseUrl={jiraBaseUrl} />)}
+            </div>
+          </>
+        )}
+      </div>
     </section>
   )
 }
@@ -46,84 +58,74 @@ function ZeroBugSection({ bugs, count, jiraBaseUrl }: { bugs: RecCard[]; count: 
     <div className="rec-block rec-zerobug" role="alert">
       <div className="rec-block-head">🐞 Zero Bug Policy — {count} открытых багов</div>
       <div className="rec-cards">
-        {bugs.map(b => <RecCardView key={b.issueKey} card={b} jiraBaseUrl={jiraBaseUrl} />)}
+        {bugs.map(b => <WarnCard key={b.issueKey} card={b} jiraBaseUrl={jiraBaseUrl} bug />)}
       </div>
     </div>
   )
 }
 
-function RoleSection({ role, jiraBaseUrl }: { role: RoleRecommendation; jiraBaseUrl: string }) {
-  const { getRoleColor, getRoleDisplayName } = useWorkflowConfig()
-  const accent = getRoleColor(role.roleCode)
-  return (
-    <div className="rec-block" style={{ borderLeftColor: accent }}>
-      <div className="rec-block-head" style={{ color: accent }}>
-        {getRoleDisplayName(role.roleCode)} — простой {fmtHours(role.idleHours)}ч
-      </div>
-
-      <div className="rec-subhead">Готово взять</div>
-      {role.ready.length === 0 ? (
-        <div className="rec-empty-line">—</div>
-      ) : (
-        <div className="rec-cards">
-          {role.ready.map(c => (
-            <RecCardView key={c.issueKey} card={c} jiraBaseUrl={jiraBaseUrl} dimmed={c.fitsInIdle === false} />
-          ))}
-        </div>
-      )}
-
-      <div className="rec-subhead rec-subhead-warn">Требует оценки</div>
-      {role.needsEstimation.length === 0 ? (
-        <div className="rec-empty-line">—</div>
-      ) : (
-        <div className="rec-cards">
-          {role.needsEstimation.map(c => (
-            <RecCardView key={c.issueKey} card={c} jiraBaseUrl={jiraBaseUrl} warn />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function RecCardView({ card, jiraBaseUrl, dimmed, warn }: { card: RecCard; jiraBaseUrl: string; dimmed?: boolean; warn?: boolean }) {
+function StoryCard({ story, jiraBaseUrl }: { story: StoryRec; jiraBaseUrl: string }) {
   const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor } = useWorkflowConfig()
-  const quadrant = card.quadrant
-  const roleHours = card.roleEstimateHours != null ? `${fmtHours(card.roleEstimateHours)}ч` : null
-  const estimateLabel = card.estimateHours != null ? `${fmtHours(card.estimateHours)}ч` : 'не оценён'
+  const quadrant = story.quadrant
 
   return (
-    <div className={`rec-card ${dimmed ? 'rec-card-dimmed' : ''} ${warn ? 'rec-card-warn' : ''}`}>
+    <div className="rec-card">
       <div className="rec-card-head">
         <img
-          src={getIssueIcon(card.issueType, getIssueTypeIconUrl(card.issueType), getIssueTypeCategory(card.issueType))}
-          alt={card.issueType}
+          src={getIssueIcon(story.issueType, getIssueTypeIconUrl(story.issueType), getIssueTypeCategory(story.issueType))}
+          alt={story.issueType}
           className="rec-card-type-icon"
         />
-        <a
-          href={`${jiraBaseUrl}${card.issueKey}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="rec-card-key"
-        >
-          {card.issueKey}
+        <a href={`${jiraBaseUrl}${story.issueKey}`} target="_blank" rel="noopener noreferrer" className="rec-card-key">
+          {story.issueKey}
         </a>
         {quadrant && (
           <span className="rec-card-quadrant" style={{ background: QUADRANT_COLORS[quadrant].accent }}>
             {quadrant}
           </span>
         )}
+      </div>
+      <div className="rec-card-summary" title={story.summary}>{story.summary}</div>
+      <div className="rec-card-roles">
+        {story.roles.map(r => (
+          <span key={r.roleCode} className="rec-role-chip" style={{ background: getRoleColor(r.roleCode) }}>
+            {r.roleCode} {fmtHours(r.hours)}ч
+          </span>
+        ))}
+      </div>
+      <div className="rec-card-total">Всего {fmtHours(story.totalHours)}ч</div>
+    </div>
+  )
+}
+
+function WarnCard({ card, jiraBaseUrl, bug }: { card: RecCard; jiraBaseUrl: string; bug?: boolean }) {
+  const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor } = useWorkflowConfig()
+  const estimateLabel = card.estimateHours != null ? `${fmtHours(card.estimateHours)}ч` : 'не оценён'
+
+  return (
+    <div className={`rec-card ${bug ? '' : 'rec-card-warn'}`}>
+      <div className="rec-card-head">
+        <img
+          src={getIssueIcon(card.issueType, getIssueTypeIconUrl(card.issueType), getIssueTypeCategory(card.issueType))}
+          alt={card.issueType}
+          className="rec-card-type-icon"
+        />
+        <a href={`${jiraBaseUrl}${card.issueKey}`} target="_blank" rel="noopener noreferrer" className="rec-card-key">
+          {card.issueKey}
+        </a>
+        {card.quadrant && (
+          <span className="rec-card-quadrant" style={{ background: QUADRANT_COLORS[card.quadrant].accent }}>
+            {card.quadrant}
+          </span>
+        )}
         {card.workflowRole && (
-          <span className="rec-card-role" style={{ background: getRoleColor(card.workflowRole) }}>
+          <span className="rec-role-chip" style={{ background: getRoleColor(card.workflowRole) }}>
             {card.workflowRole}
           </span>
         )}
       </div>
       <div className="rec-card-summary" title={card.summary}>{card.summary}</div>
-      <div className="rec-card-meta">
-        <span>{roleHours ?? estimateLabel}</span>
-        {card.cumulativeHours != null && <span className="rec-card-cumulative">Σ {fmtHours(card.cumulativeHours)}ч</span>}
-      </div>
+      <div className="rec-card-meta"><span>{estimateLabel}</span></div>
     </div>
   )
 }

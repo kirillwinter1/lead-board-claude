@@ -2,11 +2,8 @@ package com.leadboard.matrix;
 
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.matrix.RecommendationDtos.RecommendationViewDto;
-import com.leadboard.matrix.RecommendationDtos.RoleRecommendation;
-import com.leadboard.planning.RoleLoadService;
-import com.leadboard.planning.dto.RoleLoadResponse;
-import com.leadboard.planning.dto.RoleLoadResponse.RoleLoadInfo;
-import com.leadboard.planning.dto.RoleLoadResponse.UtilizationStatus;
+import com.leadboard.matrix.RecommendationDtos.RoleSlice;
+import com.leadboard.matrix.RecommendationDtos.StoryRec;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.Test;
@@ -14,15 +11,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,16 +23,14 @@ class MatrixRecommendationServiceTest {
 
     private static final Long TEAM_ID = 7L;
     private static final String STORY = "STORY";
+    private static final String BUG = "BUG";
 
     @Mock private JiraIssueRepository issueRepository;
     @Mock private WorkflowConfigService workflowConfigService;
-    @Mock private RoleLoadService roleLoadService;
-
-    private MatrixService matrixService;
 
     private MatrixRecommendationService build() {
-        matrixService = new MatrixService(issueRepository, workflowConfigService);
-        return new MatrixRecommendationService(issueRepository, roleLoadService, matrixService);
+        MatrixService matrixService = new MatrixService(issueRepository, workflowConfigService);
+        return new MatrixRecommendationService(issueRepository, matrixService);
     }
 
     private JiraIssueEntity story(String key, String quadrant, String type) {
@@ -65,35 +56,22 @@ class MatrixRecommendationServiceTest {
         return e;
     }
 
-    private RoleLoadResponse load(Map<String, RoleLoadInfo> roles) {
-        return new RoleLoadResponse(TEAM_ID, LocalDate.now(), 14, roles, List.of());
-    }
-
-    private RoleLoadInfo idle(double capacity, double assigned) {
-        return new RoleLoadInfo(2, BigDecimal.valueOf(capacity), BigDecimal.valueOf(assigned),
-                BigDecimal.ZERO, UtilizationStatus.IDLE);
-    }
-
-    private RoleLoadInfo normal() {
-        return new RoleLoadInfo(2, BigDecimal.valueOf(80), BigDecimal.valueOf(80),
-                BigDecimal.ZERO, UtilizationStatus.NORMAL);
+    /** Stubs both board-category loads (strict stubbing requires matching every call). */
+    private void stubOrphans(List<JiraIssueEntity> stories, List<JiraIssueEntity> bugs) {
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY)).thenReturn(stories);
+        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, BUG)).thenReturn(bugs);
     }
 
     @Test
     void zeroBugPolicy_collectsOpenOrphanBugs_excludingDone() {
-        // Bugs are their own board category (BUG), loaded separately from STORY orphans.
         JiraIssueEntity bug1 = story("PROJ-9", null, "Bug");
-        bug1.setBoardCategory("BUG");
+        bug1.setBoardCategory(BUG);
         JiraIssueEntity bug2done = story("PROJ-8", null, "Bug");
-        bug2done.setBoardCategory("BUG");
+        bug2done.setBoardCategory(BUG);
         bug2done.setStatus("Done");
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
-                .thenReturn(List.of());
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
-                .thenReturn(List.of(bug1, bug2done));
+        stubOrphans(List.of(), List.of(bug1, bug2done));
         when(workflowConfigService.isDone("To Do", "Bug", "PROJ")).thenReturn(false);
         when(workflowConfigService.isDone("Done", "Bug", "PROJ")).thenReturn(true);
-        when(roleLoadService.calculateRoleLoad(TEAM_ID)).thenReturn(load(Map.of()));
 
         RecommendationViewDto view = build().getRecommendations(TEAM_ID);
 
@@ -102,122 +80,86 @@ class MatrixRecommendationServiceTest {
     }
 
     @Test
-    void zeroBugPolicy_loadsBugsFromBugCategory_notFromStoryOrphans() {
-        // Regression: bugs are board_category=BUG and must be picked up even when the
-        // STORY orphan set has its own (non-bug) issues. Previously the bug set was
-        // (wrongly) derived from the STORY orphans and stayed empty.
-        JiraIssueEntity storyOrphan = story("PROJ-1", "P1", "Story");
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
-                .thenReturn(List.of(storyOrphan));
-        JiraIssueEntity bug = story("PROJ-9", null, "Bug");
-        bug.setBoardCategory("BUG");
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
-                .thenReturn(List.of(bug));
-        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
-        when(workflowConfigService.isBug(anyString())).thenReturn(false);
-        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of());
-        when(roleLoadService.calculateRoleLoad(TEAM_ID)).thenReturn(load(Map.of()));
-
-        RecommendationViewDto view = build().getRecommendations(TEAM_ID);
-
-        assertThat(view.zeroBugPolicy().bugs()).extracting(RecCard::issueKey).containsExactly("PROJ-9");
-    }
-
-    @Test
-    void readyVsNeedsEstimation_splitByRoleSubtaskEstimate() {
-        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+    void recommended_storyWithEstimatedRoleSubtasks_hasRoleCompositionAndTotal() {
         JiraIssueEntity s1 = story("PROJ-1", "P1", "Story");
-        JiraIssueEntity s2 = story("PROJ-2", "P2", "Story");
-        JiraIssueEntity s3 = story("PROJ-3", "P3", "Story");
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
-                .thenReturn(List.of(s1, s2, s3));
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
-                .thenReturn(List.of());
+        stubOrphans(List.of(s1), List.of());
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
-        when(issueRepository.findByParentKeyIn(anyList()))
-                .thenReturn(List.of(
-                        subtask("PROJ-1-1", "PROJ-1", "QA", 7200L),
-                        subtask("PROJ-2-1", "PROJ-2", "QA", null),
-                        subtask("PROJ-3-1", "PROJ-3", "DEV", 3600L)));
-        when(roleLoadService.calculateRoleLoad(TEAM_ID))
-                .thenReturn(load(Map.of("QA", idle(16, 0), "DEV", normal())));
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of(
+                subtask("PROJ-1-1", "PROJ-1", "SA", 28800L),   // 8h
+                subtask("PROJ-1-2", "PROJ-1", "DEV", 57600L),  // 16h
+                subtask("PROJ-1-3", "PROJ-1", "QA", 28800L))); // 8h
 
         RecommendationViewDto view = build().getRecommendations(TEAM_ID);
 
-        assertThat(view.roles()).hasSize(1);
-        RoleRecommendation qa = view.roles().get(0);
-        assertThat(qa.roleCode()).isEqualTo("QA");
-        assertThat(qa.idleHours()).isEqualTo(16.0);
-        assertThat(qa.ready()).extracting(RecCard::issueKey).containsExactly("PROJ-1");
-        assertThat(qa.ready().get(0).roleEstimateHours()).isEqualTo(2.0);
-        assertThat(qa.ready().get(0).cumulativeHours()).isEqualTo(2.0);
-        assertThat(qa.ready().get(0).fitsInIdle()).isTrue();
-        assertThat(qa.needsEstimation()).extracting(RecCard::issueKey)
-                .containsExactlyInAnyOrder("PROJ-2", "PROJ-3");
+        assertThat(view.needsEstimation()).isEmpty();
+        assertThat(view.recommended()).hasSize(1);
+        StoryRec rec = view.recommended().get(0);
+        assertThat(rec.issueKey()).isEqualTo("PROJ-1");
+        assertThat(rec.quadrant()).isEqualTo("P1");
+        assertThat(rec.totalHours()).isEqualTo(32.0);
+        // roles sorted by code: DEV, QA, SA
+        assertThat(rec.roles()).extracting(RoleSlice::roleCode).containsExactly("DEV", "QA", "SA");
+        assertThat(rec.roles()).extracting(RoleSlice::hours).containsExactly(16.0, 8.0, 8.0);
+        assertThat(rec.roles().get(0).subtaskKey()).isEqualTo("PROJ-1-2");
     }
 
     @Test
-    void ready_sortedByQuadrant_andCumulativeFlagsOverflow() {
+    void needsEstimation_whenStoryNotCut_orHasUnestimatedRoleSubtask() {
+        JiraIssueEntity noSubtasks = story("PROJ-1", "P1", "Story");     // not cut into roles
+        JiraIssueEntity unestimated = story("PROJ-2", "P2", "Story");    // a role subtask without estimate
+        stubOrphans(List.of(noSubtasks, unestimated), List.of());
+        when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
         when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of(
+                subtask("PROJ-2-1", "PROJ-2", "DEV", null)));
+
+        RecommendationViewDto view = build().getRecommendations(TEAM_ID);
+
+        assertThat(view.recommended()).isEmpty();
+        assertThat(view.needsEstimation()).extracting(RecCard::issueKey)
+                .containsExactlyInAnyOrder("PROJ-1", "PROJ-2");
+    }
+
+    @Test
+    void recommended_sortedByQuadrant() {
         JiraIssueEntity p2 = story("PROJ-2", "P2", "Story");
         JiraIssueEntity p1 = story("PROJ-1", "P1", "Story");
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
-                .thenReturn(List.of(p2, p1));
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
-                .thenReturn(List.of());
+        stubOrphans(List.of(p2, p1), List.of());
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
-        when(issueRepository.findByParentKeyIn(anyList()))
-                .thenReturn(List.of(
-                        subtask("PROJ-1-1", "PROJ-1", "DEV", 18000L),
-                        subtask("PROJ-2-1", "PROJ-2", "DEV", 18000L)));
-        when(roleLoadService.calculateRoleLoad(TEAM_ID))
-                .thenReturn(load(Map.of("DEV", idle(8, 0))));
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of(
+                subtask("PROJ-1-1", "PROJ-1", "DEV", 3600L),
+                subtask("PROJ-2-1", "PROJ-2", "DEV", 3600L)));
 
         RecommendationViewDto view = build().getRecommendations(TEAM_ID);
 
-        RoleRecommendation dev = view.roles().get(0);
-        assertThat(dev.ready()).extracting(RecCard::issueKey).containsExactly("PROJ-1", "PROJ-2");
-        assertThat(dev.ready().get(0).cumulativeHours()).isEqualTo(5.0);
-        assertThat(dev.ready().get(0).fitsInIdle()).isTrue();
-        assertThat(dev.ready().get(1).cumulativeHours()).isEqualTo(10.0);
-        assertThat(dev.ready().get(1).fitsInIdle()).isFalse();
+        assertThat(view.recommended()).extracting(StoryRec::issueKey).containsExactly("PROJ-1", "PROJ-2");
     }
 
     @Test
     void untriagedStories_areExcluded_noNpeOnNullQuadrant() {
-        when(workflowConfigService.isBug(anyString())).thenReturn(false);
         JiraIssueEntity triaged = story("PROJ-1", "P1", "Story");
         JiraIssueEntity untriaged = story("PROJ-2", null, "Story"); // null quadrant -> must not crash
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
-                .thenReturn(List.of(triaged, untriaged));
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
-                .thenReturn(List.of());
+        stubOrphans(List.of(triaged, untriaged), List.of());
         when(workflowConfigService.isDone(anyString(), anyString(), anyString())).thenReturn(false);
-        when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
-                .thenReturn(List.of(subtask("PROJ-1-1", "PROJ-1", "DEV", 3600L)));
-        when(roleLoadService.calculateRoleLoad(TEAM_ID)).thenReturn(load(Map.of("DEV", idle(8, 0))));
+        when(workflowConfigService.isBug(anyString())).thenReturn(false);
+        when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of(
+                subtask("PROJ-1-1", "PROJ-1", "DEV", 3600L)));
 
         RecommendationViewDto view = build().getRecommendations(TEAM_ID);
 
-        RoleRecommendation dev = view.roles().get(0);
-        assertThat(dev.ready()).extracting(RecCard::issueKey).containsExactly("PROJ-1");
-        assertThat(dev.needsEstimation()).isEmpty();
+        assertThat(view.recommended()).extracting(StoryRec::issueKey).containsExactly("PROJ-1");
     }
 
     @Test
-    void noIdleRoles_returnsEmptyRoles_butStillComputesBugs() {
-        // Orphan list is empty, so isBug is never consulted — keep the stub lenient.
-        lenient().when(workflowConfigService.isBug(anyString())).thenReturn(false);
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, STORY))
-                .thenReturn(List.of());
-        when(issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(TEAM_ID, "BUG"))
-                .thenReturn(List.of());
-        when(roleLoadService.calculateRoleLoad(TEAM_ID))
-                .thenReturn(load(Map.of("DEV", normal())));
+    void emptyTeam_returnsEmptySections() {
+        stubOrphans(List.of(), List.of());
 
         RecommendationViewDto view = build().getRecommendations(TEAM_ID);
 
-        assertThat(view.roles()).isEmpty();
+        assertThat(view.recommended()).isEmpty();
+        assertThat(view.needsEstimation()).isEmpty();
         assertThat(view.zeroBugPolicy().openBugCount()).isZero();
     }
 }

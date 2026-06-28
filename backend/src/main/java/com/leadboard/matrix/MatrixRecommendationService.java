@@ -1,18 +1,14 @@
 package com.leadboard.matrix;
 
 import com.leadboard.matrix.RecommendationDtos.RecommendationViewDto;
-import com.leadboard.matrix.RecommendationDtos.RoleRecommendation;
+import com.leadboard.matrix.RecommendationDtos.RoleSlice;
+import com.leadboard.matrix.RecommendationDtos.StoryRec;
 import com.leadboard.matrix.RecommendationDtos.ZeroBugPolicy;
-import com.leadboard.planning.RoleLoadService;
-import com.leadboard.planning.dto.RoleLoadResponse;
-import com.leadboard.planning.dto.RoleLoadResponse.RoleLoadInfo;
-import com.leadboard.planning.dto.RoleLoadResponse.UtilizationStatus;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -22,10 +18,11 @@ import java.util.stream.Collectors;
 /**
  * F78 Phase A — autoplanner recommendations from the Eisenhower matrix.
  *
- * <p>Read-only. Produces a Zero Bug Policy section (all open orphan bugs, always
- * shown) and, for each underloaded role, the triaged tech-debt stories that can be
- * picked up (matched at the role-subtask level) versus those that still need a
- * role subtask / estimate.</p>
+ * <p>Read-only. Produces a Zero Bug Policy section (all open orphan bugs) and a
+ * single prioritised list of triaged tech-debt stories (P1→P4). A story is executed
+ * by the whole SA→DEV→QA pipeline, so each story is shown once with its role
+ * composition (subtask per role + hours), NOT split per role. Stories that are not
+ * cut into estimated role subtasks land in a "needs estimation" warning list.</p>
  */
 @Service
 public class MatrixRecommendationService {
@@ -35,26 +32,20 @@ public class MatrixRecommendationService {
             Map.of("P1", 1, "P2", 2, "P3", 3, "P4", 4);
 
     private final JiraIssueRepository issueRepository;
-    private final RoleLoadService roleLoadService;
     private final MatrixService matrixService;
 
     public MatrixRecommendationService(JiraIssueRepository issueRepository,
-                                       RoleLoadService roleLoadService,
                                        MatrixService matrixService) {
         this.issueRepository = issueRepository;
-        this.roleLoadService = roleLoadService;
         this.matrixService = matrixService;
     }
 
     @Transactional(readOnly = true)
     public RecommendationViewDto getRecommendations(Long teamId) {
-        List<JiraIssueEntity> active = matrixService.loadOrphans(teamId).stream()
-                .filter(i -> !matrixService.isDone(i))
-                .toList();
-
         ZeroBugPolicy zeroBugPolicy = buildZeroBugPolicy(teamId);
 
-        List<JiraIssueEntity> triagedStories = active.stream()
+        List<JiraIssueEntity> triagedStories = matrixService.loadOrphans(teamId).stream()
+                .filter(i -> !matrixService.isDone(i))
                 .filter(i -> !matrixService.isBug(i))
                 .filter(i -> i.getEisenhowerQuadrant() != null
                           && QUADRANT_RANK.containsKey(i.getEisenhowerQuadrant()))
@@ -63,17 +54,24 @@ public class MatrixRecommendationService {
 
         Map<String, List<JiraIssueEntity>> subtasksByParent = loadSubtasksByParent(triagedStories);
 
-        RoleLoadResponse load = roleLoadService.calculateRoleLoad(teamId);
-        List<RoleRecommendation> roles = new ArrayList<>();
-        for (Map.Entry<String, RoleLoadInfo> entry : load.roles().entrySet()) {
-            RoleLoadInfo info = entry.getValue();
-            if (info.status() != UtilizationStatus.IDLE) {
-                continue;
+        List<StoryRec> recommended = new ArrayList<>();
+        List<RecCard> needsEstimation = new ArrayList<>();
+        for (JiraIssueEntity story : triagedStories) {
+            List<JiraIssueEntity> subtasks = subtasksByParent.getOrDefault(story.getIssueKey(), List.of());
+            List<JiraIssueEntity> roleSubtasks = subtasks.stream()
+                    .filter(s -> s.getWorkflowRole() != null && !s.getWorkflowRole().isBlank())
+                    .toList();
+            boolean cutIntoRoles = !roleSubtasks.isEmpty();
+            boolean allEstimated = roleSubtasks.stream()
+                    .allMatch(s -> s.getOriginalEstimateSeconds() != null && s.getOriginalEstimateSeconds() > 0);
+            if (!cutIntoRoles || !allEstimated) {
+                needsEstimation.add(card(story));
+            } else {
+                recommended.add(toStoryRec(story, roleSubtasks));
             }
-            roles.add(buildRoleRecommendation(entry.getKey(), info, triagedStories, subtasksByParent));
         }
 
-        return new RecommendationViewDto(zeroBugPolicy, roles);
+        return new RecommendationViewDto(zeroBugPolicy, recommended, needsEstimation);
     }
 
     /**
@@ -85,7 +83,7 @@ public class MatrixRecommendationService {
         List<RecCard> bugs = matrixService.loadOrphanBugs(teamId).stream()
                 .filter(b -> !matrixService.isDone(b))
                 .sorted(Comparator.comparing(JiraIssueEntity::getIssueKey))
-                .map(this::bugCard)
+                .map(this::card)
                 .toList();
         return new ZeroBugPolicy(bugs.size(), bugs);
     }
@@ -100,40 +98,16 @@ public class MatrixRecommendationService {
                 .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
     }
 
-    private RoleRecommendation buildRoleRecommendation(String roleCode, RoleLoadInfo info,
-                                                       List<JiraIssueEntity> triagedStories,
-                                                       Map<String, List<JiraIssueEntity>> subtasksByParent) {
-        double idleHours = info.totalCapacityHours()
-                .subtract(info.totalAssignedHours())
-                .max(BigDecimal.ZERO)
-                .doubleValue();
-
-        List<RecCard> ready = new ArrayList<>();
-        List<RecCard> needsEstimation = new ArrayList<>();
-        double cumulative = 0.0;
-
-        for (JiraIssueEntity story : triagedStories) {
-            JiraIssueEntity roleSubtask = findEstimatedRoleSubtask(
-                    subtasksByParent.getOrDefault(story.getIssueKey(), List.of()), roleCode);
-            if (roleSubtask == null) {
-                needsEstimation.add(storyCard(story, roleCode, null, null, null, null));
-            } else {
-                double hours = roleSubtask.getOriginalEstimateSeconds() / 3600.0;
-                cumulative += hours;
-                ready.add(storyCard(story, roleCode, roleSubtask.getIssueKey(), hours,
-                        cumulative, cumulative <= idleHours));
-            }
-        }
-        return new RoleRecommendation(roleCode, idleHours, ready, needsEstimation);
-    }
-
-    /** Returns the estimated subtask of the given role, or null if none/unestimated. */
-    private JiraIssueEntity findEstimatedRoleSubtask(List<JiraIssueEntity> subtasks, String roleCode) {
-        return subtasks.stream()
-                .filter(s -> roleCode.equals(s.getWorkflowRole()))
-                .filter(s -> s.getOriginalEstimateSeconds() != null && s.getOriginalEstimateSeconds() > 0)
-                .findFirst()
-                .orElse(null);
+    private StoryRec toStoryRec(JiraIssueEntity story, List<JiraIssueEntity> roleSubtasks) {
+        List<RoleSlice> roles = roleSubtasks.stream()
+                .sorted(Comparator.comparing(JiraIssueEntity::getWorkflowRole))
+                .map(s -> new RoleSlice(s.getWorkflowRole(), s.getIssueKey(),
+                        s.getOriginalEstimateSeconds() / 3600.0))
+                .toList();
+        double total = roles.stream().mapToDouble(RoleSlice::hours).sum();
+        return new StoryRec(
+                story.getIssueKey(), story.getSummary(), story.getIssueType(), story.getPriority(),
+                story.getStatus(), story.getEisenhowerQuadrant(), roles, total);
     }
 
     private Comparator<JiraIssueEntity> storyOrder() {
@@ -142,23 +116,12 @@ public class MatrixRecommendationService {
                 .thenComparing(JiraIssueEntity::getIssueKey);
     }
 
-    private RecCard bugCard(JiraIssueEntity issue) {
+    private RecCard card(JiraIssueEntity issue) {
+        Double estimateHours = issue.getOriginalEstimateSeconds() == null
+                ? null : issue.getOriginalEstimateSeconds() / 3600.0;
         return new RecCard(
                 issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), issue.getPriority(),
-                estimateHours(issue), issue.getAssigneeDisplayName(), issue.getStatus(),
-                null, issue.getWorkflowRole(), null, null, null, null);
-    }
-
-    private RecCard storyCard(JiraIssueEntity issue, String roleCode, String roleSubtaskKey,
-                              Double roleEstimateHours, Double cumulativeHours, Boolean fitsInIdle) {
-        return new RecCard(
-                issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), issue.getPriority(),
-                estimateHours(issue), issue.getAssigneeDisplayName(), issue.getStatus(),
-                issue.getEisenhowerQuadrant(), roleCode, roleSubtaskKey, roleEstimateHours,
-                cumulativeHours, fitsInIdle);
-    }
-
-    private Double estimateHours(JiraIssueEntity issue) {
-        return issue.getOriginalEstimateSeconds() == null ? null : issue.getOriginalEstimateSeconds() / 3600.0;
+                estimateHours, issue.getAssigneeDisplayName(), issue.getStatus(),
+                issue.getEisenhowerQuadrant(), issue.getWorkflowRole());
     }
 }

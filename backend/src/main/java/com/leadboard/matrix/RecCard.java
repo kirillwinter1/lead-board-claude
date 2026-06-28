@@ -1,14 +1,11 @@
 package com.leadboard.matrix;
 
 /**
- * A card shown in the recommendation panel (F78). Superset of the matrix card.
+ * A simple card in the recommendation panel (F78), used for Zero Bug Policy bugs
+ * and the "needs estimation" warning list.
  *
- * @param quadrant        P1/P2/P3/P4 for triaged stories; null for bug cards.
- * @param workflowRole    the issue's own workflow role (used to show who fixes a bug).
- * @param roleSubtaskKey  for "ready" story cards: key of the matched role subtask; else null.
- * @param roleEstimateHours hours of that role subtask; null for needsEstimation / bugs.
- * @param cumulativeHours running sum of role-subtask hours over the "ready" list; null otherwise.
- * @param fitsInIdle      whether cumulativeHours is within the role's idle budget; null otherwise.
+ * @param quadrant     P1/P2/P3/P4 for triaged stories; null for bug cards.
+ * @param workflowRole the issue's own workflow role (used to show who fixes a bug); may be null.
  */
 public record RecCard(
         String issueKey,
@@ -19,10 +16,6 @@ public record RecCard(
         String assigneeDisplayName,
         String status,
         String quadrant,
-        String workflowRole,
-        String roleSubtaskKey,
-        Double roleEstimateHours,
-        Double cumulativeHours,
-        Boolean fitsInIdle
+        String workflowRole
 ) {
 }

@@ -96,7 +96,7 @@ class MatrixRecommendationControllerSecurityTest {
     void recommendations_allowedForManager() throws Exception {
         when(authorizationService.canManageTeam(anyLong())).thenReturn(true);
         when(recommendationService.getRecommendations(7L))
-                .thenReturn(new RecommendationViewDto(new ZeroBugPolicy(0, List.of()), List.of()));
+                .thenReturn(new RecommendationViewDto(new ZeroBugPolicy(0, List.of()), List.of(), List.of()));
 
         mockMvc.perform(get("/api/matrix/recommendations").param("teamId", "7"))
                 .andExpect(status().isOk());
