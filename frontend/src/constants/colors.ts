@@ -133,6 +133,14 @@ export const QUADRANT_COLORS: Record<'P1' | 'P2' | 'P3' | 'P4', QuadrantColor> =
 // Unassigned zone — neutral grey tone.
 export const QUADRANT_UNASSIGNED: QuadrantColor = { accent: '#6b778c', bg: '#F4F5F7' }
 
+// Status age badge colors (F79) — "days in status" pill. Color comes ONLY from the
+// backend-decided statusAgeLevel (backlog/done are NORMAL). NORMAL grey, WARNING amber, CRITICAL red.
+export const STATUS_AGE_COLORS: Record<'NORMAL' | 'WARNING' | 'CRITICAL', { bg: string; fg: string }> = {
+  NORMAL: { bg: '#F4F5F7', fg: '#5e6c84' },
+  WARNING: { bg: '#FFF7E6', fg: '#bf4f00' },
+  CRITICAL: { bg: '#FFEBE6', fg: '#bf2600' },
+}
+
 // Helper: lighten a hex color by a factor (0 = original, 1 = white)
 export function lightenColor(hex: string, factor: number): string {
   const r = parseInt(hex.slice(1, 3), 16)

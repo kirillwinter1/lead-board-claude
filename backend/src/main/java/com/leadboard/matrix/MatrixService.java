@@ -2,6 +2,8 @@ package com.leadboard.matrix;
 
 import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
@@ -9,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -31,11 +34,14 @@ public class MatrixService {
 
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final StatusAgeService statusAgeService;
 
     public MatrixService(JiraIssueRepository issueRepository,
-                         WorkflowConfigService workflowConfigService) {
+                         WorkflowConfigService workflowConfigService,
+                         StatusAgeService statusAgeService) {
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
+        this.statusAgeService = statusAgeService;
     }
 
     /**
@@ -51,13 +57,20 @@ public class MatrixService {
         List<MatrixCardDto> p4 = new ArrayList<>();
         List<MatrixCardDto> unassigned = new ArrayList<>();
 
-        for (JiraIssueEntity issue : orphans) {
-            // "Done" and bug filtering are in-service (config-driven), never in SQL.
-            // Bugs are not triaged in the matrix (F78) — they live in recommendations only.
-            if (isDone(issue) || isBug(issue)) {
-                continue;
-            }
-            MatrixCardDto card = toCard(issue);
+        // "Done" and bug filtering are in-service (config-driven), never in SQL.
+        // Bugs are not triaged in the matrix (F78) — they live in recommendations only.
+        List<JiraIssueEntity> kept = orphans.stream()
+                .filter(issue -> !isDone(issue) && !isBug(issue))
+                .toList();
+
+        // F79: compute "days in status" once for the whole rendered set (batch, no N+1).
+        Map<String, StatusAge> statusAges = statusAgeService.compute(kept);
+        if (statusAges == null) {
+            statusAges = Map.of();
+        }
+
+        for (JiraIssueEntity issue : kept) {
+            MatrixCardDto card = toCard(issue, statusAges.get(issue.getIssueKey()));
             switch (card.quadrant() == null ? "" : card.quadrant()) {
                 case "P1" -> p1.add(card);
                 case "P2" -> p2.add(card);
@@ -92,7 +105,9 @@ public class MatrixService {
 
         issue.setEisenhowerQuadrant(normalized);
         issueRepository.save(issue);
-        return toCard(issue);
+        Map<String, StatusAge> statusAges = statusAgeService.compute(List.of(issue));
+        StatusAge age = statusAges == null ? null : statusAges.get(issue.getIssueKey());
+        return toCard(issue, age);
     }
 
     /**
@@ -110,10 +125,11 @@ public class MatrixService {
         return upper;
     }
 
-    private MatrixCardDto toCard(JiraIssueEntity issue) {
+    private MatrixCardDto toCard(JiraIssueEntity issue, StatusAge statusAge) {
         Double estimateHours = issue.getOriginalEstimateSeconds() == null
                 ? null
                 : issue.getOriginalEstimateSeconds() / 3600.0;
+        StatusAge age = statusAge != null ? statusAge : StatusAge.normal(null);
         return new MatrixCardDto(
                 issue.getIssueKey(),
                 issue.getSummary(),
@@ -122,7 +138,10 @@ public class MatrixService {
                 estimateHours,
                 issue.getAssigneeDisplayName(),
                 issue.getStatus(),
-                issue.getEisenhowerQuadrant()
+                issue.getEisenhowerQuadrant(),
+                age.daysInStatus(),
+                age.level(),
+                age.reason()
         );
     }
 

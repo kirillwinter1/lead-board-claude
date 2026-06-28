@@ -1,5 +1,6 @@
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../board/helpers'
+import { StatusAgeBadge } from '../StatusAgeBadge'
 import { QUADRANT_COLORS } from '../../constants/colors'
 import type { RecCard, RecommendationView, StoryRec } from '../../api/matrixApi'
 import './MatrixRecommendations.css'
@@ -84,6 +85,7 @@ function StoryCard({ story, jiraBaseUrl }: { story: StoryRec; jiraBaseUrl: strin
             {quadrant}
           </span>
         )}
+        <StatusAgeBadge days={story.daysInStatus} level={story.statusAgeLevel} reason={story.statusAgeReason} />
       </div>
       <div className="rec-card-summary" title={story.summary}>{story.summary}</div>
       <div className="rec-card-roles">
@@ -123,6 +125,7 @@ function WarnCard({ card, jiraBaseUrl, bug }: { card: RecCard; jiraBaseUrl: stri
             {card.workflowRole}
           </span>
         )}
+        <StatusAgeBadge days={card.daysInStatus} level={card.statusAgeLevel} reason={card.statusAgeReason} />
       </div>
       <div className="rec-card-summary" title={card.summary}>{card.summary}</div>
       <div className="rec-card-meta"><span>{estimateLabel}</span></div>

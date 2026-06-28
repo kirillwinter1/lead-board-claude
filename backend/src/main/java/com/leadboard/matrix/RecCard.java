@@ -6,6 +6,9 @@ package com.leadboard.matrix;
  *
  * @param quadrant     P1/P2/P3/P4 for triaged stories; null for bug cards.
  * @param workflowRole the issue's own workflow role (used to show who fixes a bug); may be null.
+ * @param daysInStatus whole days in current status, or null if unknown (F79).
+ * @param statusAgeLevel coloring level NORMAL/WARNING/CRITICAL (F79).
+ * @param statusAgeReason tooltip for WARNING/CRITICAL, or null (F79).
  */
 public record RecCard(
         String issueKey,
@@ -16,6 +19,9 @@ public record RecCard(
         String assigneeDisplayName,
         String status,
         String quadrant,
-        String workflowRole
+        String workflowRole,
+        Integer daysInStatus,
+        String statusAgeLevel,
+        String statusAgeReason
 ) {
 }

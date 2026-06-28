@@ -25,8 +25,8 @@ describe('MatrixRecommendations', () => {
       zeroBugPolicy: {
         openBugCount: 2,
         bugs: [
-          { issueKey: 'BUG-1', summary: 'b1', issueType: 'Bug', priority: null, estimateHours: 4, assigneeDisplayName: null, status: 'New', quadrant: null, workflowRole: null },
-          { issueKey: 'BUG-2', summary: 'b2', issueType: 'Bug', priority: null, estimateHours: null, assigneeDisplayName: null, status: 'New', quadrant: null, workflowRole: null },
+          { issueKey: 'BUG-1', summary: 'b1', issueType: 'Bug', priority: null, estimateHours: 4, assigneeDisplayName: null, status: 'New', quadrant: null, workflowRole: null, daysInStatus: null, statusAgeLevel: 'NORMAL', statusAgeReason: null },
+          { issueKey: 'BUG-2', summary: 'b2', issueType: 'Bug', priority: null, estimateHours: null, assigneeDisplayName: null, status: 'New', quadrant: null, workflowRole: null, daysInStatus: null, statusAgeLevel: 'NORMAL', statusAgeReason: null },
         ],
       },
       recommended: [],
@@ -50,6 +50,7 @@ describe('MatrixRecommendations', () => {
           { roleCode: 'SA', subtaskKey: 'PROJ-1-1', hours: 8 },
         ],
         totalHours: 32,
+        daysInStatus: null, statusAgeLevel: 'NORMAL', statusAgeReason: null,
       }],
       needsEstimation: [],
     }
@@ -67,7 +68,7 @@ describe('MatrixRecommendations', () => {
     const data: RecommendationView = {
       ...emptyView,
       needsEstimation: [
-        { issueKey: 'PROJ-9', summary: 'uncut', issueType: 'Story', priority: null, estimateHours: null, assigneeDisplayName: null, status: 'To Do', quadrant: 'P2', workflowRole: null },
+        { issueKey: 'PROJ-9', summary: 'uncut', issueType: 'Story', priority: null, estimateHours: null, assigneeDisplayName: null, status: 'To Do', quadrant: 'P2', workflowRole: null, daysInStatus: null, statusAgeLevel: 'NORMAL', statusAgeReason: null },
       ],
     }
     render(<MatrixRecommendations data={data} jiraBaseUrl="https://j/" />)

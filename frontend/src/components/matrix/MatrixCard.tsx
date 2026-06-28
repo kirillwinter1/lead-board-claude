@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../board/helpers'
+import { StatusAgeBadge } from '../StatusAgeBadge'
 import type { MatrixCard as MatrixCardData } from '../../api/matrixApi'
 
 interface MatrixCardProps {
@@ -57,6 +58,7 @@ export function MatrixCard({ card, jiraBaseUrl }: MatrixCardProps) {
             className="matrix-card-priority-icon"
           />
         )}
+        <StatusAgeBadge days={card.daysInStatus} level={card.statusAgeLevel} reason={card.statusAgeReason} />
       </div>
       <div className="matrix-card-summary" title={card.summary}>{card.summary}</div>
       <div className="matrix-card-meta">

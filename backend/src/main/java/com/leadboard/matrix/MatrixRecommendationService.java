@@ -4,6 +4,8 @@ import com.leadboard.matrix.RecommendationDtos.RecommendationViewDto;
 import com.leadboard.matrix.RecommendationDtos.RoleSlice;
 import com.leadboard.matrix.RecommendationDtos.StoryRec;
 import com.leadboard.matrix.RecommendationDtos.ZeroBugPolicy;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
@@ -33,16 +35,25 @@ public class MatrixRecommendationService {
 
     private final JiraIssueRepository issueRepository;
     private final MatrixService matrixService;
+    private final StatusAgeService statusAgeService;
 
     public MatrixRecommendationService(JiraIssueRepository issueRepository,
-                                       MatrixService matrixService) {
+                                       MatrixService matrixService,
+                                       StatusAgeService statusAgeService) {
         this.issueRepository = issueRepository;
         this.matrixService = matrixService;
+        this.statusAgeService = statusAgeService;
     }
 
     @Transactional(readOnly = true)
     public RecommendationViewDto getRecommendations(Long teamId) {
-        ZeroBugPolicy zeroBugPolicy = buildZeroBugPolicy(teamId);
+        // Zero Bug Policy: all open (non-done) orphan bugs of the team. Bugs are their
+        // own board category (not STORY), so they are loaded separately — never via the
+        // triaged-stories set.
+        List<JiraIssueEntity> openBugs = matrixService.loadOrphanBugs(teamId).stream()
+                .filter(b -> !matrixService.isDone(b))
+                .sorted(Comparator.comparing(JiraIssueEntity::getIssueKey))
+                .toList();
 
         List<JiraIssueEntity> triagedStories = matrixService.loadOrphans(teamId).stream()
                 .filter(i -> !matrixService.isDone(i))
@@ -51,6 +62,17 @@ public class MatrixRecommendationService {
                           && QUADRANT_RANK.containsKey(i.getEisenhowerQuadrant()))
                 .sorted(storyOrder())
                 .toList();
+
+        // F79: compute "days in status" once for every issue we card (stories + bugs).
+        List<JiraIssueEntity> carded = new ArrayList<>(triagedStories);
+        carded.addAll(openBugs);
+        Map<String, StatusAge> statusAges = statusAgeService.compute(carded);
+        if (statusAges == null) {
+            statusAges = Map.of();
+        }
+
+        List<RecCard> bugCards = openBugs.stream().map(b -> card(b, statusAges)).toList();
+        ZeroBugPolicy zeroBugPolicy = new ZeroBugPolicy(bugCards.size(), bugCards);
 
         Map<String, List<JiraIssueEntity>> subtasksByParent = loadSubtasksByParent(triagedStories);
 
@@ -65,27 +87,13 @@ public class MatrixRecommendationService {
             boolean allEstimated = roleSubtasks.stream()
                     .allMatch(s -> s.getOriginalEstimateSeconds() != null && s.getOriginalEstimateSeconds() > 0);
             if (!cutIntoRoles || !allEstimated) {
-                needsEstimation.add(card(story));
+                needsEstimation.add(card(story, statusAges));
             } else {
-                recommended.add(toStoryRec(story, roleSubtasks));
+                recommended.add(toStoryRec(story, roleSubtasks, statusAges));
             }
         }
 
         return new RecommendationViewDto(zeroBugPolicy, recommended, needsEstimation);
-    }
-
-    /**
-     * Zero Bug Policy: all open (non-done) orphan bugs of the team. Bugs are their
-     * own board category (not STORY), so they are loaded separately — never via the
-     * triaged-stories set.
-     */
-    private ZeroBugPolicy buildZeroBugPolicy(Long teamId) {
-        List<RecCard> bugs = matrixService.loadOrphanBugs(teamId).stream()
-                .filter(b -> !matrixService.isDone(b))
-                .sorted(Comparator.comparing(JiraIssueEntity::getIssueKey))
-                .map(this::card)
-                .toList();
-        return new ZeroBugPolicy(bugs.size(), bugs);
     }
 
     private Map<String, List<JiraIssueEntity>> loadSubtasksByParent(List<JiraIssueEntity> stories) {
@@ -98,16 +106,19 @@ public class MatrixRecommendationService {
                 .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
     }
 
-    private StoryRec toStoryRec(JiraIssueEntity story, List<JiraIssueEntity> roleSubtasks) {
+    private StoryRec toStoryRec(JiraIssueEntity story, List<JiraIssueEntity> roleSubtasks,
+                                Map<String, StatusAge> statusAges) {
         List<RoleSlice> roles = roleSubtasks.stream()
                 .sorted(Comparator.comparing(JiraIssueEntity::getWorkflowRole))
                 .map(s -> new RoleSlice(s.getWorkflowRole(), s.getIssueKey(),
                         s.getOriginalEstimateSeconds() / 3600.0))
                 .toList();
         double total = roles.stream().mapToDouble(RoleSlice::hours).sum();
+        StatusAge age = statusAges.getOrDefault(story.getIssueKey(), StatusAge.normal(null));
         return new StoryRec(
                 story.getIssueKey(), story.getSummary(), story.getIssueType(), story.getPriority(),
-                story.getStatus(), story.getEisenhowerQuadrant(), roles, total);
+                story.getStatus(), story.getEisenhowerQuadrant(), roles, total,
+                age.daysInStatus(), age.level(), age.reason());
     }
 
     private Comparator<JiraIssueEntity> storyOrder() {
@@ -116,12 +127,14 @@ public class MatrixRecommendationService {
                 .thenComparing(JiraIssueEntity::getIssueKey);
     }
 
-    private RecCard card(JiraIssueEntity issue) {
+    private RecCard card(JiraIssueEntity issue, Map<String, StatusAge> statusAges) {
         Double estimateHours = issue.getOriginalEstimateSeconds() == null
                 ? null : issue.getOriginalEstimateSeconds() / 3600.0;
+        StatusAge age = statusAges.getOrDefault(issue.getIssueKey(), StatusAge.normal(null));
         return new RecCard(
                 issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), issue.getPriority(),
                 estimateHours, issue.getAssigneeDisplayName(), issue.getStatus(),
-                issue.getEisenhowerQuadrant(), issue.getWorkflowRole());
+                issue.getEisenhowerQuadrant(), issue.getWorkflowRole(),
+                age.daysInStatus(), age.level(), age.reason());
     }
 }

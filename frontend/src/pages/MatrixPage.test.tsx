@@ -68,6 +68,9 @@ const card = (issueKey: string, quadrant: MatrixCard['quadrant']): MatrixCard =>
   assigneeDisplayName: 'Alice',
   status: 'To Do',
   quadrant,
+  daysInStatus: null,
+  statusAgeLevel: 'NORMAL',
+  statusAgeReason: null,
 })
 
 const mockView: MatrixView = {

@@ -38,7 +38,10 @@ public final class RecommendationDtos {
             String status,
             String quadrant,
             List<RoleSlice> roles,
-            double totalHours
+            double totalHours,
+            Integer daysInStatus,
+            String statusAgeLevel,
+            String statusAgeReason
     ) {
     }
 

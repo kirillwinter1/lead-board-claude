@@ -205,6 +205,9 @@ function childEpicToBoardNode(e: ChildEpicDto, jiraBaseUrl: string): BoardNode {
     parentProjectKey: null,
     parentProjectTitle: null,
     quarterLabel: null,
+    daysInStatus: null,
+    statusAgeLevel: 'NORMAL',
+    statusAgeReason: null,
     children: [],
   }
 }

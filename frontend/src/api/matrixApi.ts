@@ -12,6 +12,9 @@ export interface MatrixCard {
   assigneeDisplayName: string | null
   status: string
   quadrant: Quadrant | null
+  daysInStatus: number | null
+  statusAgeLevel: 'NORMAL' | 'WARNING' | 'CRITICAL'
+  statusAgeReason: string | null
 }
 
 export interface MatrixView {
@@ -48,6 +51,9 @@ export interface RecCard {
   status: string
   quadrant: Quadrant | null
   workflowRole: string | null
+  daysInStatus: number | null
+  statusAgeLevel: 'NORMAL' | 'WARNING' | 'CRITICAL'
+  statusAgeReason: string | null
 }
 
 export interface ZeroBugPolicy {
@@ -72,6 +78,9 @@ export interface StoryRec {
   quadrant: Quadrant | null
   roles: RoleSlice[]
   totalHours: number
+  daysInStatus: number | null
+  statusAgeLevel: 'NORMAL' | 'WARNING' | 'CRITICAL'
+  statusAgeReason: string | null
 }
 
 export interface RecommendationView {
