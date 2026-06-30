@@ -62,6 +62,11 @@ class ChatToolExecutorTest {
     @Mock private BoardService boardService;
     @Mock private com.leadboard.insight.InsightEngine insightEngine;
     @Mock private com.leadboard.jira.JiraWriteService jiraWriteService;
+    @Mock private com.leadboard.planning.QuarterlyPlanningService quarterlyPlanningService;
+    @Mock private com.leadboard.planning.ForecastService forecastService;
+    @Mock private com.leadboard.team.WorklogTimelineService worklogTimelineService;
+    @Mock private com.leadboard.matrix.MatrixService matrixService;
+    @Mock private com.leadboard.epic.EpicService epicService;
 
     private ChatToolExecutor executor;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -73,7 +78,9 @@ class ChatToolExecutorTest {
                 teamMetricsService, workflowConfigService,
                 authorizationService, boardService, bugMetricsService, projectService,
                 riceAssessmentService, absenceService, bugSlaService,
-                embeddingService, insightEngine, jiraWriteService, objectMapper
+                embeddingService, insightEngine, jiraWriteService,
+                quarterlyPlanningService, forecastService, worklogTimelineService,
+                matrixService, epicService, objectMapper
         );
         when(authorizationService.isAdmin()).thenReturn(true);
     }

@@ -46,6 +46,14 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             + "AND (:teamId IS NULL OR e.teamId = :teamId)")
     List<JiraIssueEntity> findActiveStoriesForReadiness(@Param("teamId") Long teamId);
 
+    /**
+     * Задачи с залогированным временем (F80): timeSpent > 0, опц. фильтр по команде.
+     * Фильтр «не done» выполняется в коде через WorkflowConfigService.
+     */
+    @Query("SELECT i FROM JiraIssueEntity i WHERE COALESCE(i.timeSpentSeconds, 0) > 0 "
+            + "AND (:teamId IS NULL OR i.teamId = :teamId)")
+    List<JiraIssueEntity> findWithWorklog(@Param("teamId") Long teamId);
+
     void deleteByProjectKey(String projectKey);
 
     @Query("SELECT e.issueKey FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")

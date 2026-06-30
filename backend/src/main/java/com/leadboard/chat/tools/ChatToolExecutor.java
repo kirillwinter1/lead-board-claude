@@ -4,14 +4,21 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.leadboard.auth.AuthorizationService;
+import com.leadboard.auth.LeadBoardAuthentication;
 import com.leadboard.board.BoardNode;
 import com.leadboard.board.BoardResponse;
 import com.leadboard.board.BoardService;
 import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.epic.EpicService;
+import com.leadboard.epic.RoughEstimateRequestDto;
 import com.leadboard.insight.InsightEngine;
 import com.leadboard.jira.JiraWriteService;
+import com.leadboard.matrix.MatrixService;
 import com.leadboard.metrics.dto.TeamMetricsSummary;
+import com.leadboard.planning.ForecastService;
+import com.leadboard.planning.QuarterlyPlanningService;
+import com.leadboard.team.WorklogTimelineService;
 import com.leadboard.metrics.service.BugMetricsService;
 import com.leadboard.metrics.service.TeamMetricsService;
 import com.leadboard.project.ProjectService;
@@ -25,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -49,6 +57,11 @@ public class ChatToolExecutor {
     private final EmbeddingService embeddingService;
     private final InsightEngine insightEngine;
     private final JiraWriteService jiraWriteService;
+    private final QuarterlyPlanningService quarterlyPlanningService;
+    private final ForecastService forecastService;
+    private final WorklogTimelineService worklogTimelineService;
+    private final MatrixService matrixService;
+    private final EpicService epicService;
     private final ObjectMapper objectMapper;
 
     public ChatToolExecutor(
@@ -67,6 +80,11 @@ public class ChatToolExecutor {
             EmbeddingService embeddingService,
             InsightEngine insightEngine,
             JiraWriteService jiraWriteService,
+            QuarterlyPlanningService quarterlyPlanningService,
+            ForecastService forecastService,
+            WorklogTimelineService worklogTimelineService,
+            MatrixService matrixService,
+            EpicService epicService,
             ObjectMapper objectMapper
     ) {
         this.issueRepository = issueRepository;
@@ -84,6 +102,11 @@ public class ChatToolExecutor {
         this.embeddingService = embeddingService;
         this.insightEngine = insightEngine;
         this.jiraWriteService = jiraWriteService;
+        this.quarterlyPlanningService = quarterlyPlanningService;
+        this.forecastService = forecastService;
+        this.worklogTimelineService = worklogTimelineService;
+        this.matrixService = matrixService;
+        this.epicService = epicService;
         this.objectMapper = objectMapper;
     }
 
@@ -115,6 +138,17 @@ public class ChatToolExecutor {
                 case "create_issue" -> createIssueTool(args);
                 case "add_comment" -> addCommentTool(args);
                 case "assign_issue" -> assignIssueTool(args);
+                // --- F80 read: planning / forecast / load ---
+                case "quarterly_capacity" -> quarterlyCapacity(args);
+                case "quarterly_demand" -> quarterlyDemand(args);
+                case "team_forecast" -> teamForecast(args);
+                case "team_worklog_timeline" -> teamWorklogTimeline(args);
+                case "my_open_tasks_with_worklog" -> openTasksWithWorklog(args);
+                // --- F80 write: board ---
+                case "triage_matrix" -> triageMatrix(args);
+                case "assign_epic_quarter" -> assignEpicQuarter(args);
+                case "set_epic_boost" -> setEpicBoost(args);
+                case "set_rough_estimate" -> setRoughEstimate(args);
                 default -> toJson(Map.of("error", "Unknown tool: " + toolName));
             };
         } catch (Exception e) {
@@ -817,6 +851,182 @@ public class ChatToolExecutor {
         try {
             jiraWriteService.assign(issueKey, accountId);
             return toJson(Map.of("ok", true, "issueKey", issueKey, "accountId", accountId == null ? "unassigned" : accountId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ===================== F80 read: planning / forecast / load =====================
+
+    private String resolveQuarter(JsonNode args) {
+        String q = strParam(args, "quarter");
+        return q != null ? q : com.leadboard.planning.QuarterRange.currentQuarterLabel();
+    }
+
+    private String quarterlyCapacity(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (teamId == null) {
+            return toJson(Map.of("error", "teamId is required"));
+        }
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        try {
+            return toJson(quarterlyPlanningService.getTeamCapacity(teamId, resolveQuarter(args)));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String quarterlyDemand(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (teamId == null) {
+            return toJson(Map.of("error", "teamId is required"));
+        }
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        try {
+            return toJson(quarterlyPlanningService.getTeamDemand(teamId, resolveQuarter(args)));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String teamForecast(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (teamId == null) {
+            return toJson(Map.of("error", "teamId is required"));
+        }
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        try {
+            return toJson(forecastService.calculateForecast(teamId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String teamWorklogTimeline(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (teamId == null) {
+            return toJson(Map.of("error", "teamId is required"));
+        }
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        LocalDate to = LocalDate.now();
+        LocalDate from = to.minusDays(30);
+        String fromStr = strParam(args, "from");
+        String toStr = strParam(args, "to");
+        try {
+            if (fromStr != null) from = LocalDate.parse(fromStr);
+            if (toStr != null) to = LocalDate.parse(toStr);
+        } catch (Exception e) {
+            return toJson(Map.of("error", "from/to must be ISO yyyy-MM-dd"));
+        }
+        try {
+            return toJson(worklogTimelineService.getWorklogTimeline(teamId, from, to));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String openTasksWithWorklog(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        List<Map<String, Object>> tasks = issueRepository.findWithWorklog(teamId).stream()
+                .filter(i -> !isDoneIssue(i))
+                .limit(30)
+                .map(i -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("key", i.getIssueKey());
+                    m.put("title", i.getSummary());
+                    m.put("status", i.getStatus());
+                    m.put("type", i.getIssueType());
+                    long secs = i.getTimeSpentSeconds() != null ? i.getTimeSpentSeconds() : 0L;
+                    m.put("loggedHours", Math.round(secs / 3600.0 * 10) / 10.0);
+                    if (i.getAssigneeDisplayName() != null) m.put("assignee", i.getAssigneeDisplayName());
+                    return m;
+                })
+                .toList();
+        return toJson(Map.of("tasks", tasks, "count", tasks.size()));
+    }
+
+    private boolean isDoneIssue(JiraIssueEntity i) {
+        try {
+            return workflowConfigService.isDone(i.getStatus(), i.getIssueType());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ===================== F80 write: board =====================
+
+    private String triageMatrix(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String issueKey = strParam(args, "issueKey");
+        String quadrant = strParam(args, "quadrant");
+        if (issueKey == null || quadrant == null) {
+            return toJson(Map.of("error", "issueKey and quadrant are required"));
+        }
+        try {
+            return toJson(matrixService.triage(issueKey, quadrant));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String assignEpicQuarter(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String epicKey = strParam(args, "epicKey");
+        String quarter = strParam(args, "quarter");
+        if (epicKey == null) {
+            return toJson(Map.of("error", "epicKey is required"));
+        }
+        try {
+            return toJson(quarterlyPlanningService.assignEpicToQuarter(epicKey, quarter));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String setEpicBoost(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String epicKey = strParam(args, "epicKey");
+        if (epicKey == null || !args.has("boost")) {
+            return toJson(Map.of("error", "epicKey and boost are required"));
+        }
+        try {
+            return toJson(quarterlyPlanningService.setEpicBoost(epicKey, args.get("boost").asInt()));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String setRoughEstimate(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String epicKey = strParam(args, "epicKey");
+        String role = strParam(args, "role");
+        if (epicKey == null || role == null || !args.has("days")) {
+            return toJson(Map.of("error", "epicKey, role and days are required"));
+        }
+        LeadBoardAuthentication auth = authorizationService.getCurrentAuth();
+        String updatedBy = auth != null ? auth.getAtlassianAccountId() : "mcp";
+        try {
+            BigDecimal days = new BigDecimal(args.get("days").asText());
+            return toJson(epicService.updateRoughEstimate(epicKey, role, new RoughEstimateRequestDto(days, updatedBy)));
         } catch (Exception e) {
             return toJson(Map.of("error", e.getMessage()));
         }
