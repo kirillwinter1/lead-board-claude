@@ -9,6 +9,7 @@ import com.leadboard.board.BoardResponse;
 import com.leadboard.board.BoardService;
 import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.insight.InsightEngine;
 import com.leadboard.metrics.dto.TeamMetricsSummary;
 import com.leadboard.metrics.service.BugMetricsService;
 import com.leadboard.metrics.service.TeamMetricsService;
@@ -45,6 +46,7 @@ public class ChatToolExecutor {
     private final AbsenceService absenceService;
     private final BugSlaService bugSlaService;
     private final EmbeddingService embeddingService;
+    private final InsightEngine insightEngine;
     private final ObjectMapper objectMapper;
 
     public ChatToolExecutor(
@@ -61,6 +63,7 @@ public class ChatToolExecutor {
             AbsenceService absenceService,
             BugSlaService bugSlaService,
             EmbeddingService embeddingService,
+            InsightEngine insightEngine,
             ObjectMapper objectMapper
     ) {
         this.issueRepository = issueRepository;
@@ -76,6 +79,7 @@ public class ChatToolExecutor {
         this.absenceService = absenceService;
         this.bugSlaService = bugSlaService;
         this.embeddingService = embeddingService;
+        this.insightEngine = insightEngine;
         this.objectMapper = objectMapper;
     }
 
@@ -100,6 +104,7 @@ public class ChatToolExecutor {
                 case "task_details" -> taskDetails(args);
                 case "team_members" -> teamMembers(args);
                 case "epic_progress" -> epicProgress(args);
+                case "team_readiness_briefing" -> teamReadinessBriefing(args);
                 default -> toJson(Map.of("error", "Unknown tool: " + toolName));
             };
         } catch (Exception e) {
@@ -692,6 +697,14 @@ public class ChatToolExecutor {
         }).toList();
 
         return toJson(Map.of("members", memberData, "totalMembers", members.size(), "teamId", teamId));
+    }
+
+    private String teamReadinessBriefing(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        return toJson(insightEngine.briefing(teamId));
     }
 
     private String categorizeStatus(String issueType, String status) {

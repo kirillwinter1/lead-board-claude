@@ -162,6 +162,17 @@ public class ChatToolRegistry {
                                 ),
                                 "required", List.of()
                         )
+                ),
+                new LlmToolDefinition(
+                        "team_readiness_briefing",
+                        "Morning readiness briefing for a team: planning (quarter labels coverage), load (assignees/worklog reliability), data-quality blockers (missing estimates/assignees), and flow bottlenecks. Numbers are deterministic — explain them in plain language. Use for 'is the team ready', 'what should we fix', 'what's blocking planning'.",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "teamId", Map.of("type", "integer", "description", "Team ID (optional; omit for all accessible teams)")
+                                ),
+                                "required", List.of()
+                        )
                 )
         );
     }

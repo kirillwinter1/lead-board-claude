@@ -60,6 +60,7 @@ class ChatToolExecutorTest {
     @Mock private BugSlaService bugSlaService;
     @Mock private EmbeddingService embeddingService;
     @Mock private BoardService boardService;
+    @Mock private com.leadboard.insight.InsightEngine insightEngine;
 
     private ChatToolExecutor executor;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -71,9 +72,25 @@ class ChatToolExecutorTest {
                 teamMetricsService, workflowConfigService,
                 authorizationService, boardService, bugMetricsService, projectService,
                 riceAssessmentService, absenceService, bugSlaService,
-                embeddingService, objectMapper
+                embeddingService, insightEngine, objectMapper
         );
         when(authorizationService.isAdmin()).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("team_readiness_briefing returns 4-lens JSON")
+    void teamReadinessBriefingReturnsJson() {
+        when(insightEngine.briefing(1L)).thenReturn(
+                new com.leadboard.insight.TeamReadiness(1L,
+                        new com.leadboard.insight.TeamReadiness.Lens("RED", "h", List.of(), List.of("LB-1")),
+                        new com.leadboard.insight.TeamReadiness.Lens("YELLOW", "h", List.of(), List.of()),
+                        new com.leadboard.insight.TeamReadiness.Lens("RED", "h", List.of(), List.of()),
+                        new com.leadboard.insight.TeamReadiness.Lens("YELLOW", "h", List.of(), List.of())));
+
+        String result = executor.executeTool("team_readiness_briefing", "{\"teamId\":1}");
+
+        assertTrue(result.contains("planning"));
+        assertTrue(result.contains("LB-1"));
     }
 
     @Test
