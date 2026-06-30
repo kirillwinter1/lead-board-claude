@@ -1,6 +1,7 @@
 package com.leadboard.config;
 
 import com.leadboard.auth.LeadBoardAuthenticationFilter;
+import com.leadboard.mcp.McpDebugAuthFilter;
 import com.leadboard.tenant.TenantFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,10 +22,13 @@ public class SecurityConfig {
 
     private final LeadBoardAuthenticationFilter authenticationFilter;
     private final TenantFilter tenantFilter;
+    private final McpDebugAuthFilter mcpDebugAuthFilter;
 
-    public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter, TenantFilter tenantFilter) {
+    public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter, TenantFilter tenantFilter,
+                          McpDebugAuthFilter mcpDebugAuthFilter) {
         this.authenticationFilter = authenticationFilter;
         this.tenantFilter = tenantFilter;
+        this.mcpDebugAuthFilter = mcpDebugAuthFilter;
     }
 
     @Bean
@@ -39,6 +43,9 @@ public class SecurityConfig {
             // Add tenant filter first, then auth filter
             .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterAfter(authenticationFilter, TenantFilter.class)
+            // MCP bearer auth (F80) — runs after session auth; only touches /mcp,
+            // sets tenant + LeadBoardAuthentication from the debug token.
+            .addFilterAfter(mcpDebugAuthFilter, LeadBoardAuthenticationFilter.class)
 
             // Configure authorization
             .authorizeHttpRequests(auth -> auth
@@ -60,6 +67,9 @@ public class SecurityConfig {
 
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()
+
+                // MCP endpoint (F80) — access controlled by McpDebugAuthFilter (bearer), not session
+                .requestMatchers("/mcp", "/mcp/**").permitAll()
 
                 // Issue types are needed by every authenticated user — board,
                 // planning and metrics pages all resolve icons via this endpoint.

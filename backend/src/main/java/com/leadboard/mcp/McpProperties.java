@@ -1,13 +1,19 @@
 package com.leadboard.mcp;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
 
 /**
  * Конфигурация MCP-сервера (F80).
  *
  * <p>Фаза 1 (личное использование / отладка): аутентификация по статическому
  * bearer-токену. Полный OAuth 2.1 — отдельный план (План 2).</p>
+ *
+ * <p>{@code @Component}, а не {@code @EnableConfigurationProperties}: бин нужен
+ * всегда (в т.ч. при {@code mcp.enabled=false}), т.к. от него зависит
+ * {@link McpDebugAuthFilter}, который регистрируется в SecurityConfig безусловно.</p>
  */
+@Component
 @ConfigurationProperties(prefix = "mcp")
 public class McpProperties {
 

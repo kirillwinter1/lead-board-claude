@@ -9,16 +9,22 @@ import io.modelcontextprotocol.server.McpSyncServer;
 import io.modelcontextprotocol.server.transport.HttpServletStreamableServerTransportProvider;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
+import io.modelcontextprotocol.common.McpTransportContext;
 import com.leadboard.chat.tools.ChatToolExecutor;
 import com.leadboard.chat.tools.ChatToolRegistry;
+import com.leadboard.tenant.TenantContext;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.web.servlet.ServletRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Поднимает remote MCP-сервер на {@code /mcp} (Streamable HTTP транспорт через servlet).
@@ -27,7 +33,6 @@ import java.util.List;
  * <p>Инструменты F52 подключаются адаптером {@link McpToolAdapter} (см. mcpSyncServer).</p>
  */
 @Configuration
-@EnableConfigurationProperties(McpProperties.class)
 @ConditionalOnProperty(prefix = "mcp", name = "enabled", havingValue = "true")
 public class McpServerConfig {
 
@@ -44,6 +49,21 @@ public class McpServerConfig {
         return HttpServletStreamableServerTransportProvider.builder()
                 .jsonMapper(jsonMapper)
                 .mcpEndpoint("/mcp")
+                // Захват tenant + auth в потоке HTTP-запроса (где их установил McpDebugAuthFilter)
+                // и проброс в McpTransportContext, т.к. tool-handler выполняется в другом потоке.
+                .contextExtractor((HttpServletRequest request) -> {
+                    Map<String, Object> ctx = new HashMap<>();
+                    Long tenantId = TenantContext.getCurrentTenantId();
+                    if (tenantId != null) {
+                        ctx.put(McpToolAdapter.CTX_TENANT_ID, tenantId);
+                        ctx.put(McpToolAdapter.CTX_SCHEMA, TenantContext.getCurrentSchema());
+                    }
+                    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                    if (auth != null) {
+                        ctx.put(McpToolAdapter.CTX_AUTH, auth);
+                    }
+                    return McpTransportContext.create(ctx);
+                })
                 .build();
     }
 

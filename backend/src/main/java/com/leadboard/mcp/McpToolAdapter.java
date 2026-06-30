@@ -7,8 +7,11 @@ import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
+import com.leadboard.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
@@ -23,6 +26,11 @@ import java.util.List;
 public class McpToolAdapter {
 
     private static final Logger log = LoggerFactory.getLogger(McpToolAdapter.class);
+
+    /** Ключи проброса контекста запроса в поток выполнения инструмента (см. McpServerConfig.contextExtractor). */
+    public static final String CTX_TENANT_ID = "leadboard.tenantId";
+    public static final String CTX_SCHEMA = "leadboard.schema";
+    public static final String CTX_AUTH = "leadboard.auth";
 
     private final ChatToolRegistry registry;
     private final ChatToolExecutor executor;
@@ -51,13 +59,43 @@ public class McpToolAdapter {
         return SyncToolSpecification.builder()
                 .tool(tool)
                 .callHandler((exchange, request) -> {
-                    String argsJson = writeJson(request.arguments());
-                    String resultJson = executor.executeTool(request.name(), argsJson);
-                    return CallToolResult.builder()
-                            .addTextContent(resultJson)
-                            .build();
+                    // Восстанавливаем tenant + auth в потоке выполнения инструмента
+                    // (ThreadLocal'ы фильтра здесь не видны — проброшены через transportContext).
+                    boolean ctxSet = applyContext(exchange);
+                    try {
+                        String argsJson = writeJson(request.arguments());
+                        String resultJson = executor.executeTool(request.name(), argsJson);
+                        return CallToolResult.builder()
+                                .addTextContent(resultJson)
+                                .build();
+                    } finally {
+                        if (ctxSet) {
+                            TenantContext.clear();
+                            SecurityContextHolder.clearContext();
+                        }
+                    }
                 })
                 .build();
+    }
+
+    private boolean applyContext(io.modelcontextprotocol.server.McpSyncServerExchange exchange) {
+        if (exchange == null || exchange.transportContext() == null) {
+            return false;
+        }
+        var ctx = exchange.transportContext();
+        Object tenantId = ctx.get(CTX_TENANT_ID);
+        Object schema = ctx.get(CTX_SCHEMA);
+        Object auth = ctx.get(CTX_AUTH);
+        boolean set = false;
+        if (tenantId instanceof Long tid && schema instanceof String s) {
+            TenantContext.setTenant(tid, s);
+            set = true;
+        }
+        if (auth instanceof Authentication a) {
+            SecurityContextHolder.getContext().setAuthentication(a);
+            set = true;
+        }
+        return set;
     }
 
     private String writeJson(Object obj) {
