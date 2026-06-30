@@ -1,5 +1,6 @@
 package com.leadboard.insight;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
@@ -26,13 +27,17 @@ public class InsightEngine {
     private static final int MAX_KEYS = 15;
 
     private final JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
 
-    public InsightEngine(JiraIssueRepository issueRepository) {
+    public InsightEngine(JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
         this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
     }
 
     public TeamReadiness briefing(Long teamId) {
-        List<JiraIssueEntity> stories = issueRepository.findActiveStoriesForReadiness(teamId);
+        List<JiraIssueEntity> stories = issueRepository.findActiveStoriesForReadiness(teamId).stream()
+                .filter(s -> !isDone(s))
+                .toList();
         return new TeamReadiness(
                 teamId,
                 planningLens(stories),
@@ -106,6 +111,14 @@ public class InsightEngine {
                 "Самая длинная очередь: " + bottleneck,
                 List.of("Стадия с наибольшим числом историй — кандидат на бутылочное горло"),
                 List.of());
+    }
+
+    private boolean isDone(JiraIssueEntity s) {
+        try {
+            return workflowConfigService.isDone(s.getStatus(), s.getIssueType());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private boolean hasQuarter(JiraIssueEntity s) {

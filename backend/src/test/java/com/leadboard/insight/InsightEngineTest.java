@@ -1,5 +1,6 @@
 package com.leadboard.insight;
 
+import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class InsightEngineTest {
                 story("LB-3", "2026Q3", true)
         ));
 
-        InsightEngine engine = new InsightEngine(repo);
+        InsightEngine engine = new InsightEngine(repo, mock(WorkflowConfigService.class));
         TeamReadiness r = engine.briefing(1L);
 
         assertEquals("RED", r.planning().level());
@@ -53,7 +54,7 @@ class InsightEngineTest {
                 story("LB-2", "2026Q3", true)
         ));
 
-        InsightEngine engine = new InsightEngine(repo);
+        InsightEngine engine = new InsightEngine(repo, mock(WorkflowConfigService.class));
         TeamReadiness r = engine.briefing(1L);
 
         assertEquals("GREEN", r.planning().level());
@@ -68,7 +69,7 @@ class InsightEngineTest {
                 story("LB-2", "2026Q3", true)
         ));
 
-        InsightEngine engine = new InsightEngine(repo);
+        InsightEngine engine = new InsightEngine(repo, mock(WorkflowConfigService.class));
         TeamReadiness r = engine.briefing(1L);
 
         assertTrue(r.dataQuality().issueKeys().contains("LB-1"));
@@ -76,11 +77,32 @@ class InsightEngineTest {
     }
 
     @Test
+    void excludesDoneStoriesFromCounts() {
+        JiraIssueRepository repo = mock(JiraIssueRepository.class);
+        JiraIssueEntity active = story("LB-1", null, false);
+        JiraIssueEntity done = story("LB-2", null, false);
+        done.setStatus("Готово");
+        when(repo.findActiveStoriesForReadiness(1L)).thenReturn(List.of(active, done));
+
+        WorkflowConfigService wcs = mock(WorkflowConfigService.class);
+        when(wcs.isDone("Готово", "История")).thenReturn(true);
+        when(wcs.isDone("Новое", "История")).thenReturn(false);
+
+        InsightEngine engine = new InsightEngine(repo, wcs);
+        TeamReadiness r = engine.briefing(1L);
+
+        // only the active story counts; done one excluded
+        assertTrue(r.planning().issueKeys().contains("LB-1"));
+        assertFalse(r.planning().issueKeys().contains("LB-2"));
+        assertTrue(r.planning().headline().contains("из 1"));
+    }
+
+    @Test
     void allFourLensesPresent() {
         JiraIssueRepository repo = mock(JiraIssueRepository.class);
         when(repo.findActiveStoriesForReadiness(null)).thenReturn(List.of());
 
-        InsightEngine engine = new InsightEngine(repo);
+        InsightEngine engine = new InsightEngine(repo, mock(WorkflowConfigService.class));
         TeamReadiness r = engine.briefing(null);
 
         assertNotNull(r.planning());
