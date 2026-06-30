@@ -1,6 +1,6 @@
 # F80 — ИИ-компаньон через MCP-сервер
 
-**Статус:** 🚧 В работе — План 1 (MCP-сервер + 14 инструментов F52 + брифинг + bearer-auth, ПК) + Фаза write (30 инструментов: Jira write — transition/log_work/create/comment/assign, доска write — triage/quarter/boost/estimate, read-планирование — capacity/demand/forecast/worklog/open-tasks; аудит-логи; все write с подтверждением). План 2 (OAuth 2.1, деплой, телефон) — следующий.
+**Статус:** ✅ Развёрнуто — План 1 (MCP+16 инструментов) + Фаза write (30 инструментов) + План 2 (OAuth 2.1 на onelane.ru, подключение с телефона через claude.ai). Деплой на прод выполнен.
 **Версия:** 0.80.0
 **Дата проектирования:** 2026-06-30
 **План реализации:** `docs/superpowers/plans/2026-06-30-f80-mcp-companion-plan1.md`
