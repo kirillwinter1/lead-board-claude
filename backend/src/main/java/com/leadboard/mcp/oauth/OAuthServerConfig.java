@@ -36,6 +36,7 @@ import org.springframework.security.oauth2.server.authorization.client.JdbcRegis
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.settings.ClientSettings;
@@ -86,8 +87,10 @@ public class OAuthServerConfig {
         http.getConfigurer(OAuth2AuthorizationServerConfigurer.class)
                 .oidc(Customizer.withDefaults());
         http
-                // переиспользуем session-аутентификацию: tenant + LeadBoardAuthentication из cookie
-                .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
+                // переиспользуем session-аутентификацию: tenant + LeadBoardAuthentication из cookie.
+                // ВАЖНО: ставим ДО AuthorizationServerContextFilter, чтобы principal был установлен
+                // к моменту обработки /oauth2/authorize.
+                .addFilterAfter(tenantFilter, SecurityContextHolderFilter.class)
                 .addFilterAfter(authenticationFilter, TenantFilter.class)
                 // если не залогинен — отправляем на наш вход (Atlassian), не на дефолтный form login
                 .exceptionHandling(e -> e.defaultAuthenticationEntryPointFor(
@@ -123,16 +126,16 @@ public class OAuthServerConfig {
         return new JdbcRegisteredClientRepository(jdbcTemplate);
     }
 
+    // In-memory: избегаем JDBC-сериализации кастомного principal (LeadBoardAuthentication),
+    // которая ломает authorize. Persistence токенов и так эфемерна (RSA-ключ генерируется при старте).
     @Bean
-    public OAuth2AuthorizationService oauth2AuthorizationService(JdbcTemplate jdbcTemplate,
-                                                                RegisteredClientRepository repo) {
-        return new JdbcOAuth2AuthorizationService(jdbcTemplate, repo);
+    public OAuth2AuthorizationService oauth2AuthorizationService() {
+        return new org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationService();
     }
 
     @Bean
-    public OAuth2AuthorizationConsentService consentService(JdbcTemplate jdbcTemplate,
-                                                            RegisteredClientRepository repo) {
-        return new JdbcOAuth2AuthorizationConsentService(jdbcTemplate, repo);
+    public OAuth2AuthorizationConsentService consentService() {
+        return new org.springframework.security.oauth2.server.authorization.InMemoryOAuth2AuthorizationConsentService();
     }
 
     /** Регистрирует клиента claude-ai при старте (pre-registration вместо анонимной DCR). */
