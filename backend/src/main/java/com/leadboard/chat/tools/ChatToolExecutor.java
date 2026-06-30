@@ -10,6 +10,7 @@ import com.leadboard.board.BoardService;
 import com.leadboard.chat.embedding.EmbeddingService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.insight.InsightEngine;
+import com.leadboard.jira.JiraWriteService;
 import com.leadboard.metrics.dto.TeamMetricsSummary;
 import com.leadboard.metrics.service.BugMetricsService;
 import com.leadboard.metrics.service.TeamMetricsService;
@@ -47,6 +48,7 @@ public class ChatToolExecutor {
     private final BugSlaService bugSlaService;
     private final EmbeddingService embeddingService;
     private final InsightEngine insightEngine;
+    private final JiraWriteService jiraWriteService;
     private final ObjectMapper objectMapper;
 
     public ChatToolExecutor(
@@ -64,6 +66,7 @@ public class ChatToolExecutor {
             BugSlaService bugSlaService,
             EmbeddingService embeddingService,
             InsightEngine insightEngine,
+            JiraWriteService jiraWriteService,
             ObjectMapper objectMapper
     ) {
         this.issueRepository = issueRepository;
@@ -80,6 +83,7 @@ public class ChatToolExecutor {
         this.bugSlaService = bugSlaService;
         this.embeddingService = embeddingService;
         this.insightEngine = insightEngine;
+        this.jiraWriteService = jiraWriteService;
         this.objectMapper = objectMapper;
     }
 
@@ -105,6 +109,12 @@ public class ChatToolExecutor {
                 case "team_members" -> teamMembers(args);
                 case "epic_progress" -> epicProgress(args);
                 case "team_readiness_briefing" -> teamReadinessBriefing(args);
+                // --- F80 write tools (modify Jira; client must confirm before calling) ---
+                case "transition_issue" -> transitionIssue(args);
+                case "log_work" -> logWork(args);
+                case "create_issue" -> createIssueTool(args);
+                case "add_comment" -> addCommentTool(args);
+                case "assign_issue" -> assignIssueTool(args);
                 default -> toJson(Map.of("error", "Unknown tool: " + toolName));
             };
         } catch (Exception e) {
@@ -705,6 +715,111 @@ public class ChatToolExecutor {
             return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
         }
         return toJson(insightEngine.briefing(teamId));
+    }
+
+    // ===================== F80 write tools =====================
+
+    private String strParam(JsonNode args, String name) {
+        return args.has(name) && !args.get(name).isNull() ? args.get(name).asText() : null;
+    }
+
+    private String transitionIssue(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String issueKey = strParam(args, "issueKey");
+        String target = strParam(args, "targetStatus");
+        if (issueKey == null || target == null) {
+            return toJson(Map.of("error", "issueKey and targetStatus are required"));
+        }
+        try {
+            String newStatus = jiraWriteService.transition(issueKey, target);
+            return toJson(Map.of("ok", true, "issueKey", issueKey, "newStatus", newStatus));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String logWork(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String issueKey = strParam(args, "issueKey");
+        if (issueKey == null || !args.has("hours")) {
+            return toJson(Map.of("error", "issueKey and hours are required"));
+        }
+        double hours = args.get("hours").asDouble();
+        if (hours <= 0) {
+            return toJson(Map.of("error", "hours must be positive"));
+        }
+        LocalDate date = LocalDate.now();
+        String dateStr = strParam(args, "date");
+        if (dateStr != null) {
+            try {
+                date = LocalDate.parse(dateStr);
+            } catch (Exception e) {
+                return toJson(Map.of("error", "date must be ISO yyyy-MM-dd"));
+            }
+        }
+        try {
+            int seconds = (int) Math.round(hours * 3600);
+            jiraWriteService.logWork(issueKey, seconds, date);
+            return toJson(Map.of("ok", true, "issueKey", issueKey, "hours", hours, "date", date.toString()));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String createIssueTool(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String kind = strParam(args, "kind");
+        String summary = strParam(args, "summary");
+        String parentEpicKey = strParam(args, "parentEpicKey");
+        if (summary == null || summary.isBlank()) {
+            return toJson(Map.of("error", "summary is required"));
+        }
+        try {
+            String key = jiraWriteService.createIssue(kind != null ? kind : "story", summary, parentEpicKey);
+            return toJson(Map.of("ok", true, "issueKey", key));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String addCommentTool(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String issueKey = strParam(args, "issueKey");
+        String text = strParam(args, "text");
+        if (issueKey == null || text == null || text.isBlank()) {
+            return toJson(Map.of("error", "issueKey and text are required"));
+        }
+        try {
+            jiraWriteService.comment(issueKey, text);
+            return toJson(Map.of("ok", true, "issueKey", issueKey));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private String assignIssueTool(JsonNode args) {
+        if (!authorizationService.isAuthenticated()) {
+            return toJson(Map.of("error", "Authentication required"));
+        }
+        String issueKey = strParam(args, "issueKey");
+        String accountId = strParam(args, "accountId");
+        if (issueKey == null) {
+            return toJson(Map.of("error", "issueKey is required"));
+        }
+        try {
+            jiraWriteService.assign(issueKey, accountId);
+            return toJson(Map.of("ok", true, "issueKey", issueKey, "accountId", accountId == null ? "unassigned" : accountId));
+        } catch (Exception e) {
+            return toJson(Map.of("error", e.getMessage()));
+        }
     }
 
     private String categorizeStatus(String issueType, String status) {

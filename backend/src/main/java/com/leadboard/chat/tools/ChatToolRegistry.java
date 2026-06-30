@@ -173,6 +173,70 @@ public class ChatToolRegistry {
                                 ),
                                 "required", List.of()
                         )
+                ),
+                // ===================== F80 WRITE tools =====================
+                // Each MODIFIES Jira. ALWAYS confirm the exact action with the user before calling.
+                new LlmToolDefinition(
+                        "transition_issue",
+                        "⚠️ WRITE — moves an issue to another status in Jira (e.g. take in progress, close). ALWAYS confirm with the user before calling. targetStatus can be a status name or intent like 'in progress'/'done'.",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "issueKey", Map.of("type", "string", "description", "Issue key, e.g. LB-123"),
+                                        "targetStatus", Map.of("type", "string", "description", "Target status name or intent (in progress / done)")
+                                ),
+                                "required", List.of("issueKey", "targetStatus")
+                        )
+                ),
+                new LlmToolDefinition(
+                        "log_work",
+                        "⚠️ WRITE — logs work time on an issue in Jira under the current user. ALWAYS confirm with the user before calling. hours is decimal (e.g. 1.5). date optional (ISO yyyy-MM-dd, default today).",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "issueKey", Map.of("type", "string", "description", "Issue key, e.g. LB-123"),
+                                        "hours", Map.of("type", "number", "description", "Hours worked (decimal), e.g. 5 or 1.5"),
+                                        "date", Map.of("type", "string", "description", "Work date ISO yyyy-MM-dd (default: today)")
+                                ),
+                                "required", List.of("issueKey", "hours")
+                        )
+                ),
+                new LlmToolDefinition(
+                        "create_issue",
+                        "⚠️ WRITE — creates a Story or Bug in Jira (Epics/Projects are NOT allowed). ALWAYS confirm with the user before calling. parentEpicKey optional (links Story to an Epic and sets the project).",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "kind", Map.of("type", "string", "description", "story or bug"),
+                                        "summary", Map.of("type", "string", "description", "Title of the issue"),
+                                        "parentEpicKey", Map.of("type", "string", "description", "Optional epic key to link to, e.g. LB-100")
+                                ),
+                                "required", List.of("summary")
+                        )
+                ),
+                new LlmToolDefinition(
+                        "add_comment",
+                        "⚠️ WRITE — adds a comment to an issue in Jira. ALWAYS confirm with the user before calling.",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "issueKey", Map.of("type", "string", "description", "Issue key, e.g. LB-123"),
+                                        "text", Map.of("type", "string", "description", "Comment text")
+                                ),
+                                "required", List.of("issueKey", "text")
+                        )
+                ),
+                new LlmToolDefinition(
+                        "assign_issue",
+                        "⚠️ WRITE — assigns an issue to a user in Jira (omit accountId to unassign). ALWAYS confirm with the user before calling.",
+                        Map.of(
+                                "type", "object",
+                                "properties", Map.of(
+                                        "issueKey", Map.of("type", "string", "description", "Issue key, e.g. LB-123"),
+                                        "accountId", Map.of("type", "string", "description", "Atlassian accountId of the assignee (omit to unassign)")
+                                ),
+                                "required", List.of("issueKey")
+                        )
                 )
         );
     }

@@ -61,6 +61,7 @@ class ChatToolExecutorTest {
     @Mock private EmbeddingService embeddingService;
     @Mock private BoardService boardService;
     @Mock private com.leadboard.insight.InsightEngine insightEngine;
+    @Mock private com.leadboard.jira.JiraWriteService jiraWriteService;
 
     private ChatToolExecutor executor;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -72,9 +73,55 @@ class ChatToolExecutorTest {
                 teamMetricsService, workflowConfigService,
                 authorizationService, boardService, bugMetricsService, projectService,
                 riceAssessmentService, absenceService, bugSlaService,
-                embeddingService, insightEngine, objectMapper
+                embeddingService, insightEngine, jiraWriteService, objectMapper
         );
         when(authorizationService.isAdmin()).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("transition_issue delegates to JiraWriteService")
+    void transitionIssueWrites() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(jiraWriteService.transition("LB-1", "in progress")).thenReturn("Developing");
+
+        String result = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"in progress\"}");
+
+        assertTrue(result.contains("Developing"));
+        verify(jiraWriteService).transition("LB-1", "in progress");
+    }
+
+    @Test
+    @DisplayName("log_work converts hours to seconds")
+    void logWorkConvertsHours() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+
+        String result = executor.executeTool("log_work", "{\"issueKey\":\"LB-1\",\"hours\":5}");
+
+        assertTrue(result.contains("\"ok\":true"));
+        verify(jiraWriteService).logWork(eq("LB-1"), eq(18000), any());
+    }
+
+    @Test
+    @DisplayName("write tool denied when not authenticated")
+    void writeDeniedWhenAnonymous() {
+        when(authorizationService.isAuthenticated()).thenReturn(false);
+
+        String result = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"done\"}");
+
+        assertTrue(result.contains("Authentication required"));
+        verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    @DisplayName("create_issue delegates and returns key")
+    void createIssueWrites() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(jiraWriteService.createIssue("story", "New story", "LB-100")).thenReturn("LB-555");
+
+        String result = executor.executeTool("create_issue", "{\"kind\":\"story\",\"summary\":\"New story\",\"parentEpicKey\":\"LB-100\"}");
+
+        assertTrue(result.contains("LB-555"));
+        verify(jiraWriteService).createIssue("story", "New story", "LB-100");
     }
 
     @Test

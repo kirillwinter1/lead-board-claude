@@ -441,6 +441,50 @@ public class JiraClient {
                 .block();
     }
 
+    /**
+     * Add a comment to an issue using explicit OAuth credentials (F80 write).
+     * Body is wrapped in Atlassian Document Format (ADF).
+     */
+    public void addComment(String issueKey, String text, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        Map<String, Object> adf = Map.of(
+                "type", "doc",
+                "version", 1,
+                "content", List.of(Map.of(
+                        "type", "paragraph",
+                        "content", List.of(Map.of("type", "text", "text", text))
+                ))
+        );
+
+        webClient.post()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/comment")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .bodyValue(Map.of("body", adf))
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
+    /**
+     * Assign an issue to a user using explicit OAuth credentials (F80 write).
+     * Pass accountId=null to unassign.
+     */
+    public void assignIssue(String issueKey, String accountId, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("accountId", accountId); // null => unassign
+
+        webClient.put()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/assignee?notifyUsers=false")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .bodyValue(body)
+                .retrieve()
+                .toBodilessEntity()
+                .block();
+    }
+
     // ============================================================
     // Simulation methods — Basic Auth fallback (system API token)
     // ============================================================
