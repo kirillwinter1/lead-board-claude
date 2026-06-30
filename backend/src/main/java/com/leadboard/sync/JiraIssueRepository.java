@@ -37,6 +37,15 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     List<JiraIssueEntity> findByParentKeyIn(List<String> parentKeys);
 
+    /**
+     * Активные истории для брифинга готовности (F80). Категория STORY; если задан
+     * teamId — только этой команды. Фильтр «не done» выполняется в InsightEngine
+     * через WorkflowConfigService (статусы конфигурируемы, не хардкодим здесь).
+     */
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.boardCategory = 'STORY' "
+            + "AND (:teamId IS NULL OR e.teamId = :teamId)")
+    List<JiraIssueEntity> findActiveStoriesForReadiness(@Param("teamId") Long teamId);
+
     void deleteByProjectKey(String projectKey);
 
     @Query("SELECT e.issueKey FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")
