@@ -122,6 +122,11 @@ mcp:
   debug-token: ${MCP_DEBUG_TOKEN:}
   debug-tenant-slug: ${MCP_DEBUG_TENANT_SLUG:}
   debug-account-id: ${MCP_DEBUG_ACCOUNT_ID:}
+  # OAuth 2.1 (phone / claude.ai). When true, /mcp is protected by JWT instead of debug token.
+  oauth-enabled: ${MCP_OAUTH_ENABLED:false}
+  issuer: ${MCP_ISSUER:http://localhost:8080}
+  client-id: ${MCP_CLIENT_ID:claude-ai}
+  client-secret: ${MCP_CLIENT_SECRET:}
 
 simulation:
   enabled: ${SIMULATION_ENABLED:false}

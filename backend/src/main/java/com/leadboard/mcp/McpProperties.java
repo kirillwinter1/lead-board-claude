@@ -29,6 +29,23 @@ public class McpProperties {
     /** atlassian_account_id отладочного пользователя. */
     private String debugAccountId = "";
 
+    /** Включён ли OAuth 2.1 (для подключения с телефона/claude.ai). Если true — /mcp защищён JWT, а не debug-токеном. */
+    private boolean oauthEnabled = false;
+
+    /** Публичный issuer OAuth Authorization Server (напр. https://leadboard.ru). Локально http://localhost:8080. */
+    private String issuer = "http://localhost:8080";
+
+    /** Pre-registered client_id для claude.ai. */
+    private String clientId = "claude-ai";
+
+    /** Pre-registered client_secret для claude.ai (впишется в Advanced settings коннектора). */
+    private String clientSecret = "";
+
+    /** Канонический URI MCP-ресурса для audience (обычно issuer + /mcp). */
+    public String resourceUri() {
+        return issuer.endsWith("/") ? issuer + "mcp" : issuer + "/mcp";
+    }
+
     public boolean isEnabled() {
         return enabled;
     }
@@ -59,5 +76,37 @@ public class McpProperties {
 
     public void setDebugAccountId(String debugAccountId) {
         this.debugAccountId = debugAccountId;
+    }
+
+    public boolean isOauthEnabled() {
+        return oauthEnabled;
+    }
+
+    public void setOauthEnabled(boolean oauthEnabled) {
+        this.oauthEnabled = oauthEnabled;
+    }
+
+    public String getIssuer() {
+        return issuer;
+    }
+
+    public void setIssuer(String issuer) {
+        this.issuer = issuer;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public String getClientSecret() {
+        return clientSecret;
+    }
+
+    public void setClientSecret(String clientSecret) {
+        this.clientSecret = clientSecret;
     }
 }
