@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.leadboard"
-version = "0.79.0"
+version = "0.80.0"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -29,6 +29,13 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql:10.10.0")
     runtimeOnly("org.postgresql:postgresql")
     implementation("me.paulschwarz:spring-dotenv:4.0.0")
+
+    // MCP server (Model Context Protocol) — Streamable HTTP transport via servlet (F80)
+    // 0.18.3: last line before 2.0 restructure; uses Jackson 2 (compatible with Spring Boot 3.2.x)
+    implementation(platform("io.modelcontextprotocol.sdk:mcp-bom:0.18.3"))
+    implementation("io.modelcontextprotocol.sdk:mcp")
+    implementation("io.modelcontextprotocol.sdk:mcp-spring-webmvc")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.security:spring-security-test")
     testImplementation("com.h2database:h2")
