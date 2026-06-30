@@ -62,13 +62,23 @@ public class McpToolAdapter {
                     // Восстанавливаем tenant + auth в потоке выполнения инструмента
                     // (ThreadLocal'ы фильтра здесь не видны — проброшены через transportContext).
                     boolean ctxSet = applyContext(exchange);
+                    long startNanos = System.nanoTime();
+                    String user = currentUser();
+                    Long tenant = TenantContext.getCurrentTenantId();
+                    String argsJson = writeJson(request.arguments());
+                    log.info("MCP tool call: tool={} user={} tenant={} args={}",
+                            request.name(), user, tenant, truncate(argsJson));
+                    boolean ok = false;
                     try {
-                        String argsJson = writeJson(request.arguments());
                         String resultJson = executor.executeTool(request.name(), argsJson);
+                        ok = resultJson == null || !resultJson.contains("\"error\"");
                         return CallToolResult.builder()
                                 .addTextContent(resultJson)
                                 .build();
                     } finally {
+                        long ms = (System.nanoTime() - startNanos) / 1_000_000;
+                        log.info("MCP tool done: tool={} user={} tenant={} ms={} ok={}",
+                                request.name(), user, tenant, ms, ok);
                         if (ctxSet) {
                             TenantContext.clear();
                             SecurityContextHolder.clearContext();
@@ -76,6 +86,22 @@ public class McpToolAdapter {
                     }
                 })
                 .build();
+    }
+
+    private String currentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof com.leadboard.auth.LeadBoardAuthentication lba) {
+            return lba.getAtlassianAccountId();
+        }
+        return "anonymous";
+    }
+
+    /** Обрезает длинные аргументы в логе (например, текст семантического запроса). */
+    private String truncate(String s) {
+        if (s == null) {
+            return "{}";
+        }
+        return s.length() <= 300 ? s : s.substring(0, 300) + "…";
     }
 
     private boolean applyContext(io.modelcontextprotocol.server.McpSyncServerExchange exchange) {
