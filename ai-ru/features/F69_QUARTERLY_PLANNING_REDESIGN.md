@@ -69,7 +69,7 @@
   - `GET /api/quarterly-planning/quarters/{quarter}/epics` — список эпиков с `priorityScore`, `demandByRole`, флагами `hasEstimate`/`hasTeamMapping`, `overloadedTeams`
   - `POST /api/quarterly-planning/epics/{epicKey}/quarter` — body `{ quarter: "2026Q2" | null }`, пишет/удаляет label в Jira атомарно
   - `POST /api/quarterly-planning/epics/{epicKey}/boost` — body `{ boost: -50..50 }`
-- Авторизация: ROLE_ADMIN или ROLE_PROJECT_MANAGER на mutate endpoints
+- Авторизация на epic-уровневых mutate endpoints (`/epics/{key}/quarter`, `/epics/{key}/boost`): ROLE_ADMIN, ROLE_PROJECT_MANAGER или ROLE_TEAM_LEAD — TEAM_LEAD является основным пользователем доски планирования и должен иметь возможность публиковать изменения. Project-уровневые операции (`/projects/{key}/desired-quarter`, `/projects/{key}/boost`) остаются ADMIN/PROJECT_MANAGER (PM-решение, F70).
 - `JiraClient.updateLabels(issueKey, labels)` — `PUT /rest/api/3/issue/{key}` через JiraConfigResolver
 - 4 новых метода в `QuarterlyPlanningService`: `getEpicsForQuarter`, `assignEpicToQuarter`, `removeEpicFromQuarter`, `setEpicBoost`
 - 2 новых DTO: `PlanningEpicDto`, `QuarterlyEpicsResponse`
