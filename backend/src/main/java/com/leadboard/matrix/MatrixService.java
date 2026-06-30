@@ -1,0 +1,170 @@
+package com.leadboard.matrix;
+
+import com.leadboard.config.entity.BoardCategory;
+import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
+import com.leadboard.sync.JiraIssueEntity;
+import com.leadboard.sync.JiraIssueRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * F77 Eisenhower Matrix MVP — backlog triage of orphan tasks.
+ *
+ * <p>An "orphan" task is a top-level Story/Task ({@code board_category = STORY},
+ * {@code parent_key IS NULL}) that is not yet "done". Subtasks and epics never appear
+ * in the matrix; bugs are excluded too (F78 — they are handled by recommendations,
+ * not triaged here). Tasks are grouped by their manually-assigned Eisenhower quadrant
+ * (P1/P2/P3/P4) or land in {@code unassigned} when no quadrant is set.</p>
+ *
+ * <p>Multi-tenancy: queries run against the tenant schema selected by
+ * {@code TenantContext} (search_path) — no schema handling is needed here.</p>
+ */
+@Service
+public class MatrixService {
+
+    private static final String STORY_CATEGORY = "STORY";
+    static final Set<String> VALID_QUADRANTS = Set.of("P1", "P2", "P3", "P4");
+
+    private final JiraIssueRepository issueRepository;
+    private final WorkflowConfigService workflowConfigService;
+    private final StatusAgeService statusAgeService;
+
+    public MatrixService(JiraIssueRepository issueRepository,
+                         WorkflowConfigService workflowConfigService,
+                         StatusAgeService statusAgeService) {
+        this.issueRepository = issueRepository;
+        this.workflowConfigService = workflowConfigService;
+        this.statusAgeService = statusAgeService;
+    }
+
+    /**
+     * Builds the Eisenhower matrix for a team: orphan, non-done tasks grouped by quadrant.
+     */
+    @Transactional(readOnly = true)
+    public MatrixViewDto getMatrix(Long teamId) {
+        List<JiraIssueEntity> orphans = loadOrphans(teamId);
+
+        List<MatrixCardDto> p1 = new ArrayList<>();
+        List<MatrixCardDto> p2 = new ArrayList<>();
+        List<MatrixCardDto> p3 = new ArrayList<>();
+        List<MatrixCardDto> p4 = new ArrayList<>();
+        List<MatrixCardDto> unassigned = new ArrayList<>();
+
+        // "Done" and bug filtering are in-service (config-driven), never in SQL.
+        // Bugs are not triaged in the matrix (F78) — they live in recommendations only.
+        List<JiraIssueEntity> kept = orphans.stream()
+                .filter(issue -> !isDone(issue) && !isBug(issue))
+                .toList();
+
+        // F79: compute "days in status" once for the whole rendered set (batch, no N+1).
+        Map<String, StatusAge> statusAges = statusAgeService.compute(kept);
+        if (statusAges == null) {
+            statusAges = Map.of();
+        }
+
+        for (JiraIssueEntity issue : kept) {
+            MatrixCardDto card = toCard(issue, statusAges.get(issue.getIssueKey()));
+            switch (card.quadrant() == null ? "" : card.quadrant()) {
+                case "P1" -> p1.add(card);
+                case "P2" -> p2.add(card);
+                case "P3" -> p3.add(card);
+                case "P4" -> p4.add(card);
+                default -> unassigned.add(card);
+            }
+        }
+
+        return new MatrixViewDto(p1, p2, p3, p4, unassigned);
+    }
+
+    /**
+     * Sets or clears the Eisenhower quadrant of an orphan task.
+     *
+     * @param issueKey the task key (must exist and be a valid orphan = no parent, STORY)
+     * @param quadrant one of P1/P2/P3/P4, or {@code null} to clear (back to unassigned)
+     * @throws IllegalArgumentException        when {@code quadrant} is not a valid value
+     * @throws MatrixIssueNotFoundException    when the issue is missing or not a valid orphan
+     */
+    @Transactional
+    public MatrixCardDto triage(String issueKey, String quadrant) {
+        String normalized = normalizeQuadrant(quadrant);
+
+        JiraIssueEntity issue = issueRepository.findByIssueKey(issueKey)
+                .orElseThrow(() -> new MatrixIssueNotFoundException("Issue not found: " + issueKey));
+
+        if (issue.getParentKey() != null || !STORY_CATEGORY.equals(issue.getBoardCategory())) {
+            throw new MatrixIssueNotFoundException(
+                    "Issue is not a triageable orphan task: " + issueKey);
+        }
+
+        issue.setEisenhowerQuadrant(normalized);
+        issueRepository.save(issue);
+        Map<String, StatusAge> statusAges = statusAgeService.compute(List.of(issue));
+        StatusAge age = statusAges == null ? null : statusAges.get(issue.getIssueKey());
+        return toCard(issue, age);
+    }
+
+    /**
+     * Validates the quadrant input. Blank strings are treated as "clear" (null).
+     */
+    private String normalizeQuadrant(String quadrant) {
+        if (quadrant == null || quadrant.isBlank()) {
+            return null;
+        }
+        String upper = quadrant.trim().toUpperCase();
+        if (!VALID_QUADRANTS.contains(upper)) {
+            throw new IllegalArgumentException(
+                    "Invalid quadrant '" + quadrant + "'. Allowed: P1, P2, P3, P4 or null.");
+        }
+        return upper;
+    }
+
+    private MatrixCardDto toCard(JiraIssueEntity issue, StatusAge statusAge) {
+        Double estimateHours = issue.getOriginalEstimateSeconds() == null
+                ? null
+                : issue.getOriginalEstimateSeconds() / 3600.0;
+        StatusAge age = statusAge != null ? statusAge : StatusAge.normal(null);
+        return new MatrixCardDto(
+                issue.getIssueKey(),
+                issue.getSummary(),
+                issue.getIssueType(),
+                issue.getPriority(),
+                estimateHours,
+                issue.getAssigneeDisplayName(),
+                issue.getStatus(),
+                issue.getEisenhowerQuadrant(),
+                age.daysInStatus(),
+                age.level(),
+                age.reason()
+        );
+    }
+
+    /** Loads top-level orphan tasks (board_category=STORY, no parent) for the team. */
+    List<JiraIssueEntity> loadOrphans(Long teamId) {
+        return issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(teamId, STORY_CATEGORY);
+    }
+
+    /**
+     * Loads top-level orphan bugs for the team. Bugs are their own board category
+     * (not STORY), so they are queried separately — used by Zero Bug Policy (F78).
+     */
+    List<JiraIssueEntity> loadOrphanBugs(Long teamId) {
+        return issueRepository.findByTeamIdAndParentKeyIsNullAndBoardCategory(teamId, BoardCategory.BUG.name());
+    }
+
+    /** Config-driven "done" check for an issue. */
+    boolean isDone(JiraIssueEntity issue) {
+        return workflowConfigService.isDone(issue.getStatus(), issue.getIssueType(), issue.getProjectKey());
+    }
+
+    /** Config-driven "bug" check for an issue (never hardcode the type name). */
+    boolean isBug(JiraIssueEntity issue) {
+        return workflowConfigService.isBug(issue.getIssueType());
+    }
+}

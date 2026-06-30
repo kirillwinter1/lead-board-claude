@@ -1,6 +1,7 @@
 package com.leadboard.config;
 
 import com.leadboard.jira.JiraClientException;
+import com.leadboard.matrix.MatrixIssueNotFoundException;
 import com.leadboard.planning.EpicNotFoundException;
 import com.leadboard.planning.ProjectNotFoundException;
 import com.leadboard.simulation.SimulationNotFoundException;
@@ -87,6 +88,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleProjectNotFound(ProjectNotFoundException ex) {
         // F70: explicit handler so the generic Exception fallback (500) does not
         // swallow the @ResponseStatus(NOT_FOUND) declared on ProjectNotFoundException.
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MatrixIssueNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleMatrixIssueNotFound(MatrixIssueNotFoundException ex) {
+        // F77: explicit handler so the generic Exception fallback (500) does not
+        // swallow the @ResponseStatus(NOT_FOUND) on MatrixIssueNotFoundException.
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(Map.of("error", ex.getMessage()));

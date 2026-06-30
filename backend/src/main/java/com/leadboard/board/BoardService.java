@@ -10,6 +10,8 @@ import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedEpic;
 import com.leadboard.planning.dto.UnifiedPlanningResult.PlannedStory;
 import com.leadboard.quality.DataQualityService;
 import com.leadboard.quality.DataQualityViolation;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.TeamRepository;
@@ -41,6 +43,7 @@ public class BoardService {
     private final DataQualityService dataQualityService;
     private final UnifiedPlanningService unifiedPlanningService;
     private final WorkflowConfigService workflowConfigService;
+    private final StatusAgeService statusAgeService;
 
     @Autowired(required = false)
     private EmbeddingService embeddingService;
@@ -57,7 +60,8 @@ public class BoardService {
                         TeamRepository teamRepository, RoughEstimateProperties roughEstimateProperties,
                         DataQualityService dataQualityService,
                         UnifiedPlanningService unifiedPlanningService,
-                        WorkflowConfigService workflowConfigService) {
+                        WorkflowConfigService workflowConfigService,
+                        StatusAgeService statusAgeService) {
         this.issueRepository = issueRepository;
         this.jiraConfigResolver = jiraConfigResolver;
         this.teamRepository = teamRepository;
@@ -65,6 +69,7 @@ public class BoardService {
         this.dataQualityService = dataQualityService;
         this.unifiedPlanningService = unifiedPlanningService;
         this.workflowConfigService = workflowConfigService;
+        this.statusAgeService = statusAgeService;
     }
 
     public void invalidateBoardCache() {
@@ -196,12 +201,22 @@ public class BoardService {
                     })
                     .collect(Collectors.toList());
 
+            // F79: compute "days in status" + stuck-epic signal once for every issue that
+            // becomes a node (epics + stories + subtasks) — single batch, no per-node query.
+            List<JiraIssueEntity> nodeIssues = new ArrayList<>(filteredEpics);
+            nodeIssues.addAll(stories);
+            nodeIssues.addAll(subtasks);
+            Map<String, StatusAge> statusAges = statusAgeService.compute(nodeIssues);
+            if (statusAges == null) {
+                statusAges = Map.of();
+            }
+
             // Build hierarchy
             Map<String, BoardNode> epicMap = new LinkedHashMap<>();
             Map<String, BoardNode> storyMap = new LinkedHashMap<>();
 
             for (JiraIssueEntity epic : filteredEpics) {
-                BoardNode node = mapToNode(epic, baseUrl, teamNames, teamColors, subtasksByParent);
+                BoardNode node = mapToNode(epic, baseUrl, teamNames, teamColors, subtasksByParent, statusAges);
                 epicMap.put(epic.getIssueKey(), node);
             }
 
@@ -236,7 +251,7 @@ public class BoardService {
             }
 
             for (JiraIssueEntity story : stories) {
-                BoardNode storyNode = mapToNode(story, baseUrl, teamNames, teamColors, subtasksByParent);
+                BoardNode storyNode = mapToNode(story, baseUrl, teamNames, teamColors, subtasksByParent, statusAges);
                 storyMap.put(story.getIssueKey(), storyNode);
 
                 String parentKey = story.getParentKey();
@@ -246,7 +261,7 @@ public class BoardService {
             }
 
             for (JiraIssueEntity subtask : subtasks) {
-                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames, teamColors, subtasksByParent);
+                BoardNode subtaskNode = mapToNode(subtask, baseUrl, teamNames, teamColors, subtasksByParent, statusAges);
 
                 // Use WorkflowConfigService for role detection
                 String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
@@ -347,7 +362,8 @@ public class BoardService {
     }
 
     private BoardNode mapToNode(JiraIssueEntity entity, String baseUrl, Map<Long, String> teamNames,
-                                Map<Long, String> teamColors, Map<String, List<JiraIssueEntity>> subtasksByParent) {
+                                Map<Long, String> teamColors, Map<String, List<JiraIssueEntity>> subtasksByParent,
+                                Map<String, StatusAge> statusAges) {
         String jiraUrl = baseUrl + "/browse/" + entity.getIssueKey();
         BoardNode node = new BoardNode(
                 entity.getIssueKey(),
@@ -358,6 +374,12 @@ public class BoardService {
         );
         node.setProjectKey(entity.getProjectKey());
         node.setPriority(entity.getPriority());
+
+        // F79: surface "days in status" + status-age coloring (NORMAL for missing entries).
+        StatusAge age = statusAges.getOrDefault(entity.getIssueKey(), StatusAge.normal(null));
+        node.setDaysInStatus(age.daysInStatus());
+        node.setStatusAgeLevel(age.level());
+        node.setStatusAgeReason(age.reason());
 
         if (entity.isSubtask()) {
             node.setEstimateSeconds(entity.getEffectiveEstimateSeconds());

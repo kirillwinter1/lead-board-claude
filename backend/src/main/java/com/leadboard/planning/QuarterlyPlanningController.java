@@ -118,7 +118,7 @@ public class QuarterlyPlanningController {
         return ResponseEntity.ok(planningService.getEpicsForQuarter(quarter, onlyDesired, scopedTeamIds()));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")
     @PostMapping("/epics/{epicKey}/quarter")
     public ResponseEntity<PlanningEpicDto> assignEpicToQuarter(
             @PathVariable String epicKey,
@@ -129,7 +129,7 @@ public class QuarterlyPlanningController {
         return ResponseEntity.ok(result);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD')")
     @PostMapping("/epics/{epicKey}/boost")
     public ResponseEntity<PlanningEpicDto> setEpicBoost(
             @PathVariable String epicKey,

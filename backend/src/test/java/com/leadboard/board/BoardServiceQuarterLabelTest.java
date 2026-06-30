@@ -36,6 +36,7 @@ class BoardServiceQuarterLabelTest {
     @Mock private DataQualityService dataQualityService;
     @Mock private UnifiedPlanningService unifiedPlanningService;
     @Mock private WorkflowConfigService workflowConfigService;
+    @Mock private com.leadboard.status.StatusAgeService statusAgeService;
 
     private BoardService boardService;
 
@@ -44,7 +45,7 @@ class BoardServiceQuarterLabelTest {
         boardService = new BoardService(
                 issueRepository, jiraConfigResolver, teamRepository,
                 roughEstimateProperties, dataQualityService,
-                unifiedPlanningService, workflowConfigService
+                unifiedPlanningService, workflowConfigService, statusAgeService
         );
 
         when(jiraConfigResolver.getActiveProjectKeys()).thenReturn(List.of("LB"));

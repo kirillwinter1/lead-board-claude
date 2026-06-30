@@ -76,6 +76,9 @@
 | F74 | Simulation Resilience (Circuit Breaker + Timeout) | 2026-06-27 | [features/F74](features/F74_SIMULATION_RESILIENCE.md) |
 | F75 | Metrics Sparklines (KPI Trend Mini-Charts) | 2026-06-27 | [features/F75](features/F75_METRICS_SPARKLINES.md) |
 | F76 | Throughput by Period — type selector + epic/story split | 2026-06-27 | [features/F76](features/F76_THROUGHPUT_TYPE_SELECTOR.md) |
+| F77 | Eisenhower Matrix — MVP (backlog triage) | 2026-06-27 | [features/F77](features/F77_EISENHOWER_MATRIX_MVP.md) |
+| F78 | Рекомендации автопланера из матрицы (Фаза A) | 2026-06-28 | [features/F78](features/F78_MATRIX_RECOMMENDATIONS.md) |
+| F79 | Дней в статусе + «зависшие эпики» | 2026-06-28 | [features/F79](features/F79_STATUS_AGE.md) |
 
 ## Бэклог (BF)
 

@@ -15,6 +15,7 @@ import { MemberProfilePage } from './pages/MemberProfilePage'
 import { TeamCompetencyPage } from './pages/TeamCompetencyPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { QuarterlyPlanningPage } from './pages/QuarterlyPlanningPage'
+import { MatrixPage } from './pages/MatrixPage'
 import { GuidePage } from './pages/GuidePage'
 import { LandingPage } from './pages/landing/LandingPage'
 import RegistrationPage from './pages/RegistrationPage'
@@ -53,6 +54,7 @@ function App() {
           <Route path="poker/room/:roomCode" element={<PokerRoomPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="quarterly-planning" element={<QuarterlyPlanningPage />} />
+          <Route path="matrix" element={<MatrixPage />} />
           <Route path="guide" element={<GuidePage />} />
           <Route path="teams" element={<TeamsPage />} />
           <Route path="teams/:teamId" element={<TeamMembersPage />} />

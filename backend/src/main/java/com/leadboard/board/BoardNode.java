@@ -43,6 +43,9 @@ public class BoardNode {
     private String parentProjectTitle; // Parent PROJECT summary (Epic only)
     private String quarterLabel; // Quarter label (e.g. "2026Q2") from Jira labels (Epic only)
     private List<DataQualityViolation> alerts = new ArrayList<>(); // data quality violations
+    private Integer daysInStatus; // F79: whole days in current status, or null if unknown
+    private String statusAgeLevel; // F79: NORMAL/WARNING/CRITICAL
+    private String statusAgeReason; // F79: tooltip for WARNING/CRITICAL, or null
     private List<BoardNode> children = new ArrayList<>();
 
     public BoardNode() {
@@ -310,6 +313,30 @@ public class BoardNode {
 
     public void addAlerts(List<DataQualityViolation> alerts) {
         this.alerts.addAll(alerts);
+    }
+
+    public Integer getDaysInStatus() {
+        return daysInStatus;
+    }
+
+    public void setDaysInStatus(Integer daysInStatus) {
+        this.daysInStatus = daysInStatus;
+    }
+
+    public String getStatusAgeLevel() {
+        return statusAgeLevel;
+    }
+
+    public void setStatusAgeLevel(String statusAgeLevel) {
+        this.statusAgeLevel = statusAgeLevel;
+    }
+
+    public String getStatusAgeReason() {
+        return statusAgeReason;
+    }
+
+    public void setStatusAgeReason(String statusAgeReason) {
+        this.statusAgeReason = statusAgeReason;
     }
 
     public List<BoardNode> getChildren() {

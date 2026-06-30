@@ -32,7 +32,9 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -700,13 +702,29 @@ public class SyncService {
         }
     }
 
-    private OffsetDateTime parseOffsetDateTime(String dateTimeStr) {
+    /**
+     * Jira REST returns datetimes with an RFC-822 offset without a colon, e.g.
+     * {@code 2026-01-23T16:38:52.663+0300}. {@code ISO_OFFSET_DATE_TIME} only accepts
+     * a colon-offset ({@code +03:00}), so we fall back to this lenient parser
+     * (optional fractional seconds + {@code +HHMM} offset).
+     */
+    private static final DateTimeFormatter JIRA_DATETIME = new DateTimeFormatterBuilder()
+            .appendPattern("yyyy-MM-dd'T'HH:mm:ss")
+            .optionalStart().appendFraction(ChronoField.NANO_OF_SECOND, 1, 9, true).optionalEnd()
+            .appendOffset("+HHMM", "+0000")
+            .toFormatter();
+
+    static OffsetDateTime parseOffsetDateTime(String dateTimeStr) {
         if (dateTimeStr == null || dateTimeStr.isEmpty()) return null;
         try {
             return OffsetDateTime.parse(dateTimeStr, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
         } catch (DateTimeParseException e) {
-            log.warn("Failed to parse datetime: {}", dateTimeStr);
-            return null;
+            try {
+                return OffsetDateTime.parse(dateTimeStr, JIRA_DATETIME);
+            } catch (DateTimeParseException e2) {
+                log.warn("Failed to parse datetime: {}", dateTimeStr);
+                return null;
+            }
         }
     }
 

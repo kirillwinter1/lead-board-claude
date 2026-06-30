@@ -7,6 +7,7 @@ import { ExpectedDoneCell } from './ExpectedDoneCell'
 import { StoryExpectedDoneCell } from './StoryExpectedDoneCell'
 import { AlertIcon } from './AlertIcon'
 import { TeamBadge } from '../TeamBadge'
+import { StatusAgeBadge } from '../StatusAgeBadge'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
@@ -64,7 +65,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                 {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
                 <span className="issue-title">{node.title}</span>
               </div>
-              {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel) && (
+              {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel || node.daysInStatus != null) && (
                 <div className="name-row-labels">
                   {node.priority && priorityIconUrl && (
                 <img
@@ -111,6 +112,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   {node.quarterLabel}
                 </span>
               )}
+              <StatusAgeBadge days={node.daysInStatus} level={node.statusAgeLevel} reason={node.statusAgeReason} />
                 </div>
               )}
             </div>

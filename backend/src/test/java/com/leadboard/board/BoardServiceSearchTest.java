@@ -55,6 +55,9 @@ class BoardServiceSearchTest {
     @Mock
     private EmbeddingService embeddingService;
 
+    @Mock
+    private com.leadboard.status.StatusAgeService statusAgeService;
+
     private BoardService boardService;
 
     @BeforeEach
@@ -66,7 +69,8 @@ class BoardServiceSearchTest {
                 roughEstimateProperties,
                 dataQualityService,
                 unifiedPlanningService,
-                workflowConfigService
+                workflowConfigService,
+                statusAgeService
         );
 
         // Inject embeddingService via reflection (it's @Autowired(required=false))

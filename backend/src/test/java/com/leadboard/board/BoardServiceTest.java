@@ -58,6 +58,9 @@ class BoardServiceTest {
     @Mock
     private WorkflowConfigService workflowConfigService;
 
+    @Mock
+    private com.leadboard.status.StatusAgeService statusAgeService;
+
     private BoardService boardService;
 
     @BeforeEach
@@ -69,7 +72,8 @@ class BoardServiceTest {
                 roughEstimateProperties,
                 dataQualityService,
                 unifiedPlanningService,
-                workflowConfigService
+                workflowConfigService,
+                statusAgeService
         );
 
         // Common setup

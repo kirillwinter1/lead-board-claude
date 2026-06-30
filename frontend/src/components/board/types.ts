@@ -50,6 +50,9 @@ export interface BoardNode {
   parentProjectKey: string | null
   parentProjectTitle: string | null
   quarterLabel: string | null
+  daysInStatus: number | null
+  statusAgeLevel: 'NORMAL' | 'WARNING' | 'CRITICAL'
+  statusAgeReason: string | null
   children: BoardNode[]
 }
 
