@@ -13,6 +13,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -32,6 +33,7 @@ import java.util.Optional;
  * Для claude.ai / телефона нужен OAuth 2.1 (План 2).</p>
  */
 @Component
+@ConditionalOnProperty(prefix = "mcp", name = "enabled", havingValue = "true")
 public class McpDebugAuthFilter extends OncePerRequestFilter {
 
     private final McpProperties props;

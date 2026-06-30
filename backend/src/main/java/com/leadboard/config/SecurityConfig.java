@@ -3,6 +3,7 @@ package com.leadboard.config;
 import com.leadboard.auth.LeadBoardAuthenticationFilter;
 import com.leadboard.mcp.McpDebugAuthFilter;
 import com.leadboard.tenant.TenantFilter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -22,10 +23,10 @@ public class SecurityConfig {
 
     private final LeadBoardAuthenticationFilter authenticationFilter;
     private final TenantFilter tenantFilter;
-    private final McpDebugAuthFilter mcpDebugAuthFilter;
+    private final ObjectProvider<McpDebugAuthFilter> mcpDebugAuthFilter;
 
     public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter, TenantFilter tenantFilter,
-                          McpDebugAuthFilter mcpDebugAuthFilter) {
+                          ObjectProvider<McpDebugAuthFilter> mcpDebugAuthFilter) {
         this.authenticationFilter = authenticationFilter;
         this.tenantFilter = tenantFilter;
         this.mcpDebugAuthFilter = mcpDebugAuthFilter;
@@ -42,10 +43,16 @@ public class SecurityConfig {
 
             // Add tenant filter first, then auth filter
             .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(authenticationFilter, TenantFilter.class)
-            // MCP bearer auth (F80) — runs after session auth; only touches /mcp,
-            // sets tenant + LeadBoardAuthentication from the debug token.
-            .addFilterAfter(mcpDebugAuthFilter, LeadBoardAuthenticationFilter.class)
+            .addFilterAfter(authenticationFilter, TenantFilter.class);
+
+        // MCP bearer auth (F80) — present only when mcp.enabled=true; runs after
+        // session auth, only touches /mcp, sets tenant + LeadBoardAuthentication.
+        McpDebugAuthFilter mcpFilter = mcpDebugAuthFilter.getIfAvailable();
+        if (mcpFilter != null) {
+            http.addFilterAfter(mcpFilter, LeadBoardAuthenticationFilter.class);
+        }
+
+        http
 
             // Configure authorization
             .authorizeHttpRequests(auth -> auth
