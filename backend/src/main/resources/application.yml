@@ -117,6 +117,12 @@ chat:
   embedding-model: ${CHAT_EMBEDDING_MODEL:openai/text-embedding-3-small}
   embedding-base-url: ${CHAT_EMBEDDING_BASE_URL:}
 
+mcp:
+  enabled: ${MCP_ENABLED:false}
+  debug-token: ${MCP_DEBUG_TOKEN:}
+  debug-tenant-slug: ${MCP_DEBUG_TENANT_SLUG:}
+  debug-account-id: ${MCP_DEBUG_ACCOUNT_ID:}
+
 simulation:
   enabled: ${SIMULATION_ENABLED:false}
   cron: ${SIMULATION_CRON:0 0 19 * * MON-FRI}
