@@ -88,6 +88,14 @@ public class McpJwtContextFilter extends OncePerRequestFilter {
                 // leave null
             }
         }
+        // Токен без tenant_id (domain != tenant subdomain при authorize) — резолвим tenant
+        // пользователя из tenant_users. Если пользователь ровно в одном tenant — берём его.
+        if (tenantId == null) {
+            var memberships = tenantUserRepository.findByUserId(user.get().getId());
+            if (memberships.size() == 1) {
+                tenantId = memberships.get(0).getTenant().getId();
+            }
+        }
         if (tenantId != null) {
             Optional<TenantEntity> tenant = tenantRepository.findById(tenantId);
             if (tenant.isEmpty()) {
