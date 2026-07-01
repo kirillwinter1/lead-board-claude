@@ -7,6 +7,7 @@ import io.modelcontextprotocol.json.McpJsonMapper;
 import io.modelcontextprotocol.server.McpServerFeatures.SyncToolSpecification;
 import io.modelcontextprotocol.spec.McpSchema.CallToolResult;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
+import io.modelcontextprotocol.spec.McpSchema.ToolAnnotations;
 import com.leadboard.tenant.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Превращает инструменты F52 ({@link ChatToolRegistry}) в MCP {@link SyncToolSpecification},
@@ -31,6 +33,11 @@ public class McpToolAdapter {
     public static final String CTX_TENANT_ID = "leadboard.tenantId";
     public static final String CTX_SCHEMA = "leadboard.schema";
     public static final String CTX_AUTH = "leadboard.auth";
+
+    /** Write-инструменты (меняют данные) — destructiveHint=true, требуют подтверждения. Остальные readOnly. */
+    private static final Set<String> WRITE_TOOLS = Set.of(
+            "transition_issue", "log_work", "create_issue", "add_comment", "assign_issue",
+            "triage_matrix", "assign_epic_quarter", "set_epic_boost", "set_rough_estimate");
 
     private final ChatToolRegistry registry;
     private final ChatToolExecutor executor;
@@ -50,10 +57,15 @@ public class McpToolAdapter {
     }
 
     private SyncToolSpecification toSpec(LlmToolDefinition def) {
+        boolean write = WRITE_TOOLS.contains(def.name());
+        // ToolAnnotations(title, readOnlyHint, destructiveHint, idempotentHint, openWorldHint, returnDirect)
+        ToolAnnotations annotations = new ToolAnnotations(
+                null, !write, write, null, null, null);
         Tool tool = Tool.builder()
                 .name(def.name())
                 .description(def.description())
                 .inputSchema(jsonMapper, writeJson(def.parameters()))
+                .annotations(annotations)
                 .build();
 
         return SyncToolSpecification.builder()
