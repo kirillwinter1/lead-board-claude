@@ -106,7 +106,10 @@ public class OAuthServerConfig {
                                                 JwtDecoder jwtDecoder,
                                                 McpJwtContextFilter jwtContextFilter) throws Exception {
         http.securityMatcher("/mcp", "/mcp/**")
-                .authorizeHttpRequests(a -> a.anyRequest().hasAuthority("SCOPE_mcp.read"))
+                // authenticated(), а не hasAuthority("SCOPE_mcp.read"): McpJwtContextFilter заменяет
+                // JwtAuthenticationToken на LeadBoardAuthentication (без SCOPE-authorities) до AuthorizationFilter.
+                // Валидность JWT уже проверена BearerTokenAuthenticationFilter.
+                .authorizeHttpRequests(a -> a.anyRequest().authenticated())
                 .csrf(AbstractHttpConfigurer::disable)
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.decoder(jwtDecoder))
