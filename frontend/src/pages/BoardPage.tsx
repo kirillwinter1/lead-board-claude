@@ -93,22 +93,29 @@ export function BoardPage() {
       if (!epicToMove) return prevBoard
       const teamId = epicToMove.teamId
 
+      // targetIndex is relative to ACTIVE epics only (done epics form a read-only band
+      // at the top and never participate in reordering).
       const teamItems = prevBoard.filter(e => e.teamId === teamId)
-      const oldIndex = teamItems.findIndex(e => e.issueKey === epicKey)
+      const doneItems = teamItems.filter(e => e.epicDone)
+      const activeItems = teamItems.filter(e => !e.epicDone)
+
+      const oldIndex = activeItems.findIndex(e => e.issueKey === epicKey)
       if (oldIndex === -1 || oldIndex === targetIndex) return prevBoard
 
-      const [movedItem] = teamItems.splice(oldIndex, 1)
-      teamItems.splice(targetIndex, 0, movedItem)
+      const [movedItem] = activeItems.splice(oldIndex, 1)
+      activeItems.splice(targetIndex, 0, movedItem)
 
-      const reorderedTeam = teamItems.map((item, idx) => ({
+      const reorderedActive = activeItems.map((item, idx) => ({
         ...item,
         manualOrder: idx + 1,
       }))
 
+      // Rebuild team order: done band (unchanged) on top, reordered active below.
+      const newTeamOrder = [...doneItems, ...reorderedActive]
       let teamIdx = 0
       return prevBoard.map(item => {
         if (item.teamId === teamId) {
-          return reorderedTeam[teamIdx++]
+          return newTeamOrder[teamIdx++]
         }
         return item
       })

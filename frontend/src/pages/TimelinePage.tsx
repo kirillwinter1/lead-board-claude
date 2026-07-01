@@ -1476,7 +1476,9 @@ function mergeHybridEpics(
     })
   }
 
-  return [...mergedPlanEpics, ...retroOnlyEpics]
+  // Done (retro-only) epics render at the top so the Gantt reads top-to-bottom
+  // (completed work above, active/planned work below) — consistent with the board.
+  return [...retroOnlyEpics, ...mergedPlanEpics]
 }
 
 // --- Gantt Row ---
