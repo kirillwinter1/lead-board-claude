@@ -948,12 +948,25 @@ public class ChatToolExecutor {
                     m.put("status", i.getStatus());
                     m.put("type", i.getIssueType());
                     long secs = i.getTimeSpentSeconds() != null ? i.getTimeSpentSeconds() : 0L;
-                    m.put("loggedHours", Math.round(secs / 3600.0 * 10) / 10.0);
+                    m.put("loggedHours", hours(secs));
+                    Long rem = i.getRemainingEstimateSeconds();
+                    Long orig = i.getOriginalEstimateSeconds();
+                    m.put("originalEstimateHours", orig != null ? hours(orig) : null);
+                    m.put("remainingEstimateHours", rem != null ? hours(rem) : null);
+                    // hasEstimate=false => оценки не было (remaining NULL) — решение о закрытии за человеком.
+                    boolean hasEstimate = rem != null;
+                    m.put("hasEstimate", hasEstimate);
+                    // Кандидат на закрытие: есть списание, есть оценка, остаток == 0.
+                    m.put("readyToClose", secs > 0 && hasEstimate && rem == 0L);
                     if (i.getAssigneeDisplayName() != null) m.put("assignee", i.getAssigneeDisplayName());
                     return m;
                 })
                 .toList();
         return toJson(Map.of("tasks", tasks, "count", tasks.size()));
+    }
+
+    private double hours(long seconds) {
+        return Math.round(seconds / 3600.0 * 10) / 10.0;
     }
 
     private boolean isDoneIssue(JiraIssueEntity i) {

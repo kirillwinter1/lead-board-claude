@@ -273,7 +273,7 @@ public class ChatToolRegistry {
                 ),
                 new LlmToolDefinition(
                         "my_open_tasks_with_worklog",
-                        "Tasks that have logged time but are NOT yet done — candidates to close. Use for 'check tasks with logged time and ask to close'. teamId optional.",
+                        "Tasks that have logged time but are NOT yet done — candidates to close. Each task has loggedHours, originalEstimateHours, remainingEstimateHours, hasEstimate, and readyToClose. readyToClose=true means logged>0 AND estimate existed AND remaining=0 (safe to close). hasEstimate=false means the task was never estimated (remaining is null) — needs manual review, NOT auto-close. teamId optional.",
                         Map.of("type", "object", "properties", Map.of(
                                 "teamId", Map.of("type", "integer", "description", "Team ID to filter by (optional)")
                         ), "required", List.of())
