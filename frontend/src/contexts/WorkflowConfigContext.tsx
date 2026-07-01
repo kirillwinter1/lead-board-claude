@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import axios from 'axios'
 import { WorkflowRoleDto, JiraIssueTypeMetadata, JiraPriorityMetadata } from '../api/workflowConfig'
+import { getTenantSlug } from '../utils/tenant'
 
 interface WorkflowConfig {
   roles: WorkflowRoleDto[]
@@ -49,8 +50,10 @@ const EMPTY_CONFIG: WorkflowConfig = {
 // falling back to the story icon while the config re-fetches. A background fetch still runs
 // and refreshes the cache.
 function configCacheKey(): string {
+  // Use the resolved tenant (subdomain on prod, else localStorage) so cross-tenant
+  // browsers don't share one cache entry.
   let slug = 'default'
-  try { slug = localStorage.getItem('tenant_slug') || 'default' } catch { /* ignore */ }
+  try { slug = getTenantSlug() ?? 'default' } catch { /* ignore */ }
   return `workflow-config:${slug}`
 }
 

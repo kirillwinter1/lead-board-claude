@@ -144,7 +144,6 @@ public class StatusAgeService {
         };
     }
 
-    /** For each issue, the latest transition timestamp whose target equals its current status. */
     /**
      * When each issue last changed status = the entry into its current status.
      * We deliberately do NOT match {@code to_status} against {@code jira_issues.status}:

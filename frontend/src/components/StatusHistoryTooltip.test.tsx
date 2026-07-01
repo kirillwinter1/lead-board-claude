@@ -47,7 +47,7 @@ describe('StatusHistoryTooltip', () => {
     render(<StatusHistoryTooltip issueKey="LB-1"><span>badge</span></StatusHistoryTooltip>)
     hoverTrigger()
 
-    await waitFor(() => expect(api.getStatusHistory).toHaveBeenCalledWith('LB-1'))
+    await waitFor(() => expect(api.getStatusHistory).toHaveBeenCalledWith('LB-1', expect.anything()))
     expect(await screen.findByText('New')).toBeInTheDocument()
     expect(screen.getByText('Development')).toBeInTheDocument()
     // current status highlighted with a "сейчас" marker

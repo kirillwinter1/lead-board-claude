@@ -31,12 +31,14 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
     setLoading(true)
     setError(false)
     try {
-      const data = await getStatusHistory(issueKey)
+      const data = await getStatusHistory(issueKey, controller.signal)
       if (!controller.signal.aborted) setHistory(data)
     } catch {
       if (!controller.signal.aborted) setError(true)
     } finally {
-      if (!controller.signal.aborted) setLoading(false)
+      // Always clear loading — otherwise a mid-flight abort leaves it stuck true
+      // and a re-hover would show "Загрузка…" forever (handleMouseEnter gates on !loading).
+      setLoading(false)
     }
   }, [issueKey, history])
 
@@ -60,6 +62,7 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
     setShow(false)
     if (debounceRef.current) clearTimeout(debounceRef.current)
     abortRef.current?.abort()
+    setLoading(false)
   }
 
   return (

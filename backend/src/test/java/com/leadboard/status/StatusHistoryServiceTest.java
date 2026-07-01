@@ -70,6 +70,24 @@ class StatusHistoryServiceTest {
     }
 
     @Test
+    void currentSegmentUsesAuthoritativeStatusNameOnLocalizationMismatch() {
+        // jira_issues.status is localized ("Запланировано") while the changelog records
+        // the English name ("Planned"); the current segment must show the authoritative name.
+        JiraIssueEntity issue = issue("LB-9", "Запланировано", BASE);
+        List<StatusChangelogEntity> transitions = List.of(
+                transition("New", "Planned", BASE.plusDays(2)));
+        OffsetDateTime now = BASE.plusDays(5);
+
+        StatusHistoryResponse r = service.buildHistory(issue, transitions, now);
+
+        StatusHistoryResponse.Segment last = r.segments().get(r.segments().size() - 1);
+        assertTrue(last.current());
+        assertEquals("Запланировано", last.status());
+        assertEquals("Запланировано", r.currentStatus());
+        assertEquals(3 * DAY, last.durationSeconds()); // now - transition (BASE+2 .. BASE+5)
+    }
+
+    @Test
     void noTransitionsYieldsSingleCurrentSegmentFromCreation() {
         JiraIssueEntity issue = issue("LB-2", "New", BASE);
         OffsetDateTime now = BASE.plusDays(4);

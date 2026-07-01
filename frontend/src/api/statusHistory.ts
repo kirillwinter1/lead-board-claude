@@ -14,8 +14,8 @@ export interface StatusHistory {
   segments: StatusSegment[]
 }
 
-export async function getStatusHistory(issueKey: string): Promise<StatusHistory> {
-  const response = await axios.get<StatusHistory>(`/api/issues/${issueKey}/status-history`)
+export async function getStatusHistory(issueKey: string, signal?: AbortSignal): Promise<StatusHistory> {
+  const response = await axios.get<StatusHistory>(`/api/issues/${issueKey}/status-history`, { signal })
   return response.data
 }
 

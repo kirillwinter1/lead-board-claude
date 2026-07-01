@@ -5,6 +5,7 @@ import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
@@ -29,6 +30,7 @@ public class StatusHistoryService {
     }
 
     /** Returns the status journey for an issue, or empty if the issue is unknown. */
+    @Transactional(readOnly = true)
     public Optional<StatusHistoryResponse> getHistory(String issueKey) {
         return issueRepository.findByIssueKey(issueKey).map(issue -> {
             List<StatusChangelogEntity> transitions =
@@ -46,6 +48,8 @@ public class StatusHistoryService {
      *       transition (or {@code now} for the current status).</li>
      *   <li>No transitions → a single current segment from creation to now.</li>
      * </ul>
+     * Note: if the first transition has a null {@code fromStatus} the start segment is
+     * skipped, so {@code totalSeconds} may be less than {@code now - jira_created_at}.
      */
     StatusHistoryResponse buildHistory(JiraIssueEntity issue,
                                        List<StatusChangelogEntity> transitions,
@@ -75,8 +79,11 @@ public class StatusHistoryService {
             StatusChangelogEntity t = transitions.get(i);
             boolean isLast = i == transitions.size() - 1;
             OffsetDateTime end = isLast ? now : transitions.get(i + 1).getTransitionedAt();
+            // The current segment uses the authoritative status name (jira_issues.status) so it
+            // matches the badge even under localization mismatch ("Planned" vs "Запланировано").
+            String status = isLast ? currentStatus : t.getToStatus();
             segments.add(new StatusHistoryResponse.Segment(
-                    t.getToStatus(),
+                    status,
                     secondsBetween(t.getTransitionedAt(), end),
                     isLast));
         }
