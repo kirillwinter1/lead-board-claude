@@ -142,11 +142,10 @@ public class OAuthServerConfig {
     @Bean
     public ApplicationRunner registerClaudeClient(RegisteredClientRepository repo) {
         return args -> {
-            if (repo.findByClientId(props.getClientId()) != null) {
-                log.info("OAuth client '{}' already registered", props.getClientId());
-                return;
-            }
-            RegisteredClient.Builder b = RegisteredClient.withId(UUID.randomUUID().toString())
+            // Перезаписываем существующего клиента (обновляем настройки), используя его же id.
+            RegisteredClient existing = repo.findByClientId(props.getClientId());
+            String id = existing != null ? existing.getId() : UUID.randomUUID().toString();
+            RegisteredClient.Builder b = RegisteredClient.withId(id)
                     .clientId(props.getClientId())
                     .clientName("Claude (MCP)")
                     .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
@@ -167,13 +166,17 @@ public class OAuthServerConfig {
                             .build());
 
             if (props.getClientSecret() != null && !props.getClientSecret().isBlank()) {
+                // claude.ai может слать секрет и в заголовке (basic), и в теле (post) — принимаем оба.
+                // Плюс NONE для public-client + PKCE (если секрет не передан).
                 b.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
                         .clientSecret("{noop}" + props.getClientSecret());
             } else {
                 b.clientAuthenticationMethod(ClientAuthenticationMethod.NONE); // public client
             }
             repo.save(b.build());
-            log.info("Registered OAuth client '{}' for MCP (redirect=claude.ai callback)", props.getClientId());
+            log.info("Registered/updated OAuth client '{}' for MCP (basic+post+none auth)", props.getClientId());
         };
     }
 
