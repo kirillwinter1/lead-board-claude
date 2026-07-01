@@ -48,6 +48,7 @@ public class JiraChangelogResponse {
     public static class ChangelogHistory {
         private String id;
         private String created;
+        private Author author;
         private List<ChangelogItem> items;
 
         public String getId() { return id; }
@@ -56,8 +57,23 @@ public class JiraChangelogResponse {
         public String getCreated() { return created; }
         public void setCreated(String created) { this.created = created; }
 
+        public Author getAuthor() { return author; }
+        public void setAuthor(Author author) { this.author = author; }
+
         public List<ChangelogItem> getItems() { return items; }
         public void setItems(List<ChangelogItem> items) { this.items = items; }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Author {
+        private String accountId;
+        private String displayName;
+
+        public String getAccountId() { return accountId; }
+        public void setAccountId(String accountId) { this.accountId = accountId; }
+
+        public String getDisplayName() { return displayName; }
+        public void setDisplayName(String displayName) { this.displayName = displayName; }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

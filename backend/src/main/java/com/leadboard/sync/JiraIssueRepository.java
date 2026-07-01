@@ -54,6 +54,13 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
             + "AND (:teamId IS NULL OR i.teamId = :teamId)")
     List<JiraIssueEntity> findWithWorklog(@Param("teamId") Long teamId);
 
+    /** Задачи, закрытые (done_at) в интервале [from, to), опц. по команде (F80 closed_tasks). */
+    @Query("SELECT i FROM JiraIssueEntity i WHERE i.doneAt >= :from AND i.doneAt < :to "
+            + "AND (:teamId IS NULL OR i.teamId = :teamId)")
+    List<JiraIssueEntity> findClosedBetween(@Param("from") java.time.OffsetDateTime from,
+                                            @Param("to") java.time.OffsetDateTime to,
+                                            @Param("teamId") Long teamId);
+
     void deleteByProjectKey(String projectKey);
 
     @Query("SELECT e.issueKey FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")

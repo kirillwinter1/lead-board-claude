@@ -22,6 +22,10 @@ public interface StatusChangelogRepository extends JpaRepository<StatusChangelog
 
     Optional<StatusChangelogEntity> findFirstByIssueKeyOrderByTransitionedAtDesc(String issueKey);
 
+    /** Последний переход задачи в конкретный статус — для closedBy (кто перевёл в Done). */
+    Optional<StatusChangelogEntity> findFirstByIssueKeyAndToStatusOrderByTransitionedAtDesc(
+            String issueKey, String toStatus);
+
     @Query("SELECT s FROM StatusChangelogEntity s WHERE s.issueKey = :issueKey AND s.toStatus = :toStatus AND s.transitionedAt = :transitionedAt")
     Optional<StatusChangelogEntity> findByIssueKeyAndToStatusAndTransitionedAt(
             @Param("issueKey") String issueKey,

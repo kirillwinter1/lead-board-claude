@@ -32,6 +32,9 @@ public class StatusChangelogEntity {
     @Column(name = "source", nullable = false, length = 20)
     private String source = "SYNC";
 
+    @Column(name = "author_account_id", length = 255)
+    private String authorAccountId;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -106,6 +109,14 @@ public class StatusChangelogEntity {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public String getAuthorAccountId() {
+        return authorAccountId;
+    }
+
+    public void setAuthorAccountId(String authorAccountId) {
+        this.authorAccountId = authorAccountId;
     }
 
     public OffsetDateTime getCreatedAt() {

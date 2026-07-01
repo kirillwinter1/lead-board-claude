@@ -16,6 +16,7 @@ import com.leadboard.insight.InsightEngine;
 import com.leadboard.jira.JiraWriteService;
 import com.leadboard.matrix.MatrixService;
 import com.leadboard.metrics.dto.TeamMetricsSummary;
+import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.planning.ForecastService;
 import com.leadboard.planning.QuarterlyPlanningService;
 import com.leadboard.team.WorklogTimelineService;
@@ -62,6 +63,7 @@ public class ChatToolExecutor {
     private final WorklogTimelineService worklogTimelineService;
     private final MatrixService matrixService;
     private final EpicService epicService;
+    private final StatusChangelogRepository statusChangelogRepository;
     private final ObjectMapper objectMapper;
 
     public ChatToolExecutor(
@@ -85,6 +87,7 @@ public class ChatToolExecutor {
             WorklogTimelineService worklogTimelineService,
             MatrixService matrixService,
             EpicService epicService,
+            StatusChangelogRepository statusChangelogRepository,
             ObjectMapper objectMapper
     ) {
         this.issueRepository = issueRepository;
@@ -107,6 +110,7 @@ public class ChatToolExecutor {
         this.worklogTimelineService = worklogTimelineService;
         this.matrixService = matrixService;
         this.epicService = epicService;
+        this.statusChangelogRepository = statusChangelogRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -144,6 +148,7 @@ public class ChatToolExecutor {
                 case "team_forecast" -> teamForecast(args);
                 case "team_worklog_timeline" -> teamWorklogTimeline(args);
                 case "my_open_tasks_with_worklog" -> openTasksWithWorklog(args);
+                case "closed_tasks" -> closedTasks(args);
                 // --- F80 write: board ---
                 case "triage_matrix" -> triageMatrix(args);
                 case "assign_epic_quarter" -> assignEpicQuarter(args);
@@ -963,6 +968,64 @@ public class ChatToolExecutor {
                 })
                 .toList();
         return toJson(Map.of("tasks", tasks, "count", tasks.size()));
+    }
+
+    private String closedTasks(JsonNode args) {
+        Long teamId = getTeamIdParam(args);
+        if (!checkTeamAccess(teamId)) {
+            return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
+        }
+        boolean mineOnly = args.has("mineOnly") && args.get("mineOnly").asBoolean();
+
+        java.time.OffsetDateTime to = java.time.OffsetDateTime.now();
+        java.time.OffsetDateTime from = to.minusDays(7);
+        try {
+            String fromStr = strParam(args, "from");
+            String toStr = strParam(args, "to");
+            java.time.ZoneOffset off = to.getOffset();
+            if (fromStr != null) from = LocalDate.parse(fromStr).atStartOfDay().atOffset(off);
+            if (toStr != null) to = LocalDate.parse(toStr).plusDays(1).atStartOfDay().atOffset(off);
+        } catch (Exception e) {
+            return toJson(Map.of("error", "from/to must be ISO yyyy-MM-dd"));
+        }
+
+        String myAccountId = null;
+        if (mineOnly) {
+            LeadBoardAuthentication auth = authorizationService.getCurrentAuth();
+            myAccountId = auth != null ? auth.getAtlassianAccountId() : null;
+        }
+
+        List<JiraIssueEntity> closed = issueRepository.findClosedBetween(from, to, teamId);
+        List<Map<String, Object>> tasks = new ArrayList<>();
+        int total = 0;
+        for (JiraIssueEntity i : closed) {
+            String closedBy = statusChangelogRepository
+                    .findFirstByIssueKeyAndToStatusOrderByTransitionedAtDesc(i.getIssueKey(), i.getStatus())
+                    .map(com.leadboard.metrics.entity.StatusChangelogEntity::getAuthorAccountId)
+                    .orElse(null);
+            if (mineOnly && (myAccountId == null || !myAccountId.equals(closedBy))) {
+                continue;
+            }
+            total++;
+            if (tasks.size() < 50) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("key", i.getIssueKey());
+                m.put("title", i.getSummary());
+                m.put("type", i.getIssueType());
+                m.put("resolvedAt", i.getDoneAt() != null ? i.getDoneAt().toString() : null);
+                m.put("closedBy", closedBy);
+                if (i.getAssigneeDisplayName() != null) m.put("assignee", i.getAssigneeDisplayName());
+                tasks.add(m);
+            }
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("count", total);
+        result.put("showing", tasks.size());
+        result.put("mineOnly", mineOnly);
+        result.put("period", Map.of("from", from.toLocalDate().toString(), "to", to.toLocalDate().toString()));
+        result.put("tasks", tasks);
+        return toJson(result);
     }
 
     private double hours(long seconds) {

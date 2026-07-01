@@ -278,6 +278,16 @@ public class ChatToolRegistry {
                                 "teamId", Map.of("type", "integer", "description", "Team ID to filter by (optional)")
                         ), "required", List.of())
                 ),
+                new LlmToolDefinition(
+                        "closed_tasks",
+                        "Tasks closed (moved to Done) in a period, with resolvedAt and closedBy (who moved it to Done, from changelog — NOT assignee). Use for 'how many did I/we close this week'. Params: from/to (ISO yyyy-MM-dd, default last 7 days), teamId optional, mineOnly=true to count only tasks closed by the current user. Returns count + tasks.",
+                        Map.of("type", "object", "properties", Map.of(
+                                "from", Map.of("type", "string", "description", "Start date ISO (default 7 days ago)"),
+                                "to", Map.of("type", "string", "description", "End date ISO inclusive (default today)"),
+                                "teamId", Map.of("type", "integer", "description", "Team ID (optional)"),
+                                "mineOnly", Map.of("type", "boolean", "description", "true = only tasks closed by the current user")
+                        ), "required", List.of())
+                ),
                 // ===================== F80 WRITE: board (confirm before calling) =====================
                 new LlmToolDefinition(
                         "triage_matrix",
