@@ -88,6 +88,28 @@
   border-color: #ea580c;
 }
 
+.timeline-history-toggle {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.timeline-history-btn {
+  padding: 4px 12px;
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  color: #0052cc;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.timeline-history-btn:hover {
+  background: #f4f5f7;
+  border-color: #0052cc;
+}
+
 .timeline-legend {
   display: flex;
   align-items: center;

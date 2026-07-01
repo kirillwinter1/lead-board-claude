@@ -85,6 +85,20 @@ class RetrospectiveTimelineServiceTest {
         return entity;
     }
 
+    private JiraIssueEntity createSubtask(String key, String parentKey, String issueType, String status,
+                                          OffsetDateTime startedAt, OffsetDateTime doneAt) {
+        JiraIssueEntity entity = new JiraIssueEntity();
+        entity.setIssueKey(key);
+        entity.setParentKey(parentKey);
+        entity.setIssueType(issueType);
+        entity.setStatus(status);
+        entity.setBoardCategory("SUBTASK");
+        entity.setSubtask(true);
+        entity.setStartedAt(startedAt);
+        entity.setDoneAt(doneAt);
+        return entity;
+    }
+
     private StatusChangelogEntity createTransition(String issueKey, String fromStatus, String toStatus, OffsetDateTime at) {
         StatusChangelogEntity entity = new StatusChangelogEntity();
         entity.setIssueKey(issueKey);
@@ -350,6 +364,101 @@ class RetrospectiveTimelineServiceTest {
             assertNotNull(epicResult200);
             assertEquals(2, epicResult100.stories().size());
             assertEquals(1, epicResult200.stories().size());
+        }
+    }
+
+    @Nested
+    class SubtaskDerivedPhases {
+        /**
+         * Root cause of grey Timeline bars: retro phases used to be derived from the STORY's
+         * own status workflow (Analysis->SA, Development->DEV), which can lag far behind the
+         * actual work logged on subtasks. Phases must come from the SUBTASKS (role + started/done),
+         * so they align with worklogDays (also aggregated from subtasks).
+         */
+        @Test
+        void shouldDerivePhasesFromSubtasksNotStoryStatus() {
+            JiraIssueEntity story = createStory("PROJ-1", "Done", "PROJ-100");
+            JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
+            epic.setBoardCategory("EPIC");
+
+            OffsetDateTime base = OffsetDateTime.of(2025, 1, 10, 10, 0, 0, 0, ZoneOffset.UTC);
+
+            // Subtasks did the real work EARLY (Jan 10-12 SA, Jan 13-15 DEV)
+            JiraIssueEntity saSub = createSubtask("PROJ-10", "PROJ-1", "Analysis", "Done",
+                    base, base.plusDays(2));
+            JiraIssueEntity devSub = createSubtask("PROJ-11", "PROJ-1", "Development", "Done",
+                    base.plusDays(3), base.plusDays(5));
+
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
+                    .thenReturn(List.of(story));
+            when(issueRepository.findByIssueKey("PROJ-100"))
+                    .thenReturn(Optional.of(epic));
+            when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
+                    .thenReturn(List.of(saSub, devSub));
+            when(workflowConfigService.getSubtaskRole("Analysis")).thenReturn("SA");
+            when(workflowConfigService.getSubtaskRole("Development")).thenReturn("DEV");
+
+            // Story's OWN workflow lagged (Jan 24+) — must be IGNORED for phase windows
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", base.plusDays(14)),
+                    createTransition("PROJ-1", "In Development", "Done", base.plusDays(16))
+            );
+            when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-1")))
+                    .thenReturn(transitions);
+
+            RetrospectiveResult result = service.calculateRetrospective(1L);
+            RetroStory rs = result.epics().get(0).stories().get(0);
+
+            assertEquals(2, rs.phases().size(), "phases should come from the two subtasks");
+
+            RetroPhase sa = rs.phases().get("SA");
+            assertNotNull(sa, "SA phase must exist (from subtask), not be lost to story workflow");
+            assertEquals(base.toLocalDate(), sa.startDate());            // Jan 10, not Jan 24
+            assertEquals(base.plusDays(2).toLocalDate(), sa.endDate());  // Jan 12
+            assertFalse(sa.active());
+
+            RetroPhase dev = rs.phases().get("DEV");
+            assertNotNull(dev);
+            assertEquals(base.plusDays(3).toLocalDate(), dev.startDate());
+            assertEquals(base.plusDays(5).toLocalDate(), dev.endDate());
+
+            // Story window derived from subtask phases
+            assertEquals(base.toLocalDate(), rs.startDate());
+        }
+
+        @Test
+        void shouldMarkPhaseActiveForInProgressSubtask() {
+            JiraIssueEntity story = createStory("PROJ-2", "In Development", "PROJ-100");
+            JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
+            epic.setBoardCategory("EPIC");
+
+            OffsetDateTime base = OffsetDateTime.of(2025, 1, 10, 10, 0, 0, 0, ZoneOffset.UTC);
+
+            JiraIssueEntity saSub = createSubtask("PROJ-20", "PROJ-2", "Analysis", "Done",
+                    base, base.plusDays(2));
+            // DEV subtask started but not done -> active phase, no end date
+            JiraIssueEntity devSub = createSubtask("PROJ-21", "PROJ-2", "Development", "In Development",
+                    base.plusDays(3), null);
+
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
+                    .thenReturn(List.of(story));
+            when(issueRepository.findByIssueKey("PROJ-100"))
+                    .thenReturn(Optional.of(epic));
+            when(issueRepository.findByParentKeyIn(List.of("PROJ-2")))
+                    .thenReturn(List.of(saSub, devSub));
+            when(workflowConfigService.getSubtaskRole("Analysis")).thenReturn("SA");
+            when(workflowConfigService.getSubtaskRole("Development")).thenReturn("DEV");
+            when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-2")))
+                    .thenReturn(List.of(createTransition("PROJ-2", "To Do", "In Development", base.plusDays(14))));
+
+            RetrospectiveResult result = service.calculateRetrospective(1L);
+            RetroStory rs = result.epics().get(0).stories().get(0);
+
+            RetroPhase dev = rs.phases().get("DEV");
+            assertTrue(dev.active(), "DEV phase should be active for in-progress subtask");
+            assertNull(dev.endDate());
+            assertFalse(rs.completed());
+            assertNull(rs.endDate());
         }
     }
 

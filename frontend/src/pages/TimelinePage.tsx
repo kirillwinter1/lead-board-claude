@@ -72,7 +72,15 @@ function startOfMonth(date: Date): Date {
 
 // --- Date range & timeline ---
 
-function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast: ForecastResponse | null): DateRange {
+// By default the timeline renders at most this many days of the past. Older completed
+// work is hidden until the user explicitly expands via the "Show earlier" button.
+export const DEFAULT_PAST_DAYS = 30
+
+export function calculateDateRange(
+  unifiedPlan: UnifiedPlanningResult | null,
+  forecast: ForecastResponse | null,
+  clampPastDays: number | null = null,
+): DateRange {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -114,6 +122,13 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
         if (d > maxDate) maxDate = d
       }
     }
+  }
+
+  // Clamp how far back we render: hide work completed more than clampPastDays ago
+  // (keeps the initial view focused; a "Show earlier" toggle passes null to disable).
+  if (clampPastDays != null) {
+    const clamp = addDays(today, -clampPastDays)
+    if (minDate < clamp) minDate = clamp
   }
 
   // Align to week boundaries so date % matches header grid exactly
@@ -1563,6 +1578,8 @@ export function TimelineContent({
   const [forecast, setForecast] = useState<ForecastResponse | null>(initialCache?.forecast ?? null)
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(initialCache?.unifiedPlan ?? null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
+  // When true, render the full history instead of clamping to DEFAULT_PAST_DAYS.
+  const [showEarlier, setShowEarlier] = useState(false)
   const [loading, setLoading] = useState(selectedTeamId ? !initialCache : false)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
@@ -1611,6 +1628,8 @@ export function TimelineContent({
 
   // Load available snapshot dates when team changes
   useEffect(() => {
+    // Each team starts in the clamped (recent) view
+    setShowEarlier(false)
     if (!selectedTeamId) {
       setAvailableDates([])
       setSelectedHistoricalDate('')
@@ -1731,24 +1750,39 @@ export function TimelineContent({
     }
   }
 
-  // Auto-scroll to today
+  // Position the horizontal scroll: on the clamped (default) view, place the "today"
+  // line at 30% of the visible width — 30% past on the left, 70% future on the right.
+  // When the user expands history, scroll all the way left to reveal the older work.
   useEffect(() => {
-    if (!unifiedPlan || !chartRef.current) return
+    const el = chartRef.current
+    if (!unifiedPlan || !el) return
 
-    const range = calculateDateRange(unifiedPlan, forecast)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-
-    const totalDays = daysBetween(range.start, range.end)
-    const todayOffset = daysBetween(range.start, today)
-    const todayPercent = todayOffset / totalDays
-
-    const scrollTarget = Math.max(0, (todayPercent - 0.2) * chartRef.current.scrollWidth)
-    chartRef.current.scrollLeft = scrollTarget
-  }, [unifiedPlan, forecast])
+    const raf = requestAnimationFrame(() => {
+      if (showEarlier) {
+        el.scrollLeft = 0
+        return
+      }
+      const range = calculateDateRange(unifiedPlan, forecast, DEFAULT_PAST_DAYS)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const totalDays = daysBetween(range.start, range.end)
+      if (totalDays <= 0) return
+      const todayX = (daysBetween(range.start, today) / totalDays) * el.scrollWidth
+      el.scrollLeft = Math.max(0, todayX - 0.30 * el.clientWidth)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [unifiedPlan, forecast, showEarlier])
 
   const dateRange = useMemo(() => {
-    return calculateDateRange(unifiedPlan, forecast)
+    return calculateDateRange(unifiedPlan, forecast, showEarlier ? null : DEFAULT_PAST_DAYS)
+  }, [unifiedPlan, forecast, showEarlier])
+
+  // Whether there is history older than the default window (controls the toggle button).
+  const canExpandHistory = useMemo(() => {
+    if (!unifiedPlan && !forecast) return false
+    const full = calculateDateRange(unifiedPlan, forecast, null)
+    const clamped = calculateDateRange(unifiedPlan, forecast, DEFAULT_PAST_DAYS)
+    return full.start.getTime() < clamped.start.getTime()
   }, [unifiedPlan, forecast])
 
   const headers = useMemo(() => {
@@ -1985,6 +2019,18 @@ export function TimelineContent({
 
       {!loading && !error && !needsTeamSelection && epics.length === 0 && (
         <div className="empty">No epics with planning data</div>
+      )}
+
+      {!loading && !error && !needsTeamSelection && epics.length > 0 && canExpandHistory && (
+        <div className="timeline-history-toggle">
+          <button
+            type="button"
+            className="timeline-history-btn"
+            onClick={() => setShowEarlier(v => !v)}
+          >
+            {showEarlier ? 'Show recent ▶' : '◀ Show earlier'}
+          </button>
+        </div>
       )}
 
       {!loading && !error && !needsTeamSelection && epics.length > 0 && (
