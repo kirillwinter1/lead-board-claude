@@ -424,6 +424,9 @@ class RetrospectiveTimelineServiceTest {
 
             // Story window derived from subtask phases
             assertEquals(base.toLocalDate(), rs.startDate());
+
+            // issueType is carried through so the Timeline can render the correct Jira icon
+            assertEquals("Story", rs.issueType());
         }
 
         @Test

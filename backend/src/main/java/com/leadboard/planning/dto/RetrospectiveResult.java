@@ -29,6 +29,7 @@ public record RetrospectiveResult(
             String storyKey,
             String summary,
             String status,
+            String issueType,
             boolean completed,
             LocalDate startDate,
             LocalDate endDate,

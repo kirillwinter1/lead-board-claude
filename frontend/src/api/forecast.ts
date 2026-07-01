@@ -342,6 +342,7 @@ export interface RetroStory {
   storyKey: string
   summary: string
   status: string
+  issueType: string | null
   completed: boolean
   startDate: string | null
   endDate: string | null

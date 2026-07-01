@@ -225,6 +225,7 @@ public class RetrospectiveTimelineService {
                 story.getIssueKey(),
                 story.getSummary(),
                 story.getStatus(),
+                story.getIssueType(),
                 storyDone,
                 storyStart,
                 storyEnd,

@@ -388,9 +388,11 @@ interface EpicLabelProps {
 }
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
   const statusStyles = useStatusStyles()
-  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))
+  // Resolve the real Jira epic type name (e.g. 'Эпик') so the icon matches the board.
+  const epicTypeName = getTypeNameByCategory('EPIC') ?? 'Epic'
+  const epicIconUrl = getIssueIcon(epicTypeName, getIssueTypeIconUrl(epicTypeName), 'EPIC')
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -1151,8 +1153,9 @@ interface RoughEstimateBarsProps {
 }
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
-  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
+  const epicTypeName = getTypeNameByCategory('EPIC') ?? 'Epic'
+  const epicIconUrl = getIssueIcon(epicTypeName, getIssueTypeIconUrl(epicTypeName), 'EPIC')
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1431,15 +1434,15 @@ function mergeHybridEpics(
       }
       return {
         storyKey: rs.storyKey,
-        summary: '',
+        summary: rs.summary,
         autoScore: null,
-        status: rs.completed ? 'Done' : '',
+        status: rs.status,
         startDate: rs.startDate,
         endDate: rs.endDate,
         phases,
         blockedBy: [],
         warnings: [],
-        issueType: null,
+        issueType: rs.issueType,
         priority: null,
         flagged: null,
         totalEstimateSeconds: null,

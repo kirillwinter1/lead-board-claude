@@ -35,6 +35,8 @@ vi.mock('../contexts/WorkflowConfigContext', () => ({
     getRoleColor: () => '#669DF1',
     getRoleDisplayName: (code: string) => code,
     getIssueTypeIconUrl: () => undefined,
+    getIssueTypeCategory: () => null,
+    getTypeNameByCategory: () => null,
     issueTypeIcons: {},
     issueTypeCategories: {},
     config: { roles: [], issueTypes: [], statuses: [] },
