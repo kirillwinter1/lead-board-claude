@@ -78,6 +78,24 @@ class StatusAgeServiceTest {
     }
 
     @Test
+    void daysInStatus_usesLastTransition_whenCurrentStatusNameDiffersFromChangelog() {
+        // Current status is localized ("Запланировано") but the changelog records the
+        // English name ("Planned"). daysInStatus must be time since the last transition
+        // (47d), not the total age from creation (121d).
+        JiraIssueEntity s = issue("PROJ-1", "Story", "Запланировано", NOW.minusDays(121));
+        lenient().when(workflowConfigService.categorizeIssueType("Story", "PROJ")).thenReturn(BoardCategory.STORY);
+        category("Запланировано", StatusCategory.IN_PROGRESS);
+        when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-1")))
+                .thenReturn(List.of(
+                        transition("PROJ-1", "New", NOW.minusDays(121)),
+                        transition("PROJ-1", "Planned", NOW.minusDays(47))));
+
+        Map<String, StatusAge> r = service.compute(List.of(s), NOW);
+
+        assertThat(r.get("PROJ-1").daysInStatus()).isEqualTo(47);
+    }
+
+    @Test
     void backlogAndDone_areAlwaysNormal_evenIfOld() {
         JiraIssueEntity backlog = issue("PROJ-1", "Story", "To Do", NOW.minusDays(100));
         JiraIssueEntity done = issue("PROJ-2", "Story", "Done", NOW.minusDays(100));
