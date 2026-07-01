@@ -9,6 +9,7 @@ import { ViewToggle } from '../components/ViewToggle'
 import { useBoardData } from '../hooks/useBoardData'
 import { useBoardFilters } from '../hooks/useBoardFilters'
 import { useBoardForecasts } from '../hooks/useBoardForecasts'
+import { invalidateApiCache } from '../hooks/useApiCache'
 import { TimelineContent } from './TimelinePage'
 import './BoardPage.css'
 
@@ -77,6 +78,13 @@ export function BoardPage() {
     })
   }, [triggerSync, loadForecasts])
 
+  // Reordering epics/stories on the board changes planning order; drop the Timeline's
+  // cached plan and bump its refresh token so it re-fetches the new order (no stale view).
+  const refreshTimeline = useCallback(() => {
+    if (selectedTeamId != null) invalidateApiCache(`timeline-${selectedTeamId}`)
+    setTimelineRefreshToken(prev => prev + 1)
+  }, [selectedTeamId])
+
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
 
@@ -109,11 +117,12 @@ export function BoardPage() {
     try {
       await updateEpicOrder(epicKey, newPosition)
       loadForecasts()
+      refreshTimeline()
     } catch (err) {
       console.error('Failed to reorder epic:', err)
       await fetchBoard()
     }
-  }, [setBoard, fetchBoard, loadForecasts])
+  }, [setBoard, fetchBoard, loadForecasts, refreshTimeline])
 
   const handleStoryReorder = useCallback(async (storyKey: string, parentEpicKey: string, newIndex: number) => {
     const newPosition = newIndex + 1
@@ -141,11 +150,12 @@ export function BoardPage() {
     try {
       await updateStoryOrder(storyKey, newPosition)
       loadForecasts()
+      refreshTimeline()
     } catch (err) {
       console.error('Failed to reorder story:', err)
       await fetchBoard()
     }
-  }, [setBoard, fetchBoard, loadForecasts])
+  }, [setBoard, fetchBoard, loadForecasts, refreshTimeline])
 
   const view: BoardWorkspaceView = searchParams.get('view') === 'timeline' ? 'timeline' : 'board'
   const updateView = (nextView: BoardWorkspaceView) => {

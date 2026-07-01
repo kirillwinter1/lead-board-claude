@@ -1435,7 +1435,7 @@ function mergeHybridEpics(
       return {
         storyKey: rs.storyKey,
         summary: rs.summary,
-        autoScore: null,
+        autoScore: rs.autoScore,
         status: rs.status,
         startDate: rs.startDate,
         endDate: rs.endDate,
@@ -1445,10 +1445,10 @@ function mergeHybridEpics(
         issueType: rs.issueType,
         priority: null,
         flagged: null,
-        totalEstimateSeconds: null,
-        totalLoggedSeconds: null,
-        progressPercent: rs.completed ? 100 : null,
-        roleProgress: null,
+        totalEstimateSeconds: rs.totalEstimateSeconds,
+        totalLoggedSeconds: rs.totalLoggedSeconds,
+        progressPercent: rs.progressPercent,
+        roleProgress: rs.roleProgress,
         _source: 'retro' as PhaseSource,
         _worklogDays: rs.worklogDays || null
       } as PlannedStory

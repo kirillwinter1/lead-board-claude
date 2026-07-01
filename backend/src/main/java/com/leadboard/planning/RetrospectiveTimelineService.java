@@ -221,6 +221,35 @@ public class RetrospectiveTimelineService {
                 (int) (completedPhases * 100 / phases.size());
         if (storyDone) progressPercent = 100;
 
+        // Aggregate estimate/logged per role from subtasks — gives the tooltip the same
+        // score / progress bar / per-role logged-vs-estimate the plan (unified) view shows.
+        Map<String, long[]> roleTotals = new LinkedHashMap<>(); // role -> [estimate, logged]
+        Map<String, Boolean> roleDone = new LinkedHashMap<>();
+        long totalEstimate = 0, totalLogged = 0;
+        for (JiraIssueEntity subtask : subtasks) {
+            String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
+            if (role == null) continue;
+            long est = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
+            long log = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+            long[] agg = roleTotals.computeIfAbsent(role, k -> new long[2]);
+            agg[0] += est;
+            agg[1] += log;
+            totalEstimate += est;
+            totalLogged += log;
+            boolean subtaskDone = workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType());
+            roleDone.merge(role, subtaskDone, (a, b) -> a && b);
+        }
+        Map<String, RoleProgress> roleProgress = new LinkedHashMap<>();
+        for (var e : roleTotals.entrySet()) {
+            long[] agg = e.getValue();
+            roleProgress.put(e.getKey(), new RoleProgress(agg[0], agg[1], roleDone.getOrDefault(e.getKey(), false)));
+        }
+        Double autoScore = story.getAutoScore() != null ? story.getAutoScore().doubleValue() : null;
+        // Prefer logged/estimate progress (matches the plan view); fall back to phase-based.
+        if (totalEstimate > 0) {
+            progressPercent = (int) Math.round(totalLogged * 100.0 / totalEstimate);
+        }
+
         return new RetroStory(
                 story.getIssueKey(),
                 story.getSummary(),
@@ -230,6 +259,10 @@ public class RetrospectiveTimelineService {
                 storyStart,
                 storyEnd,
                 progressPercent,
+                autoScore,
+                totalEstimate > 0 ? totalEstimate : null,
+                totalLogged > 0 ? totalLogged : null,
+                roleProgress.isEmpty() ? null : roleProgress,
                 phases,
                 worklogDays != null && !worklogDays.isEmpty() ? worklogDays : null
         );
