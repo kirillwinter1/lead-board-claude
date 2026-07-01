@@ -999,9 +999,20 @@ public class ChatToolExecutor {
         List<Map<String, Object>> tasks = new ArrayList<>();
         int total = 0;
         for (JiraIssueEntity i : closed) {
+            // closedBy = автор ПОСЛЕДНЕГО перехода в статус КАТЕГОРИИ Done (не по точному имени статуса:
+            // текущий status может быть «Готово», а changelog-переход — в «Done»).
             String closedBy = statusChangelogRepository
-                    .findFirstByIssueKeyAndToStatusOrderByTransitionedAtDesc(i.getIssueKey(), i.getStatus())
+                    .findByIssueKeyOrderByTransitionedAtDesc(i.getIssueKey()).stream()
+                    .filter(c -> {
+                        try {
+                            return workflowConfigService.isDone(c.getToStatus(), i.getIssueType());
+                        } catch (Exception e) {
+                            return false;
+                        }
+                    })
                     .map(com.leadboard.metrics.entity.StatusChangelogEntity::getAuthorAccountId)
+                    .filter(a -> a != null)
+                    .findFirst()
                     .orElse(null);
             if (mineOnly && (myAccountId == null || !myAccountId.equals(closedBy))) {
                 continue;

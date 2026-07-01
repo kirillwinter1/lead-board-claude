@@ -53,7 +53,7 @@ public class ChangelogReimportRunner implements ApplicationRunner {
                     List<String> keys = jiraConfigResolver.getActiveProjectKeys();
                     for (String pk : keys) {
                         log.warn("Re-import changelog: tenant={} project={}", tenant.getSlug(), pk);
-                        var result = changelogImportService.importAllChangelogs(pk, 6);
+                        var result = changelogImportService.importAllChangelogs(pk, null); // null = все задачи
                         log.warn("Re-import done: tenant={} project={} result={}", tenant.getSlug(), pk, result);
                     }
                 } catch (Exception e) {
