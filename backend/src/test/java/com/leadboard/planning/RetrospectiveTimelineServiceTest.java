@@ -463,6 +463,40 @@ class RetrospectiveTimelineServiceTest {
             assertFalse(rs.completed());
             assertNull(rs.endDate());
         }
+
+        @Test
+        void doneStoryStays100PercentEvenWhenUnderLogged() {
+            JiraIssueEntity story = createStory("PROJ-3", "Done", "PROJ-100");
+            JiraIssueEntity epic = createStory("PROJ-100", "In Progress", null);
+            epic.setBoardCategory("EPIC");
+
+            OffsetDateTime base = OffsetDateTime.of(2025, 1, 10, 10, 0, 0, 0, ZoneOffset.UTC);
+
+            // Done subtask, under-logged: 5h logged of a 10h estimate.
+            JiraIssueEntity devSub = createSubtask("PROJ-30", "PROJ-3", "Development", "Done",
+                    base, base.plusDays(2));
+            devSub.setOriginalEstimateSeconds(36000L); // 10h
+            devSub.setTimeSpentSeconds(18000L);        // 5h
+
+            when(issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), 1L))
+                    .thenReturn(List.of(story));
+            when(issueRepository.findByIssueKey("PROJ-100"))
+                    .thenReturn(Optional.of(epic));
+            when(issueRepository.findByParentKeyIn(List.of("PROJ-3")))
+                    .thenReturn(List.of(devSub));
+            when(workflowConfigService.getSubtaskRole("Development")).thenReturn("DEV");
+            when(changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(List.of("PROJ-3")))
+                    .thenReturn(List.of(createTransition("PROJ-3", "To Do", "In Development", base.plusDays(14))));
+
+            RetrospectiveResult result = service.calculateRetrospective(1L);
+            RetroStory rs = result.epics().get(0).stories().get(0);
+
+            assertTrue(rs.completed());
+            assertEquals(100, rs.progressPercent(), "done story must stay 100%, not logged/estimate");
+            assertEquals(36000L, rs.totalEstimateSeconds());
+            assertEquals(18000L, rs.totalLoggedSeconds());
+            assertNotNull(rs.roleProgress().get("DEV"));
+        }
     }
 
     @Nested

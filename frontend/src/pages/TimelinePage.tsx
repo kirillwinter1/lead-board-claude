@@ -1778,17 +1778,17 @@ export function TimelineContent({
     return () => cancelAnimationFrame(raf)
   }, [unifiedPlan, forecast, showEarlier])
 
-  const dateRange = useMemo(() => {
-    return calculateDateRange(unifiedPlan, forecast, showEarlier ? null : DEFAULT_PAST_DAYS)
-  }, [unifiedPlan, forecast, showEarlier])
+  // Compute the full and clamped ranges once per data change; derive the active range
+  // and the "can expand" flag from them (avoids re-traversing epic/story dates 3x).
+  const { fullRange, clampedRange } = useMemo(() => ({
+    fullRange: calculateDateRange(unifiedPlan, forecast, null),
+    clampedRange: calculateDateRange(unifiedPlan, forecast, DEFAULT_PAST_DAYS),
+  }), [unifiedPlan, forecast])
+
+  const dateRange = showEarlier ? fullRange : clampedRange
 
   // Whether there is history older than the default window (controls the toggle button).
-  const canExpandHistory = useMemo(() => {
-    if (!unifiedPlan && !forecast) return false
-    const full = calculateDateRange(unifiedPlan, forecast, null)
-    const clamped = calculateDateRange(unifiedPlan, forecast, DEFAULT_PAST_DAYS)
-    return full.start.getTime() < clamped.start.getTime()
-  }, [unifiedPlan, forecast])
+  const canExpandHistory = fullRange.start.getTime() < clampedRange.start.getTime()
 
   const headers = useMemo(() => {
     return generateTimelineHeaders(dateRange, zoom)
@@ -2031,6 +2031,7 @@ export function TimelineContent({
           <button
             type="button"
             className="timeline-history-btn"
+            aria-label={showEarlier ? 'Show recent history only' : 'Show earlier history'}
             onClick={() => setShowEarlier(v => !v)}
           >
             {showEarlier ? 'Show recent ▶' : '◀ Show earlier'}

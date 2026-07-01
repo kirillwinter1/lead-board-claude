@@ -245,8 +245,9 @@ public class RetrospectiveTimelineService {
             roleProgress.put(e.getKey(), new RoleProgress(agg[0], agg[1], roleDone.getOrDefault(e.getKey(), false)));
         }
         Double autoScore = story.getAutoScore() != null ? story.getAutoScore().doubleValue() : null;
-        // Prefer logged/estimate progress (matches the plan view); fall back to phase-based.
-        if (totalEstimate > 0) {
+        // Active stories show logged/estimate progress (matches the plan view); a done story
+        // stays at 100% (set above) regardless of under-/over-logging.
+        if (totalEstimate > 0 && !storyDone) {
             progressPercent = (int) Math.round(totalLogged * 100.0 / totalEstimate);
         }
 
@@ -301,10 +302,12 @@ public class RetrospectiveTimelineService {
                 LocalDate end = subtask.getDoneAt().toLocalDate();
                 lastEnd.merge(role, end, (a, b) -> a.isAfter(b) ? a : b);
                 active.putIfAbsent(role, false);
-            } else {
+            } else if (!subtaskDone) {
                 // Subtask still in progress — role phase is active, no end date.
                 active.put(role, true);
             }
+            // done-but-no-doneAt (sync not caught up): leave lastEnd/active untouched so
+            // the phase isn't mistakenly painted as open-ended to "today".
         }
 
         // A role with any active subtask must not carry an end date (frontend uses "today").
