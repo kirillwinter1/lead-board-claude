@@ -57,7 +57,10 @@ public class McpJwtContextFilter extends OncePerRequestFilter {
 
         var auth = SecurityContextHolder.getContext().getAuthentication();
         if (!(auth instanceof JwtAuthenticationToken jwtAuth)) {
-            chain.doFilter(request, response);
+            // Гейт: /mcp разрешён permitAll на уровне AuthorizationFilter, поэтому отсутствие
+            // валидного JWT отклоняем здесь (нет токена → нет JwtAuthenticationToken).
+            response.setHeader("WWW-Authenticate", "Bearer realm=\"mcp\"");
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Bearer token required");
             return;
         }
 
@@ -107,9 +110,11 @@ public class McpJwtContextFilter extends OncePerRequestFilter {
             }
             LeadBoardAuthentication appAuth = new LeadBoardAuthentication(user.get(), tenantId, role);
             SecurityContextHolder.getContext().setAuthentication(appAuth);
+            // НЕ очищаем SecurityContext вручную: MCP servlet работает асинхронно (streamable),
+            // ручной clearContext после старта async ломает пропагацию auth → 401 на re-dispatch.
+            // SecurityContextHolderFilter очистит контекст сам по завершении диспатча.
             chain.doFilter(request, response);
         } finally {
-            SecurityContextHolder.clearContext();
             TenantContext.clear();
         }
     }

@@ -28,6 +28,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -106,10 +108,10 @@ public class OAuthServerConfig {
                                                 JwtDecoder jwtDecoder,
                                                 McpJwtContextFilter jwtContextFilter) throws Exception {
         http.securityMatcher("/mcp", "/mcp/**")
-                // authenticated(), а не hasAuthority("SCOPE_mcp.read"): McpJwtContextFilter заменяет
-                // JwtAuthenticationToken на LeadBoardAuthentication (без SCOPE-authorities) до AuthorizationFilter.
-                // Валидность JWT уже проверена BearerTokenAuthenticationFilter.
-                .authorizeHttpRequests(a -> a.anyRequest().authenticated())
+                // permitAll на уровне AuthorizationFilter: MCP servlet асинхронный (streamable), и
+                // authenticated()-проверка конфликтует с async re-dispatch (даёт 401 после Secured).
+                // Гейт — McpJwtContextFilter: нет валидного JWT → 401. JWT валидирует BearerTokenAuthenticationFilter.
+                .authorizeHttpRequests(a -> a.anyRequest().permitAll())
                 .csrf(AbstractHttpConfigurer::disable)
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(jwt -> jwt.decoder(jwtDecoder))
@@ -205,10 +207,16 @@ public class OAuthServerConfig {
     @Bean
     public JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
         NimbusJwtDecoder decoder = (NimbusJwtDecoder) OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+        // Audience validator через jwt.getAudience() — нормализует aud (String ИЛИ массив) в List<String>.
+        // (JwtClaimValidator<List> падал, когда aud сериализован как одиночная строка.)
+        OAuth2TokenValidator<org.springframework.security.oauth2.jwt.Jwt> audienceValidator = jwt ->
+                jwt.getAudience() != null && jwt.getAudience().contains(props.resourceUri())
+                        ? OAuth2TokenValidatorResult.success()
+                        : OAuth2TokenValidatorResult.failure(new org.springframework.security.oauth2.core.OAuth2Error(
+                                "invalid_token", "Required audience " + props.resourceUri() + " missing", null));
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
                 JwtValidators.createDefaultWithIssuer(props.getIssuer()),
-                new JwtClaimValidator<List<String>>("aud",
-                        aud -> aud != null && aud.contains(props.resourceUri()))));
+                audienceValidator));
         return decoder;
     }
 

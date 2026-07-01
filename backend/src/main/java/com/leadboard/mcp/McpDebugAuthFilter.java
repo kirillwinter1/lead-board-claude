@@ -53,7 +53,9 @@ public class McpDebugAuthFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/mcp");
+        // В OAuth-режиме /mcp защищает mcpResourceChain (JWT); debug-фильтр не вмешивается
+        // (иначе перехватывает async re-dispatch и отвечает 401).
+        return props.isOauthEnabled() || !request.getRequestURI().startsWith("/mcp");
     }
 
     @Override
