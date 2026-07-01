@@ -80,6 +80,7 @@
 | F78 | Рекомендации автопланера из матрицы (Фаза A) | 2026-06-28 | [features/F78](features/F78_MATRIX_RECOMMENDATIONS.md) |
 | F79 | Дней в статусе + «зависшие эпики» | 2026-06-28 | [features/F79](features/F79_STATUS_AGE.md) |
 | F80 | ИИ-компаньон через MCP (План 1: сервер + инструменты F52 + брифинг готовности + bearer-auth) | 2026-06-30 | [features/F80](features/F80_MCP_AI_COMPANION.md) |
+| F81 | Путь по статусам (тултип на бейдже «дней в статусе») | 2026-07-01 | [features/F81](features/F81_STATUS_JOURNEY_TOOLTIP.md) |
 
 ## Бэклог (BF)
 

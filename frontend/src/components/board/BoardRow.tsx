@@ -112,7 +112,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   {node.quarterLabel}
                 </span>
               )}
-              <StatusAgeBadge days={node.daysInStatus} level={node.statusAgeLevel} reason={node.statusAgeReason} />
+              <StatusAgeBadge days={node.daysInStatus} level={node.statusAgeLevel} reason={node.statusAgeReason} issueKey={node.issueKey} />
                 </div>
               )}
             </div>
