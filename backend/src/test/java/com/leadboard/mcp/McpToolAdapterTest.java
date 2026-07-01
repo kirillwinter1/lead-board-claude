@@ -35,7 +35,7 @@ class McpToolAdapterTest {
         );
         ChatToolExecutor executor = mock(ChatToolExecutor.class);
 
-        McpToolAdapter adapter = new McpToolAdapter(registry, executor, jsonMapper);
+        McpToolAdapter adapter = new McpToolAdapter(registry, executor, jsonMapper, new ObjectMapper(), mock(com.leadboard.config.JiraConfigResolver.class));
         List<SyncToolSpecification> specs = adapter.buildSpecifications();
 
         assertEquals(1, specs.size());
@@ -53,7 +53,7 @@ class McpToolAdapterTest {
         when(executor.executeTool(eq("team_list"), anyString()))
                 .thenReturn("{\"teams\":[],\"totalTeams\":0}");
 
-        McpToolAdapter adapter = new McpToolAdapter(registry, executor, jsonMapper);
+        McpToolAdapter adapter = new McpToolAdapter(registry, executor, jsonMapper, new ObjectMapper(), mock(com.leadboard.config.JiraConfigResolver.class));
         SyncToolSpecification spec = adapter.buildSpecifications().get(0);
 
         CallToolResult result = spec.callHandler().apply(null,

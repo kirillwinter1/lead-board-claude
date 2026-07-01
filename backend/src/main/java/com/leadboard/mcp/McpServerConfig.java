@@ -105,8 +105,10 @@ public class McpServerConfig {
     @Bean
     public McpToolAdapter mcpToolAdapter(ChatToolRegistry registry,
                                          ChatToolExecutor executor,
-                                         McpJsonMapper jsonMapper) {
-        return new McpToolAdapter(registry, executor, jsonMapper);
+                                         McpJsonMapper jsonMapper,
+                                         ObjectMapper objectMapper,
+                                         com.leadboard.config.JiraConfigResolver jiraConfigResolver) {
+        return new McpToolAdapter(registry, executor, jsonMapper, objectMapper, jiraConfigResolver);
     }
 
     @Bean
