@@ -9,6 +9,7 @@ import { ViewToggle } from '../components/ViewToggle'
 import { useBoardData } from '../hooks/useBoardData'
 import { useBoardFilters } from '../hooks/useBoardFilters'
 import { useBoardForecasts } from '../hooks/useBoardForecasts'
+import { invalidateApiCache } from '../hooks/useApiCache'
 import { TimelineContent } from './TimelinePage'
 import './BoardPage.css'
 
@@ -77,6 +78,13 @@ export function BoardPage() {
     })
   }, [triggerSync, loadForecasts])
 
+  // Reordering epics/stories on the board changes planning order; drop the Timeline's
+  // cached plan and bump its refresh token so it re-fetches the new order (no stale view).
+  const refreshTimeline = useCallback(() => {
+    if (selectedTeamId != null) invalidateApiCache(`timeline-${selectedTeamId}`)
+    setTimelineRefreshToken(prev => prev + 1)
+  }, [selectedTeamId])
+
   const handleReorder = useCallback(async (epicKey: string, targetIndex: number) => {
     const newPosition = targetIndex + 1
 
@@ -85,22 +93,29 @@ export function BoardPage() {
       if (!epicToMove) return prevBoard
       const teamId = epicToMove.teamId
 
+      // targetIndex is relative to ACTIVE epics only (done epics form a read-only band
+      // at the top and never participate in reordering).
       const teamItems = prevBoard.filter(e => e.teamId === teamId)
-      const oldIndex = teamItems.findIndex(e => e.issueKey === epicKey)
+      const doneItems = teamItems.filter(e => e.epicDone)
+      const activeItems = teamItems.filter(e => !e.epicDone)
+
+      const oldIndex = activeItems.findIndex(e => e.issueKey === epicKey)
       if (oldIndex === -1 || oldIndex === targetIndex) return prevBoard
 
-      const [movedItem] = teamItems.splice(oldIndex, 1)
-      teamItems.splice(targetIndex, 0, movedItem)
+      const [movedItem] = activeItems.splice(oldIndex, 1)
+      activeItems.splice(targetIndex, 0, movedItem)
 
-      const reorderedTeam = teamItems.map((item, idx) => ({
+      const reorderedActive = activeItems.map((item, idx) => ({
         ...item,
         manualOrder: idx + 1,
       }))
 
+      // Rebuild team order: done band (unchanged) on top, reordered active below.
+      const newTeamOrder = [...doneItems, ...reorderedActive]
       let teamIdx = 0
       return prevBoard.map(item => {
         if (item.teamId === teamId) {
-          return reorderedTeam[teamIdx++]
+          return newTeamOrder[teamIdx++]
         }
         return item
       })
@@ -109,11 +124,12 @@ export function BoardPage() {
     try {
       await updateEpicOrder(epicKey, newPosition)
       loadForecasts()
+      refreshTimeline()
     } catch (err) {
       console.error('Failed to reorder epic:', err)
       await fetchBoard()
     }
-  }, [setBoard, fetchBoard, loadForecasts])
+  }, [setBoard, fetchBoard, loadForecasts, refreshTimeline])
 
   const handleStoryReorder = useCallback(async (storyKey: string, parentEpicKey: string, newIndex: number) => {
     const newPosition = newIndex + 1
@@ -141,11 +157,12 @@ export function BoardPage() {
     try {
       await updateStoryOrder(storyKey, newPosition)
       loadForecasts()
+      refreshTimeline()
     } catch (err) {
       console.error('Failed to reorder story:', err)
       await fetchBoard()
     }
-  }, [setBoard, fetchBoard, loadForecasts])
+  }, [setBoard, fetchBoard, loadForecasts, refreshTimeline])
 
   const view: BoardWorkspaceView = searchParams.get('view') === 'timeline' ? 'timeline' : 'board'
   const updateView = (nextView: BoardWorkspaceView) => {

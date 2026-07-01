@@ -60,6 +60,14 @@ class ChatToolExecutorTest {
     @Mock private BugSlaService bugSlaService;
     @Mock private EmbeddingService embeddingService;
     @Mock private BoardService boardService;
+    @Mock private com.leadboard.insight.InsightEngine insightEngine;
+    @Mock private com.leadboard.jira.JiraWriteService jiraWriteService;
+    @Mock private com.leadboard.planning.QuarterlyPlanningService quarterlyPlanningService;
+    @Mock private com.leadboard.planning.ForecastService forecastService;
+    @Mock private com.leadboard.team.WorklogTimelineService worklogTimelineService;
+    @Mock private com.leadboard.matrix.MatrixService matrixService;
+    @Mock private com.leadboard.epic.EpicService epicService;
+    @Mock private com.leadboard.metrics.repository.StatusChangelogRepository statusChangelogRepository;
 
     private ChatToolExecutor executor;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -71,9 +79,73 @@ class ChatToolExecutorTest {
                 teamMetricsService, workflowConfigService,
                 authorizationService, boardService, bugMetricsService, projectService,
                 riceAssessmentService, absenceService, bugSlaService,
-                embeddingService, objectMapper
+                embeddingService, insightEngine, jiraWriteService,
+                quarterlyPlanningService, forecastService, worklogTimelineService,
+                matrixService, epicService, statusChangelogRepository, objectMapper
         );
         when(authorizationService.isAdmin()).thenReturn(true);
+    }
+
+    @Test
+    @DisplayName("transition_issue delegates to JiraWriteService")
+    void transitionIssueWrites() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(jiraWriteService.transition("LB-1", "in progress")).thenReturn("Developing");
+
+        String result = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"in progress\"}");
+
+        assertTrue(result.contains("Developing"));
+        verify(jiraWriteService).transition("LB-1", "in progress");
+    }
+
+    @Test
+    @DisplayName("log_work converts hours to seconds")
+    void logWorkConvertsHours() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+
+        String result = executor.executeTool("log_work", "{\"issueKey\":\"LB-1\",\"hours\":5}");
+
+        assertTrue(result.contains("\"ok\":true"));
+        verify(jiraWriteService).logWork(eq("LB-1"), eq(18000), any());
+    }
+
+    @Test
+    @DisplayName("write tool denied when not authenticated")
+    void writeDeniedWhenAnonymous() {
+        when(authorizationService.isAuthenticated()).thenReturn(false);
+
+        String result = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"done\"}");
+
+        assertTrue(result.contains("Authentication required"));
+        verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    @DisplayName("create_issue delegates and returns key")
+    void createIssueWrites() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(jiraWriteService.createIssue("story", "New story", "LB-100")).thenReturn("LB-555");
+
+        String result = executor.executeTool("create_issue", "{\"kind\":\"story\",\"summary\":\"New story\",\"parentEpicKey\":\"LB-100\"}");
+
+        assertTrue(result.contains("LB-555"));
+        verify(jiraWriteService).createIssue("story", "New story", "LB-100");
+    }
+
+    @Test
+    @DisplayName("team_readiness_briefing returns 4-lens JSON")
+    void teamReadinessBriefingReturnsJson() {
+        when(insightEngine.briefing(1L)).thenReturn(
+                new com.leadboard.insight.TeamReadiness(1L,
+                        new com.leadboard.insight.TeamReadiness.Lens("RED", "h", List.of(), List.of("LB-1")),
+                        new com.leadboard.insight.TeamReadiness.Lens("YELLOW", "h", List.of(), List.of()),
+                        new com.leadboard.insight.TeamReadiness.Lens("RED", "h", List.of(), List.of()),
+                        new com.leadboard.insight.TeamReadiness.Lens("YELLOW", "h", List.of(), List.of())));
+
+        String result = executor.executeTool("team_readiness_briefing", "{\"teamId\":1}");
+
+        assertTrue(result.contains("planning"));
+        assertTrue(result.contains("LB-1"));
     }
 
     @Test

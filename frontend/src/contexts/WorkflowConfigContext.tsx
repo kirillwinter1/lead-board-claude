@@ -22,6 +22,8 @@ interface WorkflowConfigHelpers extends WorkflowConfig {
   getRoleCodes: () => string[]
   getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
   getIssueTypeCategory: (typeName: string | null | undefined) => string | null
+  // Resolve the configured Jira type name for a board category (e.g. 'EPIC' -> 'Эпик').
+  getTypeNameByCategory: (category: string) => string | null
   getPriorityIconUrl: (name: string | null | undefined) => string | null
   refresh: () => void
 }
@@ -118,6 +120,10 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
       if (!typeName) return null
       return config.issueTypeCategories[typeName] || null
     },
+    getTypeNameByCategory: (category) => {
+      const entry = Object.entries(config.issueTypeCategories).find(([, cat]) => cat === category)
+      return entry ? entry[0] : null
+    },
     getPriorityIconUrl: (name) => {
       if (!name) return null
       return config.priorityIcons[name] || null
@@ -153,6 +159,7 @@ export function useWorkflowConfig(): WorkflowConfigHelpers {
       getRoleCodes: () => [],
       getIssueTypeIconUrl: () => null,
       getIssueTypeCategory: () => null,
+      getTypeNameByCategory: () => null,
       getPriorityIconUrl: () => null,
       refresh: () => {},
     }

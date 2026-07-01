@@ -29,12 +29,24 @@ public record RetrospectiveResult(
             String storyKey,
             String summary,
             String status,
+            String issueType,
             boolean completed,
             LocalDate startDate,
             LocalDate endDate,
             Integer progressPercent,
+            Double autoScore,
+            Long totalEstimateSeconds,
+            Long totalLoggedSeconds,
+            Map<String, RoleProgress> roleProgress,
             Map<String, RetroPhase> phases,
             List<WorklogDay> worklogDays
+    ) {}
+
+    /** Logged/estimated time and completion for a role, for tooltip parity with the plan view. */
+    public record RoleProgress(
+            Long estimateSeconds,
+            Long loggedSeconds,
+            boolean completed
     ) {}
 
     public record WorklogDay(

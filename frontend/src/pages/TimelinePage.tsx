@@ -72,7 +72,15 @@ function startOfMonth(date: Date): Date {
 
 // --- Date range & timeline ---
 
-function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast: ForecastResponse | null): DateRange {
+// By default the timeline renders at most this many days of the past. Older completed
+// work is hidden until the user explicitly expands via the "Show earlier" button.
+export const DEFAULT_PAST_DAYS = 30
+
+export function calculateDateRange(
+  unifiedPlan: UnifiedPlanningResult | null,
+  forecast: ForecastResponse | null,
+  clampPastDays: number | null = null,
+): DateRange {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -114,6 +122,13 @@ function calculateDateRange(unifiedPlan: UnifiedPlanningResult | null, forecast:
         if (d > maxDate) maxDate = d
       }
     }
+  }
+
+  // Clamp how far back we render: hide work completed more than clampPastDays ago
+  // (keeps the initial view focused; a "Show earlier" toggle passes null to disable).
+  if (clampPastDays != null) {
+    const clamp = addDays(today, -clampPastDays)
+    if (minDate < clamp) minDate = clamp
   }
 
   // Align to week boundaries so date % matches header grid exactly
@@ -373,9 +388,11 @@ interface EpicLabelProps {
 }
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
   const statusStyles = useStatusStyles()
-  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))
+  // Resolve the real Jira epic type name (e.g. 'Эпик') so the icon matches the board.
+  const epicTypeName = getTypeNameByCategory('EPIC') ?? 'Epic'
+  const epicIconUrl = getIssueIcon(epicTypeName, getIssueTypeIconUrl(epicTypeName), 'EPIC')
   const [showTooltip, setShowTooltip] = useState(false)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const labelRef = useRef<HTMLDivElement>(null)
@@ -1136,8 +1153,9 @@ interface RoughEstimateBarsProps {
 }
 
 function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsProps) {
-  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl } = useWorkflowConfig()
-  const epicIconUrl = getIssueIcon('Epic', getIssueTypeIconUrl('Epic'))
+  const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
+  const epicTypeName = getTypeNameByCategory('EPIC') ?? 'Epic'
+  const epicIconUrl = getIssueIcon(epicTypeName, getIssueTypeIconUrl(epicTypeName), 'EPIC')
   const [hoveredEpic, setHoveredEpic] = useState<PlannedEpic | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -1416,21 +1434,21 @@ function mergeHybridEpics(
       }
       return {
         storyKey: rs.storyKey,
-        summary: '',
-        autoScore: null,
-        status: rs.completed ? 'Done' : '',
+        summary: rs.summary,
+        autoScore: rs.autoScore,
+        status: rs.status,
         startDate: rs.startDate,
         endDate: rs.endDate,
         phases,
         blockedBy: [],
         warnings: [],
-        issueType: null,
+        issueType: rs.issueType,
         priority: null,
         flagged: null,
-        totalEstimateSeconds: null,
-        totalLoggedSeconds: null,
-        progressPercent: rs.completed ? 100 : null,
-        roleProgress: null,
+        totalEstimateSeconds: rs.totalEstimateSeconds,
+        totalLoggedSeconds: rs.totalLoggedSeconds,
+        progressPercent: rs.progressPercent,
+        roleProgress: rs.roleProgress,
         _source: 'retro' as PhaseSource,
         _worklogDays: rs.worklogDays || null
       } as PlannedStory
@@ -1458,7 +1476,9 @@ function mergeHybridEpics(
     })
   }
 
-  return [...mergedPlanEpics, ...retroOnlyEpics]
+  // Done (retro-only) epics render at the top so the Gantt reads top-to-bottom
+  // (completed work above, active/planned work below) — consistent with the board.
+  return [...retroOnlyEpics, ...mergedPlanEpics]
 }
 
 // --- Gantt Row ---
@@ -1563,6 +1583,8 @@ export function TimelineContent({
   const [forecast, setForecast] = useState<ForecastResponse | null>(initialCache?.forecast ?? null)
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(initialCache?.unifiedPlan ?? null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
+  // When true, render the full history instead of clamping to DEFAULT_PAST_DAYS.
+  const [showEarlier, setShowEarlier] = useState(false)
   const [loading, setLoading] = useState(selectedTeamId ? !initialCache : false)
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState<string>('')
@@ -1611,6 +1633,8 @@ export function TimelineContent({
 
   // Load available snapshot dates when team changes
   useEffect(() => {
+    // Each team starts in the clamped (recent) view
+    setShowEarlier(false)
     if (!selectedTeamId) {
       setAvailableDates([])
       setSelectedHistoricalDate('')
@@ -1731,25 +1755,40 @@ export function TimelineContent({
     }
   }
 
-  // Auto-scroll to today
+  // Position the horizontal scroll: on the clamped (default) view, place the "today"
+  // line at 30% of the visible width — 30% past on the left, 70% future on the right.
+  // When the user expands history, scroll all the way left to reveal the older work.
   useEffect(() => {
-    if (!unifiedPlan || !chartRef.current) return
+    const el = chartRef.current
+    if (!unifiedPlan || !el) return
 
-    const range = calculateDateRange(unifiedPlan, forecast)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const raf = requestAnimationFrame(() => {
+      if (showEarlier) {
+        el.scrollLeft = 0
+        return
+      }
+      const range = calculateDateRange(unifiedPlan, forecast, DEFAULT_PAST_DAYS)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const totalDays = daysBetween(range.start, range.end)
+      if (totalDays <= 0) return
+      const todayX = (daysBetween(range.start, today) / totalDays) * el.scrollWidth
+      el.scrollLeft = Math.max(0, todayX - 0.30 * el.clientWidth)
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [unifiedPlan, forecast, showEarlier])
 
-    const totalDays = daysBetween(range.start, range.end)
-    const todayOffset = daysBetween(range.start, today)
-    const todayPercent = todayOffset / totalDays
+  // Compute the full and clamped ranges once per data change; derive the active range
+  // and the "can expand" flag from them (avoids re-traversing epic/story dates 3x).
+  const { fullRange, clampedRange } = useMemo(() => ({
+    fullRange: calculateDateRange(unifiedPlan, forecast, null),
+    clampedRange: calculateDateRange(unifiedPlan, forecast, DEFAULT_PAST_DAYS),
+  }), [unifiedPlan, forecast])
 
-    const scrollTarget = Math.max(0, (todayPercent - 0.2) * chartRef.current.scrollWidth)
-    chartRef.current.scrollLeft = scrollTarget
-  }, [unifiedPlan, forecast])
+  const dateRange = showEarlier ? fullRange : clampedRange
 
-  const dateRange = useMemo(() => {
-    return calculateDateRange(unifiedPlan, forecast)
-  }, [unifiedPlan, forecast])
+  // Whether there is history older than the default window (controls the toggle button).
+  const canExpandHistory = fullRange.start.getTime() < clampedRange.start.getTime()
 
   const headers = useMemo(() => {
     return generateTimelineHeaders(dateRange, zoom)
@@ -1985,6 +2024,19 @@ export function TimelineContent({
 
       {!loading && !error && !needsTeamSelection && epics.length === 0 && (
         <div className="empty">No epics with planning data</div>
+      )}
+
+      {!loading && !error && !needsTeamSelection && epics.length > 0 && canExpandHistory && (
+        <div className="timeline-history-toggle">
+          <button
+            type="button"
+            className="timeline-history-btn"
+            aria-label={showEarlier ? 'Show recent history only' : 'Show earlier history'}
+            onClick={() => setShowEarlier(v => !v)}
+          >
+            {showEarlier ? 'Show recent ▶' : '◀ Show earlier'}
+          </button>
+        </div>
       )}
 
       {!loading && !error && !needsTeamSelection && epics.length > 0 && (

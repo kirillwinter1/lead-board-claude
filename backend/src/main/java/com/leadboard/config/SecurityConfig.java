@@ -1,7 +1,9 @@
 package com.leadboard.config;
 
 import com.leadboard.auth.LeadBoardAuthenticationFilter;
+import com.leadboard.mcp.McpDebugAuthFilter;
 import com.leadboard.tenant.TenantFilter;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -21,10 +23,13 @@ public class SecurityConfig {
 
     private final LeadBoardAuthenticationFilter authenticationFilter;
     private final TenantFilter tenantFilter;
+    private final ObjectProvider<McpDebugAuthFilter> mcpDebugAuthFilter;
 
-    public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter, TenantFilter tenantFilter) {
+    public SecurityConfig(LeadBoardAuthenticationFilter authenticationFilter, TenantFilter tenantFilter,
+                          ObjectProvider<McpDebugAuthFilter> mcpDebugAuthFilter) {
         this.authenticationFilter = authenticationFilter;
         this.tenantFilter = tenantFilter;
+        this.mcpDebugAuthFilter = mcpDebugAuthFilter;
     }
 
     @Bean
@@ -38,7 +43,16 @@ public class SecurityConfig {
 
             // Add tenant filter first, then auth filter
             .addFilterBefore(tenantFilter, UsernamePasswordAuthenticationFilter.class)
-            .addFilterAfter(authenticationFilter, TenantFilter.class)
+            .addFilterAfter(authenticationFilter, TenantFilter.class);
+
+        // MCP bearer auth (F80) — present only when mcp.enabled=true; runs after
+        // session auth, only touches /mcp, sets tenant + LeadBoardAuthentication.
+        McpDebugAuthFilter mcpFilter = mcpDebugAuthFilter.getIfAvailable();
+        if (mcpFilter != null) {
+            http.addFilterAfter(mcpFilter, LeadBoardAuthenticationFilter.class);
+        }
+
+        http
 
             // Configure authorization
             .authorizeHttpRequests(auth -> auth
@@ -60,6 +74,9 @@ public class SecurityConfig {
 
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()
+
+                // MCP endpoint (F80) — access controlled by McpDebugAuthFilter (bearer), not session
+                .requestMatchers("/mcp", "/mcp/**").permitAll()
 
                 // Issue types are needed by every authenticated user — board,
                 // planning and metrics pages all resolve icons via this endpoint.

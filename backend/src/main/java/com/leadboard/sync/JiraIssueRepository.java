@@ -37,6 +37,30 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     List<JiraIssueEntity> findByParentKeyIn(List<String> parentKeys);
 
+    /**
+     * Активные истории для брифинга готовности (F80). Категория STORY; если задан
+     * teamId — только этой команды. Фильтр «не done» выполняется в InsightEngine
+     * через WorkflowConfigService (статусы конфигурируемы, не хардкодим здесь).
+     */
+    @Query("SELECT e FROM JiraIssueEntity e WHERE e.boardCategory = 'STORY' "
+            + "AND (:teamId IS NULL OR e.teamId = :teamId)")
+    List<JiraIssueEntity> findActiveStoriesForReadiness(@Param("teamId") Long teamId);
+
+    /**
+     * Задачи с залогированным временем (F80): timeSpent > 0, опц. фильтр по команде.
+     * Фильтр «не done» выполняется в коде через WorkflowConfigService.
+     */
+    @Query("SELECT i FROM JiraIssueEntity i WHERE COALESCE(i.timeSpentSeconds, 0) > 0 "
+            + "AND (:teamId IS NULL OR i.teamId = :teamId)")
+    List<JiraIssueEntity> findWithWorklog(@Param("teamId") Long teamId);
+
+    /** Задачи, закрытые (done_at) в интервале [from, to), опц. по команде (F80 closed_tasks). */
+    @Query("SELECT i FROM JiraIssueEntity i WHERE i.doneAt >= :from AND i.doneAt < :to "
+            + "AND (:teamId IS NULL OR i.teamId = :teamId)")
+    List<JiraIssueEntity> findClosedBetween(@Param("from") java.time.OffsetDateTime from,
+                                            @Param("to") java.time.OffsetDateTime to,
+                                            @Param("teamId") Long teamId);
+
     void deleteByProjectKey(String projectKey);
 
     @Query("SELECT e.issueKey FROM JiraIssueEntity e WHERE e.projectKey = :projectKey")

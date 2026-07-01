@@ -342,10 +342,15 @@ export interface RetroStory {
   storyKey: string
   summary: string
   status: string
+  issueType: string | null
   completed: boolean
   startDate: string | null
   endDate: string | null
   progressPercent: number | null
+  autoScore: number | null
+  totalEstimateSeconds: number | null
+  totalLoggedSeconds: number | null
+  roleProgress: Record<string, PhaseProgressInfo> | null
   phases: Record<string, RetroPhase>
   worklogDays: WorklogDay[] | null
 }

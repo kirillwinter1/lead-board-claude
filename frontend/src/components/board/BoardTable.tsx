@@ -23,6 +23,12 @@ import type { BoardNode, BoardTableProps } from './types'
 
 export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, forecastMap, storyPlanningMap, canReorder, onReorder, onStoryReorder }: BoardTableProps) {
   const { isStoryOrBug } = useWorkflowConfig()
+
+  // Done epics render at the top as a read-only "recently shipped" band; they are
+  // excluded from priority ordering, drag and AutoScore recommendations. Only active
+  // epics are prioritized — matching the Timeline, which also separates done work.
+  const doneEpics = useMemo(() => items.filter(e => e.epicDone), [items])
+  const activeEpics = useMemo(() => items.filter(e => !e.epicDone), [items])
   // Load expanded keys from localStorage
   const loadExpandedKeys = (): Set<string> => {
     try {
@@ -85,15 +91,15 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
       return
     }
 
-    const oldIndex = items.findIndex(e => e.issueKey === active.id)
-    const newIndex = items.findIndex(e => e.issueKey === over.id)
+    const oldIndex = activeEpics.findIndex(e => e.issueKey === active.id)
+    const newIndex = activeEpics.findIndex(e => e.issueKey === over.id)
 
     if (oldIndex === -1 || newIndex === -1) {
       setDragPreviewPositions(null)
       return
     }
 
-    const reordered = [...items]
+    const reordered = [...activeEpics]
     const [movedItem] = reordered.splice(oldIndex, 1)
     reordered.splice(newIndex, 0, movedItem)
 
@@ -102,7 +108,7 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
       positions.set(epic.issueKey, idx + 1)
     })
     setDragPreviewPositions(positions)
-  }, [items])
+  }, [activeEpics])
 
   // Handle epic drag end - call API directly
   const handleEpicDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -111,14 +117,16 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
     const { active, over } = event
     if (!over || active.id === over.id) return
 
-    const oldIndex = items.findIndex(e => e.issueKey === active.id)
-    const newIndex = items.findIndex(e => e.issueKey === over.id)
+    const oldIndex = activeEpics.findIndex(e => e.issueKey === active.id)
+    const newIndex = activeEpics.findIndex(e => e.issueKey === over.id)
 
     if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
       playDropSound()
+      // newIndex is relative to active epics; the backend shift keeps the active
+      // epics' relative order correct even though done epics keep their manual_order.
       await onReorder(active.id as string, newIndex)
     }
-  }, [items, onReorder])
+  }, [activeEpics, onReorder])
 
   // Calculate preview positions for stories during drag
   const handleStoryDragOver = useCallback((event: DragOverEvent, stories: BoardNode[]) => {
@@ -169,7 +177,7 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
       return new Map<string, number>()
     }
 
-    const sorted = [...items]
+    const sorted = [...activeEpics]
       .filter(e => e.autoScore !== null)
       .sort((a, b) => (b.autoScore || 0) - (a.autoScore || 0))
 
@@ -178,7 +186,7 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
       recommendations.set(epic.issueKey, idx + 1)
     })
     return recommendations
-  }, [items, canReorder])
+  }, [activeEpics, canReorder])
 
   // Calculate recommended positions for stories within each epic
   const getStoryRecommendations = useCallback((children: BoardNode[]): Map<string, number> => {
@@ -352,43 +360,70 @@ export function BoardTable({ items, roughEstimateConfig, onRoughEstimateUpdate, 
         </div>
         <div className="board-body">
           {canReorder ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragOver={handleEpicDragOver}
-              onDragEnd={handleEpicDragEnd}
-            >
-              <SortableContext
-                items={items.map(e => e.issueKey)}
-                strategy={verticalListSortingStrategy}
-              >
-                {items.map((epic, epicIndex) => {
-                  const isExpanded = expandedKeys.has(epic.issueKey)
-                  const hasChildren = epic.children.length > 0
-                  const forecast = forecastMap.get(epic.issueKey) || null
-                  const actualPosition = dragPreviewPositions?.get(epic.issueKey) ?? (epicIndex + 1)
-                  const recommendedPosition = epicRecommendations.get(epic.issueKey)
-
-                  return (
-                    <SortableEpicRow
-                      key={epic.issueKey}
-                      epic={epic}
-                      isExpanded={isExpanded}
+            <>
+              {/* Done epics: read-only band at the top, not draggable, no recommendation. */}
+              {doneEpics.map(epic => {
+                const isExpanded = expandedKeys.has(epic.issueKey)
+                const hasChildren = epic.children.length > 0
+                const forecast = forecastMap.get(epic.issueKey) || null
+                return (
+                  <Fragment key={epic.issueKey}>
+                    <BoardRow
+                      node={epic}
+                      level={0}
+                      expanded={isExpanded}
                       onToggle={() => toggleExpand(epic.issueKey)}
                       hasChildren={hasChildren}
                       roughEstimateConfig={roughEstimateConfig}
                       onRoughEstimateUpdate={onRoughEstimateUpdate}
                       forecast={forecast}
-                      canReorder={canReorder}
-                      actualPosition={actualPosition}
-                      recommendedPosition={recommendedPosition}
-                    >
-                      {hasChildren && renderChildren(epic.children, epic.issueKey, 1, isExpanded)}
-                    </SortableEpicRow>
-                  )
-                })}
-              </SortableContext>
-            </DndContext>
+                      canReorder={false}
+                      isJustDropped={false}
+                      actualPosition={undefined}
+                      recommendedPosition={undefined}
+                    />
+                    {hasChildren && renderChildren(epic.children, epic.issueKey, 1, isExpanded)}
+                  </Fragment>
+                )
+              })}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragOver={handleEpicDragOver}
+                onDragEnd={handleEpicDragEnd}
+              >
+                <SortableContext
+                  items={activeEpics.map(e => e.issueKey)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {activeEpics.map((epic, epicIndex) => {
+                    const isExpanded = expandedKeys.has(epic.issueKey)
+                    const hasChildren = epic.children.length > 0
+                    const forecast = forecastMap.get(epic.issueKey) || null
+                    const actualPosition = dragPreviewPositions?.get(epic.issueKey) ?? (epicIndex + 1)
+                    const recommendedPosition = epicRecommendations.get(epic.issueKey)
+
+                    return (
+                      <SortableEpicRow
+                        key={epic.issueKey}
+                        epic={epic}
+                        isExpanded={isExpanded}
+                        onToggle={() => toggleExpand(epic.issueKey)}
+                        hasChildren={hasChildren}
+                        roughEstimateConfig={roughEstimateConfig}
+                        onRoughEstimateUpdate={onRoughEstimateUpdate}
+                        forecast={forecast}
+                        canReorder={canReorder}
+                        actualPosition={actualPosition}
+                        recommendedPosition={recommendedPosition}
+                      >
+                        {hasChildren && renderChildren(epic.children, epic.issueKey, 1, isExpanded)}
+                      </SortableEpicRow>
+                    )
+                  })}
+                </SortableContext>
+              </DndContext>
+            </>
           ) : (
             items.map((epic, epicIndex) => {
               const isExpanded = expandedKeys.has(epic.issueKey)

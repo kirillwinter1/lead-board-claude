@@ -73,8 +73,14 @@ public class RetrospectiveTimelineService {
         Map<String, List<StatusChangelogEntity>> transitionsByKey = allTransitions.stream()
                 .collect(Collectors.groupingBy(StatusChangelogEntity::getIssueKey));
 
-        // Batch-load worklogs: find subtasks for all stories, then aggregate worklogs by parent story
-        Map<String, List<WorklogDay>> worklogsByStory = loadWorklogsByStory(storyKeys);
+        // Batch-load subtasks for all stories once — reused for both phase windows and worklogs.
+        List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+        Map<String, List<JiraIssueEntity>> subtasksByStory = subtasks.stream()
+                .filter(st -> st.getParentKey() != null)
+                .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+
+        // Aggregate worklogs (from those subtasks) by parent story
+        Map<String, List<WorklogDay>> worklogsByStory = loadWorklogsBySubtasks(subtasks);
 
         // Build RetroStory for each story
         Map<String, RetroStory> retroStoryMap = new LinkedHashMap<>();
@@ -83,6 +89,7 @@ public class RetrospectiveTimelineService {
                     story.getIssueKey(), List.of());
 
             RetroStory retroStory = buildRetroStory(story, transitions,
+                    subtasksByStory.getOrDefault(story.getIssueKey(), List.of()),
                     worklogsByStory.getOrDefault(story.getIssueKey(), List.of()));
             if (retroStory != null) {
                 retroStoryMap.put(story.getIssueKey(), retroStory);
@@ -149,11 +156,176 @@ public class RetrospectiveTimelineService {
     }
 
     RetroStory buildRetroStory(JiraIssueEntity story, List<StatusChangelogEntity> transitions,
-                               List<WorklogDay> worklogDays) {
-        if (transitions.isEmpty()) {
+                               List<JiraIssueEntity> subtasks, List<WorklogDay> worklogDays) {
+        // Prefer phase windows derived from subtasks: subtask started/done dates match the
+        // worklog (both live on subtasks), so bars paint correctly. The story's own status
+        // workflow can lag the actual work and previously produced grey (unpaintable) bars.
+        PhaseWindows windows = buildPhaseWindowsFromSubtasks(subtasks);
+        if (windows.isEmpty()) {
+            // Fallback: derive phases from the story's own status workflow (legacy behaviour,
+            // used for stories that have no subtasks with role/started data).
+            if (transitions.isEmpty()) {
+                return null;
+            }
+            windows = buildPhaseWindowsFromStoryStatus(story, transitions);
+        }
+        if (windows.isEmpty()) {
             return null;
         }
 
+        boolean storyDone = workflowConfigService.isDone(story.getStatus(), story.getIssueType());
+
+        // Build phase map
+        Map<String, RetroPhase> phases = new LinkedHashMap<>();
+        for (String role : windows.firstStart().keySet()) {
+            LocalDate start = windows.firstStart().get(role);
+            LocalDate end = windows.lastEnd().get(role);
+            boolean active = windows.active().getOrDefault(role, false);
+
+            long duration;
+            if (end != null) {
+                duration = java.time.temporal.ChronoUnit.DAYS.between(start, end);
+            } else if (active) {
+                duration = java.time.temporal.ChronoUnit.DAYS.between(start, LocalDate.now());
+            } else {
+                duration = 0;
+            }
+
+            phases.put(role, new RetroPhase(role, start, end, duration, active));
+        }
+
+        if (phases.isEmpty()) {
+            return null;
+        }
+
+        // Story-level dates
+        LocalDate storyStart = windows.firstStart().values().stream()
+                .min(Comparator.naturalOrder())
+                .orElse(null);
+
+        LocalDate storyEnd;
+        if (storyDone) {
+            storyEnd = windows.lastEnd().values().stream()
+                    .filter(Objects::nonNull)
+                    .max(Comparator.naturalOrder())
+                    .orElse(LocalDate.now());
+        } else {
+            storyEnd = null; // active — frontend will show until today
+        }
+
+        // Progress = percentage of phases completed (non-active)
+        long completedPhases = phases.values().stream()
+                .filter(p -> !p.active() && p.endDate() != null)
+                .count();
+        int progressPercent = phases.isEmpty() ? 0 :
+                (int) (completedPhases * 100 / phases.size());
+        if (storyDone) progressPercent = 100;
+
+        // Aggregate estimate/logged per role from subtasks — gives the tooltip the same
+        // score / progress bar / per-role logged-vs-estimate the plan (unified) view shows.
+        Map<String, long[]> roleTotals = new LinkedHashMap<>(); // role -> [estimate, logged]
+        Map<String, Boolean> roleDone = new LinkedHashMap<>();
+        long totalEstimate = 0, totalLogged = 0;
+        for (JiraIssueEntity subtask : subtasks) {
+            String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
+            if (role == null) continue;
+            long est = subtask.getOriginalEstimateSeconds() != null ? subtask.getOriginalEstimateSeconds() : 0;
+            long log = subtask.getTimeSpentSeconds() != null ? subtask.getTimeSpentSeconds() : 0;
+            long[] agg = roleTotals.computeIfAbsent(role, k -> new long[2]);
+            agg[0] += est;
+            agg[1] += log;
+            totalEstimate += est;
+            totalLogged += log;
+            boolean subtaskDone = workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType());
+            roleDone.merge(role, subtaskDone, (a, b) -> a && b);
+        }
+        Map<String, RoleProgress> roleProgress = new LinkedHashMap<>();
+        for (var e : roleTotals.entrySet()) {
+            long[] agg = e.getValue();
+            roleProgress.put(e.getKey(), new RoleProgress(agg[0], agg[1], roleDone.getOrDefault(e.getKey(), false)));
+        }
+        Double autoScore = story.getAutoScore() != null ? story.getAutoScore().doubleValue() : null;
+        // Active stories show logged/estimate progress (matches the plan view); a done story
+        // stays at 100% (set above) regardless of under-/over-logging.
+        if (totalEstimate > 0 && !storyDone) {
+            progressPercent = (int) Math.round(totalLogged * 100.0 / totalEstimate);
+        }
+
+        return new RetroStory(
+                story.getIssueKey(),
+                story.getSummary(),
+                story.getStatus(),
+                story.getIssueType(),
+                storyDone,
+                storyStart,
+                storyEnd,
+                progressPercent,
+                autoScore,
+                totalEstimate > 0 ? totalEstimate : null,
+                totalLogged > 0 ? totalLogged : null,
+                roleProgress.isEmpty() ? null : roleProgress,
+                phases,
+                worklogDays != null && !worklogDays.isEmpty() ? worklogDays : null
+        );
+    }
+
+    /** Phase start/end/active windows keyed by role code. */
+    private record PhaseWindows(Map<String, LocalDate> firstStart,
+                                Map<String, LocalDate> lastEnd,
+                                Map<String, Boolean> active) {
+        boolean isEmpty() {
+            return firstStart.isEmpty();
+        }
+    }
+
+    /**
+     * Derive per-role phase windows from the story's subtasks. Each subtask maps to a role
+     * (SA/DEV/QA) via workflow config; its started_at/done_at (corrected from real changelog
+     * during sync) give the phase window. Multiple subtasks of the same role are merged
+     * (earliest start, latest end). An unfinished subtask keeps its role phase active.
+     */
+    private PhaseWindows buildPhaseWindowsFromSubtasks(List<JiraIssueEntity> subtasks) {
+        Map<String, LocalDate> firstStart = new LinkedHashMap<>();
+        Map<String, LocalDate> lastEnd = new LinkedHashMap<>();
+        Map<String, Boolean> active = new LinkedHashMap<>();
+
+        for (JiraIssueEntity subtask : subtasks) {
+            String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
+            if (role == null || subtask.getStartedAt() == null) {
+                continue; // no role mapping, or never moved into progress
+            }
+            LocalDate start = subtask.getStartedAt().toLocalDate();
+            firstStart.merge(role, start, (a, b) -> a.isBefore(b) ? a : b);
+
+            boolean subtaskDone = workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType());
+            if (subtaskDone && subtask.getDoneAt() != null) {
+                LocalDate end = subtask.getDoneAt().toLocalDate();
+                lastEnd.merge(role, end, (a, b) -> a.isAfter(b) ? a : b);
+                active.putIfAbsent(role, false);
+            } else if (!subtaskDone) {
+                // Subtask still in progress — role phase is active, no end date.
+                active.put(role, true);
+            }
+            // done-but-no-doneAt (sync not caught up): leave lastEnd/active untouched so
+            // the phase isn't mistakenly painted as open-ended to "today".
+        }
+
+        // A role with any active subtask must not carry an end date (frontend uses "today").
+        active.forEach((role, isActive) -> {
+            if (Boolean.TRUE.equals(isActive)) {
+                lastEnd.remove(role);
+            }
+        });
+
+        return new PhaseWindows(firstStart, lastEnd, active);
+    }
+
+    /**
+     * Legacy fallback: derive phase windows from the story's own status transitions,
+     * mapping each status to a role. Used only when subtask-derived windows are unavailable.
+     */
+    private PhaseWindows buildPhaseWindowsFromStoryStatus(JiraIssueEntity story,
+                                                          List<StatusChangelogEntity> transitions) {
         Map<String, LocalDate> phaseFirstStart = new LinkedHashMap<>();
         Map<String, LocalDate> phaseLastEnd = new LinkedHashMap<>();
         Map<String, Boolean> phaseActive = new LinkedHashMap<>();
@@ -205,77 +377,16 @@ public class RetrospectiveTimelineService {
             // Don't set endDate — frontend will use "today"
         }
 
-        // Build phase map
-        Map<String, RetroPhase> phases = new LinkedHashMap<>();
-        for (String role : phaseFirstStart.keySet()) {
-            LocalDate start = phaseFirstStart.get(role);
-            LocalDate end = phaseLastEnd.get(role);
-            boolean active = phaseActive.getOrDefault(role, false);
-
-            long duration;
-            if (end != null) {
-                duration = java.time.temporal.ChronoUnit.DAYS.between(start, end);
-            } else if (active) {
-                duration = java.time.temporal.ChronoUnit.DAYS.between(start, LocalDate.now());
-            } else {
-                duration = 0;
-            }
-
-            phases.put(role, new RetroPhase(role, start, end, duration, active));
-        }
-
-        if (phases.isEmpty()) {
-            return null;
-        }
-
-        // Story-level dates
-        LocalDate storyStart = phaseFirstStart.values().stream()
-                .min(Comparator.naturalOrder())
-                .orElse(null);
-
-        LocalDate storyEnd;
-        if (storyDone) {
-            storyEnd = phaseLastEnd.values().stream()
-                    .filter(Objects::nonNull)
-                    .max(Comparator.naturalOrder())
-                    .orElse(LocalDate.now());
-        } else {
-            storyEnd = null; // active — frontend will show until today
-        }
-
-        // Progress = percentage of phases completed (non-active)
-        long completedPhases = phases.values().stream()
-                .filter(p -> !p.active() && p.endDate() != null)
-                .count();
-        int progressPercent = phases.isEmpty() ? 0 :
-                (int) (completedPhases * 100 / phases.size());
-        if (storyDone) progressPercent = 100;
-
-        return new RetroStory(
-                story.getIssueKey(),
-                story.getSummary(),
-                story.getStatus(),
-                storyDone,
-                storyStart,
-                storyEnd,
-                progressPercent,
-                phases,
-                worklogDays != null && !worklogDays.isEmpty() ? worklogDays : null
-        );
+        return new PhaseWindows(phaseFirstStart, phaseLastEnd, phaseActive);
     }
 
     /**
-     * Load worklogs for stories by finding their subtasks and aggregating.
-     * Worklogs are logged on subtasks, so we need to:
-     * 1. Find all subtasks for the given story keys
-     * 2. Load worklogs for those subtask keys
-     * 3. Aggregate by parent story -> date -> role
+     * Aggregate worklogs for the given (already loaded) subtasks by parent story.
+     * Worklogs are logged on subtasks, so we:
+     * 1. Load worklogs for those subtask keys
+     * 2. Aggregate by parent story -> date -> role
      */
-    private Map<String, List<WorklogDay>> loadWorklogsByStory(List<String> storyKeys) {
-        if (storyKeys.isEmpty()) return Map.of();
-
-        // Find subtasks for these stories
-        List<JiraIssueEntity> subtasks = issueRepository.findByParentKeyIn(storyKeys);
+    private Map<String, List<WorklogDay>> loadWorklogsBySubtasks(List<JiraIssueEntity> subtasks) {
         if (subtasks.isEmpty()) return Map.of();
 
         // Build subtask key -> parent story key mapping

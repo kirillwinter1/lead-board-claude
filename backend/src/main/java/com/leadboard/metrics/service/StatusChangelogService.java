@@ -114,7 +114,8 @@ public class StatusChangelogService {
                         .map(item -> new StatusTransition(
                                 item.getFromString(),
                                 item.getToString(),
-                                parseJiraTimestamp(h.getCreated())
+                                parseJiraTimestamp(h.getCreated()),
+                                h.getAuthor() != null ? h.getAuthor().getAccountId() : null
                         )))
                 .filter(t -> t.transitionedAt != null)
                 .sorted(Comparator.comparing(t -> t.transitionedAt))
@@ -142,6 +143,7 @@ public class StatusChangelogService {
             entry.setTransitionedAt(transition.transitionedAt);
             entry.setTimeInPreviousStatusSeconds(timeInPrevStatus);
             entry.setSource("JIRA");
+            entry.setAuthorAccountId(transition.authorAccountId);
             entry.setCreatedAt(OffsetDateTime.now());
 
             repository.save(entry);
@@ -200,5 +202,6 @@ public class StatusChangelogService {
         }
     }
 
-    private record StatusTransition(String fromStatus, String toStatus, OffsetDateTime transitionedAt) {}
+    private record StatusTransition(String fromStatus, String toStatus, OffsetDateTime transitionedAt,
+                                    String authorAccountId) {}
 }

@@ -45,6 +45,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int REGISTRATION_LIMIT = 10;
     private static final int CHAT_LIMIT = 30;
     private static final int METRICS_LIMIT = 600;
+    private static final int MCP_LIMIT = 60;
     private static final long WINDOW_MS = 60_000; // 1 minute
 
     @Value("${app.rate-limit.general:200}")
@@ -69,7 +70,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         // Skip non-API paths (frontend static resources)
-        if (!path.startsWith("/api/") && !path.startsWith("/oauth/") && !path.startsWith("/ws/")) {
+        if (!path.startsWith("/api/") && !path.startsWith("/oauth/") && !path.startsWith("/ws/")
+                && !path.startsWith("/mcp")) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -111,6 +113,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/metrics/")) {
             return METRICS_LIMIT;
         }
+        if (path.startsWith("/mcp")) {
+            return MCP_LIMIT;
+        }
         return generalApiLimit;
     }
 
@@ -129,6 +134,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         if (path.startsWith("/api/metrics/")) {
             return "metrics";
+        }
+        if (path.startsWith("/mcp")) {
+            return "mcp";
         }
         return "api";
     }

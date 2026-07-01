@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
-import { TimelinePage } from './TimelinePage'
+import { TimelinePage, calculateDateRange, DEFAULT_PAST_DAYS } from './TimelinePage'
 import { teamsApi } from '../api/teams'
 import * as forecastApi from '../api/forecast'
 import * as configApi from '../api/config'
@@ -35,6 +35,8 @@ vi.mock('../contexts/WorkflowConfigContext', () => ({
     getRoleColor: () => '#669DF1',
     getRoleDisplayName: (code: string) => code,
     getIssueTypeIconUrl: () => undefined,
+    getIssueTypeCategory: () => null,
+    getTypeNameByCategory: () => null,
     issueTypeIcons: {},
     issueTypeCategories: {},
     config: { roles: [], issueTypes: [], statuses: [] },
@@ -182,5 +184,51 @@ describe('TimelinePage', () => {
         expect(screen.getByText(/Failed to load teams/i)).toBeInTheDocument()
       })
     })
+  })
+})
+
+describe('calculateDateRange past clamping', () => {
+  const daysAgo = (n: number) => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - n)
+    return d.toISOString().slice(0, 10)
+  }
+  const daysAhead = (n: number) => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() + n)
+    return d.toISOString().slice(0, 10)
+  }
+
+  // Minimal unified plan: one epic with a story that started 90 days ago and ends 5 days out.
+  const plan = {
+    epics: [
+      {
+        isRoughEstimate: false,
+        stories: [{ startDate: daysAgo(90), endDate: daysAhead(5), phases: {} }],
+      },
+    ],
+  } as unknown as Parameters<typeof calculateDateRange>[0]
+
+  it('renders the full history when clamp is disabled (null)', () => {
+    const range = calculateDateRange(plan, null, null)
+    // Start should be near the 90-days-ago story start (allowing for week alignment/padding)
+    expect(range.start.getTime()).toBeLessThan(Date.now() - 80 * 24 * 3600 * 1000)
+  })
+
+  it('clamps the start to roughly DEFAULT_PAST_DAYS ago', () => {
+    const full = calculateDateRange(plan, null, null)
+    const clamped = calculateDateRange(plan, null, DEFAULT_PAST_DAYS)
+
+    // Clamp moved the start forward (hides the 90-days-ago work)
+    expect(clamped.start.getTime()).toBeGreaterThan(full.start.getTime())
+
+    // Clamped start sits within ~2 weeks of (today - DEFAULT_PAST_DAYS), accounting for
+    // the -3 day pad and week-boundary alignment inside calculateDateRange.
+    const target = Date.now() - DEFAULT_PAST_DAYS * 24 * 3600 * 1000
+    const slackMs = 14 * 24 * 3600 * 1000
+    expect(clamped.start.getTime()).toBeGreaterThan(target - slackMs)
+    expect(clamped.start.getTime()).toBeLessThan(target + slackMs)
   })
 })

@@ -79,6 +79,7 @@
 | F77 | Eisenhower Matrix — MVP (backlog triage) | 2026-06-27 | [features/F77](features/F77_EISENHOWER_MATRIX_MVP.md) |
 | F78 | Рекомендации автопланера из матрицы (Фаза A) | 2026-06-28 | [features/F78](features/F78_MATRIX_RECOMMENDATIONS.md) |
 | F79 | Дней в статусе + «зависшие эпики» | 2026-06-28 | [features/F79](features/F79_STATUS_AGE.md) |
+| F80 | ИИ-компаньон через MCP (План 1: сервер + инструменты F52 + брифинг готовности + bearer-auth) | 2026-06-30 | [features/F80](features/F80_MCP_AI_COMPANION.md) |
 
 ## Бэклог (BF)
 

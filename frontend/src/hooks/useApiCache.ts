@@ -7,3 +7,7 @@ export function setApiCache(key: string, value: unknown) {
 export function getApiCache<T>(key: string): T | undefined {
   return cache.get(key) as T | undefined
 }
+
+export function invalidateApiCache(key: string) {
+  cache.delete(key)
+}
