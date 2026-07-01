@@ -67,7 +67,7 @@ public class StatusAgeService {
             return Map.of();
         }
         List<String> keys = issues.stream().map(JiraIssueEntity::getIssueKey).toList();
-        Map<String, OffsetDateTime> latestTransitionToCurrent = latestTransitionPerIssue(keys, issues);
+        Map<String, OffsetDateTime> latestTransitionToCurrent = latestTransitionPerIssue(keys);
         Map<String, OffsetDateTime> epicLastSubtreeActivity = epicInactivity(issues, now);
 
         Map<String, StatusAge> result = new HashMap<>();
@@ -144,17 +144,17 @@ public class StatusAgeService {
         };
     }
 
-    /** For each issue, the latest transition timestamp whose target equals its current status. */
-    private Map<String, OffsetDateTime> latestTransitionPerIssue(List<String> keys, List<JiraIssueEntity> issues) {
-        Map<String, String> currentStatus = new HashMap<>();
-        for (JiraIssueEntity i : issues) {
-            currentStatus.put(i.getIssueKey(), i.getStatus());
-        }
+    /**
+     * When each issue last changed status = the entry into its current status.
+     * We deliberately do NOT match {@code to_status} against {@code jira_issues.status}:
+     * the two can disagree by localization (e.g. current "Запланировано" vs the changelog's
+     * "Planned"), which would otherwise drop back to {@code jira_created_at} and report the
+     * total age instead of the current-status age. This mirrors how the F81 status-journey
+     * tooltip anchors the current segment, so badge and tooltip stay consistent.
+     */
+    private Map<String, OffsetDateTime> latestTransitionPerIssue(List<String> keys) {
         Map<String, OffsetDateTime> latest = new HashMap<>();
         for (StatusChangelogEntity c : changelogRepository.findByIssueKeyInOrderByIssueKeyAscTransitionedAtAsc(keys)) {
-            if (!c.getToStatus().equals(currentStatus.get(c.getIssueKey()))) {
-                continue;
-            }
             OffsetDateTime prev = latest.get(c.getIssueKey());
             if (prev == null || c.getTransitionedAt().isAfter(prev)) {
                 latest.put(c.getIssueKey(), c.getTransitionedAt());

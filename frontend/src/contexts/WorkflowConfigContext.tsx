@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import axios from 'axios'
 import { WorkflowRoleDto, JiraIssueTypeMetadata, JiraPriorityMetadata } from '../api/workflowConfig'
+import { getTenantSlug } from '../utils/tenant'
 
 interface WorkflowConfig {
   roles: WorkflowRoleDto[]
@@ -36,14 +37,57 @@ const DEFAULT_ROLE_COLORS: Record<string, string> = {
   QA: '#206A83',
 }
 
+const EMPTY_CONFIG: WorkflowConfig = {
+  roles: [],
+  issueTypeCategories: {},
+  issueTypeIcons: {},
+  priorityIcons: {},
+  loading: true,
+}
+
+// Cache the workflow config (icons/categories/roles) in localStorage, scoped per tenant,
+// so a page reload renders the correct issue-type icons immediately instead of briefly
+// falling back to the story icon while the config re-fetches. A background fetch still runs
+// and refreshes the cache.
+function configCacheKey(): string {
+  // Use the resolved tenant (subdomain on prod, else localStorage) so cross-tenant
+  // browsers don't share one cache entry.
+  let slug = 'default'
+  try { slug = getTenantSlug() ?? 'default' } catch { /* ignore */ }
+  return `workflow-config:${slug}`
+}
+
+function readCachedConfig(): WorkflowConfig {
+  try {
+    const raw = localStorage.getItem(configCacheKey())
+    if (raw) {
+      const c = JSON.parse(raw)
+      return {
+        roles: c.roles ?? [],
+        issueTypeCategories: c.issueTypeCategories ?? {},
+        issueTypeIcons: c.issueTypeIcons ?? {},
+        priorityIcons: c.priorityIcons ?? {},
+        loading: false, // we have cached data; a background fetch still refreshes it
+      }
+    }
+  } catch { /* ignore malformed cache */ }
+  return EMPTY_CONFIG
+}
+
+function writeCachedConfig(config: WorkflowConfig): void {
+  try {
+    localStorage.setItem(configCacheKey(), JSON.stringify({
+      roles: config.roles,
+      issueTypeCategories: config.issueTypeCategories,
+      issueTypeIcons: config.issueTypeIcons,
+      priorityIcons: config.priorityIcons,
+    }))
+  } catch { /* ignore quota/serialization errors */ }
+}
+
 export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
-  const [config, setConfig] = useState<WorkflowConfig>({
-    roles: [],
-    issueTypeCategories: {},
-    issueTypeIcons: {},
-    priorityIcons: {},
-    loading: true,
-  })
+  // Initialise from the per-tenant cache so reloads don't flash fallback icons.
+  const [config, setConfig] = useState<WorkflowConfig>(readCachedConfig)
 
   const loadConfig = useCallback(() => {
     Promise.all([
@@ -61,7 +105,9 @@ export function WorkflowConfigProvider({ children }: { children: ReactNode }) {
         priorities.forEach((p: JiraPriorityMetadata) => {
           if (p.iconUrl) prioIcons[p.name] = p.iconUrl
         })
-        setConfig({ roles, issueTypeCategories: categories, issueTypeIcons: icons, priorityIcons: prioIcons, loading: false })
+        const next = { roles, issueTypeCategories: categories, issueTypeIcons: icons, priorityIcons: prioIcons, loading: false }
+        setConfig(next)
+        writeCachedConfig(next)
       })
       .catch(() => {
         setConfig(prev => ({ ...prev, loading: false }))
