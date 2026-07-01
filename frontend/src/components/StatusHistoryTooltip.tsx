@@ -133,12 +133,23 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
                   marginTop: 8,
                   paddingTop: 6,
                   display: 'flex',
-                  justifyContent: 'space-between',
+                  flexDirection: 'column',
+                  gap: 4,
                   color: '#6b778c',
                 }}
               >
-                <span>Всего</span>
-                <span style={{ fontWeight: 600, color: '#172b4d' }}>{formatDuration(history.totalSeconds)}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Всего</span>
+                  <span style={{ fontWeight: 600, color: '#172b4d' }}>{formatDuration(history.totalSeconds)}</span>
+                </div>
+                {history.segments.length > 1 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Без «{history.segments[0].status}»</span>
+                    <span style={{ fontWeight: 600, color: '#172b4d' }}>
+                      {formatDuration(history.totalSeconds - history.segments[0].durationSeconds)}
+                    </span>
+                  </div>
+                )}
               </div>
             </>
           )}

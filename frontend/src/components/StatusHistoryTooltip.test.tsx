@@ -36,10 +36,11 @@ describe('StatusHistoryTooltip', () => {
     vi.mocked(api.getStatusHistory).mockResolvedValue({
       issueKey: 'LB-1',
       currentStatus: 'Development',
-      totalSeconds: 8 * 86400,
+      totalSeconds: 9 * 86400,
       segments: [
-        { status: 'New', durationSeconds: 86400, current: false },
-        { status: 'Development', durationSeconds: 5 * 86400, current: true },
+        { status: 'New', durationSeconds: 2 * 86400, current: false },
+        { status: 'Analysis', durationSeconds: 3 * 86400, current: false },
+        { status: 'Development', durationSeconds: 4 * 86400, current: true },
       ],
     })
 
@@ -51,9 +52,11 @@ describe('StatusHistoryTooltip', () => {
     expect(screen.getByText('Development')).toBeInTheDocument()
     // current status highlighted with a "сейчас" marker
     expect(screen.getByText('сейчас')).toBeInTheDocument()
-    // durations + total
+    // total + "without New" total (9д total − 2д New = 7д)
     expect(screen.getByText('Всего')).toBeInTheDocument()
-    expect(screen.getByText('8д')).toBeInTheDocument() // total
+    expect(screen.getByText('9д')).toBeInTheDocument() // total
+    expect(screen.getByText('Без «New»')).toBeInTheDocument()
+    expect(screen.getByText('7д')).toBeInTheDocument() // total without New
   })
 
   it('does not fetch again on a second hover (cached)', async () => {
