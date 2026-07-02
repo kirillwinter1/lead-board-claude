@@ -90,6 +90,7 @@ class FixHandlersTest {
 
         FixPreview preview = handler.preview(child);
         assertEquals("LB-1", preview.changes().get(0).issueKey()); // change points at epic, not child
+        assertEquals("Epic", preview.changes().get(0).issueType()); // carries the epic's type for the preview icon
 
         FixResult result = handler.apply(child, null, Map.of());
         assertTrue(result.success());
@@ -256,9 +257,9 @@ class FixHandlersTest {
         JiraIssueEntity epic = issue("LB-1", "Epic", "Done");
         JiraIssueEntity child = issue("LB-2", "Story", "In Progress");
         JiraIssueEntity subtask = issue("LB-3", "Sub-task", "In Progress");
+        subtask.setParentKey("LB-2");
         when(issues.findByParentKey("LB-1")).thenReturn(List.of(child));
-        when(issues.findByParentKey("LB-2")).thenReturn(List.of(subtask));
-        when(issues.findByParentKey("LB-3")).thenReturn(List.of());
+        when(issues.findByParentKeyIn(List.of("LB-2"))).thenReturn(List.of(subtask));
         when(wfc.isDone(anyString(), anyString(), anyString())).thenReturn(false);
         when(wfc.categorizeIssueType("Story", "LB")).thenReturn(BoardCategory.STORY);
         when(wfc.categorizeIssueType("Sub-task", "LB")).thenReturn(BoardCategory.SUBTASK);
@@ -336,5 +337,132 @@ class FixHandlersTest {
         InOrder inOrder = inOrder(jiraClient);
         inOrder.verify(jiraClient).addWorklogAt("LB-3", 3600, "2026-01-15T10:00:00.000+0000");
         inOrder.verify(jiraClient).deleteWorklog("LB-2", "w1");
+    }
+
+    // ---------- Coverage for the remaining handlers ----------
+
+    @Test
+    void storyTodoButHasWork_movesStoryToInProgress() {
+        JiraIssueEntity story = issue("LB-2", "Story", "New");
+        when(wfc.categorizeIssueType("Story", "LB")).thenReturn(BoardCategory.STORY);
+        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY)).thenReturn("Аналитика");
+        when(jiraWrite.transitionWithFallback("LB-2", "Аналитика")).thenReturn("Аналитика");
+
+        var handler = new StoryTodoButHasWorkFixHandler(support);
+
+        FixPreview preview = handler.preview(story);
+        assertTrue(preview.applicable());
+        assertEquals("Аналитика", preview.changes().get(0).to());
+
+        FixResult result = handler.apply(story, null, Map.of());
+        assertTrue(result.success());
+        assertEquals(List.of("LB-2"), result.updatedIssues());
+        verify(jiraWrite).transitionWithFallback("LB-2", "Аналитика");
+    }
+
+    @Test
+    void subtaskInProgressStoryNot_movesParentStoryNotSubtask() {
+        JiraIssueEntity sub = issue("LB-5", "Sub-task", "In Progress");
+        sub.setParentKey("LB-2");
+        JiraIssueEntity story = issue("LB-2", "Story", "New");
+        when(issues.findByIssueKey("LB-2")).thenReturn(Optional.of(story));
+        when(wfc.categorizeIssueType("Story", "LB")).thenReturn(BoardCategory.STORY);
+        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY)).thenReturn("Аналитика");
+        when(jiraWrite.transitionWithFallback("LB-2", "Аналитика")).thenReturn("Аналитика");
+
+        var handler = new SubtaskInProgressStoryNotFixHandler(support);
+
+        FixPreview preview = handler.preview(sub);
+        assertEquals("LB-2", preview.changes().get(0).issueKey()); // targets the story, not the subtask
+        assertEquals("Story", preview.changes().get(0).issueType());
+
+        FixResult result = handler.apply(sub, null, Map.of());
+        assertEquals(List.of("LB-2"), result.updatedIssues());
+        verify(jiraWrite).transitionWithFallback("LB-2", "Аналитика");
+    }
+
+    @Test
+    void subtaskInProgressStoryNot_notApplicableWithoutParent() {
+        JiraIssueEntity sub = issue("LB-5", "Sub-task", "In Progress");
+        sub.setParentKey("LB-404");
+        when(issues.findByIssueKey("LB-404")).thenReturn(Optional.empty());
+
+        var handler = new SubtaskInProgressStoryNotFixHandler(support);
+        assertFalse(handler.preview(sub).applicable());
+    }
+
+    @Test
+    void subtaskTimeLoggedButTodo_movesSubtaskItself() {
+        JiraIssueEntity sub = issue("LB-5", "Sub-task", "New");
+        when(wfc.categorizeIssueType("Sub-task", "LB")).thenReturn(BoardCategory.SUBTASK);
+        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.SUBTASK)).thenReturn("In Progress");
+        when(jiraWrite.transitionWithFallback("LB-5", "In Progress")).thenReturn("In Progress");
+
+        var handler = new SubtaskTimeLoggedButTodoFixHandler(support);
+
+        FixPreview preview = handler.preview(sub);
+        assertEquals("LB-5", preview.changes().get(0).issueKey());
+
+        FixResult result = handler.apply(sub, null, Map.of());
+        assertEquals(List.of("LB-5"), result.updatedIssues());
+        verify(jiraWrite).transitionWithFallback("LB-5", "In Progress");
+    }
+
+    @Test
+    void subtaskWorkNoEstimate_convertsHoursToSeconds() {
+        JiraIssueEntity sub = issue("LB-5", "Sub-task", "In Progress");
+        var handler = new SubtaskWorkNoEstimateFixHandler(support);
+
+        handler.apply(sub, null, Map.of("hours", "1.5"));
+        verify(jiraClient).updateEstimate("LB-5", 5400);
+    }
+
+    @Test
+    void childDueAfterEpic_bothChoicesUpdateTheChosenIssue() {
+        JiraIssueEntity story = issue("LB-2", "Story", "In Progress");
+        story.setParentKey("LB-1");
+        story.setDueDate(LocalDate.of(2026, 8, 20));
+        JiraIssueEntity epic = issue("LB-1", "Epic", "In Progress");
+        epic.setDueDate(LocalDate.of(2026, 8, 1));
+        when(issues.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
+        when(wfc.categorizeIssueType("Epic", "LB")).thenReturn(BoardCategory.EPIC);
+
+        var handler = new ChildDueAfterEpicFixHandler(support);
+
+        FixPreview preview = handler.preview(story);
+        assertEquals(2, preview.choices().size());
+        assertEquals("Epic", preview.choices().get(1).changes().get(0).issueType());
+
+        FixResult moveStory = handler.apply(story, "moveStory", Map.of("dueDate", "2026-08-01"));
+        assertEquals(List.of("LB-2"), moveStory.updatedIssues());
+        verify(jiraClient).updateDueDate("LB-2", LocalDate.of(2026, 8, 1));
+
+        FixResult moveEpic = handler.apply(story, "moveEpic", Map.of("dueDate", "2026-08-20"));
+        assertEquals(List.of("LB-1"), moveEpic.updatedIssues());
+        verify(jiraClient).updateDueDate("LB-1", LocalDate.of(2026, 8, 20));
+    }
+
+    @Test
+    void storyDoneOpenChildren_continueOnErrorReportsPartial() {
+        JiraIssueEntity story = issue("LB-2", "Story", "Done");
+        JiraIssueEntity ok = issue("LB-3", "Sub-task", "In Progress");
+        JiraIssueEntity bad = issue("LB-4", "Sub-task", "In Progress");
+        when(issues.findByParentKey("LB-2")).thenReturn(List.of(ok, bad));
+        when(wfc.isDone(anyString(), anyString(), anyString())).thenReturn(false);
+        when(wfc.categorizeIssueType("Sub-task", "LB")).thenReturn(BoardCategory.SUBTASK);
+        when(wfc.getFirstStatusNameForCategory(StatusCategory.DONE, BoardCategory.SUBTASK)).thenReturn("Done");
+        when(jiraWrite.transitionWithFallback("LB-3", "Done")).thenReturn("Done");
+        when(jiraWrite.transitionWithFallback("LB-4", "Done")).thenThrow(new RuntimeException("boom"));
+
+        var handler = new StoryDoneOpenChildrenFixHandler(support);
+
+        FixPreview preview = handler.preview(story);
+        assertTrue(preview.risky());
+        assertEquals(List.of("LB-3", "LB-4"), preview.affectedIssues());
+
+        FixResult result = handler.apply(story, null, Map.of());
+        assertFalse(result.success()); // partial: LB-4 failed
+        assertEquals(List.of("LB-3"), result.updatedIssues());
+        assertTrue(result.message().contains("LB-4"));
     }
 }

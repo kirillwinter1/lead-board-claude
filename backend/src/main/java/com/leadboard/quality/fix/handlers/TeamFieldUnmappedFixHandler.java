@@ -49,14 +49,14 @@ public class TeamFieldUnmappedFixHandler implements FixHandler {
             return b.notApplicable("Issue has no Jira team field value to map.").build();
         }
         List<FixInput.Option> options = support.teamsWithBlankJiraValue().stream()
-                .map(t -> new FixInput.Option(String.valueOf(t.getId()), t.getName()))
+                .map(t -> new FixInput.Option(String.valueOf(t.getId()), t.getName(), t.getColor()))
                 .toList();
         if (options.isEmpty()) {
             return b.notApplicable("No teams without a Jira mapping are available.").build();
         }
         return b
                 .inputs(List.of(FixInput.select("teamId", "Team", true, options, null)))
-                .changes(List.of(FixChange.local(issue.getIssueKey(), issue.getSummary(),
+                .changes(List.of(FixChange.local(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Team mapping", "\"" + fieldValue + "\" (unmapped)", "→ selected team")))
                 .build();
     }

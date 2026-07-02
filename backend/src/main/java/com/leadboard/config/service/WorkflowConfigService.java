@@ -781,21 +781,17 @@ public class WorkflowConfigService {
         if (target == null || boardCat == null) return null;
         ConfigSnapshot s = snapshot();
 
-        String prefix = boardCat.name() + ":";
-        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
-            if (entry.getKey().startsWith(prefix) && entry.getValue() == target) {
-                return entry.getKey().substring(prefix.length());
-            }
-        }
+        // Pick the pipeline-first status: lowest statusSortOrder among all matching entries.
+        // statusLookup iteration order is arbitrary — relying on the first hash-order match
+        // is non-deterministic and produced user-visible wrong picks (e.g. "Test Review"
+        // instead of the first in-progress status "Аналитика").
+        String pipelineFirst = lowestSortOrderStatusName(s, target, boardCat.name() + ":");
+        if (pipelineFirst != null) return pipelineFirst;
 
         // BUG fallback: try STORY mappings
         if (boardCat == BoardCategory.BUG) {
-            String storyPrefix = "STORY:";
-            for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
-                if (entry.getKey().startsWith(storyPrefix) && entry.getValue() == target) {
-                    return entry.getKey().substring(storyPrefix.length());
-                }
-            }
+            String storyFallback = lowestSortOrderStatusName(s, target, "STORY:");
+            if (storyFallback != null) return storyFallback;
         }
 
         // Hardcoded last resort for common status names
@@ -806,6 +802,27 @@ public class WorkflowConfigService {
             case NEW -> "New";
             default -> null;
         };
+    }
+
+    /**
+     * Among all {@code statusLookup} entries under {@code prefix} that map to {@code target},
+     * returns the status name with the LOWEST {@code statusSortOrder} (missing order →
+     * {@link Integer#MAX_VALUE}, tie-break by name for full determinism), or null if none match.
+     */
+    private String lowestSortOrderStatusName(ConfigSnapshot s, StatusCategory target, String prefix) {
+        String best = null;
+        int bestOrder = Integer.MAX_VALUE;
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
+            String key = entry.getKey();
+            if (!key.startsWith(prefix) || entry.getValue() != target) continue;
+            String name = key.substring(prefix.length());
+            int order = s.statusSortOrder.getOrDefault(key, Integer.MAX_VALUE);
+            if (best == null || order < bestOrder || (order == bestOrder && name.compareTo(best) < 0)) {
+                best = name;
+                bestOrder = order;
+            }
+        }
+        return best;
     }
 
     /**

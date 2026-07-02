@@ -8,6 +8,8 @@ import com.leadboard.quality.fix.dto.FixInput;
 import com.leadboard.quality.fix.dto.FixPreview;
 import com.leadboard.quality.fix.dto.FixResult;
 import com.leadboard.sync.JiraIssueEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -16,6 +18,8 @@ import java.util.Map;
 /** BUG_NO_PRIORITY: bug without a priority. Fix sets one from the Jira priority list. */
 @Component
 public class BugNoPriorityFixHandler implements FixHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(BugNoPriorityFixHandler.class);
 
     // Fallback when the Jira priority list can't be fetched (offline / no perms).
     private static final List<String> DEFAULT_PRIORITIES = List.of("Highest", "High", "Medium", "Low", "Lowest");
@@ -39,7 +43,7 @@ public class BugNoPriorityFixHandler implements FixHandler {
         return FixPreview.builder(issue.getIssueKey(), rule(), "PRIORITY", "Set a priority")
                 .authMode(support.authMode())
                 .inputs(List.of(FixInput.select("priority", "Priority", true, options, null)))
-                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(),
+                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Priority", "—", "(selected priority)")))
                 .build();
     }
@@ -49,6 +53,9 @@ public class BugNoPriorityFixHandler implements FixHandler {
         String priority = FixSupport.stringParam(params, "priority");
         if (priority == null || priority.isBlank()) {
             throw new IllegalArgumentException("priority is required");
+        }
+        if (!priorityNames().contains(priority)) {
+            throw new IllegalArgumentException("Unknown priority: " + priority);
         }
         support.jira().updatePriority(issue.getIssueKey(), priority);
         return FixResult.ok("Set priority " + priority + " on " + issue.getIssueKey(),
@@ -63,7 +70,7 @@ public class BugNoPriorityFixHandler implements FixHandler {
                     .toList();
             if (!names.isEmpty()) return names;
         } catch (Exception e) {
-            // fall through to defaults
+            log.warn("Failed to fetch Jira priorities, falling back to defaults: {}", e.getMessage());
         }
         return DEFAULT_PRIORITIES;
     }

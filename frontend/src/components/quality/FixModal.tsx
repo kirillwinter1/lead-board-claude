@@ -3,6 +3,9 @@ import axios from 'axios'
 import { Modal } from '../Modal'
 import { SingleSelectDropdown } from '../SingleSelectDropdown'
 import { RiceForm } from '../rice/RiceForm'
+import { StatusBadge } from '../board/StatusBadge'
+import { getIssueIcon } from '../board/helpers'
+import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import {
   applyFix,
   getFixPreview,
@@ -51,10 +54,19 @@ function errorMessage(e: unknown): string {
 }
 
 function ChangeRow({ change }: { change: FixChange }) {
+  const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
+  const isStatus = change.field === 'Status'
   return (
     <div className="fix-change-row" style={{ borderColor: BORDER_DEFAULT, background: BG_PAGE }}>
       <div className="fix-change-head">
-        <span className="fix-change-key" style={{ color: TEXT_PRIMARY }}>{change.issueKey}</span>
+        {change.issueType && (
+          <img
+            className="fix-change-icon"
+            src={getIssueIcon(change.issueType, getIssueTypeIconUrl(change.issueType), getIssueTypeCategory(change.issueType))}
+            alt={change.issueType}
+          />
+        )}
+        <span className="fix-change-key" style={{ color: LINK_COLOR }}>{change.issueKey}</span>
         {change.local && (
           <span className="fix-local-hint" style={{ color: TEXT_MUTED, borderColor: BORDER_DEFAULT }}>
             local
@@ -66,9 +78,19 @@ function ChangeRow({ change }: { change: FixChange }) {
       )}
       <div className="fix-change-detail" style={{ color: TEXT_SECONDARY }}>
         {change.field && <span className="fix-change-field">{change.field}: </span>}
-        <span>{change.from || '∅'}</span>
-        <span className="fix-change-arrow" style={{ color: TEXT_MUTED }}> → </span>
-        <span style={{ color: TEXT_PRIMARY, fontWeight: 600 }}>{change.to || '∅'}</span>
+        {isStatus ? (
+          <span className="fix-change-status">
+            {change.from ? <StatusBadge status={change.from} /> : <span>∅</span>}
+            <span className="fix-change-arrow" style={{ color: TEXT_MUTED }}> → </span>
+            {change.to ? <StatusBadge status={change.to} /> : <span>∅</span>}
+          </span>
+        ) : (
+          <>
+            <span>{change.from || '∅'}</span>
+            <span className="fix-change-arrow" style={{ color: TEXT_MUTED }}> → </span>
+            <span style={{ color: TEXT_PRIMARY, fontWeight: 600 }}>{change.to || '∅'}</span>
+          </>
+        )}
       </div>
     </div>
   )
@@ -204,8 +226,7 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
         <>
           <div className="fix-error" style={{ color: ERROR_TEXT }}>{loadError}</div>
           <div className="modal-actions" style={{ marginTop: 16 }}>
-            <button type="button" className="fix-btn-secondary" onClick={onClose}
-              style={{ background: BG_PAGE, color: TEXT_PRIMARY, borderColor: BORDER_DEFAULT }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
               Close
             </button>
           </div>
@@ -223,9 +244,8 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
           <div className="modal-actions" style={{ marginTop: 16 }}>
             <button
               type="button"
-              className="fix-btn-secondary"
+              className="btn btn-secondary"
               onClick={onApplied}
-              style={{ background: BG_PAGE, color: TEXT_PRIMARY, borderColor: BORDER_DEFAULT }}
             >
               Close
             </button>
@@ -281,7 +301,7 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
                   {inp.type === 'select' ? (
                     <SingleSelectDropdown
                       label={inp.label}
-                      options={inp.options ?? []}
+                      options={(inp.options ?? []).map(o => ({ ...o, color: o.color ?? undefined }))}
                       selected={inputValues[inp.name] || null}
                       onChange={v => setInput(inp.name, v ?? '')}
                       placeholder={inp.label}
@@ -316,7 +336,7 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
               {preview.affectedIssues.length > 0 && (
                 <ul className="fix-affected-list">
                   {preview.affectedIssues.map((line, idx) => (
-                    <li key={idx}>{line}</li>
+                    <li key={`${idx}-${line}`}>{line}</li>
                   ))}
                 </ul>
               )}
@@ -340,19 +360,18 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
           <div className="modal-actions" style={{ marginTop: 16 }}>
             <button
               type="button"
-              className="fix-btn-secondary"
+              className="btn btn-secondary"
               onClick={onClose}
               disabled={applying}
-              style={{ background: BG_PAGE, color: TEXT_PRIMARY, borderColor: BORDER_DEFAULT }}
             >
               Cancel
             </button>
             <button
               type="button"
-              className="fix-btn-primary"
+              className="btn btn-primary"
               onClick={handleApply}
               disabled={!canApply}
-              style={{ background: LINK_COLOR, color: BG_PAGE, opacity: canApply ? 1 : 0.5 }}
+              style={{ opacity: canApply ? 1 : 0.5 }}
             >
               {applying ? 'Applying...' : 'Apply'}
             </button>

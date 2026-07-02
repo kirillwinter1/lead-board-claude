@@ -42,7 +42,7 @@ public class EpicNoTeamFixHandler implements FixHandler {
     @Override
     public FixPreview preview(JiraIssueEntity issue) {
         List<FixInput.Option> options = support.teams().findByActiveTrue().stream()
-                .map(t -> new FixInput.Option(String.valueOf(t.getId()), t.getName()))
+                .map(t -> new FixInput.Option(String.valueOf(t.getId()), t.getName(), t.getColor()))
                 .toList();
         FixPreview.Builder b = FixPreview.builder(issue.getIssueKey(), rule(), "TEAM_SELECT",
                 "Assign a team (Lead Board only)").authMode("LOCAL");
@@ -51,7 +51,7 @@ public class EpicNoTeamFixHandler implements FixHandler {
         }
         return b
                 .inputs(List.of(FixInput.select("teamId", "Team", true, options, null)))
-                .changes(List.of(FixChange.local(issue.getIssueKey(), issue.getSummary(), "Team", "—", "(selected team)")))
+                .changes(List.of(FixChange.local(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), "Team", "—", "(selected team)")))
                 .build();
     }
 

@@ -6,6 +6,8 @@ import axios from 'axios'
 export interface FixChange {
   issueKey: string
   summary: string
+  /** Jira issue type name (e.g. "Story", "Epic") — drives the issue-type icon. */
+  issueType: string
   field: string
   from: string
   to: string
@@ -16,6 +18,8 @@ export interface FixChange {
 export interface FixInputOption {
   value: string
   label: string
+  /** Accent color (e.g. team color) — rendered as a dot in the select dropdown. */
+  color?: string | null
 }
 
 /** A user-provided input required to compute/apply the fix. */
