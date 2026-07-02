@@ -10,9 +10,15 @@ import {
   TOOLTIP_DIVIDER, TOOLTIP_PROGRESS_TRACK, TOOLTIP_SUCCESS, TOOLTIP_VALUE, TOOLTIP_ACCENT,
   lightenColor,
 } from '../constants/colors'
+import {
+  ZoomLevel, DateRange,
+  daysBetween,
+  calculateDateRangeFromCandidates, generateTimelineHeaders, generateGroupHeaders,
+  generateWeekHeaders as generateWeekHeadersBase, isWeekend, formatDateShort, formatHours,
+} from '../utils/dateGrid'
 import '../pages/ProjectTimelinePage.css'
 
-export type ZoomLevel = 'day' | 'week' | 'month'
+export type { ZoomLevel }
 
 const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
   day: 40,
@@ -20,203 +26,19 @@ const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
   month: 100,
 }
 
-interface DateRange {
-  start: Date
-  end: Date
-}
-
-interface TimelineHeader {
-  date: Date
-  label: string
-}
-
-interface GroupHeader {
-  label: string
-  span: number
-}
-
-function toLocalMidnight(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function daysBetween(start: Date, end: Date): number {
-  const s = toLocalMidnight(start)
-  const e = toLocalMidnight(end)
-  return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
-}
-
-function startOfWeek(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  return d
-}
-
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
-}
-
-function formatDateShort(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
 // Re-export lightenColor for backward compatibility (ProjectsPage imports it from here)
 export { lightenColor }
 
 function calculateDateRange(projects: ProjectTimelineDto[]): DateRange {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let minDate: Date = today
-  let maxDate: Date = addDays(today, 30)
+  const startCandidates: Date[] = []
+  const endCandidates: Date[] = []
   for (const project of projects) {
     for (const epic of project.epics) {
-      if (epic.startDate) {
-        const d = new Date(epic.startDate)
-        if (d < minDate) minDate = d
-      }
-      if (epic.endDate) {
-        const d = new Date(epic.endDate)
-        if (d > maxDate) maxDate = d
-      }
+      if (epic.startDate) startCandidates.push(new Date(epic.startDate))
+      if (epic.endDate) endCandidates.push(new Date(epic.endDate))
     }
   }
-  minDate = startOfWeek(addDays(minDate, -3))
-  const paddedMax = addDays(maxDate, 7)
-  const numWeeks = Math.ceil(daysBetween(minDate, paddedMax) / 7)
-  maxDate = addDays(minDate, numWeeks * 7)
-  return { start: minDate, end: maxDate }
-}
-
-function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): TimelineHeader[] {
-  const headers: TimelineHeader[] = []
-  let current = new Date(range.start)
-  if (zoom === 'day') {
-    while (current <= range.end) {
-      headers.push({ date: new Date(current), label: current.getDate().toString() })
-      current = addDays(current, 1)
-    }
-  } else if (zoom === 'week') {
-    current = startOfWeek(current)
-    while (current <= range.end) {
-      headers.push({ date: new Date(current), label: formatDateShort(current) })
-      current = addDays(current, 7)
-    }
-  } else {
-    current = startOfMonth(current)
-    while (current <= range.end) {
-      headers.push({
-        date: new Date(current),
-        label: current.toLocaleDateString('en-US', { month: 'short' })
-      })
-      current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
-    }
-  }
-  return headers
-}
-
-function generateGroupHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupHeader[] {
-  if (headers.length === 0) return []
-  const groups: GroupHeader[] = []
-  if (zoom === 'day' || zoom === 'week') {
-    let currentMonth = -1
-    let currentYear = -1
-    let currentSpan = 0
-    for (const header of headers) {
-      const month = header.date.getMonth()
-      const year = header.date.getFullYear()
-      if (month !== currentMonth || year !== currentYear) {
-        if (currentSpan > 0) {
-          groups.push({
-            label: new Date(currentYear, currentMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-            span: currentSpan
-          })
-        }
-        currentMonth = month
-        currentYear = year
-        currentSpan = 1
-      } else {
-        currentSpan++
-      }
-    }
-    if (currentSpan > 0) {
-      groups.push({
-        label: new Date(currentYear, currentMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        span: currentSpan
-      })
-    }
-  } else {
-    let currentQuarter = -1
-    let currentYear = -1
-    let currentSpan = 0
-    for (const header of headers) {
-      const quarter = Math.floor(header.date.getMonth() / 3) + 1
-      const year = header.date.getFullYear()
-      if (quarter !== currentQuarter || year !== currentYear) {
-        if (currentSpan > 0) {
-          groups.push({ label: `Q${currentQuarter} ${currentYear}`, span: currentSpan })
-        }
-        currentQuarter = quarter
-        currentYear = year
-        currentSpan = 1
-      } else {
-        currentSpan++
-      }
-    }
-    if (currentSpan > 0) {
-      groups.push({ label: `Q${currentQuarter} ${currentYear}`, span: currentSpan })
-    }
-  }
-  return groups
-}
-
-function generateWeekHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupHeader[] {
-  if (zoom !== 'day' || headers.length === 0) return []
-  const weeks: GroupHeader[] = []
-  let currentWeekStart: Date | null = null
-  let currentSpan = 0
-  for (const header of headers) {
-    const weekStart = startOfWeek(header.date)
-    if (!currentWeekStart || weekStart.getTime() !== currentWeekStart.getTime()) {
-      if (currentSpan > 0 && currentWeekStart) {
-        weeks.push({ label: `W${getWeekNumber(currentWeekStart)}`, span: currentSpan })
-      }
-      currentWeekStart = weekStart
-      currentSpan = 1
-    } else {
-      currentSpan++
-    }
-  }
-  if (currentSpan > 0 && currentWeekStart) {
-    weeks.push({ label: `W${getWeekNumber(currentWeekStart)}`, span: currentSpan })
-  }
-  return weeks
-}
-
-function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-}
-
-function isWeekend(date: Date): boolean {
-  const day = date.getDay()
-  return day === 0 || day === 6
-}
-
-function formatHours(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '0h'
-  return `${Math.round(seconds / 3600)}h`
+  return calculateDateRangeFromCandidates(startCandidates, endCandidates)
 }
 
 function buildRemainingText(epic: EpicTimelineDto, roleCodes: string[]): string {
@@ -288,7 +110,7 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
   const dateRange = useMemo(() => calculateDateRange(projects), [projects])
   const headers = useMemo(() => generateTimelineHeaders(dateRange, zoom), [dateRange, zoom])
   const groupHeaders = useMemo(() => generateGroupHeaders(headers, zoom), [headers, zoom])
-  const weekHeaders = useMemo(() => generateWeekHeaders(headers, zoom), [headers, zoom])
+  const weekHeaders = useMemo(() => generateWeekHeadersBase(headers, zoom, n => `W${n}`), [headers, zoom])
   const chartWidth = useMemo(() => headers.length * ZOOM_UNIT_WIDTH[zoom], [headers.length, zoom])
 
   const todayPercent = useMemo(() => {

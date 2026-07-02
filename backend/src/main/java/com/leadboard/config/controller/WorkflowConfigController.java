@@ -478,10 +478,14 @@ public class WorkflowConfigController {
             epicKeys.add(epic.getIssueKey());
         }
 
+        var projectKeys = projects.stream().map(p -> p.getIssueKey()).toList();
+        var epicsByParentKey = jiraIssueRepository.findByParentKeyIn(projectKeys).stream()
+                .collect(java.util.stream.Collectors.groupingBy(epic -> epic.getParentKey()));
+
         // Check parent mode: any EPIC with parentKey pointing to a PROJECT?
         int parentCount = 0;
         for (var proj : projects) {
-            for (var epic : jiraIssueRepository.findByParentKey(proj.getIssueKey())) {
+            for (var epic : epicsByParentKey.getOrDefault(proj.getIssueKey(), List.of())) {
                 if (epicKeys.contains(epic.getIssueKey())) {
                     parentCount++;
                 }
