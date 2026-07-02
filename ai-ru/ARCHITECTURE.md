@@ -51,7 +51,7 @@ com.leadboard/
 │   ├── controller/ — PokerController (13 endpoints)
 │   └── service/    — PokerSessionService, PokerJiraService
 ├── project/        — Projects: синхронизация, прогресс, alignment (ProjectService, ProjectAlignmentService, ProjectController)
-├── quality/        — Data Quality: 17 правил проверки (DataQualityService 444 LOC)
+├── quality/        — Data Quality: 38 правил проверки, сгруппированных в 12 категорий (DataQualityCategory, F83), DataQualityService 775 LOC
 ├── rice/           — RICE Scoring: шаблоны, оценки, нормализация (RiceAssessmentService 307 LOC)
 ├── simulation/     — AI Simulation: моделирование сценариев планирования
 │   ├── SimulationController (5 endpoints, ADMIN only)
@@ -70,7 +70,7 @@ com.leadboard/
 | UnifiedPlanningService | 838 | Единый алгоритм планирования: dynamic role pipeline, capacity, dependencies |
 | BoardService | 621 | Агрегация Epic→Story→Subtask, прогресс, оценки, alerts |
 | StoryForecastService | 464 | Story-level прогноз с учётом assignee и грейдов |
-| DataQualityService | 444 | 17 правил проверки качества данных |
+| DataQualityService | 775 | 38 правил проверки качества данных, сгруппированных в 12 категорий (F83) |
 | SyncService | 437 | Инкрементальная синхронизация из Jira, status changelog |
 | StoryAutoScoreService | 392 | AutoScore для stories: 9 факторов + топологическая сортировка |
 | WorkCalendarService | 359 | Рабочие дни, праздники РФ, расчёт дат |

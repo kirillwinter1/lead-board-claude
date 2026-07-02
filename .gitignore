@@ -51,3 +51,6 @@ output/
 /qp_*.png
 /screenshot*.png
 /screen-*.png
+
+# Subagent working memory (tooling, not project code)
+.claude/agent-memory/

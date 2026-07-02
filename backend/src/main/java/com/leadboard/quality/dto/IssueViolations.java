@@ -24,15 +24,29 @@ public record IssueViolations(
 ) {
     /**
      * Simplified violation DTO for API response.
+     *
+     * @param rule The rule code (enum name)
+     * @param label Human-readable rule name
+     * @param category The rule's category code (enum name)
+     * @param categoryLabel Human-readable category name
+     * @param severity The severity level
+     * @param message Human-readable message describing the violation
      */
     public record ViolationDto(
             String rule,
+            String label,
+            String category,
+            String categoryLabel,
             String severity,
             String message
     ) {
         public static ViolationDto from(DataQualityViolation violation) {
+            var rule = violation.rule();
             return new ViolationDto(
-                    violation.rule().name(),
+                    rule.name(),
+                    rule.getLabel(),
+                    rule.getCategory().name(),
+                    rule.getCategory().getLabel(),
                     violation.severity().name(),
                     violation.message()
             );

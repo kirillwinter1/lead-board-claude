@@ -1,7 +1,10 @@
 package com.leadboard.quality;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.metrics.entity.FlagChangelogEntity;
+import com.leadboard.metrics.repository.FlagChangelogRepository;
 import com.leadboard.rice.RiceAssessmentRepository;
+import com.leadboard.status.StatusAge;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -17,7 +20,9 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -43,6 +48,9 @@ class DataQualityServiceTest {
 
     @Mock
     private BugSlaService bugSlaService;
+
+    @Mock
+    private FlagChangelogRepository flagChangelogRepository;
 
     private DataQualityService dataQualityService;
 
@@ -80,7 +88,11 @@ class DataQualityServiceTest {
         lenient().when(workflowConfigService.categorizeEpic("Requirements")).thenReturn(StatusCategory.REQUIREMENTS);
         lenient().when(workflowConfigService.categorizeEpic("Planned")).thenReturn(StatusCategory.PLANNED);
 
-        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService, riceAssessmentRepository, bugSlaService);
+        // By default no open flag entry exists — individual tests stub as needed.
+        lenient().when(flagChangelogRepository.findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc(anyString()))
+                .thenReturn(Optional.empty());
+
+        dataQualityService = new DataQualityService(issueRepository, memberRepository, workflowConfigService, riceAssessmentRepository, bugSlaService, flagChangelogRepository);
     }
 
     // ==================== Helper Methods ====================
@@ -104,6 +116,17 @@ class DataQualityServiceTest {
         story.setSummary("Test Story");
         story.setProjectKey("TEST");
         return story;
+    }
+
+    private JiraIssueEntity createBug(String key, String status, String parentKey) {
+        JiraIssueEntity bug = new JiraIssueEntity();
+        bug.setIssueKey(key);
+        bug.setIssueType("Bug");
+        bug.setStatus(status);
+        bug.setParentKey(parentKey);
+        bug.setSummary("Test Bug");
+        bug.setProjectKey("TEST");
+        return bug;
     }
 
     private JiraIssueEntity createSubtask(String key, String status, String parentKey) {
@@ -665,6 +688,355 @@ class DataQualityServiceTest {
             assertNull(dataQualityService.checkForecastLate(null, LocalDate.now()));
             assertNull(dataQualityService.checkForecastLate(LocalDate.now(), null));
             assertNull(dataQualityService.checkForecastLate(null, null));
+        }
+    }
+
+    // ==================== New Rules Tests (F83) ====================
+
+    @Nested
+    class AssigneeRulesTests {
+
+        @Test
+        void subtaskInProgressNoAssignee_shouldReturnError() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(3600L);
+            subtask.setAssigneeAccountId(null);
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.IN_PROGRESS_NO_ASSIGNEE));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.IN_PROGRESS_NO_ASSIGNEE)
+                    .allMatch(v -> v.severity() == DataQualitySeverity.ERROR));
+        }
+
+        @Test
+        void subtaskInProgressWithAssignee_shouldNotReturnError() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing"); // teamId null -> no ASSIGNEE_NOT_IN_TEAM
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(3600L);
+            subtask.setAssigneeAccountId("acc-1");
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.IN_PROGRESS_NO_ASSIGNEE));
+        }
+
+        @Test
+        void assigneeNotInEpicTeam_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            epic.setTeamId(5L);
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(3600L);
+            subtask.setAssigneeAccountId("acc-1");
+            subtask.setAssigneeDisplayName("John Doe");
+
+            when(memberRepository.existsByJiraAccountIdAndTeamIdAndActiveTrue("acc-1", 5L)).thenReturn(false);
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.ASSIGNEE_NOT_IN_TEAM));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.ASSIGNEE_NOT_IN_TEAM)
+                    .allMatch(v -> v.message().contains("John Doe")));
+        }
+
+        @Test
+        void assigneeInEpicTeam_shouldNotReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            epic.setTeamId(5L);
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(3600L);
+            subtask.setAssigneeAccountId("acc-1");
+
+            when(memberRepository.existsByJiraAccountIdAndTeamIdAndActiveTrue("acc-1", 5L)).thenReturn(true);
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.ASSIGNEE_NOT_IN_TEAM));
+        }
+    }
+
+    @Nested
+    class StalenessRulesTests {
+
+        @Test
+        void statusAgeCritical_shouldReturnInProgressTooLong() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(3600L);
+            subtask.setAssigneeAccountId("acc-1");
+
+            StatusAge critical = new StatusAge(25, StatusAge.CRITICAL, "25д в статусе");
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic, critical);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.IN_PROGRESS_TOO_LONG));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.IN_PROGRESS_TOO_LONG)
+                    .allMatch(v -> v.message().contains("25")));
+        }
+
+        @Test
+        void statusAgeNormal_shouldNotReturnInProgressTooLong() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(3600L);
+            subtask.setAssigneeAccountId("acc-1");
+
+            List<DataQualityViolation> violations =
+                    dataQualityService.checkSubtask(subtask, story, epic, StatusAge.normal(5));
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.IN_PROGRESS_TOO_LONG));
+        }
+
+        @Test
+        void epicFlaggedLongerThanThreshold_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            epic.setTeamId(1L);
+            epic.setDueDate(LocalDate.now().plusDays(30));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
+            epic.setDescription("desc");
+            epic.setFlagged(true);
+
+            when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
+
+            FlagChangelogEntity entry = new FlagChangelogEntity();
+            entry.setIssueKey("TEST-1");
+            entry.setFlaggedAt(OffsetDateTime.now().minusDays(20));
+            when(flagChangelogRepository.findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc("TEST-1"))
+                    .thenReturn(Optional.of(entry));
+
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), null);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_FLAGGED_TOO_LONG));
+        }
+
+        @Test
+        void epicFlaggedRecently_shouldNotReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            epic.setTeamId(1L);
+            epic.setDueDate(LocalDate.now().plusDays(30));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
+            epic.setDescription("desc");
+            epic.setFlagged(true);
+
+            when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
+
+            FlagChangelogEntity entry = new FlagChangelogEntity();
+            entry.setIssueKey("TEST-1");
+            entry.setFlaggedAt(OffsetDateTime.now().minusDays(5));
+            when(flagChangelogRepository.findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc("TEST-1"))
+                    .thenReturn(Optional.of(entry));
+
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of(), null);
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_FLAGGED_TOO_LONG));
+        }
+    }
+
+    @Nested
+    class TeamFieldAndContentRulesTests {
+
+        @Test
+        void teamFieldSetButUnmapped_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
+            epic.setTeamId(null);
+            epic.setTeamFieldValue("Team Rocket");
+
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TEAM_FIELD_UNMAPPED));
+            // EPIC_NO_TEAM still fires alongside it (it blocks planning)
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_TEAM));
+        }
+
+        @Test
+        void teamFieldMapped_shouldNotReturnUnmapped() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Backlog");
+            epic.setTeamId(1L);
+            epic.setTeamFieldValue("Team Rocket");
+
+            when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
+
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.TEAM_FIELD_UNMAPPED));
+        }
+
+        @Test
+        void epicPastTodoNoDescription_shouldReturnInfo() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Planned");
+            epic.setTeamId(1L);
+            epic.setDueDate(LocalDate.now().plusDays(30));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
+            epic.setDescription(null);
+
+            when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
+
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_DESCRIPTION));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.EPIC_NO_DESCRIPTION)
+                    .allMatch(v -> v.severity() == DataQualitySeverity.INFO));
+        }
+
+        @Test
+        void epicWithDescription_shouldNotReturnNoDescription() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Planned");
+            epic.setTeamId(1L);
+            epic.setDueDate(LocalDate.now().plusDays(30));
+            epic.setRoughEstimate("DEV", new java.math.BigDecimal("5.0"));
+            epic.setDescription("Some meaningful description");
+
+            when(memberRepository.findByTeamIdAndActiveTrue(1L)).thenReturn(List.of(new TeamMemberEntity()));
+
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, List.of());
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.EPIC_NO_DESCRIPTION));
+        }
+    }
+
+    @Nested
+    class DueDateAndEstimateRulesTests {
+
+        @Test
+        void storyDueAfterEpic_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            epic.setDueDate(LocalDate.now().plusDays(10));
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            story.setDueDate(LocalDate.now().plusDays(20));
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.CHILD_DUE_AFTER_EPIC));
+        }
+
+        @Test
+        void storyDueBeforeEpic_shouldNotReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            epic.setDueDate(LocalDate.now().plusDays(20));
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            story.setDueDate(LocalDate.now().plusDays(10));
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.CHILD_DUE_AFTER_EPIC));
+        }
+
+        @Test
+        void subtaskEstimateTooBig_shouldReturnInfo() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(41L * 3600L); // 41 hours > 40h threshold
+            subtask.setAssigneeAccountId("acc-1");
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_ESTIMATE_TOO_BIG));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.SUBTASK_ESTIMATE_TOO_BIG)
+                    .allMatch(v -> v.severity() == DataQualitySeverity.INFO));
+        }
+
+        @Test
+        void subtaskEstimateWithinThreshold_shouldNotReturnInfo() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            JiraIssueEntity subtask = createSubtask("TEST-3", "In Progress", "TEST-2");
+            subtask.setOriginalEstimateSeconds(20L * 3600L); // 20 hours
+            subtask.setAssigneeAccountId("acc-1");
+
+            List<DataQualityViolation> violations = dataQualityService.checkSubtask(subtask, story, epic);
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.SUBTASK_ESTIMATE_TOO_BIG));
+        }
+    }
+
+    @Nested
+    class BugPriorityRulesTests {
+
+        @Test
+        void bugWithoutPriority_shouldReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity bug = createBug("TEST-2", "Development", "TEST-1");
+            bug.setPriority(null);
+
+            List<DataQualityViolation> violations = dataQualityService.checkBug(bug, epic, List.of());
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.BUG_NO_PRIORITY));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.BUG_NO_PRIORITY)
+                    .allMatch(v -> v.severity() == DataQualitySeverity.WARNING));
+        }
+
+        @Test
+        void bugWithPriority_shouldNotReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity bug = createBug("TEST-2", "Development", "TEST-1");
+            bug.setPriority("High");
+
+            List<DataQualityViolation> violations = dataQualityService.checkBug(bug, epic, List.of());
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.BUG_NO_PRIORITY));
+        }
+
+        @Test
+        void doneBugWithoutPriority_shouldNotReturnWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity bug = createBug("TEST-2", "Done", "TEST-1");
+            bug.setPriority(null);
+
+            List<DataQualityViolation> violations = dataQualityService.checkBug(bug, epic, List.of());
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.BUG_NO_PRIORITY));
+        }
+    }
+
+    @Nested
+    class BlockedNoProgressTests {
+
+        @Test
+        void oldStoryWithRecentBlocker_shouldNotReturnViolation() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            story.setJiraCreatedAt(OffsetDateTime.now().minusDays(100));
+            story.setIsBlockedBy(List.of("BLOCK-1"));
+
+            JiraIssueEntity blocker = createStory("BLOCK-1", "In Progress", null);
+            blocker.setJiraCreatedAt(OffsetDateTime.now().minusDays(5)); // blocker created recently
+
+            when(issueRepository.findByIssueKeyIn(List.of("BLOCK-1"))).thenReturn(List.of(blocker));
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_BLOCKED_NO_PROGRESS));
+        }
+
+        @Test
+        void oldStoryWithOldIdleBlocker_shouldReturnViolation() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+            story.setJiraCreatedAt(OffsetDateTime.now().minusDays(100));
+            story.setIsBlockedBy(List.of("BLOCK-1"));
+
+            JiraIssueEntity blocker = createStory("BLOCK-1", "In Progress", null);
+            blocker.setJiraCreatedAt(OffsetDateTime.now().minusDays(90)); // old blocker, idle
+
+            when(issueRepository.findByIssueKeyIn(List.of("BLOCK-1"))).thenReturn(List.of(blocker));
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of());
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_BLOCKED_NO_PROGRESS));
         }
     }
 }
