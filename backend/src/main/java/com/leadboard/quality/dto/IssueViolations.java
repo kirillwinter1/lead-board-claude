@@ -38,9 +38,10 @@ public record IssueViolations(
             String category,
             String categoryLabel,
             String severity,
-            String message
+            String message,
+            boolean fixable
     ) {
-        public static ViolationDto from(DataQualityViolation violation) {
+        public static ViolationDto from(DataQualityViolation violation, boolean fixable) {
             var rule = violation.rule();
             return new ViolationDto(
                     rule.name(),
@@ -48,7 +49,8 @@ public record IssueViolations(
                     rule.getCategory().name(),
                     rule.getCategory().getLabel(),
                     violation.severity().name(),
-                    violation.message()
+                    violation.message(),
+                    fixable
             );
         }
     }

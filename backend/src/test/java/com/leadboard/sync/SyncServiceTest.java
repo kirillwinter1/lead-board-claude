@@ -673,6 +673,105 @@ class SyncServiceTest {
 
     // ==================== Helper Methods ====================
 
+    // ==================== F84: syncSingleIssue + team_id_manual ====================
+
+    @Nested
+    @DisplayName("F84: syncSingleIssue()")
+    class SyncSingleIssueTests {
+
+        @Test
+        @DisplayName("should reject malformed issue key (anti JQL-injection)")
+        void shouldRejectMalformedKey() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> syncService.syncSingleIssue("LB-1 OR project = SECRET"));
+            verifyNoInteractions(jiraClient);
+        }
+
+        @Test
+        @DisplayName("should be a no-op when Jira returns nothing")
+        void shouldNoOpWhenNotFound() {
+            when(jiraClient.search(anyString(), anyInt(), any()))
+                    .thenReturn(createSearchResponse(List.of(), true));
+
+            syncService.syncSingleIssue("LB-123");
+
+            verify(jiraClient).search(eq("key = LB-123"), eq(1), any());
+            verify(issueRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("should upsert the issue when found")
+        void shouldUpsertWhenFound() {
+            JiraIssue jiraIssue = createJiraIssue("LB-777", "Refetched", "Новое", "Epic");
+            when(jiraClient.search(anyString(), anyInt(), any()))
+                    .thenReturn(createSearchResponse(List.of(jiraIssue), true));
+            when(issueRepository.findByIssueKey("LB-777")).thenReturn(Optional.empty());
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            syncService.syncSingleIssue("LB-777");
+
+            ArgumentCaptor<JiraIssueEntity> captor = ArgumentCaptor.forClass(JiraIssueEntity.class);
+            verify(issueRepository).save(captor.capture());
+            assertEquals("LB-777", captor.getValue().getIssueKey());
+            assertEquals("LB", captor.getValue().getProjectKey());
+        }
+    }
+
+    @Nested
+    @DisplayName("F84: team_id_manual preservation")
+    class TeamIdManualTests {
+
+        @Test
+        @DisplayName("keeps a manually-assigned team when Jira resolves no team")
+        void keepsManualTeamWhenJiraHasNone() {
+            // No team field configured -> computed team id is null.
+            JiraIssue jiraIssue = createJiraIssue("LB-200", "Epic", "Новое", "Epic");
+            when(jiraClient.search(anyString(), anyInt(), any()))
+                    .thenReturn(createSearchResponse(List.of(jiraIssue), true));
+
+            JiraIssueEntity existing = createExistingEntity("LB-200", "Новое");
+            existing.setTeamId(7L);
+            existing.setTeamIdManual(true);
+            when(issueRepository.findByIssueKey("LB-200")).thenReturn(Optional.of(existing));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            syncService.syncSingleIssue("LB-200");
+
+            ArgumentCaptor<JiraIssueEntity> captor = ArgumentCaptor.forClass(JiraIssueEntity.class);
+            verify(issueRepository).save(captor.capture());
+            assertEquals(7L, captor.getValue().getTeamId());
+            assertTrue(captor.getValue().isTeamIdManual());
+        }
+
+        @Test
+        @DisplayName("Jira-resolved team wins and clears the manual flag")
+        void jiraTeamClearsManualFlag() {
+            String teamFieldId = "customfield_12345";
+            JiraIssue jiraIssue = createJiraIssueWithTeam("LB-201", "Epic", "Новое", "Epic", teamFieldId, "Team B");
+            when(jiraConfigResolver.getTeamFieldId()).thenReturn(teamFieldId);
+            when(jiraClient.search(anyString(), anyInt(), any()))
+                    .thenReturn(createSearchResponse(List.of(jiraIssue), true));
+
+            TeamEntity teamB = new TeamEntity();
+            teamB.setId(9L);
+            teamB.setName("Team B");
+            when(teamRepository.findByJiraTeamValue("Team B")).thenReturn(Optional.of(teamB));
+
+            JiraIssueEntity existing = createExistingEntity("LB-201", "Новое");
+            existing.setTeamId(7L);
+            existing.setTeamIdManual(true);
+            when(issueRepository.findByIssueKey("LB-201")).thenReturn(Optional.of(existing));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            syncService.syncSingleIssue("LB-201");
+
+            ArgumentCaptor<JiraIssueEntity> captor = ArgumentCaptor.forClass(JiraIssueEntity.class);
+            verify(issueRepository).save(captor.capture());
+            assertEquals(9L, captor.getValue().getTeamId());
+            assertFalse(captor.getValue().isTeamIdManual());
+        }
+    }
+
     private JiraIssue createJiraIssue(String key, String summary, String status, String issueType) {
         JiraIssue issue = new JiraIssue();
         issue.setId("id-" + key);

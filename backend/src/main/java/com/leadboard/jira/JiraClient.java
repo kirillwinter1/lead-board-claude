@@ -538,6 +538,127 @@ public class JiraClient {
         }
     }
 
+    /**
+     * Update the due date on an issue (F84). {@code fields.duedate} in "yyyy-MM-dd".
+     * OAuth when a token is present, BasicAuth service-account fallback otherwise.
+     */
+    public void updateDueDate(String issueKey, LocalDate dueDate) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        String value = dueDate != null ? dueDate.format(DateTimeFormatter.ISO_LOCAL_DATE) : null;
+        Map<String, Object> duedateField = new java.util.HashMap<>();
+        duedateField.put("duedate", value); // null clears the due date
+        Map<String, Object> body = Map.of("fields", duedateField);
+
+        if (accessToken != null && cloudId != null) {
+            updateIssueWithOAuth(issueKey, body, accessToken, cloudId);
+        } else {
+            updateIssueWithBasicAuth(issueKey, body);
+        }
+    }
+
+    /**
+     * Update the priority on an issue (F84). {@code fields.priority.name}.
+     * OAuth when a token is present, BasicAuth service-account fallback otherwise.
+     */
+    public void updatePriority(String issueKey, String priorityName) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        Map<String, Object> body = Map.of(
+                "fields", Map.of("priority", Map.of("name", priorityName))
+        );
+
+        if (accessToken != null && cloudId != null) {
+            updateIssueWithOAuth(issueKey, body, accessToken, cloudId);
+        } else {
+            updateIssueWithBasicAuth(issueKey, body);
+        }
+    }
+
+    /**
+     * Add a worklog preserving an explicit {@code started} timestamp (F84 worklog move).
+     * Unlike {@link #addWorklog} (which forces 09:00), this keeps the original timestamp
+     * so a moved worklog stays on its real date/time. OAuth-else-Basic.
+     *
+     * @param started ISO datetime string as returned by Jira, e.g. "2024-01-15T10:00:00.000+0000".
+     *                When null falls back to today 09:00.
+     */
+    public void addWorklogAt(String issueKey, int timeSpentSeconds, String started) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        String startedValue = (started != null && !started.isBlank())
+                ? started
+                : LocalDate.now().atTime(9, 0, 0)
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
+        Map<String, Object> body = Map.of(
+                "timeSpentSeconds", timeSpentSeconds,
+                "started", startedValue
+        );
+
+        if (accessToken != null && cloudId != null) {
+            String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+            webClient.post()
+                    .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .bodyValue(body)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                    .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
+                    .toBodilessEntity()
+                    .block();
+        } else {
+            String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+            webClient.post()
+                    .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
+                    .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                    .bodyValue(body)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                    .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
+                    .toBodilessEntity()
+                    .block();
+        }
+    }
+
+    /**
+     * Delete a worklog from an issue (F84 worklog move). Uses
+     * {@code ?adjustEstimate=leave&notifyUsers=false} so the remaining estimate is untouched.
+     * OAuth-else-Basic. A 403 (no permission to delete others' worklogs) surfaces as a
+     * {@link JiraClientException}.
+     */
+    public void deleteWorklog(String issueKey, String worklogId) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+        String query = "?adjustEstimate=leave&notifyUsers=false";
+
+        if (accessToken != null && cloudId != null) {
+            String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+            webClient.delete()
+                    .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog/" + worklogId + query)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                    .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
+                    .toBodilessEntity()
+                    .block();
+        } else {
+            String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
+            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+            webClient.delete()
+                    .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog/" + worklogId + query)
+                    .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                    .retrieve()
+                    .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                    .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
+                    .toBodilessEntity()
+                    .block();
+        }
+    }
+
     private void updateIssueWithOAuth(String issueKey, Map<String, Object> body, String accessToken, String cloudId) {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
 

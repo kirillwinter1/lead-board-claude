@@ -62,6 +62,12 @@ public class JiraIssueEntity {
     @Column(name = "team_id")
     private Long teamId;
 
+    // F84: true when team_id was assigned manually via a Data Quality fix (EPIC_NO_TEAM)
+    // rather than resolved from the Jira team field. Sync preserves the manual team while
+    // the Jira team field is empty, and clears the flag once Jira resolves a team.
+    @Column(name = "team_id_manual", nullable = false)
+    private boolean teamIdManual = false;
+
     @Column(name = "rough_estimates", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, BigDecimal> roughEstimates;
@@ -226,6 +232,9 @@ public class JiraIssueEntity {
 
     public Long getTeamId() { return teamId; }
     public void setTeamId(Long teamId) { this.teamId = teamId; }
+
+    public boolean isTeamIdManual() { return teamIdManual; }
+    public void setTeamIdManual(boolean teamIdManual) { this.teamIdManual = teamIdManual; }
 
     public Map<String, BigDecimal> getRoughEstimates() { return roughEstimates; }
     public void setRoughEstimates(Map<String, BigDecimal> roughEstimates) { this.roughEstimates = roughEstimates; }

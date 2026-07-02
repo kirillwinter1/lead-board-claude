@@ -12,6 +12,8 @@ import { FilterBar } from '../components/FilterBar'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 import { FilterChip } from '../components/FilterChips'
+import { FixModal } from '../components/quality/FixModal'
+import { useAuth } from '../contexts/AuthContext'
 import './DataQualityPage.css'
 
 interface ViolationDto {
@@ -21,6 +23,16 @@ interface ViolationDto {
   label: string
   category: string
   categoryLabel: string
+  fixable: boolean
+}
+
+// Roles allowed to run auto-fixes (mirrors backend @PreAuthorize).
+const FIX_ROLES = ['ADMIN', 'PROJECT_MANAGER', 'TEAM_LEAD'] as const
+
+interface FixTarget {
+  issueKey: string
+  rule: string
+  label: string
 }
 
 interface IssueViolations {
@@ -76,7 +88,15 @@ function SummaryCard({ title, value, color }: { title: string; value: number; co
   )
 }
 
-function ViolationRow({ issue }: { issue: IssueViolations }) {
+function ViolationRow({
+  issue,
+  canFix,
+  onFix,
+}: {
+  issue: IssueViolations
+  canFix: boolean
+  onFix: (target: FixTarget) => void
+}) {
   const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const iconUrl = getIssueTypeIconUrl(issue.issueType)
   const [expanded, setExpanded] = useState(false)
@@ -128,6 +148,18 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
               <SeverityBadge severity={v.severity} />
               {v.categoryLabel && <span className="violation-category">{v.categoryLabel}</span>}
               <span className="violation-rule">{v.label}</span>
+              {v.fixable && canFix && (
+                <button
+                  type="button"
+                  className="violation-fix-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onFix({ issueKey: issue.issueKey, rule: v.rule, label: v.label })
+                  }}
+                >
+                  Fix
+                </button>
+              )}
             </div>
           </td>
         </tr>
@@ -137,7 +169,10 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
 }
 
 export function DataQualityPage() {
+  const { hasRole } = useAuth()
+  const canFix = hasRole(...FIX_ROLES)
   const [searchParams, setSearchParams] = useSearchParams()
+  const [fixTarget, setFixTarget] = useState<FixTarget | null>(null)
   const [data, setData] = useState<DataQualityResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -447,7 +482,12 @@ export function DataQualityPage() {
                   </thead>
                   <tbody>
                     {filteredViolations.map(issue => (
-                      <ViolationRow key={issue.issueKey} issue={issue} />
+                      <ViolationRow
+                        key={issue.issueKey}
+                        issue={issue}
+                        canFix={canFix}
+                        onFix={setFixTarget}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -456,6 +496,16 @@ export function DataQualityPage() {
           </>
         )}
       </main>
+
+      {fixTarget && (
+        <FixModal
+          issueKey={fixTarget.issueKey}
+          rule={fixTarget.rule}
+          ruleLabel={fixTarget.label}
+          onClose={() => setFixTarget(null)}
+          onApplied={() => { setFixTarget(null); fetchData() }}
+        />
+      )}
     </div>
     </StatusStylesProvider>
   )

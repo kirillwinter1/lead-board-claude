@@ -48,13 +48,31 @@ public class JiraWriteService {
     }
 
     private Creds requireCreds() {
-        String token = oauthService.getValidAccessToken();
-        String cloudId = oauthService.getCloudIdForCurrentUser();
-        if (token == null || cloudId == null) {
+        Creds c = optionalCreds();
+        if (c == null) {
             throw new IllegalStateException(
                     "Нет валидного OAuth-токена Jira у пользователя. Войдите через Atlassian, чтобы выполнять действия.");
         }
+        return c;
+    }
+
+    /**
+     * OAuth credentials of the current user, or {@code null} when the user has no valid token.
+     * Unlike {@link #requireCreds()} this does not throw — callers use it to decide between the
+     * OAuth path (attributed to the real user) and the BasicAuth service-account fallback (F84).
+     */
+    private Creds optionalCreds() {
+        String token = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+        if (token == null || cloudId == null) {
+            return null;
+        }
         return new Creds(token, cloudId);
+    }
+
+    /** True when the current user has a valid OAuth token (writes attributed to them). */
+    public boolean hasUserCreds() {
+        return optionalCreds() != null;
     }
 
     /**
@@ -199,6 +217,68 @@ public class JiraWriteService {
         Creds c = requireCreds();
         jiraClient.assignIssue(issueKey, accountId, c.accessToken(), c.cloudId());
         log.info("Jira assign: {} -> {}", issueKey, accountId);
+    }
+
+    // ============================================================
+    // F84 — fallback variants: OAuth (attributed to current user) when a token is
+    // present, otherwise the JiraClient BasicAuth service-account twins. Data Quality
+    // fixes must still work for users who have not connected Atlassian OAuth.
+    // ============================================================
+
+    /**
+     * Transition an issue to a target status/transition/intent, falling back to BasicAuth
+     * when the current user has no OAuth token. Reuses the same {@link #findTransition}
+     * resolution as {@link #transition}.
+     *
+     * @return the resulting status name
+     */
+    public String transitionWithFallback(String issueKey, String targetStatusName) {
+        Creds c = optionalCreds();
+        List<JiraTransition> transitions = c != null
+                ? jiraClient.getTransitions(issueKey, c.accessToken(), c.cloudId())
+                : jiraClient.getTransitionsBasicAuth(issueKey);
+        if (transitions.isEmpty()) {
+            throw new IllegalStateException("Для " + issueKey + " нет доступных переходов из текущего статуса.");
+        }
+        JiraTransition match = findTransition(transitions, targetStatusName);
+        if (match == null) {
+            String available = transitions.stream()
+                    .map(t -> t.to() != null ? t.to().name() : t.name())
+                    .distinct().reduce((a, b) -> a + ", " + b).orElse("");
+            throw new IllegalArgumentException(
+                    "Не нашёл перехода в '" + targetStatusName + "' для " + issueKey + ". Доступные статусы: " + available);
+        }
+        if (c != null) {
+            jiraClient.transitionIssue(issueKey, match.id(), c.accessToken(), c.cloudId());
+        } else {
+            jiraClient.transitionIssueBasicAuth(issueKey, match.id());
+        }
+        String newStatus = match.to() != null ? match.to().name() : match.name();
+        log.info("Jira transition (fallback): {} -> {}", issueKey, newStatus);
+        return newStatus;
+    }
+
+    /** Assign an issue, falling back to BasicAuth when no OAuth token is present. */
+    public void assignWithFallback(String issueKey, String accountId) {
+        Creds c = optionalCreds();
+        if (c != null) {
+            jiraClient.assignIssue(issueKey, accountId, c.accessToken(), c.cloudId());
+        } else {
+            jiraClient.assignIssueBasicAuth(issueKey, accountId);
+        }
+        log.info("Jira assign (fallback): {} -> {}", issueKey, accountId);
+    }
+
+    /** Log work on an issue, falling back to BasicAuth when no OAuth token is present. */
+    public void logWorkWithFallback(String issueKey, int timeSpentSeconds, LocalDate date) {
+        Creds c = optionalCreds();
+        LocalDate when = date != null ? date : LocalDate.now();
+        if (c != null) {
+            jiraClient.addWorklog(issueKey, timeSpentSeconds, when, c.accessToken(), c.cloudId());
+        } else {
+            jiraClient.addWorklogBasicAuth(issueKey, timeSpentSeconds, when);
+        }
+        log.info("Jira worklog (fallback): {} +{}s on {}", issueKey, timeSpentSeconds, when);
     }
 
     /**
