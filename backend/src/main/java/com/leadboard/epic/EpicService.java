@@ -98,6 +98,16 @@ public class EpicService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public EpicDetailDto getEpicDetail(String epicKey) {
+        JiraIssueEntity epic = issueRepository.findByIssueKey(epicKey)
+                .orElseThrow(() -> new IllegalArgumentException("Epic not found: " + epicKey));
+        if (!workflowConfigService.isEpic(epic.getIssueType())) {
+            throw new IllegalArgumentException("Issue " + epicKey + " is not an Epic");
+        }
+        return new EpicDetailDto(epic.getIssueKey(), epic.getSummary(), epic.getDescription());
+    }
+
     private boolean isEpic(String issueType) {
         return workflowConfigService.isEpic(issueType);
     }

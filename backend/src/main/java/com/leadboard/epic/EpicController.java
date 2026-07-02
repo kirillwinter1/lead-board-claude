@@ -21,6 +21,15 @@ public class EpicController {
         return ResponseEntity.ok(epicService.getRoughEstimateConfig());
     }
 
+    @GetMapping("/{epicKey}/detail")
+    public ResponseEntity<EpicDetailDto> getEpicDetail(@PathVariable String epicKey) {
+        try {
+            return ResponseEntity.ok(epicService.getEpicDetail(epicKey));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @PatchMapping("/{epicKey}/rough-estimate/{role}")
     @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
     public ResponseEntity<?> updateRoughEstimate(

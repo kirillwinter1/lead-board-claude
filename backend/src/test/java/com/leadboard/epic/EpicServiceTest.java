@@ -273,6 +273,44 @@ class EpicServiceTest {
         }
     }
 
+    // ==================== getEpicDetail() Tests ====================
+
+    @Nested
+    @DisplayName("getEpicDetail()")
+    class GetEpicDetail {
+
+        @Test
+        void returnsSummaryAndDescription() {
+            JiraIssueEntity epic = new JiraIssueEntity();
+            epic.setIssueKey("LB-1");
+            epic.setIssueType("Epic");
+            epic.setSummary("Big Epic");
+            epic.setDescription("Detailed description");
+            when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
+
+            EpicDetailDto dto = epicService.getEpicDetail("LB-1");
+
+            assertEquals("LB-1", dto.issueKey());
+            assertEquals("Big Epic", dto.summary());
+            assertEquals("Detailed description", dto.description());
+        }
+
+        @Test
+        void throwsWhenNotFound() {
+            when(issueRepository.findByIssueKey("LB-404")).thenReturn(Optional.empty());
+            assertThrows(IllegalArgumentException.class, () -> epicService.getEpicDetail("LB-404"));
+        }
+
+        @Test
+        void throwsWhenNotEpic() {
+            JiraIssueEntity story = new JiraIssueEntity();
+            story.setIssueKey("LB-2");
+            story.setIssueType("Story");
+            when(issueRepository.findByIssueKey("LB-2")).thenReturn(Optional.of(story));
+            assertThrows(IllegalArgumentException.class, () -> epicService.getEpicDetail("LB-2"));
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     private JiraIssueEntity createEpic(String key, String summary, String status) {
