@@ -3,6 +3,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import packageJson from './package.json'
 
+// Overridable so parallel checkouts/worktrees can run side by side
+// (e.g. BACKEND_URL=http://localhost:8081 npm run dev -- --port 5174).
+const backendUrl = process.env.BACKEND_URL || 'http://localhost:8080'
+
 export default defineConfig({
   plugins: [react()],
   define: {
@@ -13,15 +17,15 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: backendUrl,
         changeOrigin: true,
       },
       '/oauth': {
-        target: 'http://localhost:8080',
+        target: backendUrl,
         changeOrigin: true,
       },
       '/ws': {
-        target: 'http://localhost:8080',
+        target: backendUrl,
         changeOrigin: true,
         ws: true,
       },
