@@ -97,3 +97,4 @@ None — новые правила используют существующие
 ## Related
 - Опирается на `StatusAgeService` из [F79](F79_STATUS_AGE.md) (переиспользует CRITICAL-порог для `IN_PROGRESS_TOO_LONG`).
 - Дополняет [F18](F18_DATA_QUALITY.md) (Data Quality MVP) — см. обновлённую таблицу правил в F18.
+- [F84](F84_DQ_AUTOFIX.md) добавляет кнопку Fix (авто-исправление) для 19 из 38 правил, включая 5 новых из этой фичи (`TEAM_FIELD_UNMAPPED`, `IN_PROGRESS_NO_ASSIGNEE`, `ASSIGNEE_NOT_IN_TEAM`, `CHILD_DUE_AFTER_EPIC`, `BUG_NO_PRIORITY`).

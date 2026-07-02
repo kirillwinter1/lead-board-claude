@@ -52,6 +52,7 @@ com.leadboard/
 │   └── service/    — PokerSessionService, PokerJiraService
 ├── project/        — Projects: синхронизация, прогресс, alignment (ProjectService, ProjectAlignmentService, ProjectController)
 ├── quality/        — Data Quality: 38 правил проверки, сгруппированных в 12 категорий (DataQualityCategory, F83), DataQualityService 775 LOC
+│   └── fix/        — Auto-Fix (F84): FixService (реестр FixHandler по правилу), FixSupport (общая инфраструктура), 18 FixHandler-ов (handlers/) для 19 из 38 правил
 ├── rice/           — RICE Scoring: шаблоны, оценки, нормализация (RiceAssessmentService 307 LOC)
 ├── simulation/     — AI Simulation: моделирование сценариев планирования
 │   ├── SimulationController (5 endpoints, ADMIN only)
@@ -130,7 +131,7 @@ com.leadboard/
 | CalendarController | 6 | /api/calendar/* |
 | ForecastSnapshotController | 6 | /api/forecast-snapshots/* |
 | EpicController | 2 | /api/epics/* |
-| DataQualityController | 1 | /api/data-quality |
+| DataQualityController | 3 | /api/data-quality, /api/data-quality/fix-preview, /api/data-quality/fix (F84) |
 | SyncController | 4 | /api/sync/* |
 | OAuthController | 5 | /oauth/*, /api/auth/* |
 | HealthController | 1 | /api/health |
