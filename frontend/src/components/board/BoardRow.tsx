@@ -10,7 +10,6 @@ import { EpicTooltip } from './EpicTooltip'
 import { TeamBadge } from '../TeamBadge'
 import { StatusAgeBadge } from '../StatusAgeBadge'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
-import { ERROR_BG, INFO_BG, SUCCESS_BG } from '../../constants/colors'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
@@ -73,7 +72,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                     <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
                       {node.issueKey}
                     </a>
-                    {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }}>FLG</span>}
+                    {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
                     <span className="issue-title">{node.title}</span>
                   </>
                 )}
@@ -100,7 +99,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                     fontSize: 10,
                     padding: '1px 5px',
                     borderRadius: 3,
-                    background: INFO_BG,
+                    background: '#DEEBFF',
                     color: '#0747A6',
                     fontWeight: 500,
                     whiteSpace: 'nowrap',
@@ -116,7 +115,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   fontSize: 10,
                   padding: '1px 5px',
                   borderRadius: 3,
-                  background: SUCCESS_BG,
+                  background: '#E3FCEF',
                   color: '#006644',
                   fontWeight: 500,
                   whiteSpace: 'nowrap',
