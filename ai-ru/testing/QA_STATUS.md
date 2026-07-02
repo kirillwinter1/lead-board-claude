@@ -14,7 +14,7 @@
 | 2 | **Teams** | F5, F6, F7, F37 | ✅ Проверен (F37) | 1 Medium (color tests missing) | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
 | 3 | **Team Metrics** | F22, F24, F32 | ✅ Проверен | 9 багов (1 Critical, 3 High, 4 Medium, 1 Low) | [reports/2026-02-17_TEAM_METRICS.md](reports/2026-02-17_TEAM_METRICS.md) |
 | 4 | **Timeline** | F14, F20, F21, F45 | ✅ Проверен | 0 багов (11 fixed) | [reports/2026-02-25_TIMELINE.md](reports/2026-02-25_TIMELINE.md) |
-| 5 | **Data Quality** | F18, F36, F42, **F83** | ✅ Проверен (F83, 2026-07-02) | 0 багов (F83: категории + новые правила) | (inline QA — API+UI, скриншоты ai-ru/testing/screenshots/f83_dq_*.png) |
+| 5 | **Data Quality** | F18, F36, F42, F83, **F84** | ✅ Проверен (F84, 2026-07-02) | 0 code багов (F84: auto-fix Fix-кнопка + preview modal); 1 Medium deploy-risk, 2 Low | [reports/2026-07-02_F84_DATA_QUALITY_AUTOFIX.md](reports/2026-07-02_F84_DATA_QUALITY_AUTOFIX.md) |
 | 6 | **Planning Poker** | F23 | ✅ Проверен + Исправлен (2026-07-07) | 13/15 fixed (2 Low отложены: язык, бейджи лобби) | [reports/2026-07-07_POKER.md](reports/2026-07-07_POKER.md) |
 | 7 | **Workflow Config** | F17, F29, F38, F48 | ✅ Проверен | 2 Critical, 4 High, 10 Medium, 8 Low | [reports/2026-03-01_F48_PER_PROJECT_WORKFLOW.md](reports/2026-03-01_F48_PER_PROJECT_WORKFLOW.md) |
 | 8 | **Simulation** | F28 | ✅ Проверен | 2 Critical, 4 High, 7 Medium, 5 Low | [reports/2026-02-25_SIMULATION.md](reports/2026-02-25_SIMULATION.md) |
