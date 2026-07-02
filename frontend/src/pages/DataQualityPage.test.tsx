@@ -25,7 +25,17 @@ const mockDataQuality = {
       WARNING: 10,
       INFO: 3,
     },
+    byCategory: {
+      ESTIMATES: 12,
+      TEAM: 9,
+      DUE_DATES: 7,
+    },
   },
+  rules: [
+    { name: 'EPIC_NO_ESTIMATE', label: 'Epic without estimate', category: 'ESTIMATES', categoryLabel: 'Estimates', severity: 'ERROR' },
+    { name: 'EPIC_NO_TEAM', label: 'Epic without team', category: 'TEAM', categoryLabel: 'Team', severity: 'WARNING' },
+    { name: 'EPIC_OVERDUE', label: 'Epic overdue', category: 'DUE_DATES', categoryLabel: 'Due Dates', severity: 'INFO' },
+  ],
   violations: [
     {
       issueKey: 'STORY-1',
@@ -34,8 +44,8 @@ const mockDataQuality = {
       status: 'To Do',
       jiraUrl: 'https://jira.example.com/STORY-1',
       violations: [
-        { rule: 'EPIC_NO_ESTIMATE', severity: 'ERROR' as const, message: 'Story has no estimate' },
-        { rule: 'EPIC_NO_TEAM', severity: 'WARNING' as const, message: 'Story has no assignee' },
+        { rule: 'EPIC_NO_ESTIMATE', severity: 'ERROR' as const, message: 'Story has no estimate', label: 'Epic without estimate', category: 'ESTIMATES', categoryLabel: 'Estimates' },
+        { rule: 'EPIC_NO_TEAM', severity: 'WARNING' as const, message: 'Story has no assignee', label: 'Epic without team', category: 'TEAM', categoryLabel: 'Team' },
       ],
     },
     {
@@ -45,7 +55,7 @@ const mockDataQuality = {
       status: 'In Progress',
       jiraUrl: 'https://jira.example.com/EPIC-1',
       violations: [
-        { rule: 'EPIC_OVERDUE', severity: 'INFO' as const, message: 'No updates for 30 days' },
+        { rule: 'EPIC_OVERDUE', severity: 'INFO' as const, message: 'No updates for 30 days', label: 'Epic overdue', category: 'DUE_DATES', categoryLabel: 'Due Dates' },
       ],
     },
   ],
@@ -134,6 +144,66 @@ describe('DataQualityPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('All rules')).toBeInTheDocument()
+      })
+    })
+
+    it('should render category filter', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('All categories')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Category filtering', () => {
+    it('should render category summary chips from byCategory', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        const row = document.querySelector('.category-summary-row')
+        expect(row).toBeInTheDocument()
+        // 3 categories in byCategory
+        expect(document.querySelectorAll('.category-chip').length).toBe(3)
+      })
+    })
+
+    it('should filter the table when a category chip is clicked', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('STORY-1')).toBeInTheDocument()
+        expect(screen.getByText('EPIC-1')).toBeInTheDocument()
+      })
+
+      // Click the "Estimates" category chip — only STORY-1 has an ESTIMATES violation
+      const estimatesChip = Array.from(document.querySelectorAll('.category-chip'))
+        .find(el => el.textContent?.includes('Estimates')) as HTMLElement
+      fireEvent.click(estimatesChip)
+
+      await waitFor(() => {
+        expect(screen.getByText('STORY-1')).toBeInTheDocument()
+        expect(screen.queryByText('EPIC-1')).not.toBeInTheDocument()
+      })
+    })
+
+    it('should show category label and human-readable rule label in expanded row', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('STORY-1')).toBeInTheDocument()
+      })
+
+      const row = screen.getByText('STORY-1').closest('tr')!
+      const expanderBtn = row.querySelector('.expander-btn') as HTMLElement
+      fireEvent.click(expanderBtn)
+
+      await waitFor(() => {
+        // Rule label from API (not the enum code)
+        expect(screen.getByText('Epic without estimate')).toBeInTheDocument()
+        // Category label badge
+        const categoryBadges = document.querySelectorAll('.violation-category')
+        expect(categoryBadges.length).toBeGreaterThanOrEqual(1)
       })
     })
   })

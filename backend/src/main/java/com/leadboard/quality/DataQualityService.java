@@ -1,7 +1,10 @@
 package com.leadboard.quality;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.metrics.entity.FlagChangelogEntity;
+import com.leadboard.metrics.repository.FlagChangelogRepository;
 import com.leadboard.rice.RiceAssessmentRepository;
+import com.leadboard.status.StatusAge;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -25,25 +28,42 @@ public class DataQualityService {
 
     private static final Logger log = LoggerFactory.getLogger(DataQualityService.class);
     private static final double OVERRUN_THRESHOLD = 1.5;
+    /** An epic flagged (paused) for longer than this is worth a warning. */
+    private static final int FLAGGED_TOO_LONG_DAYS = 14;
+    /** A single subtask estimated above this many hours should probably be split. */
+    private static final int SUBTASK_MAX_ESTIMATE_HOURS = 40;
 
     private final JiraIssueRepository issueRepository;
     private final TeamMemberRepository memberRepository;
     private final WorkflowConfigService workflowConfigService;
     private final RiceAssessmentRepository riceAssessmentRepository;
     private final BugSlaService bugSlaService;
+    private final FlagChangelogRepository flagChangelogRepository;
 
     public DataQualityService(
             JiraIssueRepository issueRepository,
             TeamMemberRepository memberRepository,
             WorkflowConfigService workflowConfigService,
             RiceAssessmentRepository riceAssessmentRepository,
-            BugSlaService bugSlaService
+            BugSlaService bugSlaService,
+            FlagChangelogRepository flagChangelogRepository
     ) {
         this.issueRepository = issueRepository;
         this.memberRepository = memberRepository;
         this.workflowConfigService = workflowConfigService;
         this.riceAssessmentRepository = riceAssessmentRepository;
         this.bugSlaService = bugSlaService;
+        this.flagChangelogRepository = flagChangelogRepository;
+    }
+
+    /**
+     * Checks all data quality rules for an Epic (without the time-in-status signal).
+     */
+    public List<DataQualityViolation> checkEpic(
+            JiraIssueEntity epic,
+            List<JiraIssueEntity> children
+    ) {
+        return checkEpic(epic, children, null);
     }
 
     /**
@@ -51,17 +71,28 @@ public class DataQualityService {
      *
      * @param epic The epic to check
      * @param children All direct children (Stories/Bugs) of the epic
+     * @param statusAge Pre-computed time-in-status signal for this epic (may be null)
      * @return List of violations found
      */
     public List<DataQualityViolation> checkEpic(
             JiraIssueEntity epic,
-            List<JiraIssueEntity> children
+            List<JiraIssueEntity> children,
+            StatusAge statusAge
     ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
         // EPIC_NO_TEAM - Epic without team
         if (epic.getTeamId() == null) {
             violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_TEAM));
+        }
+
+        // TEAM_FIELD_UNMAPPED - Jira team field is set but not mapped to any team.
+        // Fires in addition to EPIC_NO_TEAM: it points at the root cause (mapping gap).
+        if (epic.getTeamFieldValue() != null && !epic.getTeamFieldValue().isBlank() && epic.getTeamId() == null) {
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.TEAM_FIELD_UNMAPPED,
+                    epic.getTeamFieldValue()
+            ));
         }
 
         // EPIC_TEAM_NO_MEMBERS - Epic's team has no active members
@@ -161,7 +192,54 @@ public class DataQualityService {
             }
         }
 
+        // EPIC_NO_DESCRIPTION - Epic in Planned+ without a description
+        if (epicPastTodo && (epic.getDescription() == null || epic.getDescription().isBlank())) {
+            violations.add(DataQualityViolation.of(DataQualityRule.EPIC_NO_DESCRIPTION));
+        }
+
+        // EPIC_FLAGGED_TOO_LONG - Epic flagged (paused) for longer than the threshold
+        if (Boolean.TRUE.equals(epic.getFlagged())
+                && !workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
+            Optional<FlagChangelogEntity> openFlag = flagChangelogRepository
+                    .findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc(epic.getIssueKey());
+            if (openFlag.isPresent() && openFlag.get().getFlaggedAt() != null) {
+                long daysFlagged = ChronoUnit.DAYS.between(openFlag.get().getFlaggedAt(), OffsetDateTime.now());
+                if (daysFlagged > FLAGGED_TOO_LONG_DAYS) {
+                    violations.add(DataQualityViolation.of(DataQualityRule.EPIC_FLAGGED_TOO_LONG, daysFlagged));
+                }
+            }
+        }
+
+        // IN_PROGRESS_TOO_LONG - Epic stuck in its current (active) status for too long
+        addInProgressTooLong(violations, epic, statusAge);
+
         return violations;
+    }
+
+    /**
+     * IN_PROGRESS_TOO_LONG - one violation per issue whose current status has aged into
+     * the CRITICAL band (F79 time-in-status / stuck-epic signal). Null-safe.
+     */
+    private void addInProgressTooLong(List<DataQualityViolation> violations, JiraIssueEntity issue, StatusAge statusAge) {
+        if (statusAge != null && StatusAge.CRITICAL.equals(statusAge.level())) {
+            int days = statusAge.daysInStatus() != null ? statusAge.daysInStatus() : 0;
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.IN_PROGRESS_TOO_LONG,
+                    issue.getStatus(),
+                    days
+            ));
+        }
+    }
+
+    /**
+     * Checks all data quality rules for a Story/Bug (without the time-in-status signal).
+     */
+    public List<DataQualityViolation> checkStory(
+            JiraIssueEntity story,
+            JiraIssueEntity epic,
+            List<JiraIssueEntity> subtasks
+    ) {
+        return checkStory(story, epic, subtasks, null);
     }
 
     /**
@@ -170,12 +248,14 @@ public class DataQualityService {
      * @param story The story or bug to check
      * @param epic The parent epic (may be null)
      * @param subtasks All subtasks of this story
+     * @param statusAge Pre-computed time-in-status signal for this story (may be null)
      * @return List of violations found
      */
     public List<DataQualityViolation> checkStory(
             JiraIssueEntity story,
             JiraIssueEntity epic,
-            List<JiraIssueEntity> subtasks
+            List<JiraIssueEntity> subtasks,
+            StatusAge statusAge
     ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
@@ -256,35 +336,44 @@ public class DataQualityService {
             ));
         }
 
-        // STORY_BLOCKED_NO_PROGRESS - Story blocked >30 days without progress
+        // STORY_BLOCKED_NO_PROGRESS - Story blocked >30 days without progress.
+        // The "blocked for" window is measured per blocker from max(story.created, blocker.created):
+        // a story cannot be blocked before its blocker exists, so an old story with a recent
+        // blocker should not be flagged immediately.
         if (isBlockedBy != null && !isBlockedBy.isEmpty()) {
             OffsetDateTime storyCreated = story.getJiraCreatedAt();
             if (storyCreated != null) {
-                long daysSinceCreated = ChronoUnit.DAYS.between(storyCreated, OffsetDateTime.now());
-                if (daysSinceCreated > 30) {
-                    // Batch-load subtasks of all blockers in one query
-                    List<String> notDoneBlockerKeys = isBlockedBy.stream()
-                            .filter(blockerMap::containsKey)
-                            .filter(key -> !workflowConfigService.isDone(
-                                    blockerMap.get(key).getStatus(), blockerMap.get(key).getIssueType()))
-                            .toList();
-                    Map<String, List<JiraIssueEntity>> blockerSubtasksByParent = Map.of();
-                    if (!notDoneBlockerKeys.isEmpty()) {
-                        blockerSubtasksByParent = issueRepository.findByParentKeyIn(new ArrayList<>(notDoneBlockerKeys)).stream()
-                                .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
-                    }
+                // Batch-load subtasks of all not-done blockers in one query
+                List<String> notDoneBlockerKeys = isBlockedBy.stream()
+                        .filter(blockerMap::containsKey)
+                        .filter(key -> !workflowConfigService.isDone(
+                                blockerMap.get(key).getStatus(), blockerMap.get(key).getIssueType()))
+                        .toList();
+                Map<String, List<JiraIssueEntity>> blockerSubtasksByParent = Map.of();
+                if (!notDoneBlockerKeys.isEmpty()) {
+                    blockerSubtasksByParent = issueRepository.findByParentKeyIn(new ArrayList<>(notDoneBlockerKeys)).stream()
+                            .collect(Collectors.groupingBy(JiraIssueEntity::getParentKey));
+                }
 
-                    for (String blockerKey : notDoneBlockerKeys) {
-                        List<JiraIssueEntity> blockerSubtasks = blockerSubtasksByParent.getOrDefault(blockerKey, List.of());
-                        long blockerTimeSpent = blockerSubtasks.stream()
-                                .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
-                                .sum();
-                        if (blockerTimeSpent == 0) {
-                            violations.add(DataQualityViolation.of(
-                                    DataQualityRule.STORY_BLOCKED_NO_PROGRESS,
-                                    blockerKey
-                            ));
-                        }
+                for (String blockerKey : notDoneBlockerKeys) {
+                    JiraIssueEntity blocker = blockerMap.get(blockerKey);
+                    OffsetDateTime blockedSince = storyCreated;
+                    if (blocker.getJiraCreatedAt() != null && blocker.getJiraCreatedAt().isAfter(storyCreated)) {
+                        blockedSince = blocker.getJiraCreatedAt();
+                    }
+                    long daysBlocked = ChronoUnit.DAYS.between(blockedSince, OffsetDateTime.now());
+                    if (daysBlocked <= 30) {
+                        continue;
+                    }
+                    List<JiraIssueEntity> blockerSubtasks = blockerSubtasksByParent.getOrDefault(blockerKey, List.of());
+                    long blockerTimeSpent = blockerSubtasks.stream()
+                            .mapToLong(st -> st.getTimeSpentSeconds() != null ? st.getTimeSpentSeconds() : 0)
+                            .sum();
+                    if (blockerTimeSpent == 0) {
+                        violations.add(DataQualityViolation.of(
+                                DataQualityRule.STORY_BLOCKED_NO_PROGRESS,
+                                blockerKey
+                        ));
                     }
                 }
             }
@@ -319,7 +408,33 @@ public class DataQualityService {
             }
         }
 
+        // CHILD_DUE_AFTER_EPIC - Story due date is later than the parent epic's due date
+        if (!workflowConfigService.isDone(story.getStatus(), story.getIssueType())
+                && story.getDueDate() != null
+                && epic != null && epic.getDueDate() != null
+                && story.getDueDate().isAfter(epic.getDueDate())) {
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.CHILD_DUE_AFTER_EPIC,
+                    story.getDueDate().toString(),
+                    epic.getDueDate().toString()
+            ));
+        }
+
+        // IN_PROGRESS_TOO_LONG - Story/Bug stuck in its current (active) status for too long
+        addInProgressTooLong(violations, story, statusAge);
+
         return violations;
+    }
+
+    /**
+     * Checks all data quality rules for a Bug (without the time-in-status signal).
+     */
+    public List<DataQualityViolation> checkBug(
+            JiraIssueEntity bug,
+            JiraIssueEntity epic,
+            List<JiraIssueEntity> subtasks
+    ) {
+        return checkBug(bug, epic, subtasks, null);
     }
 
     /**
@@ -329,10 +444,11 @@ public class DataQualityService {
     public List<DataQualityViolation> checkBug(
             JiraIssueEntity bug,
             JiraIssueEntity epic,
-            List<JiraIssueEntity> subtasks
+            List<JiraIssueEntity> subtasks,
+            StatusAge statusAge
     ) {
-        // Start with all Story checks (bugs share the same hierarchy rules)
-        List<DataQualityViolation> violations = new ArrayList<>(checkStory(bug, epic, subtasks));
+        // Start with all Story checks (bugs share the same hierarchy rules, including IN_PROGRESS_TOO_LONG)
+        List<DataQualityViolation> violations = new ArrayList<>(checkStory(bug, epic, subtasks, statusAge));
 
         // BUG_SLA_BREACH - Bug exceeded SLA threshold
         if (!workflowConfigService.isDone(bug.getStatus(), bug.getIssueType())) {
@@ -345,6 +461,12 @@ public class DataQualityService {
                         slaLimit
                 ));
             }
+        }
+
+        // BUG_NO_PRIORITY - Bug without a priority is invisible to SLA checks (BugSlaService skips it)
+        if (!workflowConfigService.isDone(bug.getStatus(), bug.getIssueType())
+                && (bug.getPriority() == null || bug.getPriority().isBlank())) {
+            violations.add(DataQualityViolation.of(DataQualityRule.BUG_NO_PRIORITY));
         }
 
         // BUG_STALE - Bug has no updates for more than 14 days
@@ -360,17 +482,30 @@ public class DataQualityService {
     }
 
     /**
-     * Checks all data quality rules for a Subtask.
-     *
-     * @param subtask The subtask to check
-     * @param story The parent story (may be null)
-     * @param epic The grandparent epic (may be null)
-     * @return List of violations found
+     * Checks all data quality rules for a Subtask (without the time-in-status signal).
      */
     public List<DataQualityViolation> checkSubtask(
             JiraIssueEntity subtask,
             JiraIssueEntity story,
             JiraIssueEntity epic
+    ) {
+        return checkSubtask(subtask, story, epic, null);
+    }
+
+    /**
+     * Checks all data quality rules for a Subtask.
+     *
+     * @param subtask The subtask to check
+     * @param story The parent story (may be null)
+     * @param epic The grandparent epic (may be null)
+     * @param statusAge Pre-computed time-in-status signal for this subtask (may be null)
+     * @return List of violations found
+     */
+    public List<DataQualityViolation> checkSubtask(
+            JiraIssueEntity subtask,
+            JiraIssueEntity story,
+            JiraIssueEntity epic,
+            StatusAge statusAge
     ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
@@ -457,6 +592,41 @@ public class DataQualityService {
                 violations.add(DataQualityViolation.of(DataQualityRule.SUBTASK_TIME_LOGGED_WHILE_EPIC_FLAGGED));
             }
         }
+
+        // IN_PROGRESS_NO_ASSIGNEE - Subtask is in progress but nobody is assigned
+        if (workflowConfigService.isInProgress(subtask.getStatus(), subtask.getIssueType())
+                && subtask.getAssigneeAccountId() == null) {
+            violations.add(DataQualityViolation.of(DataQualityRule.IN_PROGRESS_NO_ASSIGNEE));
+        }
+
+        // ASSIGNEE_NOT_IN_TEAM - Subtask assignee is not an active member of the epic's team
+        if (subtask.getAssigneeAccountId() != null
+                && epic != null && epic.getTeamId() != null
+                && !memberRepository.existsByJiraAccountIdAndTeamIdAndActiveTrue(
+                        subtask.getAssigneeAccountId(), epic.getTeamId())) {
+            String assignee = subtask.getAssigneeDisplayName() != null
+                    ? subtask.getAssigneeDisplayName()
+                    : subtask.getAssigneeAccountId();
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.ASSIGNEE_NOT_IN_TEAM,
+                    assignee
+            ));
+        }
+
+        // SUBTASK_ESTIMATE_TOO_BIG - A single subtask estimated above the split threshold
+        if (subtask.getOriginalEstimateSeconds() != null
+                && subtask.getOriginalEstimateSeconds() > SUBTASK_MAX_ESTIMATE_HOURS * 3600L
+                && !workflowConfigService.isDone(subtask.getStatus(), subtask.getIssueType())) {
+            double estimateHours = subtask.getOriginalEstimateSeconds() / 3600.0;
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.SUBTASK_ESTIMATE_TOO_BIG,
+                    estimateHours,
+                    SUBTASK_MAX_ESTIMATE_HOURS
+            ));
+        }
+
+        // IN_PROGRESS_TOO_LONG - Subtask stuck in its current (active) status for too long
+        addInProgressTooLong(violations, subtask, statusAge);
 
         return violations;
     }

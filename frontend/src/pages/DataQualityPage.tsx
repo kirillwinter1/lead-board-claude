@@ -16,6 +16,9 @@ interface ViolationDto {
   rule: string
   severity: 'ERROR' | 'WARNING' | 'INFO'
   message: string
+  label: string
+  category: string
+  categoryLabel: string
 }
 
 interface IssueViolations {
@@ -27,6 +30,15 @@ interface IssueViolations {
   violations: ViolationDto[]
 }
 
+// Catalog entry for ALL rules (not only violated ones) — drives filter options
+interface RuleCatalogEntry {
+  name: string
+  label: string
+  category: string
+  categoryLabel: string
+  severity: string
+}
+
 interface Summary {
   totalIssues: number
   issuesWithErrors: number
@@ -34,12 +46,14 @@ interface Summary {
   issuesWithInfo: number
   byRule: Record<string, number>
   bySeverity: Record<string, number>
+  byCategory: Record<string, number>
 }
 
 interface DataQualityResponse {
   generatedAt: string
   teamId: number | null
   summary: Summary
+  rules: RuleCatalogEntry[]
   violations: IssueViolations[]
 }
 
@@ -47,40 +61,6 @@ interface Team {
   id: number
   name: string
   color: string | null
-}
-
-// Human-readable English names for rules
-const ruleLabels: Record<string, string> = {
-  TIME_LOGGED_WRONG_EPIC_STATUS: 'Time logged on wrong epic status',
-  TIME_LOGGED_NOT_IN_SUBTASK: 'Time logged not in subtask',
-  CHILD_IN_PROGRESS_EPIC_NOT: 'Child in progress, epic is not',
-  SUBTASK_IN_PROGRESS_STORY_NOT: 'Subtask in progress, story is not',
-  EPIC_NO_ESTIMATE: 'Epic without estimate',
-  SUBTASK_NO_ESTIMATE: 'Subtask without estimate',
-  SUBTASK_WORK_NO_ESTIMATE: 'Time logged without estimate',
-  SUBTASK_OVERRUN: 'Subtask estimate exceeded',
-  EPIC_NO_TEAM: 'Epic without team',
-  EPIC_TEAM_NO_MEMBERS: 'Epic team has no members',
-  EPIC_NO_DUE_DATE: 'Epic without due date',
-  EPIC_OVERDUE: 'Epic overdue',
-  EPIC_FORECAST_LATE: 'Forecast later than due date',
-  EPIC_DONE_OPEN_CHILDREN: 'Epic done, has open children',
-  STORY_DONE_OPEN_CHILDREN: 'Story done, has open subtasks',
-  EPIC_IN_PROGRESS_NO_STORIES: 'Epic in progress without stories',
-  STORY_IN_PROGRESS_NO_SUBTASKS: 'Story in progress without subtasks',
-  STORY_NO_SUBTASK_ESTIMATES: 'Story without subtask estimates',
-  STORY_BLOCKED_BY_MISSING: 'Blocker not found',
-  STORY_CIRCULAR_DEPENDENCY: 'Circular dependency',
-  STORY_BLOCKED_NO_PROGRESS: 'Blocked without progress >30 days',
-  SUBTASK_DONE_NO_TIME_LOGGED: 'Subtask done without time logged',
-  SUBTASK_TIME_LOGGED_BUT_TODO: 'Time logged but subtask in TODO',
-  BUG_SLA_BREACH: 'Bug SLA breach',
-  BUG_STALE: 'Bug stale >14 days',
-  STORY_FULLY_LOGGED_NOT_DONE: 'All time logged but epic not done',
-}
-
-function getRuleLabel(rule: string): string {
-  return ruleLabels[rule] || rule
 }
 
 function SummaryCard({ title, value, color }: { title: string; value: number; color: string }) {
@@ -136,7 +116,8 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
           <td colSpan={6}>
             <div className="violation-detail">
               <SeverityBadge severity={v.severity} />
-              <span className="violation-rule">{getRuleLabel(v.rule)}</span>
+              {v.categoryLabel && <span className="violation-category">{v.categoryLabel}</span>}
+              <span className="violation-rule">{v.label}</span>
             </div>
           </td>
         </tr>
@@ -164,6 +145,7 @@ export function DataQualityPage() {
     }
   }
   const [ruleFilter, setRuleFilter] = useState<string | null>(null)
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -213,6 +195,12 @@ export function DataQualityPage() {
       const hasMatchingSeverity = issue.violations.some(v => severityFilter.has(v.severity))
       if (!hasMatchingSeverity) return false
 
+      // Filter by category
+      if (categoryFilter) {
+        const hasMatchingCategory = issue.violations.some(v => v.category === categoryFilter)
+        if (!hasMatchingCategory) return false
+      }
+
       // Filter by rule
       if (ruleFilter) {
         const hasMatchingRule = issue.violations.some(v => v.rule === ruleFilter)
@@ -221,12 +209,38 @@ export function DataQualityPage() {
 
       return true
     })
-  }, [data, severityFilter, ruleFilter])
+  }, [data, severityFilter, ruleFilter, categoryFilter])
 
-  const allRules = useMemo(() => {
-    if (!data) return []
-    return Object.keys(data.summary.byRule).sort()
+  // Lookup: rule name -> catalog entry (for narrowing / reset logic)
+  const rulesByName = useMemo(() => {
+    const m = new Map<string, RuleCatalogEntry>()
+    for (const r of data?.rules || []) m.set(r.name, r)
+    return m
   }, [data])
+
+  // Lookup: category code -> human-readable label
+  const categoryLabelByCode = useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const r of data?.rules || []) m[r.category] = r.categoryLabel
+    return m
+  }, [data])
+
+  // Selecting a category filters the table AND narrows the rule dropdown.
+  // If the current rule filter is not part of the chosen category, reset it.
+  const handleCategoryChange = useCallback((cat: string | null) => {
+    setCategoryFilter(cat)
+    if (cat) {
+      setRuleFilter(prev => {
+        if (!prev) return prev
+        const entry = rulesByName.get(prev)
+        return entry && entry.category !== cat ? null : prev
+      })
+    }
+  }, [rulesByName])
+
+  const toggleCategory = useCallback((cat: string) => {
+    handleCategoryChange(categoryFilter === cat ? null : cat)
+  }, [categoryFilter, handleCategoryChange])
 
   const toggleSeverity = (severity: string) => {
     setSeverityFilter(prev => {
@@ -256,10 +270,37 @@ export function DataQualityPage() {
     [teams]
   )
 
-  const ruleOptions = useMemo(() =>
-    allRules.map(r => ({ value: r, label: getRuleLabel(r) })),
-    [allRules]
-  )
+  // Category options: unique categories from the rules catalog, sorted by label
+  const categoryOptions = useMemo(() => {
+    if (!data) return []
+    const seen = new Map<string, string>()
+    for (const r of data.rules) {
+      if (!seen.has(r.category)) seen.set(r.category, r.categoryLabel)
+    }
+    return Array.from(seen.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [data])
+
+  // Rule options: rules that have violations (present in summary.byRule),
+  // narrowed to the selected category, labelled from the catalog, sorted by label
+  const ruleOptions = useMemo(() => {
+    if (!data) return []
+    const byRule = data.summary.byRule
+    return data.rules
+      .filter(r => r.name in byRule)
+      .filter(r => !categoryFilter || r.category === categoryFilter)
+      .map(r => ({ value: r.name, label: r.label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [data, categoryFilter])
+
+  // Category summary: chips "CategoryLabel N" from summary.byCategory, sorted by count desc
+  const categorySummary = useMemo(() => {
+    if (!data) return []
+    return Object.entries(data.summary.byCategory || {})
+      .map(([code, count]) => ({ code, count, label: categoryLabelByCode[code] || code }))
+      .sort((a, b) => b.count - a.count)
+  }, [data, categoryLabelByCode])
 
   const chips = useMemo(() => {
     const result: FilterChip[] = []
@@ -274,10 +315,17 @@ export function DataQualityPage() {
         })
       }
     }
+    if (categoryFilter) {
+      result.push({
+        category: 'Category',
+        value: categoryLabelByCode[categoryFilter] || categoryFilter,
+        onRemove: () => handleCategoryChange(null),
+      })
+    }
     if (ruleFilter) {
       result.push({
         category: 'Rule',
-        value: getRuleLabel(ruleFilter),
+        value: rulesByName.get(ruleFilter)?.label || ruleFilter,
         onRemove: () => setRuleFilter(null),
       })
     }
@@ -292,11 +340,12 @@ export function DataQualityPage() {
       }
     }
     return result
-  }, [selectedTeamId, ruleFilter, severityFilter, teams])
+  }, [selectedTeamId, ruleFilter, categoryFilter, severityFilter, teams, categoryLabelByCode, rulesByName, handleCategoryChange])
 
   const clearAllFilters = () => {
     setSelectedTeamId(null)
     setRuleFilter(null)
+    setCategoryFilter(null)
     setSeverityFilter(new Set(['ERROR', 'WARNING', 'INFO']))
   }
 
@@ -338,6 +387,14 @@ export function DataQualityPage() {
         </div>
 
         <SingleSelectDropdown
+          label="Category"
+          options={categoryOptions}
+          selected={categoryFilter}
+          onChange={handleCategoryChange}
+          placeholder="All categories"
+        />
+
+        <SingleSelectDropdown
           label="Rule"
           options={ruleOptions}
           selected={ruleFilter}
@@ -358,6 +415,23 @@ export function DataQualityPage() {
               <SummaryCard title="Warnings" value={data.summary.issuesWithWarnings} color="#d97706" />
               <SummaryCard title="Info" value={data.summary.issuesWithInfo} color="#9ca3af" />
             </div>
+
+            {categorySummary.length > 0 && (
+              <div className="category-summary-row">
+                {categorySummary.map(cat => (
+                  <button
+                    key={cat.code}
+                    type="button"
+                    className={`category-chip ${categoryFilter === cat.code ? 'active' : ''}`}
+                    onClick={() => toggleCategory(cat.code)}
+                    aria-pressed={categoryFilter === cat.code}
+                  >
+                    <span className="category-chip-label">{cat.label}</span>
+                    <span className="category-chip-count">{cat.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="report-meta">
               Generated: {formatDate(data.generatedAt)}

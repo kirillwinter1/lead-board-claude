@@ -4,6 +4,8 @@ import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.quality.dto.DataQualityResponse;
 import com.leadboard.quality.dto.IssueViolations;
+import com.leadboard.status.StatusAge;
+import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.http.ResponseEntity;
@@ -24,17 +26,20 @@ public class DataQualityController {
     private final JiraConfigResolver jiraConfigResolver;
     private final DataQualityService dataQualityService;
     private final WorkflowConfigService workflowConfigService;
+    private final StatusAgeService statusAgeService;
 
     public DataQualityController(
             JiraIssueRepository issueRepository,
             JiraConfigResolver jiraConfigResolver,
             DataQualityService dataQualityService,
-            WorkflowConfigService workflowConfigService
+            WorkflowConfigService workflowConfigService,
+            StatusAgeService statusAgeService
     ) {
         this.issueRepository = issueRepository;
         this.jiraConfigResolver = jiraConfigResolver;
         this.dataQualityService = dataQualityService;
         this.workflowConfigService = workflowConfigService;
+        this.statusAgeService = statusAgeService;
     }
 
     /**
@@ -53,6 +58,9 @@ public class DataQualityController {
 
         // Load all issues from all projects
         List<JiraIssueEntity> allIssues = issueRepository.findByProjectKeyIn(allProjectKeys);
+
+        // Compute the F79 time-in-status signal once for the whole report (batched).
+        Map<String, StatusAge> statusAges = statusAgeService.compute(allIssues);
 
         // Build maps for quick lookup
         Map<String, JiraIssueEntity> issueMap = allIssues.stream()
@@ -84,37 +92,41 @@ public class DataQualityController {
         // Collect all violations
         List<IssueViolations> allViolations = new ArrayList<>();
         Map<String, Integer> byRule = new HashMap<>();
+        Map<String, Integer> byCategory = new HashMap<>();
         Map<String, Integer> bySeverity = new HashMap<>();
 
         // Check epics
         for (JiraIssueEntity epic : epics) {
             List<JiraIssueEntity> children = childrenByParent.getOrDefault(epic.getIssueKey(), List.of());
-            List<DataQualityViolation> violations = dataQualityService.checkEpic(epic, children);
+            List<DataQualityViolation> violations = dataQualityService.checkEpic(
+                    epic, children, statusAges.get(epic.getIssueKey()));
 
             if (!violations.isEmpty()) {
                 allViolations.add(toIssueViolations(epic, baseUrl, violations));
-                countViolations(violations, byRule, bySeverity);
+                countViolations(violations, byRule, byCategory, bySeverity);
             }
 
             // Check children of this epic
             for (JiraIssueEntity child : children) {
                 List<JiraIssueEntity> childSubtasks = subtasksByParent.getOrDefault(child.getIssueKey(), List.of());
+                StatusAge childAge = statusAges.get(child.getIssueKey());
                 List<DataQualityViolation> childViolations = workflowConfigService.isBug(child.getIssueType())
-                        ? dataQualityService.checkBug(child, epic, childSubtasks)
-                        : dataQualityService.checkStory(child, epic, childSubtasks);
+                        ? dataQualityService.checkBug(child, epic, childSubtasks, childAge)
+                        : dataQualityService.checkStory(child, epic, childSubtasks, childAge);
 
                 if (!childViolations.isEmpty()) {
                     allViolations.add(toIssueViolations(child, baseUrl, childViolations));
-                    countViolations(childViolations, byRule, bySeverity);
+                    countViolations(childViolations, byRule, byCategory, bySeverity);
                 }
 
                 // Check subtasks
                 for (JiraIssueEntity subtask : childSubtasks) {
-                    List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(subtask, child, epic);
+                    List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(
+                            subtask, child, epic, statusAges.get(subtask.getIssueKey()));
 
                     if (!subtaskViolations.isEmpty()) {
                         allViolations.add(toIssueViolations(subtask, baseUrl, subtaskViolations));
-                        countViolations(subtaskViolations, byRule, bySeverity);
+                        countViolations(subtaskViolations, byRule, byCategory, bySeverity);
                     }
                 }
             }
@@ -138,6 +150,7 @@ public class DataQualityController {
                 issuesWithWarnings,
                 issuesWithInfo,
                 byRule,
+                byCategory,
                 bySeverity
         );
 
@@ -145,7 +158,8 @@ public class DataQualityController {
                 OffsetDateTime.now(),
                 teamId,
                 summary,
-                allViolations
+                allViolations,
+                buildRuleCatalog()
         ));
     }
 
@@ -153,9 +167,26 @@ public class DataQualityController {
         return new DataQualityResponse(
                 OffsetDateTime.now(),
                 teamId,
-                new DataQualityResponse.Summary(0, 0, 0, 0, Map.of(), Map.of()),
-                List.of()
+                new DataQualityResponse.Summary(0, 0, 0, 0, Map.of(), Map.of(), Map.of()),
+                List.of(),
+                buildRuleCatalog()
         );
+    }
+
+    /**
+     * Catalog of all known rules — lets the frontend build category/rule filters
+     * without scanning the (possibly empty) violations list.
+     */
+    private List<DataQualityResponse.RuleInfo> buildRuleCatalog() {
+        return Arrays.stream(DataQualityRule.values())
+                .map(r -> new DataQualityResponse.RuleInfo(
+                        r.name(),
+                        r.getLabel(),
+                        r.getCategory().name(),
+                        r.getCategory().getLabel(),
+                        r.getSeverity().name()
+                ))
+                .toList();
     }
 
     private IssueViolations toIssueViolations(JiraIssueEntity issue, String baseUrl, List<DataQualityViolation> violations) {
@@ -174,9 +205,11 @@ public class DataQualityController {
         );
     }
 
-    private void countViolations(List<DataQualityViolation> violations, Map<String, Integer> byRule, Map<String, Integer> bySeverity) {
+    private void countViolations(List<DataQualityViolation> violations, Map<String, Integer> byRule,
+                                 Map<String, Integer> byCategory, Map<String, Integer> bySeverity) {
         for (DataQualityViolation v : violations) {
             byRule.merge(v.rule().name(), 1, Integer::sum);
+            byCategory.merge(v.rule().getCategory().name(), 1, Integer::sum);
             bySeverity.merge(v.severity().name(), 1, Integer::sum);
         }
     }
