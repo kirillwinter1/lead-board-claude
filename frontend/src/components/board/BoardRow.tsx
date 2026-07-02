@@ -66,6 +66,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                     <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
                       {node.issueKey}
                     </a>
+                    {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
                     <span className="issue-title">{node.title}</span>
                   </EpicTooltip>
                 ) : (

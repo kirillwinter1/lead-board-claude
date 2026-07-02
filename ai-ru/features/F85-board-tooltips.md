@@ -19,7 +19,7 @@
 
 ### Backend
 - `EpicDetailDto` — новый DTO `{issueKey, summary, description}`
-- `EpicService.getEpicDetail(epicKey)` — загружает эпик, проверяет тип через `WorkflowConfigService.isEpic()`, возвращает `EpicDetailDto`; бросает 404 если не найден, 400 если не эпик
+- `EpicService.getEpicDetail(epicKey)` — загружает эпик, проверяет тип через `WorkflowConfigService.isEpic()`, возвращает `EpicDetailDto`; бросает 404 если не найден или не является эпиком
 - `EpicController` — новый endpoint `GET /api/epics/{epicKey}/detail`
 - Тесты: `EpicServiceTest.GetEpicDetail` — успех / 404 / не-эпик
 
