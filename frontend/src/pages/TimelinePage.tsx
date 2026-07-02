@@ -16,7 +16,7 @@ import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import './TimelinePage.css'
 
 import { getIssueIcon } from '../components/board/helpers'
-import { lightenColor } from '../constants/colors'
+import { ERROR_BG, lightenColor } from '../constants/colors'
 import {
   ZoomLevel, DateRange,
   daysBetween,
@@ -184,7 +184,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               {epic.epicKey}
             </a>
             {dueDateIndicator}
-            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }} title="Flagged">FLG</span>}
+            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span title={epic.status || ''}>
@@ -540,7 +540,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         }}
       >
         {storyNumber}
-        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6' }}>FLG</span>}
+        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG }}>FLG</span>}
         {hasWarning && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff8b00', backgroundColor: '#fffae6' }}>!</span>}
       </span>
     </div>
@@ -634,7 +634,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
                 <span style={{ color: '#9ca3af', fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
               )}
               {hoveredStory.flagged && (
-                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }} title="Flagged">FLG</span>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>
               )}
             </div>
             <StatusBadge status={hoveredStory.status} />

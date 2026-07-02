@@ -255,7 +255,20 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
               const p = row.project
               const isExp = expanded[p.issueKey]
               return (
-                <div key={p.issueKey} className="pt-project-label" onClick={() => onToggleProject(p.issueKey)}>
+                <div
+                  key={p.issueKey}
+                  className="pt-project-label"
+                  onClick={() => onToggleProject(p.issueKey)}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExp}
+                  onKeyDown={ev => {
+                    if (ev.key === 'Enter' || ev.key === ' ') {
+                      if (ev.key === ' ') ev.preventDefault()
+                      onToggleProject(p.issueKey)
+                    }
+                  }}
+                >
                   <span className={`pt-project-chevron ${isExp ? 'expanded' : ''}`}>&#9654;</span>
                   <img
                     src={getIssueIcon(p.issueType || 'Project', getIssueTypeIconUrl(p.issueType), getIssueTypeCategory(p.issueType))}

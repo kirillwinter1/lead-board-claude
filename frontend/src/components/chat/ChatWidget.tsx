@@ -193,6 +193,10 @@ export function ChatWidget() {
       .catch(() => setEnabled(false))
   }, [])
 
+  // Abort any in-flight SSE stream when the widget unmounts, so it doesn't keep
+  // updating state (and holding the connection open) after the component is gone.
+  useEffect(() => () => abortRef.current?.abort(), [])
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, toolCallInProgress])

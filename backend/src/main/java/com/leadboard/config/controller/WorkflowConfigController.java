@@ -1,51 +1,36 @@
 package com.leadboard.config.controller;
 
 import com.leadboard.config.JiraConfigResolver;
-import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.dto.*;
-import com.leadboard.config.entity.*;
 import com.leadboard.config.repository.*;
 import com.leadboard.config.service.MappingAutoDetectService;
 import com.leadboard.config.service.MappingValidationService;
+import com.leadboard.config.service.WorkflowConfigAdminService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
-import com.leadboard.jira.JiraIssue;
 import com.leadboard.sync.JiraIssueRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Admin API for workflow configuration management.
  * All endpoints require ADMIN role (secured via SecurityConfig).
+ *
+ * <p>Routing, authorization and request/response translation only — mapping/repository
+ * access and business rules live in {@link WorkflowConfigAdminService}.</p>
  */
 @RestController
 @RequestMapping("/api/admin/workflow-config")
 @PreAuthorize("hasRole('ADMIN')")
 public class WorkflowConfigController {
 
-    private static final Logger log = LoggerFactory.getLogger(WorkflowConfigController.class);
-
-    private final ProjectConfigurationRepository configRepo;
-    private final WorkflowRoleRepository roleRepo;
-    private final IssueTypeMappingRepository issueTypeRepo;
-    private final StatusMappingRepository statusMappingRepo;
-    private final LinkTypeMappingRepository linkTypeRepo;
-    private final WorkflowConfigService workflowConfigService;
-    private final MappingValidationService validationService;
-    private final MappingAutoDetectService autoDetectService;
-    private final ObjectMapper objectMapper;
-    private final JiraIssueRepository jiraIssueRepository;
-    private final JiraConfigResolver jiraConfigResolver;
-    private final JiraClient jiraClient;
+    private final WorkflowConfigAdminService adminService;
 
     public WorkflowConfigController(
             ProjectConfigurationRepository configRepo,
@@ -61,39 +46,27 @@ public class WorkflowConfigController {
             JiraConfigResolver jiraConfigResolver,
             JiraClient jiraClient
     ) {
-        this.configRepo = configRepo;
-        this.roleRepo = roleRepo;
-        this.issueTypeRepo = issueTypeRepo;
-        this.statusMappingRepo = statusMappingRepo;
-        this.linkTypeRepo = linkTypeRepo;
-        this.workflowConfigService = workflowConfigService;
-        this.validationService = validationService;
-        this.autoDetectService = autoDetectService;
-        this.objectMapper = objectMapper;
-        this.jiraIssueRepository = jiraIssueRepository;
-        this.jiraConfigResolver = jiraConfigResolver;
-        this.jiraClient = jiraClient;
+        this.adminService = new WorkflowConfigAdminService(
+                configRepo,
+                roleRepo,
+                issueTypeRepo,
+                statusMappingRepo,
+                linkTypeRepo,
+                workflowConfigService,
+                validationService,
+                autoDetectService,
+                objectMapper,
+                jiraIssueRepository,
+                jiraConfigResolver,
+                jiraClient
+        );
     }
 
     // ==================== Project Configs List ====================
 
     @GetMapping("/projects")
     public ResponseEntity<List<Map<String, Object>>> getProjectConfigs() {
-        List<String> allKeys = jiraConfigResolver.getAllProjectKeys();
-        List<Map<String, Object>> result = new ArrayList<>();
-
-        for (String key : allKeys) {
-            var config = configRepo.findByProjectKey(key).orElse(null);
-            var entry = new java.util.LinkedHashMap<String, Object>();
-            entry.put("projectKey", key);
-            entry.put("configured", config != null
-                    && !issueTypeRepo.findByConfigId(config.getId()).isEmpty());
-            entry.put("isDefault", config != null && config.isDefault());
-            entry.put("configId", config != null ? config.getId() : null);
-            result.add(entry);
-        }
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(adminService.getProjectConfigs());
     }
 
     // ==================== Full Config ====================
@@ -101,67 +74,22 @@ public class WorkflowConfigController {
     @GetMapping
     public ResponseEntity<WorkflowConfigResponse> getConfig(
             @RequestParam(required = false) String projectKey) {
-        ProjectConfigurationEntity config = projectKey != null
-                ? getConfigForProject(projectKey)
-                : getDefaultConfig();
-        if (config == null) {
+        WorkflowConfigResponse response = adminService.getConfig(projectKey);
+        if (response == null) {
             return ResponseEntity.notFound().build();
         }
-
-        Long configId = config.getId();
-        Map<String, Integer> scoreWeights = parseScoreWeights(config.getStatusScoreWeights());
-
-        return ResponseEntity.ok(new WorkflowConfigResponse(
-                configId,
-                config.getName(),
-                config.getProjectKey(),
-                mapRoles(roleRepo.findByConfigIdOrderBySortOrderAsc(configId)),
-                mapIssueTypes(issueTypeRepo.findByConfigId(configId)),
-                mapStatuses(statusMappingRepo.findByConfigId(configId)),
-                mapLinkTypes(linkTypeRepo.findByConfigId(configId)),
-                scoreWeights,
-                config.getPlanningAllowedCategories(),
-                config.getTimeLoggingAllowedCategories(),
-                config.getEpicLinkType(),
-                config.getEpicLinkName()
-        ));
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping
     public ResponseEntity<WorkflowConfigResponse> updateProjectConfig(
             @RequestParam(required = false) String projectKey,
             @RequestBody ProjectConfigUpdateRequest request) {
-        ProjectConfigurationEntity config = projectKey != null
-                ? getOrCreateConfigForProject(projectKey)
-                : getOrCreateDefaultConfig();
-
-        if (request.name() != null) {
-            config.setName(request.name());
+        try {
+            adminService.updateProjectConfig(projectKey, request);
+        } catch (WorkflowConfigAdminService.InvalidRequestException e) {
+            return ResponseEntity.badRequest().build();
         }
-        if (request.statusScoreWeights() != null) {
-            try {
-                config.setStatusScoreWeights(objectMapper.writeValueAsString(request.statusScoreWeights()));
-            } catch (Exception e) {
-                return ResponseEntity.badRequest().build();
-            }
-        }
-        if (request.planningAllowedCategories() != null) {
-            config.setPlanningAllowedCategories(request.planningAllowedCategories());
-        }
-        if (request.timeLoggingAllowedCategories() != null) {
-            config.setTimeLoggingAllowedCategories(request.timeLoggingAllowedCategories());
-        }
-        if (request.epicLinkType() != null) {
-            config.setEpicLinkType(request.epicLinkType());
-        }
-        if (request.epicLinkName() != null) {
-            config.setEpicLinkName(request.epicLinkName());
-        }
-
-        configRepo.save(config);
-        workflowConfigService.clearCache();
-        log.info("Project configuration updated: {}", config.getName());
-
         return getConfig(projectKey);
     }
 
@@ -170,11 +98,7 @@ public class WorkflowConfigController {
     @GetMapping("/roles")
     public ResponseEntity<List<WorkflowRoleDto>> getRoles(
             @RequestParam(required = false) String projectKey) {
-        ProjectConfigurationEntity config = projectKey != null
-                ? getConfigForProject(projectKey) : getDefaultConfig();
-        if (config == null) return ResponseEntity.ok(List.of());
-
-        return ResponseEntity.ok(mapRoles(roleRepo.findByConfigIdOrderBySortOrderAsc(config.getId())));
+        return ResponseEntity.ok(adminService.getRoles(projectKey));
     }
 
     @Transactional
@@ -185,29 +109,7 @@ public class WorkflowConfigController {
         if (roles == null || roles.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = projectKey != null
-                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
-        Long configId = config.getId();
-
-        // Delete existing and replace
-        roleRepo.deleteByConfigId(configId);
-        roleRepo.flush();
-
-        for (WorkflowRoleDto dto : roles) {
-            WorkflowRoleEntity entity = new WorkflowRoleEntity();
-            entity.setConfigId(configId);
-            entity.setCode(dto.code());
-            entity.setDisplayName(dto.displayName());
-            entity.setColor(dto.color());
-            entity.setSortOrder(dto.sortOrder());
-            entity.setDefault(dto.isDefault());
-            roleRepo.save(entity);
-        }
-
-        workflowConfigService.clearCache();
-        log.info("Updated {} workflow roles", roles.size());
-
-        return ResponseEntity.ok(mapRoles(roleRepo.findByConfigIdOrderBySortOrderAsc(configId)));
+        return ResponseEntity.ok(adminService.updateRoles(projectKey, roles));
     }
 
     // ==================== Issue Types ====================
@@ -215,11 +117,7 @@ public class WorkflowConfigController {
     @GetMapping("/issue-types")
     public ResponseEntity<List<IssueTypeMappingDto>> getIssueTypes(
             @RequestParam(required = false) String projectKey) {
-        ProjectConfigurationEntity config = projectKey != null
-                ? getConfigForProject(projectKey) : getDefaultConfig();
-        if (config == null) return ResponseEntity.ok(List.of());
-
-        return ResponseEntity.ok(mapIssueTypes(issueTypeRepo.findByConfigId(config.getId())));
+        return ResponseEntity.ok(adminService.getIssueTypes(projectKey));
     }
 
     @Transactional
@@ -230,26 +128,7 @@ public class WorkflowConfigController {
         if (issueTypes == null || issueTypes.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = projectKey != null
-                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
-        Long configId = config.getId();
-
-        issueTypeRepo.deleteByConfigId(configId);
-        issueTypeRepo.flush();
-
-        for (IssueTypeMappingDto dto : issueTypes) {
-            IssueTypeMappingEntity entity = new IssueTypeMappingEntity();
-            entity.setConfigId(configId);
-            entity.setJiraTypeName(dto.jiraTypeName());
-            entity.setBoardCategory(dto.boardCategory());
-            entity.setWorkflowRoleCode(dto.workflowRoleCode());
-            issueTypeRepo.save(entity);
-        }
-
-        workflowConfigService.clearCache();
-        log.info("Updated {} issue type mappings", issueTypes.size());
-
-        return ResponseEntity.ok(mapIssueTypes(issueTypeRepo.findByConfigId(configId)));
+        return ResponseEntity.ok(adminService.updateIssueTypes(projectKey, issueTypes));
     }
 
     // ==================== Statuses ====================
@@ -257,11 +136,7 @@ public class WorkflowConfigController {
     @GetMapping("/statuses")
     public ResponseEntity<List<StatusMappingDto>> getStatuses(
             @RequestParam(required = false) String projectKey) {
-        ProjectConfigurationEntity config = projectKey != null
-                ? getConfigForProject(projectKey) : getDefaultConfig();
-        if (config == null) return ResponseEntity.ok(List.of());
-
-        return ResponseEntity.ok(mapStatuses(statusMappingRepo.findByConfigId(config.getId())));
+        return ResponseEntity.ok(adminService.getStatuses(projectKey));
     }
 
     @Transactional
@@ -272,46 +147,14 @@ public class WorkflowConfigController {
         if (statuses == null || statuses.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = projectKey != null
-                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
-        Long configId = config.getId();
-
-        statusMappingRepo.deleteByConfigId(configId);
-        statusMappingRepo.flush();
-
-        for (StatusMappingDto dto : statuses) {
-            StatusMappingEntity entity = new StatusMappingEntity();
-            entity.setConfigId(configId);
-            entity.setJiraStatusName(dto.jiraStatusName());
-            entity.setIssueCategory(dto.issueCategory());
-            entity.setStatusCategory(dto.statusCategory());
-            entity.setWorkflowRoleCode(dto.workflowRoleCode());
-            entity.setSortOrder(dto.sortOrder());
-            entity.setScoreWeight(dto.scoreWeight());
-            entity.setColor(dto.color());
-            statusMappingRepo.save(entity);
-        }
-
-        workflowConfigService.clearCache();
-        log.info("Updated {} status mappings", statuses.size());
-
-        return ResponseEntity.ok(mapStatuses(statusMappingRepo.findByConfigId(configId)));
+        return ResponseEntity.ok(adminService.updateStatuses(projectKey, statuses));
     }
 
     // ==================== Status Issue Counts ====================
 
     @GetMapping("/status-issue-counts")
     public ResponseEntity<List<Map<String, Object>>> getStatusIssueCounts() {
-        List<Object[]> rows = jiraIssueRepository.countByStatusAndBoardCategory();
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Object[] row : rows) {
-            result.add(Map.of(
-                    "jiraStatusName", row[0],
-                    "issueCategory", row[1],
-                    "count", row[2]
-            ));
-        }
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(adminService.getStatusIssueCounts());
     }
 
     // ==================== Link Types ====================
@@ -319,11 +162,7 @@ public class WorkflowConfigController {
     @GetMapping("/link-types")
     public ResponseEntity<List<LinkTypeMappingDto>> getLinkTypes(
             @RequestParam(required = false) String projectKey) {
-        ProjectConfigurationEntity config = projectKey != null
-                ? getConfigForProject(projectKey) : getDefaultConfig();
-        if (config == null) return ResponseEntity.ok(List.of());
-
-        return ResponseEntity.ok(mapLinkTypes(linkTypeRepo.findByConfigId(config.getId())));
+        return ResponseEntity.ok(adminService.getLinkTypes(projectKey));
     }
 
     @Transactional
@@ -334,25 +173,7 @@ public class WorkflowConfigController {
         if (linkTypes == null || linkTypes.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
-        ProjectConfigurationEntity config = projectKey != null
-                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
-        Long configId = config.getId();
-
-        linkTypeRepo.deleteByConfigId(configId);
-        linkTypeRepo.flush();
-
-        for (LinkTypeMappingDto dto : linkTypes) {
-            LinkTypeMappingEntity entity = new LinkTypeMappingEntity();
-            entity.setConfigId(configId);
-            entity.setJiraLinkTypeName(dto.jiraLinkTypeName());
-            entity.setLinkCategory(dto.linkCategory());
-            linkTypeRepo.save(entity);
-        }
-
-        workflowConfigService.clearCache();
-        log.info("Updated {} link type mappings", linkTypes.size());
-
-        return ResponseEntity.ok(mapLinkTypes(linkTypeRepo.findByConfigId(configId)));
+        return ResponseEntity.ok(adminService.updateLinkTypes(projectKey, linkTypes));
     }
 
     // ==================== Detect statuses for a single issue type ====================
@@ -363,84 +184,20 @@ public class WorkflowConfigController {
             @PathVariable String typeName,
             @RequestParam(required = false) String projectKey,
             @RequestBody Map<String, String> body) {
-
-        String categoryStr = body.get("boardCategory");
-        if (categoryStr == null || categoryStr.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "boardCategory is required"));
-        }
-
-        BoardCategory category;
-        try {
-            category = BoardCategory.valueOf(categoryStr);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid boardCategory: " + categoryStr));
-        }
-
-        ProjectConfigurationEntity config = projectKey != null
-                ? getOrCreateConfigForProject(projectKey) : getOrCreateDefaultConfig();
-        IssueTypeMappingEntity mapping = issueTypeRepo
-                .findByConfigIdAndJiraTypeName(config.getId(), typeName)
-                .orElseThrow(() -> new IllegalArgumentException("Issue type not found: " + typeName));
-
-        mapping.setBoardCategory(category);
-        if (category == BoardCategory.SUBTASK) {
-            mapping.setWorkflowRoleCode(autoDetectService.detectRoleFromSubtaskName(typeName));
-        } else {
-            mapping.setWorkflowRoleCode(null);
-        }
-        issueTypeRepo.save(mapping);
-
-        // Detect statuses for this type
-        int statusCount = autoDetectService.detectStatusesForIssueType(typeName, category);
-        workflowConfigService.clearCache();
-
-        return ResponseEntity.ok(Map.of(
-                "typeName", typeName,
-                "boardCategory", category.name(),
-                "statusesDetected", statusCount
-        ));
+        return ResponseEntity.ok(adminService.detectStatusesForType(typeName, projectKey, body));
     }
 
     @PostMapping("/statuses/resort-by-category")
     @Transactional
     public ResponseEntity<Map<String, Object>> resortStatusesByCategory(@RequestBody Map<String, String> body) {
-        String categoryStr = body.get("boardCategory");
-        if (categoryStr == null || categoryStr.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "boardCategory is required"));
-        }
-        BoardCategory category;
-        try {
-            category = BoardCategory.valueOf(categoryStr);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Invalid boardCategory: " + categoryStr));
-        }
-        ProjectConfigurationEntity config = getDefaultConfig();
-        if (config == null) {
-            return ResponseEntity.badRequest().body(Map.of("error", "No configuration found"));
-        }
-        autoDetectService.resortStatusesByCategory(config.getId(), category);
-        return ResponseEntity.ok(Map.of("resorted", true, "boardCategory", category.name()));
+        return ResponseEntity.ok(adminService.resortStatusesByCategory(body));
     }
 
     // ==================== Validation ====================
 
     @PostMapping("/validate")
     public ResponseEntity<ValidationResult> validate() {
-        ProjectConfigurationEntity config = getDefaultConfig();
-        if (config == null) {
-            return ResponseEntity.ok(ValidationResult.withIssues(
-                    List.of("No default configuration found"), List.of()));
-        }
-
-        Long configId = config.getId();
-        ValidationResult result = validationService.validate(
-                mapRoles(roleRepo.findByConfigIdOrderBySortOrderAsc(configId)),
-                mapIssueTypes(issueTypeRepo.findByConfigId(configId)),
-                mapStatuses(statusMappingRepo.findByConfigId(configId)),
-                mapLinkTypes(linkTypeRepo.findByConfigId(configId))
-        );
-
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(adminService.validate());
     }
 
     // ==================== Auto-detect ====================
@@ -448,208 +205,18 @@ public class WorkflowConfigController {
     @PostMapping("/auto-detect")
     public ResponseEntity<MappingAutoDetectService.AutoDetectResult> autoDetect(
             @RequestParam(required = false) String projectKey) {
-        if (projectKey != null) {
-            log.info("Manual auto-detect triggered via API for project {}", projectKey);
-            var result = autoDetectService.autoDetectForProject(projectKey);
-            return ResponseEntity.ok(result);
-        }
-        log.info("Manual auto-detect triggered via API");
-        var result = autoDetectService.autoDetect();
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(adminService.autoDetect(projectKey));
     }
 
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> getConfigStatus() {
-        boolean configured = !autoDetectService.isConfigEmpty();
-        return ResponseEntity.ok(Map.of("configured", configured));
+        return ResponseEntity.ok(adminService.getConfigStatus());
     }
 
     // ==================== Epic Link Auto-Detect ====================
 
     @GetMapping("/detect-epic-link")
     public ResponseEntity<Map<String, Object>> detectEpicLinkMode() {
-        var projects = jiraIssueRepository.findByBoardCategory("PROJECT");
-        if (projects.isEmpty()) {
-            return ResponseEntity.ok(Map.of("detected", false, "reason", "No PROJECT issues found"));
-        }
-
-        var epicKeys = new java.util.HashSet<String>();
-        for (var epic : jiraIssueRepository.findByBoardCategory("EPIC")) {
-            epicKeys.add(epic.getIssueKey());
-        }
-
-        var projectKeys = projects.stream().map(p -> p.getIssueKey()).toList();
-        var epicsByParentKey = jiraIssueRepository.findByParentKeyIn(projectKeys).stream()
-                .collect(java.util.stream.Collectors.groupingBy(epic -> epic.getParentKey()));
-
-        // Check parent mode: any EPIC with parentKey pointing to a PROJECT?
-        int parentCount = 0;
-        for (var proj : projects) {
-            for (var epic : epicsByParentKey.getOrDefault(proj.getIssueKey(), List.of())) {
-                if (epicKeys.contains(epic.getIssueKey())) {
-                    parentCount++;
-                }
-            }
-        }
-
-        // Check issuelink mode: any PROJECT with childEpicKeys containing EPICs?
-        int linkCount = 0;
-        String sampleProjectKey = null;
-        for (var proj : projects) {
-            String[] linked = proj.getChildEpicKeys();
-            if (linked != null) {
-                for (String key : linked) {
-                    if (epicKeys.contains(key)) {
-                        linkCount++;
-                        if (sampleProjectKey == null) {
-                            sampleProjectKey = proj.getIssueKey();
-                        }
-                    }
-                }
-            }
-        }
-
-        if (parentCount > 0 && parentCount >= linkCount) {
-            return ResponseEntity.ok(Map.of(
-                "detected", true,
-                "epicLinkType", "parent",
-                "parentCount", parentCount,
-                "linkCount", linkCount
-            ));
-        } else if (linkCount > 0) {
-            // Detect specific link type name by fetching the PROJECT from Jira
-            String detectedLinkName = detectLinkTypeName(sampleProjectKey, epicKeys);
-
-            var result = new java.util.HashMap<String, Object>();
-            result.put("detected", true);
-            result.put("epicLinkType", "issuelink");
-            result.put("parentCount", parentCount);
-            result.put("linkCount", linkCount);
-            if (detectedLinkName != null) {
-                result.put("epicLinkName", detectedLinkName);
-            }
-            return ResponseEntity.ok(result);
-        }
-
-        return ResponseEntity.ok(Map.of(
-            "detected", false,
-            "reason", "No Project→Epic relationships found in synced data",
-            "parentCount", parentCount,
-            "linkCount", linkCount
-        ));
-    }
-
-    /**
-     * Fetch a PROJECT issue from Jira and find which link type connects it to EPICs.
-     * Returns the link direction label (e.g. "Epic Link: is child of") or null.
-     */
-    private String detectLinkTypeName(String projectKey, java.util.Set<String> epicKeys) {
-        try {
-            var response = jiraClient.search("key = " + projectKey, 1, null);
-            if (response == null || response.getIssues() == null || response.getIssues().isEmpty()) {
-                return null;
-            }
-            var issue = response.getIssues().get(0);
-            var links = issue.getFields().getIssuelinks();
-            if (links == null) return null;
-
-            for (JiraIssue.JiraIssueLink link : links) {
-                if (link.getType() == null) continue;
-                // Check outward direction: PROJECT --outward--> EPIC
-                if (link.getOutwardIssue() != null && epicKeys.contains(link.getOutwardIssue().getKey())) {
-                    return link.getType().getOutward();
-                }
-                // Check inward direction: EPIC --inward--> PROJECT
-                if (link.getInwardIssue() != null && epicKeys.contains(link.getInwardIssue().getKey())) {
-                    return link.getType().getInward();
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Failed to detect link type name from Jira for {}: {}", projectKey, e.getMessage());
-        }
-        return null;
-    }
-
-    // ==================== Helpers ====================
-
-    private ProjectConfigurationEntity getConfigForProject(String projectKey) {
-        if (projectKey == null) return getDefaultConfig();
-        return configRepo.findByProjectKey(projectKey).orElse(null);
-    }
-
-    private ProjectConfigurationEntity getOrCreateConfigForProject(String projectKey) {
-        if (projectKey == null) return getOrCreateDefaultConfig();
-        return configRepo.findByProjectKey(projectKey).orElseGet(() -> {
-            boolean hasAny = configRepo.findByIsDefaultTrue().isPresent();
-            ProjectConfigurationEntity config = new ProjectConfigurationEntity();
-            config.setName(projectKey);
-            config.setProjectKey(projectKey);
-            config.setDefault(!hasAny);
-            return configRepo.save(config);
-        });
-    }
-
-    private ProjectConfigurationEntity getDefaultConfig() {
-        String envProjectKey = jiraConfigResolver.getProjectKey();
-        if (envProjectKey != null && !envProjectKey.isBlank()) {
-            var byKey = configRepo.findByProjectKey(envProjectKey);
-            if (byKey.isPresent()) return byKey.get();
-        }
-        return configRepo.findByIsDefaultTrue().orElse(null);
-    }
-
-    private ProjectConfigurationEntity getOrCreateDefaultConfig() {
-        String envProjectKey = jiraConfigResolver.getProjectKey();
-        if (envProjectKey != null && !envProjectKey.isBlank()) {
-            var byKey = configRepo.findByProjectKey(envProjectKey);
-            if (byKey.isPresent()) return byKey.get();
-        }
-        return configRepo.findByIsDefaultTrue().orElseGet(() -> {
-            ProjectConfigurationEntity config = new ProjectConfigurationEntity();
-            config.setName("Default");
-            config.setDefault(true);
-            if (envProjectKey != null && !envProjectKey.isBlank()) {
-                config.setProjectKey(envProjectKey);
-            }
-            return configRepo.save(config);
-        });
-    }
-
-    private Map<String, Integer> parseScoreWeights(String json) {
-        if (json == null || json.isBlank()) return Map.of();
-        try {
-            return objectMapper.readValue(json, new com.fasterxml.jackson.core.type.TypeReference<>() {});
-        } catch (Exception e) {
-            return Map.of();
-        }
-    }
-
-    private List<WorkflowRoleDto> mapRoles(List<WorkflowRoleEntity> entities) {
-        return entities.stream()
-                .map(e -> new WorkflowRoleDto(e.getId(), e.getCode(), e.getDisplayName(),
-                        e.getColor(), e.getSortOrder(), e.isDefault()))
-                .toList();
-    }
-
-    private List<IssueTypeMappingDto> mapIssueTypes(List<IssueTypeMappingEntity> entities) {
-        return entities.stream()
-                .map(e -> new IssueTypeMappingDto(e.getId(), e.getJiraTypeName(),
-                        e.getBoardCategory(), e.getWorkflowRoleCode()))
-                .toList();
-    }
-
-    private List<StatusMappingDto> mapStatuses(List<StatusMappingEntity> entities) {
-        return entities.stream()
-                .map(e -> new StatusMappingDto(e.getId(), e.getJiraStatusName(),
-                        e.getIssueCategory(), e.getStatusCategory(),
-                        e.getWorkflowRoleCode(), e.getSortOrder(), e.getScoreWeight(),
-                        e.getColor()))
-                .toList();
-    }
-
-    private List<LinkTypeMappingDto> mapLinkTypes(List<LinkTypeMappingEntity> entities) {
-        return entities.stream()
-                .map(e -> new LinkTypeMappingDto(e.getId(), e.getJiraLinkTypeName(), e.getLinkCategory()))
-                .toList();
+        return ResponseEntity.ok(adminService.detectEpicLinkMode());
     }
 }

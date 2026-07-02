@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class AppProperties {
 
     private String frontendUrl = "http://localhost:5173";
+    private String baseDomain = "leadboard.app";
     private Session session = new Session();
     private Encryption encryption = new Encryption();
     private AccessReconcile accessReconcile = new AccessReconcile();
@@ -16,6 +17,14 @@ public class AppProperties {
 
     public void setFrontendUrl(String frontendUrl) {
         this.frontendUrl = frontendUrl;
+    }
+
+    public String getBaseDomain() {
+        return baseDomain;
+    }
+
+    public void setBaseDomain(String baseDomain) {
+        this.baseDomain = baseDomain;
     }
 
     public Session getSession() {

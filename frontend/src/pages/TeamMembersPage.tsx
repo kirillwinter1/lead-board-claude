@@ -9,11 +9,21 @@ import './TeamsPage.css'
 
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
 
-const DEFAULT_PLANNING_CONFIG: PlanningConfig = {
-  gradeCoefficients: { senior: 0.8, middle: 1.0, junior: 1.5 },
-  riskBuffer: 0.2,
-  wipLimits: { team: 6, roleLimits: { SA: 2, DEV: 3, QA: 2 } },
-  storyDuration: { roleDurations: { SA: 2, DEV: 2, QA: 2 } }
+// Fallback config used until teamsApi.getPlanningConfig() resolves. Role keys are built
+// from the workflow config's role codes (not hardcoded) — empty objects until roles load.
+function buildDefaultPlanningConfig(roles: string[]): PlanningConfig {
+  const roleLimits: Record<string, number> = {}
+  const roleDurations: Record<string, number> = {}
+  for (const role of roles) {
+    roleLimits[role] = 2
+    roleDurations[role] = 2
+  }
+  return {
+    gradeCoefficients: { senior: 0.8, middle: 1.0, junior: 1.5 },
+    riskBuffer: 0.2,
+    wipLimits: { team: 6, roleLimits },
+    storyDuration: { roleDurations }
+  }
 }
 
 export function TeamMembersPage() {
@@ -38,7 +48,7 @@ export function TeamMembersPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   // Planning config state
-  const [planningConfig, setPlanningConfig] = useState<PlanningConfig>(DEFAULT_PLANNING_CONFIG)
+  const [planningConfig, setPlanningConfig] = useState<PlanningConfig>(() => buildDefaultPlanningConfig(roles))
   const [showPlanningConfig, setShowPlanningConfig] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
 

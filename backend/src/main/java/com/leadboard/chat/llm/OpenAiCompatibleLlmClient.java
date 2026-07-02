@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.leadboard.chat.ChatProperties;
+import com.leadboard.config.AppProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -27,12 +28,14 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
     private static final Logger log = LoggerFactory.getLogger(OpenAiCompatibleLlmClient.class);
 
     private final ChatProperties chatProperties;
+    private final AppProperties appProperties;
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
 
-    public OpenAiCompatibleLlmClient(ChatProperties chatProperties, ObjectMapper objectMapper,
-                                     WebClient.Builder webClientBuilder) {
+    public OpenAiCompatibleLlmClient(ChatProperties chatProperties, AppProperties appProperties,
+                                     ObjectMapper objectMapper, WebClient.Builder webClientBuilder) {
         this.chatProperties = chatProperties;
+        this.appProperties = appProperties;
         this.objectMapper = objectMapper;
         // Build from the Spring-managed builder so the global OS-resolver
         // WebClientCustomizer applies (avoids reactor-netty native DNS failures).
@@ -134,7 +137,7 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
 
         // OpenRouter-specific headers for attribution
         if ("openrouter".equals(chatProperties.getProvider())) {
-            headers.set("HTTP-Referer", "https://leadboard.app");
+            headers.set("HTTP-Referer", "https://" + appProperties.getBaseDomain());
             headers.set("X-Title", "LeadBoard");
         }
     }

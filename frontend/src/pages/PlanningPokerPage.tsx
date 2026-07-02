@@ -11,6 +11,7 @@ import {
   getEligibleEpics,
   createSession,
 } from '../api/poker'
+import { BG_SUBTLE, INFO_BG, SUCCESS_BG } from '../constants/colors'
 
 export function PlanningPokerPage() {
   const navigate = useNavigate()
@@ -113,9 +114,9 @@ export function PlanningPokerPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PREPARING':
-        return <span className="status-badge" style={{ background: '#deebff', color: '#0747a6' }}>Подготовка</span>
+        return <span className="status-badge" style={{ background: INFO_BG, color: '#0747a6' }}>Подготовка</span>
       case 'ACTIVE':
-        return <span className="status-badge" style={{ background: '#e3fcef', color: '#006644' }}>Активна</span>
+        return <span className="status-badge" style={{ background: SUCCESS_BG, color: '#006644' }}>Активна</span>
       case 'COMPLETED':
         return <span className="status-badge" style={{ background: '#dfe1e6', color: '#42526e' }}>Завершена</span>
       default:
@@ -204,7 +205,7 @@ export function PlanningPokerPage() {
                   </td>
                   <td>
                     <code style={{
-                      background: '#f4f5f7',
+                      background: BG_SUBTLE,
                       padding: '2px 8px',
                       borderRadius: 4,
                       fontWeight: 600,

@@ -5,6 +5,7 @@ import { CompetencyRating } from '../components/competency/CompetencyRating'
 import { teamsApi, MemberProfileResponse, WeeklyTrend, Absence } from '../api/teams'
 import { competencyApi, CompetencyLevel } from '../api/competency'
 import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
+import { ERROR_TEXT } from '../constants/colors'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 
@@ -203,7 +204,7 @@ export function MemberProfilePage() {
             <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#de350b' }}>{error || 'Нет данных'}</div>
+        <div style={{ padding: 40, textAlign: 'center', color: ERROR_TEXT }}>{error || 'Нет данных'}</div>
       </main>
     )
   }

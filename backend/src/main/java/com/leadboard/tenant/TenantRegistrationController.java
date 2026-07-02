@@ -1,5 +1,6 @@
 package com.leadboard.tenant;
 
+import com.leadboard.config.AppProperties;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,9 +14,11 @@ import java.util.Map;
 public class TenantRegistrationController {
 
     private final TenantService tenantService;
+    private final AppProperties appProperties;
 
-    public TenantRegistrationController(TenantService tenantService) {
+    public TenantRegistrationController(TenantService tenantService, AppProperties appProperties) {
         this.tenantService = tenantService;
+        this.appProperties = appProperties;
     }
 
     @PostMapping("/register")
@@ -25,7 +28,7 @@ public class TenantRegistrationController {
             return ResponseEntity.ok(Map.of(
                     "tenantId", tenant.getId(),
                     "slug", tenant.getSlug(),
-                    "redirectUrl", "https://" + tenant.getSlug() + ".leadboard.app"
+                    "redirectUrl", "https://" + tenant.getSlug() + "." + appProperties.getBaseDomain()
             ));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

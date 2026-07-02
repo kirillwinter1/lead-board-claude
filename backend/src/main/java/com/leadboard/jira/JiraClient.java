@@ -806,6 +806,57 @@ public class JiraClient {
                 .toList();
     }
 
+    /**
+     * Verifies Jira credentials that have not been saved yet (e.g. the tenant Jira
+     * config setup wizard), so they can't be resolved via {@link JiraConfigResolver}.
+     * Credentials are passed explicitly and used for a single Basic Auth request.
+     */
+    public String testConnection(String baseUrl, String email, String apiToken) {
+        String auth = email + ":" + apiToken;
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        return webClient.get()
+                .uri(baseUrl + "/rest/api/3/myself")
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(Duration.ofSeconds(10));
+    }
+
+    /**
+     * Generic GET against the Jira REST API, using this client's usual OAuth-first
+     * (falling back to Basic Auth) auth logic. Intended for callers that only need
+     * a raw response shape (e.g. metadata lookups) rather than a typed DTO.
+     */
+    public <T> T getRaw(String path, Class<T> responseType) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        if (accessToken != null && cloudId != null) {
+            String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+            return webClient.get()
+                    .uri(baseUrl + path)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .retrieve()
+                    .bodyToMono(responseType)
+                    .block();
+        }
+
+        if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
+            throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
+        }
+
+        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
+        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+
+        return webClient.get()
+                .uri(configResolver.getBaseUrl() + path)
+                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .retrieve()
+                .bodyToMono(responseType)
+                .block();
+    }
+
     private String formatTimeEstimate(int seconds) {
         int hours = seconds / 3600;
         if (hours >= 8) {

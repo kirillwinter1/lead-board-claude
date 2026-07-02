@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { competencyApi, TeamCompetencyMatrix, BusFactorAlert, CompetencyLevel } from '../api/competency'
 import { CompetencyRating, LEVEL_COLORS } from '../components/competency/CompetencyRating'
+import { BG_SUBTLE, ERROR_BG, ERROR_DARK_TEXT, ERROR_TEXT, SUCCESS_BG, SUCCESS_TEXT, WARNING_BG, WARNING_BORDER } from '../constants/colors'
 import './TeamsPage.css'
 
 export function TeamCompetencyPage() {
@@ -46,9 +47,9 @@ export function TeamCompetencyPage() {
 
   const severityStyle = (severity: string) => {
     switch (severity) {
-      case 'CRITICAL': return { background: '#ffebe6', color: '#bf2600', border: '1px solid #ff8f73' }
-      case 'WARNING': return { background: '#fffae6', color: '#ff8b00', border: '1px solid #ffe380' }
-      default: return { background: '#e3fcef', color: '#006644', border: '1px solid #79f2c0' }
+      case 'CRITICAL': return { background: ERROR_BG, color: ERROR_DARK_TEXT, border: '1px solid #ff8f73' }
+      case 'WARNING': return { background: WARNING_BG, color: '#ff8b00', border: `1px solid ${WARNING_BORDER}` }
+      default: return { background: SUCCESS_BG, color: SUCCESS_TEXT, border: '1px solid #79f2c0' }
     }
   }
 
@@ -83,7 +84,7 @@ export function TeamCompetencyPage() {
             <h1>Competency Matrix</h1>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#de350b' }}>Load error</div>
+        <div style={{ padding: 40, textAlign: 'center', color: ERROR_TEXT }}>Load error</div>
       </main>
     )
   }
@@ -160,7 +161,7 @@ export function TeamCompetencyPage() {
             </thead>
             <tbody>
               {matrix.members.map(member => (
-                <tr key={member.memberId} style={{ borderBottom: '1px solid #f4f5f7' }}>
+                <tr key={member.memberId} style={{ borderBottom: `1px solid ${BG_SUBTLE}` }}>
                   <td style={{
                     padding: '10px 16px', fontWeight: 500, fontSize: 13, color: '#172b4d',
                     position: 'sticky', left: 0, background: 'white', zIndex: 1,

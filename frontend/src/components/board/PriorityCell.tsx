@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { getRecommendationIcon } from './helpers'
 import { getScoreBreakdown } from '../../api/board'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
+import { BG_SUBTLE, ERROR_BG, ERROR_TEXT, SUCCESS_BG } from '../../constants/colors'
 import type { PriorityCellProps, ScoreBreakdown } from './types'
 
 export function PriorityCell({ node, recommendedPosition, actualPosition }: PriorityCellProps) {
@@ -22,21 +23,21 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
   let color = '#888' // gray for low
   if (score > 80) color = '#36b37e' // green for high
   else if (score >= 40) color = '#ffab00' // yellow for medium
-  else if (score < 0) color = '#de350b' // red for negative (blocked)
+  else if (score < 0) color = ERROR_TEXT // red for negative (blocked)
 
   // Indicators
   const indicators: { key: string; label: string; color: string; bg: string; text: string }[] = []
   if (isBug(node.issueType)) {
-    indicators.push({ key: 'bug', label: 'BUG', color: '#de350b', bg: '#ffebe6', text: 'Bug' })
+    indicators.push({ key: 'bug', label: 'BUG', color: ERROR_TEXT, bg: ERROR_BG, text: 'Bug' })
   }
   if (node.blockedBy && node.blockedBy.length > 0) {
-    indicators.push({ key: 'blocked', label: 'BLK', color: '#6b778c', bg: '#f4f5f7', text: 'Blocked by other issues' })
+    indicators.push({ key: 'blocked', label: 'BLK', color: '#6b778c', bg: BG_SUBTLE, text: 'Blocked by other issues' })
   }
   if (node.flagged) {
-    indicators.push({ key: 'flagged', label: 'FLG', color: '#ff5630', bg: '#ffebe6', text: 'Work paused' })
+    indicators.push({ key: 'flagged', label: 'FLG', color: '#ff5630', bg: ERROR_BG, text: 'Work paused' })
   }
   if (score > 80) {
-    indicators.push({ key: 'high', label: 'HI', color: '#36b37e', bg: '#e3fcef', text: 'High priority (>80)' })
+    indicators.push({ key: 'high', label: 'HI', color: '#36b37e', bg: SUCCESS_BG, text: 'High priority (>80)' })
   }
 
 
@@ -197,7 +198,7 @@ export function PriorityCell({ node, recommendedPosition, actualPosition }: Prio
           )}
 
           {loadError && (
-            <div className="priority-tooltip-loading" style={{ color: '#de350b' }}>Failed to load</div>
+            <div className="priority-tooltip-loading" style={{ color: ERROR_TEXT }}>Failed to load</div>
           )}
 
           {breakdown && breakdown.breakdown && (

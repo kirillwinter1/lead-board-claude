@@ -4,6 +4,7 @@ import { teamsApi, TeamMember, WorklogTimelineResponse, WorklogMember, WorklogDa
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { ABSENCE_COLORS } from './AbsenceModal'
 import { AbsenceType } from '../api/teams'
+import { ERROR_TEXT } from '../constants/colors'
 import './WorklogTimeline.css'
 
 const DAY_WIDTH = 32
@@ -367,7 +368,7 @@ export function WorklogTimeline({ teamId, from: propFrom, to: propTo }: WorklogT
           </span>
         ))}
         <span className="worklog-legend-item">
-          <span className="worklog-legend-swatch" style={{ backgroundColor: '#DE350B' }} />
+          <span className="worklog-legend-swatch" style={{ backgroundColor: ERROR_TEXT }} />
           Low hours (&lt;50%)
         </span>
       </div>
