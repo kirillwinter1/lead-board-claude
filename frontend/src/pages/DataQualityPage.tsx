@@ -152,6 +152,7 @@ function ViolationRow({
                 <button
                   type="button"
                   className="violation-fix-btn"
+                  aria-label={`Fix: ${v.label} — ${issue.issueKey}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     onFix({ issueKey: issue.issueKey, rule: v.rule, label: v.label })

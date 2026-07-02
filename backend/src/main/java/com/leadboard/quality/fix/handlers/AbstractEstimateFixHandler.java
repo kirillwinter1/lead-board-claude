@@ -33,7 +33,7 @@ public abstract class AbstractEstimateFixHandler implements FixHandler {
         return FixPreview.builder(issue.getIssueKey(), rule(), "ESTIMATE", "Set original estimate")
                 .authMode(support.authMode())
                 .inputs(List.of(FixInput.number("hours", "Estimate (hours)", true, defaultHours, 0.5, 0.5)))
-                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(),
+                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Original estimate", "—", "(entered hours)")))
                 .build();
     }

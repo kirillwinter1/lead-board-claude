@@ -238,7 +238,8 @@ public class JiraWriteService {
                 ? jiraClient.getTransitions(issueKey, c.accessToken(), c.cloudId())
                 : jiraClient.getTransitionsBasicAuth(issueKey);
         if (transitions.isEmpty()) {
-            throw new IllegalStateException("Для " + issueKey + " нет доступных переходов из текущего статуса.");
+            throw new IllegalStateException(
+                    "No available transitions for " + issueKey + " — check permissions/workflow.");
         }
         JiraTransition match = findTransition(transitions, targetStatusName);
         if (match == null) {
@@ -246,7 +247,7 @@ public class JiraWriteService {
                     .map(t -> t.to() != null ? t.to().name() : t.name())
                     .distinct().reduce((a, b) -> a + ", " + b).orElse("");
             throw new IllegalArgumentException(
-                    "Не нашёл перехода в '" + targetStatusName + "' для " + issueKey + ". Доступные статусы: " + available);
+                    "No transition to '" + targetStatusName + "' found for " + issueKey + ". Available: " + available);
         }
         if (c != null) {
             jiraClient.transitionIssue(issueKey, match.id(), c.accessToken(), c.cloudId());

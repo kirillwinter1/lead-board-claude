@@ -34,7 +34,7 @@ public class EpicNoDueDateFixHandler implements FixHandler {
         return FixPreview.builder(issue.getIssueKey(), rule(), "DUE_DATE", "Set a due date")
                 .authMode(support.authMode())
                 .inputs(List.of(FixInput.date("dueDate", "Due date", true, null)))
-                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(),
+                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Due date", "—", "(selected date)")))
                 .build();
     }

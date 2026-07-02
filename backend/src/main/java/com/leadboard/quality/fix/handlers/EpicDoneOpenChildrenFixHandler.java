@@ -40,10 +40,12 @@ public class EpicDoneOpenChildrenFixHandler implements FixHandler {
     @Override
     public FixPreview preview(JiraIssueEntity issue) {
         List<JiraIssueEntity> openChildren = support.openChildren(issue.getIssueKey());
+        Map<String, List<JiraIssueEntity>> subtasksByParent = support.openSubtasksByParent(
+                openChildren.stream().map(JiraIssueEntity::getIssueKey).toList());
         List<String> affected = new ArrayList<>();
         List<FixChange> changes = new ArrayList<>();
         for (JiraIssueEntity child : openChildren) {
-            for (JiraIssueEntity st : support.openSubtasks(child.getIssueKey())) {
+            for (JiraIssueEntity st : subtasksByParent.getOrDefault(child.getIssueKey(), List.of())) {
                 affected.add(st.getIssueKey());
                 changes.add(support.statusChange(st, support.targetStatusName(st, StatusCategory.DONE)));
             }
@@ -66,12 +68,14 @@ public class EpicDoneOpenChildrenFixHandler implements FixHandler {
     @Override
     public FixResult apply(JiraIssueEntity issue, String choiceId, Map<String, Object> params) {
         List<JiraIssueEntity> openChildren = support.openChildren(issue.getIssueKey());
+        Map<String, List<JiraIssueEntity>> subtasksByParent = support.openSubtasksByParent(
+                openChildren.stream().map(JiraIssueEntity::getIssueKey).toList());
         List<String> closed = new ArrayList<>();
         List<String> failures = new ArrayList<>();
 
         for (JiraIssueEntity child : openChildren) {
             // Bottom-up: close the child's open subtasks first, then the child.
-            for (JiraIssueEntity st : support.openSubtasks(child.getIssueKey())) {
+            for (JiraIssueEntity st : subtasksByParent.getOrDefault(child.getIssueKey(), List.of())) {
                 closeToDone(st, closed, failures);
             }
             closeToDone(child, closed, failures);

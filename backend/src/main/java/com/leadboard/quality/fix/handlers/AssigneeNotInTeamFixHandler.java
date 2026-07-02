@@ -51,12 +51,12 @@ public class AssigneeNotInTeamFixHandler implements FixHandler {
                 ? issue.getAssigneeDisplayName() : issue.getAssigneeAccountId();
 
         FixChoice reassign = new FixChoice(REASSIGN, "Reassign to a team member",
-                List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(),
+                List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Assignee", who, "(selected member)")),
                 List.of(FixInput.select("accountId", "Assignee", true, support.memberOptions(teamId), null)));
 
         FixChoice addToTeam = new FixChoice(ADD_TO_TEAM, "Add " + who + " to the team",
-                List.of(FixChange.local(issue.getIssueKey(), issue.getSummary(),
+                List.of(FixChange.local(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Team membership", "Not a member", who + " added")),
                 List.of());
 

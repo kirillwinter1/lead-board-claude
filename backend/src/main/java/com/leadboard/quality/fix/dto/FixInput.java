@@ -24,8 +24,17 @@ public record FixInput(
         Double step,
         List<Option> options
 ) {
-    /** A select option: machine value + display label. */
-    public record Option(String value, String label) {}
+    /**
+     * A select option: machine value + display label, plus an optional {@code color} (hex,
+     * e.g. a team color) so the UI can render a color swatch. {@code color} is null for options
+     * that have no color (e.g. member/assignee selects).
+     */
+    public record Option(String value, String label, String color) {
+        /** Convenience constructor for options without a color. */
+        public Option(String value, String label) {
+            this(value, label, null);
+        }
+    }
 
     public static FixInput select(String name, String label, boolean required, List<Option> options, String defaultValue) {
         return new FixInput(name, "select", label, required, defaultValue, null, null, options);

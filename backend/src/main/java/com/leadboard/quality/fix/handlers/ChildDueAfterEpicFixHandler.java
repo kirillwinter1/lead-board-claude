@@ -49,11 +49,11 @@ public class ChildDueAfterEpicFixHandler implements FixHandler {
         String storyDue = issue.getDueDate().toString();
 
         FixChoice moveStory = new FixChoice(MOVE_STORY, "Pull the story's due date in",
-                List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), "Due date", storyDue, epicDue)),
+                List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), "Due date", storyDue, epicDue)),
                 List.of(FixInput.date("dueDate", "Story due date", true, epicDue)));
 
         FixChoice moveEpic = new FixChoice(MOVE_EPIC, "Push the epic's due date out",
-                List.of(FixChange.jira(epic.getIssueKey(), epic.getSummary(), "Due date", epicDue, storyDue)),
+                List.of(FixChange.jira(epic.getIssueKey(), epic.getSummary(), epic.getIssueType(), "Due date", epicDue, storyDue)),
                 List.of(FixInput.date("dueDate", "Epic due date", true, storyDue)));
 
         return b.choices(List.of(moveStory, moveEpic)).build();

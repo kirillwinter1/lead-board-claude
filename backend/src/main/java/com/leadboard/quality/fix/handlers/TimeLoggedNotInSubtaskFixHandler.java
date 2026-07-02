@@ -65,7 +65,7 @@ public class TimeLoggedNotInSubtaskFixHandler implements FixHandler {
         }
 
         List<String> affected = worklogs.stream().map(this::describe).toList();
-        List<FixChange> changes = List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(),
+        List<FixChange> changes = List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                 "Worklogs", worklogs.size() + " entr(ies) on " + issue.getIssueKey(), "→ selected subtask"));
 
         return b

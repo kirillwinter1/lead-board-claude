@@ -88,7 +88,7 @@ const mockFixPreview = {
   warning: null,
   authMode: 'OAUTH',
   changes: [
-    { issueKey: 'STORY-1', summary: 'Test story', field: 'Team', from: '∅', to: 'Team A', local: true },
+    { issueKey: 'STORY-1', summary: 'Test story', issueType: 'Story', field: 'Team', from: '∅', to: 'Team A', local: true },
   ],
   affectedIssues: [],
   inputs: [
@@ -444,7 +444,7 @@ describe('DataQualityPage', () => {
       expandStory1()
 
       await waitFor(() => {
-        const fixButtons = screen.getAllByRole('button', { name: 'Fix' })
+        const fixButtons = screen.getAllByRole('button', { name: /^Fix:/ })
         // Only the EPIC_NO_TEAM violation is fixable (the estimate one is not).
         expect(fixButtons.length).toBe(1)
       })
@@ -459,7 +459,7 @@ describe('DataQualityPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Epic without team')).toBeInTheDocument()
       })
-      expect(screen.queryByRole('button', { name: 'Fix' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^Fix:/ })).not.toBeInTheDocument()
     })
 
     it('opens the fix modal when Fix is clicked', async () => {
@@ -467,7 +467,7 @@ describe('DataQualityPage', () => {
       await waitFor(() => expect(screen.getByText('STORY-1')).toBeInTheDocument())
       expandStory1()
 
-      const fixBtn = await screen.findByRole('button', { name: 'Fix' })
+      const fixBtn = await screen.findByRole('button', { name: /^Fix:/ })
       fireEvent.click(fixBtn)
 
       await waitFor(() => {
@@ -481,7 +481,7 @@ describe('DataQualityPage', () => {
       await waitFor(() => expect(screen.getByText('STORY-1')).toBeInTheDocument())
       expandStory1()
 
-      const fixBtn = await screen.findByRole('button', { name: 'Fix' })
+      const fixBtn = await screen.findByRole('button', { name: /^Fix:/ })
       fireEvent.click(fixBtn)
 
       const applyBtn = await screen.findByRole('button', { name: 'Apply' })

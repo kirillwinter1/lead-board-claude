@@ -225,5 +225,38 @@ class WorkflowConfigServiceScoreTest {
             assertNull(service.getFirstStatusNameForCategory(null, BoardCategory.EPIC));
             assertNull(service.getFirstStatusNameForCategory(StatusCategory.DONE, null));
         }
+
+        @Test
+        @DisplayName("picks the lowest-sortOrder IN_PROGRESS status regardless of insertion order")
+        void picksPipelineFirstBySortOrder() {
+            // Two IN_PROGRESS story statuses; the pipeline-first one is sortOrder=1 ("Аналитика"),
+            // the later one is sortOrder=5 ("Test Review"). Iteration order of the underlying
+            // ConcurrentHashMap is arbitrary, so the pick must be driven by sortOrder, not insertion.
+            StatusMappingEntity testReview = new StatusMappingEntity();
+            testReview.setIssueCategory(BoardCategory.STORY);
+            testReview.setJiraStatusName("Test Review");
+            testReview.setStatusCategory(StatusCategory.IN_PROGRESS);
+            testReview.setScoreWeight(0);
+            testReview.setSortOrder(5);
+
+            StatusMappingEntity analytics = new StatusMappingEntity();
+            analytics.setIssueCategory(BoardCategory.STORY);
+            analytics.setJiraStatusName("Аналитика");
+            analytics.setStatusCategory(StatusCategory.IN_PROGRESS);
+            analytics.setScoreWeight(0);
+            analytics.setSortOrder(1);
+
+            // Insert the high-sortOrder status first to prove insertion order does not decide the pick.
+            when(statusMappingRepo.findByConfigId(1L)).thenReturn(List.of(testReview, analytics));
+            service.clearCache();
+            assertEquals("Аналитика",
+                    service.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY));
+
+            // Reversed insertion order → still the sortOrder=1 status.
+            when(statusMappingRepo.findByConfigId(1L)).thenReturn(List.of(analytics, testReview));
+            service.clearCache();
+            assertEquals("Аналитика",
+                    service.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY));
+        }
     }
 }

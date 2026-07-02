@@ -15,7 +15,6 @@ import com.leadboard.sync.SyncService;
 import com.leadboard.quality.fix.dto.FixChange;
 import com.leadboard.quality.fix.dto.FixInput;
 import com.leadboard.team.TeamEntity;
-import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import com.leadboard.team.TeamRepository;
 import com.leadboard.team.TeamService;
@@ -115,6 +114,14 @@ public class FixSupport {
                 .toList();
     }
 
+    /** Open subtasks of several parents, grouped by parent key (one query, avoids N+1). */
+    public Map<String, List<JiraIssueEntity>> openSubtasksByParent(List<String> parentKeys) {
+        if (parentKeys.isEmpty()) return Map.of();
+        return issueRepository.findByParentKeyIn(parentKeys).stream()
+                .filter(s -> !isDone(s))
+                .collect(java.util.stream.Collectors.groupingBy(JiraIssueEntity::getParentKey));
+    }
+
     /** The epic a story/bug/subtask ultimately belongs to (walks up one or two levels). */
     public JiraIssueEntity resolveEpicOf(JiraIssueEntity issue) {
         if (issue == null || issue.getParentKey() == null) return null;
@@ -131,7 +138,7 @@ public class FixSupport {
 
     /** A FixChange describing a Jira status transition of the given issue to {@code toName}. */
     public FixChange statusChange(JiraIssueEntity issue, String toName) {
-        return FixChange.jira(issue.getIssueKey(), issue.getSummary(), "Status", issue.getStatus(), toName);
+        return FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), "Status", issue.getStatus(), toName);
     }
 
     /** Active team members as select options (value = Jira account id, label = display name). */

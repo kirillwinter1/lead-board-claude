@@ -32,7 +32,7 @@ const basePreview: FixPreview = {
   warning: null,
   authMode: 'OAUTH',
   changes: [
-    { issueKey: 'LB-42', summary: 'Some epic', field: 'Due date', from: '∅', to: '2026-08-01', local: false },
+    { issueKey: 'LB-42', summary: 'Some epic', issueType: 'Epic', field: 'Due date', from: '∅', to: '2026-08-01', local: false },
   ],
   affectedIssues: [],
   inputs: [
@@ -68,6 +68,34 @@ describe('FixModal', () => {
     })
   })
 
+  it('renders the issue-type icon and StatusBadge for Status changes', async () => {
+    const preview: FixPreview = {
+      ...basePreview,
+      rule: 'STATUS_MISMATCH',
+      title: 'Fix status',
+      changes: [
+        { issueKey: 'LB-431', summary: 'Настройка PgBouncer', issueType: 'Story', field: 'Status', from: 'Новое', to: 'Test Review', local: true },
+      ],
+      inputs: [],
+    }
+    mockPreview(preview)
+    render(<FixModal issueKey="LB-431" rule="STATUS_MISMATCH" ruleLabel="Status mismatch" onClose={noop} onApplied={noop} />)
+
+    await waitFor(() => expect(screen.getByText('LB-431')).toBeInTheDocument())
+
+    // Issue-type icon rendered next to the key (alt = issue type name)
+    expect(screen.getByAltText('Story')).toBeInTheDocument()
+
+    // Status values rendered via StatusBadge (not plain text)
+    const badges = document.querySelectorAll('.status-badge')
+    expect(badges.length).toBe(2)
+    expect(screen.getByText('Новое')).toBeInTheDocument()
+    expect(screen.getByText('Test Review')).toBeInTheDocument()
+
+    // The "local" hint marker is preserved
+    expect(screen.getByText('local')).toBeInTheDocument()
+  })
+
   it('disables Apply until a required input is filled', async () => {
     mockPreview(basePreview)
     render(<FixModal issueKey="LB-42" rule="EPIC_NO_DUE_DATE" ruleLabel="Epic without due date" onClose={noop} onApplied={noop} />)
@@ -93,13 +121,13 @@ describe('FixModal', () => {
         {
           id: 'moveStory',
           label: 'Move story',
-          changes: [{ issueKey: 'LB-1', summary: 'Story', field: 'Due date', from: 'x', to: 'y', local: false }],
+          changes: [{ issueKey: 'LB-1', summary: 'Story', issueType: 'Story', field: 'Due date', from: 'x', to: 'y', local: false }],
           inputs: [{ name: 'storyDate', type: 'date', label: 'Story due date', required: true }],
         },
         {
           id: 'moveEpic',
           label: 'Move epic',
-          changes: [{ issueKey: 'LB-99', summary: 'Epic', field: 'Due date', from: 'a', to: 'b', local: false }],
+          changes: [{ issueKey: 'LB-99', summary: 'Epic', issueType: 'Epic', field: 'Due date', from: 'a', to: 'b', local: false }],
           inputs: [{ name: 'epicDate', type: 'date', label: 'Epic due date', required: true }],
         },
       ],

@@ -46,7 +46,7 @@ public class InProgressNoAssigneeFixHandler implements FixHandler {
         }
         return b
                 .inputs(List.of(FixInput.select("accountId", "Assignee", true, options, null)))
-                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(),
+                .changes(List.of(FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(),
                         "Assignee", "Unassigned", "(selected member)")))
                 .build();
     }

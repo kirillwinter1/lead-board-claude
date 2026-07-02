@@ -41,7 +41,7 @@ public class SubtaskDoneNoTimeLoggedFixHandler implements FixHandler {
         }
         String hours = formatHours(estimate);
         return b.changes(List.of(FixChange.jira(
-                issue.getIssueKey(), issue.getSummary(), "Time logged", "0h", hours))).build();
+                issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), "Time logged", "0h", hours))).build();
     }
 
     @Override
