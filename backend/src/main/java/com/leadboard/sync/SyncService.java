@@ -492,6 +492,34 @@ public class SyncService {
 
     private record SyncResult(boolean statusChanged, boolean created, boolean timeSpentChanged) {}
 
+    // Well-formed Jira issue key (e.g. "ABC-123"). Guards the value that gets interpolated
+    // into the single-issue JQL below — anti JQL-injection (mirrors JiraClient's pattern).
+    private static final java.util.regex.Pattern ISSUE_KEY_PATTERN =
+            java.util.regex.Pattern.compile("^[A-Z][A-Z0-9]+-\\d+$");
+
+    /**
+     * F84: refresh a single issue from Jira after a Data Quality fix. Fetches the current
+     * state of the issue by key and upserts it locally (Jira is the source of truth).
+     * No-op when Jira returns nothing (issue not found / deleted).
+     *
+     * @param issueKey the Jira issue key to refresh (validated against {@link #ISSUE_KEY_PATTERN})
+     */
+    public void syncSingleIssue(String issueKey) {
+        if (issueKey == null || !ISSUE_KEY_PATTERN.matcher(issueKey).matches()) {
+            throw new IllegalArgumentException("Invalid Jira issue key: " + issueKey);
+        }
+        // Derive project key from the issue-key prefix (e.g. "ABC-123" -> "ABC").
+        String projectKey = issueKey.substring(0, issueKey.indexOf('-'));
+        JiraSearchResponse response = jiraClient.search("key = " + issueKey, 1, null);
+        List<JiraIssue> issues = response != null ? response.getIssues() : null;
+        if (issues == null || issues.isEmpty()) {
+            log.info("syncSingleIssue: no issue found in Jira for {}", issueKey);
+            return;
+        }
+        saveOrUpdateIssue(issues.get(0), projectKey);
+        log.info("syncSingleIssue: refreshed {} from Jira", issueKey);
+    }
+
     private SyncResult saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
         JiraIssueEntity existing = issueRepository.findByIssueKey(jiraIssue.getKey())
                 .orElse(null);
@@ -549,7 +577,16 @@ public class SyncService {
 
         String teamFieldValue = extractTeamFieldValue(jiraIssue);
         entity.setTeamFieldValue(teamFieldValue);
-        entity.setTeamId(findTeamIdByFieldValue(teamFieldValue));
+        // F84: preserve a manually-assigned team (EPIC_NO_TEAM fix). If Jira resolves a team,
+        // it wins and clears the manual flag; if Jira resolves nothing and a manual team was
+        // set, keep it; otherwise follow Jira (null).
+        Long computedTeamId = findTeamIdByFieldValue(teamFieldValue);
+        if (computedTeamId != null) {
+            entity.setTeamId(computedTeamId);
+            entity.setTeamIdManual(false);
+        } else if (!entity.isTeamIdManual()) {
+            entity.setTeamId(null);
+        }
 
         if (jiraIssue.getFields().getPriority() != null) {
             entity.setPriority(jiraIssue.getFields().getPriority().getName());

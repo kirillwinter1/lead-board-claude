@@ -1,5 +1,7 @@
 package com.leadboard.quality;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.Map;
 
 /**
@@ -45,5 +47,14 @@ public record DataQualityViolation(
      */
     public boolean isBlocking() {
         return severity == DataQualitySeverity.ERROR;
+    }
+
+    /**
+     * Human-readable rule label (F83/F84). Serialized into board-node alerts so the frontend
+     * AlertIcon can render the label without its own hardcoded rule→label map.
+     */
+    @JsonProperty("label")
+    public String label() {
+        return rule != null ? rule.getLabel() : null;
     }
 }

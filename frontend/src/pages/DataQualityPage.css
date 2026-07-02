@@ -193,6 +193,22 @@
   color: #42526e;
 }
 
+.violation-fix-btn {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0052cc;
+  background: #e9f2ff;
+  border: 1px solid #b3d4ff;
+  border-radius: 3px;
+  padding: 3px 12px;
+  cursor: pointer;
+}
+
+.violation-fix-btn:hover {
+  background: #d6e6ff;
+}
+
 /* Expander in violations table */
 .violation-row .expander-btn {
   background: none;

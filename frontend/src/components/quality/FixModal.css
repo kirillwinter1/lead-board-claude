@@ -1,0 +1,169 @@
+/* FixModal (F84) — layout only; colors come from constants/colors via inline styles */
+
+.fix-modal-loading {
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.fix-info-panel {
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.fix-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.fix-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fix-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.fix-change-row {
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.fix-change-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fix-change-key {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.fix-local-hint {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 0 5px;
+  line-height: 15px;
+}
+
+.fix-change-summary {
+  font-size: 12px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fix-change-detail {
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.fix-change-field {
+  font-weight: 600;
+}
+
+.fix-input-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.fix-input-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fix-input-label input {
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.fix-warning-box {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.fix-warning-text {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.fix-affected-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.fix-auth-hint {
+  font-size: 12px;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.fix-error {
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.fix-success {
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+.fix-btn-secondary,
+.fix-btn-primary {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.fix-btn-secondary {
+  border: 1px solid transparent;
+}
+
+.fix-btn-primary {
+  border: none;
+}
+
+.fix-btn-secondary:disabled,
+.fix-btn-primary:disabled {
+  cursor: not-allowed;
+}

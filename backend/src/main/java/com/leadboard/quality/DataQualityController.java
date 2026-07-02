@@ -2,14 +2,22 @@ package com.leadboard.quality;
 
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.jira.JiraClientException;
 import com.leadboard.metrics.entity.FlagChangelogEntity;
 import com.leadboard.quality.dto.DataQualityResponse;
 import com.leadboard.quality.dto.IssueViolations;
+import com.leadboard.quality.fix.FixConflictException;
+import com.leadboard.quality.fix.FixService;
+import com.leadboard.quality.fix.dto.FixPreview;
+import com.leadboard.quality.fix.dto.FixRequest;
+import com.leadboard.quality.fix.dto.FixResult;
 import com.leadboard.status.StatusAge;
 import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.OffsetDateTime;
@@ -28,19 +36,22 @@ public class DataQualityController {
     private final DataQualityService dataQualityService;
     private final WorkflowConfigService workflowConfigService;
     private final StatusAgeService statusAgeService;
+    private final FixService fixService;
 
     public DataQualityController(
             JiraIssueRepository issueRepository,
             JiraConfigResolver jiraConfigResolver,
             DataQualityService dataQualityService,
             WorkflowConfigService workflowConfigService,
-            StatusAgeService statusAgeService
+            StatusAgeService statusAgeService,
+            FixService fixService
     ) {
         this.issueRepository = issueRepository;
         this.jiraConfigResolver = jiraConfigResolver;
         this.dataQualityService = dataQualityService;
         this.workflowConfigService = workflowConfigService;
         this.statusAgeService = statusAgeService;
+        this.fixService = fixService;
     }
 
     /**
@@ -207,7 +218,7 @@ public class DataQualityController {
     private IssueViolations toIssueViolations(JiraIssueEntity issue, String baseUrl, List<DataQualityViolation> violations) {
         String jiraUrl = baseUrl + "/browse/" + issue.getIssueKey();
         List<IssueViolations.ViolationDto> dtos = violations.stream()
-                .map(IssueViolations.ViolationDto::from)
+                .map(v -> IssueViolations.ViolationDto.from(v, fixService.isFixable(v.rule())))
                 .toList();
 
         return new IssueViolations(
@@ -233,6 +244,64 @@ public class DataQualityController {
         if (issue.hasErrors()) return 0;
         if (issue.hasWarnings()) return 1;
         return 2;
+    }
+
+    // ==================== F84 — Auto-fix ====================
+
+    /**
+     * Preview a fix for a single violation: describes the changes, inputs and choices.
+     */
+    @GetMapping("/fix-preview")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
+    public ResponseEntity<FixPreview> fixPreview(
+            @RequestParam String issueKey,
+            @RequestParam String rule
+    ) {
+        DataQualityRule parsedRule = DataQualityRule.valueOf(rule); // IllegalArgumentException -> 400
+        return ResponseEntity.ok(fixService.preview(issueKey, parsedRule));
+    }
+
+    /**
+     * Apply a fix. Writes to Jira (source of truth) and/or the local DB, then re-syncs the
+     * affected issues.
+     */
+    @PostMapping("/fix")
+    @PreAuthorize("hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')")
+    public ResponseEntity<FixResult> applyFix(@RequestBody FixRequest request) {
+        return ResponseEntity.ok(fixService.apply(request));
+    }
+
+    // ==================== Exception mapping (local to this controller) ====================
+
+    /** Validation / transition-not-found / bad rule -> 400. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, Object>> handleBadRequest(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Map.of("success", false, "message", safeMessage(e)));
+    }
+
+    /** Concurrent fix / violation already gone -> 409. */
+    @ExceptionHandler(FixConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(FixConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(Map.of("success", false, "message", safeMessage(e)));
+    }
+
+    /** Upstream Jira error -> 502 (message already truncated by JiraClient). */
+    @ExceptionHandler(JiraClientException.class)
+    public ResponseEntity<Map<String, Object>> handleJira(JiraClientException e) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                .body(Map.of("success", false, "message", safeMessage(e)));
+    }
+
+    /** No OAuth token and no BasicAuth available, or other precondition failure -> 400. */
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
+        return ResponseEntity.badRequest().body(Map.of("success", false, "message", safeMessage(e)));
+    }
+
+    private String safeMessage(Exception e) {
+        String msg = e.getMessage();
+        return msg != null ? msg : "Request failed";
     }
 
 }

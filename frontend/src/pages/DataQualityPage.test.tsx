@@ -2,10 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import axios from 'axios'
-import { DataQualityPage } from './DataQualityPage'
 
 vi.mock('axios')
 const mockedAxios = vi.mocked(axios)
+mockedAxios.isAxiosError = ((e: unknown): boolean =>
+  !!(e && typeof e === 'object' && 'isAxiosError' in e)) as unknown as typeof axios.isAxiosError
+
+// Controllable role for the auth mock — flip before rendering to test gating.
+let mockRole = 'ADMIN'
+vi.mock('../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    hasRole: (...roles: string[]) => roles.includes(mockRole),
+  }),
+}))
+
+import { DataQualityPage } from './DataQualityPage'
 
 const mockDataQuality = {
   generatedAt: '2024-01-15T10:00:00Z',
@@ -44,8 +55,8 @@ const mockDataQuality = {
       status: 'To Do',
       jiraUrl: 'https://jira.example.com/STORY-1',
       violations: [
-        { rule: 'EPIC_NO_ESTIMATE', severity: 'ERROR' as const, message: 'Story has no estimate', label: 'Epic without estimate', category: 'ESTIMATES', categoryLabel: 'Estimates' },
-        { rule: 'EPIC_NO_TEAM', severity: 'WARNING' as const, message: 'Story has no assignee', label: 'Epic without team', category: 'TEAM', categoryLabel: 'Team' },
+        { rule: 'EPIC_NO_ESTIMATE', severity: 'ERROR' as const, message: 'Story has no estimate', label: 'Epic without estimate', category: 'ESTIMATES', categoryLabel: 'Estimates', fixable: false },
+        { rule: 'EPIC_NO_TEAM', severity: 'WARNING' as const, message: 'Story has no assignee', label: 'Epic without team', category: 'TEAM', categoryLabel: 'Team', fixable: true },
       ],
     },
     {
@@ -55,7 +66,7 @@ const mockDataQuality = {
       status: 'In Progress',
       jiraUrl: 'https://jira.example.com/EPIC-1',
       violations: [
-        { rule: 'EPIC_OVERDUE', severity: 'INFO' as const, message: 'No updates for 30 days', label: 'Epic overdue', category: 'DUE_DATES', categoryLabel: 'Due Dates' },
+        { rule: 'EPIC_OVERDUE', severity: 'INFO' as const, message: 'No updates for 30 days', label: 'Epic overdue', category: 'DUE_DATES', categoryLabel: 'Due Dates', fixable: false },
       ],
     },
   ],
@@ -65,6 +76,26 @@ const mockTeams = [
   { id: 1, name: 'Team A' },
   { id: 2, name: 'Team B' },
 ]
+
+const mockFixPreview = {
+  issueKey: 'STORY-1',
+  rule: 'EPIC_NO_TEAM',
+  fixType: 'TEAM',
+  title: 'Set epic team',
+  applicable: true,
+  notApplicableReason: null,
+  risky: false,
+  warning: null,
+  authMode: 'OAUTH',
+  changes: [
+    { issueKey: 'STORY-1', summary: 'Test story', field: 'Team', from: '∅', to: 'Team A', local: true },
+  ],
+  affectedIssues: [],
+  inputs: [
+    { name: 'teamId', type: 'select', label: 'Team', required: true, options: [{ value: '1', label: 'Team A' }] },
+  ],
+  choices: [],
+}
 
 const renderDataQualityPage = () => {
   return render(
@@ -77,7 +108,11 @@ const renderDataQualityPage = () => {
 describe('DataQualityPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRole = 'ADMIN'
     mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('/api/data-quality/fix-preview')) {
+        return Promise.resolve({ data: mockFixPreview })
+      }
       if (url.includes('/api/teams')) {
         return Promise.resolve({ data: mockTeams })
       }
@@ -86,6 +121,7 @@ describe('DataQualityPage', () => {
       }
       return Promise.reject(new Error('Unknown URL'))
     })
+    mockedAxios.post.mockResolvedValue({ data: { success: true, message: 'Done', updatedIssues: ['STORY-1'] } })
   })
 
   describe('Rendering', () => {
@@ -392,6 +428,80 @@ describe('DataQualityPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Error: Failed to load')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Fix button', () => {
+    const expandStory1 = () => {
+      const row = screen.getByText('STORY-1').closest('tr')!
+      const expanderBtn = row.querySelector('.expander-btn') as HTMLElement
+      fireEvent.click(expanderBtn)
+    }
+
+    it('shows a Fix button only for fixable violations when the role is allowed', async () => {
+      renderDataQualityPage()
+      await waitFor(() => expect(screen.getByText('STORY-1')).toBeInTheDocument())
+      expandStory1()
+
+      await waitFor(() => {
+        const fixButtons = screen.getAllByRole('button', { name: 'Fix' })
+        // Only the EPIC_NO_TEAM violation is fixable (the estimate one is not).
+        expect(fixButtons.length).toBe(1)
+      })
+    })
+
+    it('hides the Fix button for roles without permission', async () => {
+      mockRole = 'VIEWER'
+      renderDataQualityPage()
+      await waitFor(() => expect(screen.getByText('STORY-1')).toBeInTheDocument())
+      expandStory1()
+
+      await waitFor(() => {
+        expect(screen.getByText('Epic without team')).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('button', { name: 'Fix' })).not.toBeInTheDocument()
+    })
+
+    it('opens the fix modal when Fix is clicked', async () => {
+      renderDataQualityPage()
+      await waitFor(() => expect(screen.getByText('STORY-1')).toBeInTheDocument())
+      expandStory1()
+
+      const fixBtn = await screen.findByRole('button', { name: 'Fix' })
+      fireEvent.click(fixBtn)
+
+      await waitFor(() => {
+        // Modal title comes from the fetched preview
+        expect(screen.getByText('Set epic team')).toBeInTheDocument()
+      })
+    })
+
+    it('refetches the report after a successful fix (onApplied)', async () => {
+      renderDataQualityPage()
+      await waitFor(() => expect(screen.getByText('STORY-1')).toBeInTheDocument())
+      expandStory1()
+
+      const fixBtn = await screen.findByRole('button', { name: 'Fix' })
+      fireEvent.click(fixBtn)
+
+      const applyBtn = await screen.findByRole('button', { name: 'Apply' })
+      // Pick a team so the required select is satisfied
+      fireEvent.click(screen.getByText('Team', { selector: '.filter-dropdown-label' }))
+      fireEvent.click(await screen.findByText('Team A', { selector: '.filter-dropdown-item-label' }))
+      await waitFor(() => expect(applyBtn).not.toBeDisabled())
+
+      const callsBefore = mockedAxios.get.mock.calls.filter(
+        c => c[0].includes('/api/data-quality') && !c[0].includes('fix-preview'),
+      ).length
+
+      fireEvent.click(applyBtn)
+
+      await waitFor(() => {
+        const callsAfter = mockedAxios.get.mock.calls.filter(
+          c => c[0].includes('/api/data-quality') && !c[0].includes('fix-preview'),
+        ).length
+        expect(callsAfter).toBeGreaterThan(callsBefore)
+      }, { timeout: 2000 })
     })
   })
 
