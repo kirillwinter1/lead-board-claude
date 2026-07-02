@@ -16,6 +16,8 @@ export interface DataQualityViolation {
   rule: string
   severity: 'ERROR' | 'WARNING' | 'INFO'
   message: string
+  /** Human-readable rule name from the backend (F84). Falls back to `rule`. */
+  label?: string
 }
 
 export interface BoardNode {
