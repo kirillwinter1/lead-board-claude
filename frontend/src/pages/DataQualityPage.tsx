@@ -88,7 +88,13 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
         onClick={() => setExpanded(!expanded)}
       >
         <td className="cell-expand">
-          <button className="expander-btn">
+          <button
+            type="button"
+            className="expander-btn"
+            aria-label={expanded ? 'Свернуть нарушения' : 'Развернуть нарушения'}
+            aria-expanded={expanded}
+            onClick={e => { e.stopPropagation(); setExpanded(!expanded) }}
+          >
             <span className={`chevron ${expanded ? 'expanded' : ''}`}>›</span>
           </button>
         </td>
@@ -274,7 +280,7 @@ export function DataQualityPage() {
   const categoryOptions = useMemo(() => {
     if (!data) return []
     const seen = new Map<string, string>()
-    for (const r of data.rules) {
+    for (const r of (data.rules || [])) {
       if (!seen.has(r.category)) seen.set(r.category, r.categoryLabel)
     }
     return Array.from(seen.entries())
@@ -287,20 +293,31 @@ export function DataQualityPage() {
   const ruleOptions = useMemo(() => {
     if (!data) return []
     const byRule = data.summary.byRule
-    return data.rules
+    return (data.rules || [])
       .filter(r => r.name in byRule)
       .filter(r => !categoryFilter || r.category === categoryFilter)
       .map(r => ({ value: r.name, label: r.label }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [data, categoryFilter])
 
-  // Category summary: chips "CategoryLabel N" from summary.byCategory, sorted by count desc
+  // Category summary chips "CategoryLabel N". Counts are computed from the current
+  // severity filter (not the static backend byCategory total) so they stay consistent
+  // with the filtered table; independent of the selected category/rule so each chip
+  // shows its own count. Equals summary.byCategory when all severities are enabled.
   const categorySummary = useMemo(() => {
     if (!data) return []
-    return Object.entries(data.summary.byCategory || {})
+    const counts = new Map<string, number>()
+    for (const issue of data.violations) {
+      for (const v of issue.violations) {
+        if (severityFilter.has(v.severity)) {
+          counts.set(v.category, (counts.get(v.category) || 0) + 1)
+        }
+      }
+    }
+    return Array.from(counts.entries())
       .map(([code, count]) => ({ code, count, label: categoryLabelByCode[code] || code }))
       .sort((a, b) => b.count - a.count)
-  }, [data, categoryLabelByCode])
+  }, [data, severityFilter, categoryLabelByCode])
 
   const chips = useMemo(() => {
     const result: FilterChip[] = []

@@ -21,4 +21,7 @@ public interface FlagChangelogRepository extends JpaRepository<FlagChangelogEnti
 
     /** The most recent still-open flag entry (unflagged_at IS NULL) for the issue. */
     Optional<FlagChangelogEntity> findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc(String issueKey);
+
+    /** All still-open flag entries (unflagged_at IS NULL) for the given issues — batch load to avoid N+1. */
+    List<FlagChangelogEntity> findByIssueKeyInAndUnflaggedAtIsNull(List<String> issueKeys);
 }

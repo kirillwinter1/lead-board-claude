@@ -79,6 +79,26 @@ public class DataQualityService {
             List<JiraIssueEntity> children,
             StatusAge statusAge
     ) {
+        return checkEpic(epic, children, statusAge, null);
+    }
+
+    /**
+     * Checks all data quality rules for an Epic.
+     *
+     * @param epic The epic to check
+     * @param children All direct children (Stories/Bugs) of the epic
+     * @param statusAge Pre-computed time-in-status signal for this epic (may be null)
+     * @param openFlagsByEpicKey Pre-loaded map of open flag entries keyed by issue key (may be null).
+     *                           When null, the open flag is fetched per-epic; when provided, it is
+     *                           looked up in-memory to avoid the EPIC_FLAGGED_TOO_LONG N+1.
+     * @return List of violations found
+     */
+    public List<DataQualityViolation> checkEpic(
+            JiraIssueEntity epic,
+            List<JiraIssueEntity> children,
+            StatusAge statusAge,
+            Map<String, FlagChangelogEntity> openFlagsByEpicKey
+    ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
         // EPIC_NO_TEAM - Epic without team
@@ -200,10 +220,13 @@ public class DataQualityService {
         // EPIC_FLAGGED_TOO_LONG - Epic flagged (paused) for longer than the threshold
         if (Boolean.TRUE.equals(epic.getFlagged())
                 && !workflowConfigService.isDone(epic.getStatus(), epic.getIssueType())) {
-            Optional<FlagChangelogEntity> openFlag = flagChangelogRepository
-                    .findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc(epic.getIssueKey());
-            if (openFlag.isPresent() && openFlag.get().getFlaggedAt() != null) {
-                long daysFlagged = ChronoUnit.DAYS.between(openFlag.get().getFlaggedAt(), OffsetDateTime.now());
+            FlagChangelogEntity openFlag = openFlagsByEpicKey != null
+                    ? openFlagsByEpicKey.get(epic.getIssueKey())
+                    : flagChangelogRepository
+                            .findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc(epic.getIssueKey())
+                            .orElse(null);
+            if (openFlag != null && openFlag.getFlaggedAt() != null) {
+                long daysFlagged = ChronoUnit.DAYS.between(openFlag.getFlaggedAt(), OffsetDateTime.now());
                 if (daysFlagged > FLAGGED_TOO_LONG_DAYS) {
                     violations.add(DataQualityViolation.of(DataQualityRule.EPIC_FLAGGED_TOO_LONG, daysFlagged));
                 }
@@ -507,6 +530,29 @@ public class DataQualityService {
             JiraIssueEntity epic,
             StatusAge statusAge
     ) {
+        return checkSubtask(subtask, story, epic, statusAge, null);
+    }
+
+    /**
+     * Checks all data quality rules for a Subtask.
+     *
+     * @param subtask The subtask to check
+     * @param story The parent story (may be null)
+     * @param epic The grandparent epic (may be null)
+     * @param statusAge Pre-computed time-in-status signal for this subtask (may be null)
+     * @param activeTeamMemberAccountIds Pre-computed set of active member Jira account ids for the
+     *                                   epic's team (may be null). When null, membership is checked
+     *                                   per-subtask via the repository; when provided, it is checked
+     *                                   in-memory to avoid the ASSIGNEE_NOT_IN_TEAM N+1.
+     * @return List of violations found
+     */
+    public List<DataQualityViolation> checkSubtask(
+            JiraIssueEntity subtask,
+            JiraIssueEntity story,
+            JiraIssueEntity epic,
+            StatusAge statusAge,
+            Set<String> activeTeamMemberAccountIds
+    ) {
         List<DataQualityViolation> violations = new ArrayList<>();
 
         // SUBTASK_NO_ESTIMATE - Subtask without original estimate
@@ -601,16 +647,20 @@ public class DataQualityService {
 
         // ASSIGNEE_NOT_IN_TEAM - Subtask assignee is not an active member of the epic's team
         if (subtask.getAssigneeAccountId() != null
-                && epic != null && epic.getTeamId() != null
-                && !memberRepository.existsByJiraAccountIdAndTeamIdAndActiveTrue(
-                        subtask.getAssigneeAccountId(), epic.getTeamId())) {
-            String assignee = subtask.getAssigneeDisplayName() != null
-                    ? subtask.getAssigneeDisplayName()
-                    : subtask.getAssigneeAccountId();
-            violations.add(DataQualityViolation.of(
-                    DataQualityRule.ASSIGNEE_NOT_IN_TEAM,
-                    assignee
-            ));
+                && epic != null && epic.getTeamId() != null) {
+            boolean assigneeInTeam = activeTeamMemberAccountIds != null
+                    ? activeTeamMemberAccountIds.contains(subtask.getAssigneeAccountId())
+                    : memberRepository.existsByJiraAccountIdAndTeamIdAndActiveTrue(
+                            subtask.getAssigneeAccountId(), epic.getTeamId());
+            if (!assigneeInTeam) {
+                String assignee = subtask.getAssigneeDisplayName() != null
+                        ? subtask.getAssigneeDisplayName()
+                        : subtask.getAssigneeAccountId();
+                violations.add(DataQualityViolation.of(
+                        DataQualityRule.ASSIGNEE_NOT_IN_TEAM,
+                        assignee
+                ));
+            }
         }
 
         // SUBTASK_ESTIMATE_TOO_BIG - A single subtask estimated above the split threshold
@@ -696,6 +746,41 @@ public class DataQualityService {
             );
         }
         return null;
+    }
+
+    /**
+     * Batch-loads the open flag entries (unflagged_at IS NULL) for the given epic keys and returns
+     * them keyed by issue key. When several open entries exist for one key, the one with the latest
+     * flaggedAt is kept — matching {@code findFirstByIssueKeyAndUnflaggedAtIsNullOrderByFlaggedAtDesc}.
+     * Pass the result to {@link #checkEpic(JiraIssueEntity, List, StatusAge, Map)} to avoid the
+     * EPIC_FLAGGED_TOO_LONG N+1.
+     */
+    public Map<String, FlagChangelogEntity> loadOpenFlagsByEpicKey(List<String> epicKeys) {
+        if (epicKeys == null || epicKeys.isEmpty()) {
+            return Map.of();
+        }
+        return flagChangelogRepository.findByIssueKeyInAndUnflaggedAtIsNull(epicKeys).stream()
+                .filter(f -> f.getFlaggedAt() != null)
+                .collect(Collectors.toMap(
+                        FlagChangelogEntity::getIssueKey,
+                        f -> f,
+                        (a, b) -> a.getFlaggedAt().isAfter(b.getFlaggedAt()) ? a : b
+                ));
+    }
+
+    /**
+     * Returns the set of active team members' Jira account ids for the given team (nulls excluded).
+     * Pass the result to {@link #checkSubtask(JiraIssueEntity, JiraIssueEntity, JiraIssueEntity, StatusAge, Set)}
+     * to avoid the ASSIGNEE_NOT_IN_TEAM N+1.
+     */
+    public Set<String> activeTeamMemberAccountIds(Long teamId) {
+        if (teamId == null) {
+            return Set.of();
+        }
+        return memberRepository.findByTeamIdAndActiveTrue(teamId).stream()
+                .map(TeamMemberEntity::getJiraAccountId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     /**

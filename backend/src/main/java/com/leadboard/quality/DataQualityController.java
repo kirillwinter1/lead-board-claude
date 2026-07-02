@@ -2,6 +2,7 @@ package com.leadboard.quality;
 
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.metrics.entity.FlagChangelogEntity;
 import com.leadboard.quality.dto.DataQualityResponse;
 import com.leadboard.quality.dto.IssueViolations;
 import com.leadboard.status.StatusAge;
@@ -95,16 +96,30 @@ public class DataQualityController {
         Map<String, Integer> byCategory = new HashMap<>();
         Map<String, Integer> bySeverity = new HashMap<>();
 
+        // Batch-load open flags for all epics once, to avoid the EPIC_FLAGGED_TOO_LONG N+1.
+        Map<String, FlagChangelogEntity> openFlagsByEpicKey = dataQualityService.loadOpenFlagsByEpicKey(
+                epics.stream().map(JiraIssueEntity::getIssueKey).toList());
+
+        // Cache active-member account-id sets per team, to avoid the ASSIGNEE_NOT_IN_TEAM N+1
+        // (one query per team instead of one per subtask).
+        Map<Long, Set<String>> teamMembersCache = new HashMap<>();
+
         // Check epics
         for (JiraIssueEntity epic : epics) {
             List<JiraIssueEntity> children = childrenByParent.getOrDefault(epic.getIssueKey(), List.of());
             List<DataQualityViolation> violations = dataQualityService.checkEpic(
-                    epic, children, statusAges.get(epic.getIssueKey()));
+                    epic, children, statusAges.get(epic.getIssueKey()), openFlagsByEpicKey);
 
             if (!violations.isEmpty()) {
                 allViolations.add(toIssueViolations(epic, baseUrl, violations));
                 countViolations(violations, byRule, byCategory, bySeverity);
             }
+
+            // Active members of this epic's team — reused for every subtask under the epic.
+            Set<String> teamMembers = epic.getTeamId() == null
+                    ? Set.of()
+                    : teamMembersCache.computeIfAbsent(
+                            epic.getTeamId(), dataQualityService::activeTeamMemberAccountIds);
 
             // Check children of this epic
             for (JiraIssueEntity child : children) {
@@ -122,7 +137,7 @@ public class DataQualityController {
                 // Check subtasks
                 for (JiraIssueEntity subtask : childSubtasks) {
                     List<DataQualityViolation> subtaskViolations = dataQualityService.checkSubtask(
-                            subtask, child, epic, statusAges.get(subtask.getIssueKey()));
+                            subtask, child, epic, statusAges.get(subtask.getIssueKey()), teamMembers);
 
                     if (!subtaskViolations.isEmpty()) {
                         allViolations.add(toIssueViolations(subtask, baseUrl, subtaskViolations));
