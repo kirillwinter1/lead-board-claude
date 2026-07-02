@@ -70,3 +70,14 @@ export async function updateStoryOrder(
   )
   return response.data
 }
+
+export interface EpicDetail {
+  issueKey: string
+  summary: string
+  description: string | null
+}
+
+export async function getEpicDetail(epicKey: string, signal?: AbortSignal): Promise<EpicDetail> {
+  const response = await axios.get<EpicDetail>(`/api/epics/${epicKey}/detail`, { signal })
+  return response.data
+}
