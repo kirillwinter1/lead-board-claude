@@ -498,22 +498,26 @@ export function ProjectsPage() {
   // Filter handlers
   const handlePMToggle = (pm: string) => {
     const next = new Set(selectedPMs)
-    next.has(pm) ? next.delete(pm) : next.add(pm)
+    if (next.has(pm)) next.delete(pm)
+    else next.add(pm)
     updateParam('pm', next.size > 0 ? Array.from(next).join(',') : null)
   }
   const handleStatusToggle = (status: string) => {
     const next = new Set(selectedStatuses)
-    next.has(status) ? next.delete(status) : next.add(status)
+    if (next.has(status)) next.delete(status)
+    else next.add(status)
     updateParam('status', next.size > 0 ? Array.from(next).join(',') : null)
   }
   const handleTeamToggle = (team: string) => {
     const next = new Set(selectedTeams)
-    next.has(team) ? next.delete(team) : next.add(team)
+    if (next.has(team)) next.delete(team)
+    else next.add(team)
     updateParam('team', next.size > 0 ? Array.from(next).join(',') : null)
   }
   const handleQuarterToggle = (quarter: string) => {
     const next = new Set(selectedQuarters)
-    next.has(quarter) ? next.delete(quarter) : next.add(quarter)
+    if (next.has(quarter)) next.delete(quarter)
+    else next.add(quarter)
     updateParam('quarter', next.size > 0 ? Array.from(next).join(',') : null)
   }
   const clearFilters = () => {

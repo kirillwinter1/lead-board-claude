@@ -54,6 +54,9 @@ public record PlanningConfigDto(
             Map<String, Integer> roleLimits  // Рекомендуемые лимиты по ролям (ключ = код роли)
     ) {
         public static WipLimits defaults() {
+            // Hardcoded last resort: used only when workflowConfigService.getRoleCodesInPipelineOrder()
+            // comes back empty (no roles configured yet). SA/DEV/QA is a reasonable starting guess,
+            // not a real role list — never assume these codes exist elsewhere in business logic.
             return defaults(List.of("SA", "DEV", "QA"));
         }
 
@@ -61,6 +64,9 @@ public record PlanningConfigDto(
             Map<String, Integer> roles = new LinkedHashMap<>();
             int total = 0;
             for (String code : roleCodes) {
+                // Hardcoded last resort: DEV usually has more parallel WIP than other roles, so it
+                // gets a slightly higher recommended limit. Purely a heuristic default for display —
+                // WIP limits don't affect the planning algorithm itself (see class javadoc above).
                 int limit = "DEV".equals(code) ? 3 : 2;
                 roles.put(code, limit);
                 total += limit;
@@ -78,6 +84,8 @@ public record PlanningConfigDto(
             Map<String, BigDecimal> roleDurations  // Длительность по ролям (ключ = код роли)
     ) {
         public static StoryDuration defaults() {
+            // Hardcoded last resort: same fallback as WipLimits.defaults() above — only reached
+            // when workflowConfigService.getRoleCodesInPipelineOrder() is empty.
             return defaults(List.of("SA", "DEV", "QA"));
         }
 

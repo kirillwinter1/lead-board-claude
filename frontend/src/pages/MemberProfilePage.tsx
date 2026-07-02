@@ -153,8 +153,9 @@ export function MemberProfilePage() {
     try {
       const result = await teamsApi.getMemberProfile(Number(teamId), Number(memberId), from, to)
       setData(result)
-    } catch (e: any) {
-      setError(e.response?.data?.error || e.message || 'Ошибка загрузки профиля')
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { error?: string } }; message?: string }
+      setError(axiosErr.response?.data?.error || axiosErr.message || 'Ошибка загрузки профиля')
     } finally {
       setLoading(false)
     }

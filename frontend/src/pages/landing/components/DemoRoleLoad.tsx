@@ -117,8 +117,8 @@ export function DemoRoleLoad() {
       </div>
 
       <div className="demo-role-load-alerts">
-        {mockAlerts.map((alert, index) => (
-          <AlertBadge key={index} alert={alert} />
+        {mockAlerts.map(alert => (
+          <AlertBadge key={`${alert.type}-${alert.message}`} alert={alert} />
         ))}
       </div>
     </div>

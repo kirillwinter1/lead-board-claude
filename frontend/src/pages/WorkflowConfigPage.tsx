@@ -152,6 +152,12 @@ function StatusColorPicker({ value, onChange }: { value: string; onChange: (colo
 }
 
 // --- Auto-suggest functions ---
+//
+// Design-system note: the 'SA'/'DEV'/'QA' literals below are NOT hardcoded business logic —
+// this page IS the source of truth for role configuration. They are seed defaults offered by
+// the setup wizard when auto-suggesting a starting config from Jira metadata; the user can
+// rename/remove/add roles freely afterwards, and runtime code reads roles from this config
+// via WorkflowConfigService, never from these literals.
 
 function guessRoleFromSubtaskName(name: string): string {
   const lower = name.toLowerCase()
@@ -191,12 +197,15 @@ function suggestRolesFromIssueTypes(suggestedTypes: IssueTypeMappingDto[]): Work
     }
   })
 
+  // Seed defaults for the setup wizard only (display name/color/order for a fresh config) —
+  // not a runtime role registry. See note at top of "Auto-suggest functions".
   const roleDefaults: Record<string, { displayName: string; color: string; order: number; isDefault: boolean }> = {
     SA: { displayName: 'System Analysis', color: '#1868DB', order: 1, isDefault: false },
     DEV: { displayName: 'Development', color: '#1F845A', order: 2, isDefault: true },
     QA: { displayName: 'Quality Assurance', color: '#227D9B', order: 3, isDefault: false },
   }
 
+  // No subtask types mapped to a role yet — fall back to the standard SA/DEV/QA starter set.
   if (roleSet.size === 0) {
     roleSet.add('SA')
     roleSet.add('DEV')
@@ -312,6 +321,8 @@ function suggestStatuses(
               statusCategory = 'IN_PROGRESS'
             }
           } else {
+            // Seed guess of a subtask status's role by name, offered as a wizard suggestion —
+            // not a runtime role lookup. See note at top of "Auto-suggest functions".
             if (lower.includes('analy') || lower.includes('анализ') || lower.includes('requirement') || lower.includes('требовани')) {
               workflowRoleCode = 'SA'
             } else if (lower.includes('develop') || lower.includes('разработ') || lower.includes('coding') || lower.includes('implement')) {

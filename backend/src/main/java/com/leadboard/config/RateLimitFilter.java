@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * - OAuth/auth: 20 req/min per IP
  * - Sync trigger: 5 req/min per IP
  * - Public registration: 10 req/min per IP
+ * - Audit request form (public landing page lead form): 10 req/min per IP
  * - General API: 200 req/min per IP
  */
 @Component
@@ -43,6 +44,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int OAUTH_LIMIT = 20;
     private static final int SYNC_LIMIT = 5;
     private static final int REGISTRATION_LIMIT = 10;
+    private static final int AUDIT_REQUEST_LIMIT = 10;
     private static final int CHAT_LIMIT = 30;
     private static final int METRICS_LIMIT = 600;
     private static final int MCP_LIMIT = 60;
@@ -107,6 +109,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/public/tenants/register")) {
             return REGISTRATION_LIMIT;
         }
+        if (path.startsWith("/api/audit-requests")) {
+            return AUDIT_REQUEST_LIMIT;
+        }
         if (path.startsWith("/api/chat/message")) {
             return CHAT_LIMIT;
         }
@@ -128,6 +133,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         if (path.startsWith("/api/public/tenants/register")) {
             return "register";
+        }
+        if (path.startsWith("/api/audit-requests")) {
+            return "audit-request";
         }
         if (path.startsWith("/api/chat/message")) {
             return "chat";

@@ -71,8 +71,8 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
 
       {data.alerts.length > 0 && (
         <div className="role-load-alerts">
-          {data.alerts.map((alert, index) => (
-            <AlertBadge key={index} alert={alert} />
+          {data.alerts.map(alert => (
+            <AlertBadge key={`${alert.type}-${alert.role ?? 'none'}-${alert.message}`} alert={alert} />
           ))}
         </div>
       )}

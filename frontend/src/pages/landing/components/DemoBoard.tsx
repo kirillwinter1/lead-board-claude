@@ -1,5 +1,8 @@
 import { useState, Fragment, useEffect, useRef } from 'react'
 import { mockEpics, DemoEpic, DemoStory } from '../mockData'
+// Design-system exception: this is a static marketing mock rendered outside any tenant,
+// so there is no WorkflowConfigContext / Jira metadata to resolve icons from. getIssueIcon()
+// requires that context, hence the direct local icon imports here.
 import epicIcon from '../../../icons/epic.png'
 import storyIcon from '../../../icons/story.png'
 import cursorHandIcon from '../../../icons/cursor-hand.png'
