@@ -1,10 +1,12 @@
+import { BG_SUBTLE } from '../../constants/colors'
+
 export function RiceScoreBadge({ score, normalized }: { score: number | null; normalized?: number | null }) {
   if (score == null) {
     return (
       <span style={{
         fontSize: 11,
         color: '#97A0AF',
-        background: '#F4F5F7',
+        background: BG_SUBTLE,
         padding: '2px 6px',
         borderRadius: 3,
         fontWeight: 500,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { getRoughEstimateConfig, updateRoughEstimate } from '../api/epics'
 import type { BoardNode, BoardResponse, SyncStatus, RoughEstimateConfig } from '../components/board/types'
@@ -14,21 +14,33 @@ export function useBoardData(includeArchived: boolean = false) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [roughEstimateConfig, setRoughEstimateConfig] = useState<RoughEstimateConfig | null>(null)
+  // fetchBoard can be triggered concurrently (mount effect, includeArchived toggle, manual
+  // refresh after drag/estimate updates, post-sync refresh) — abort the previous in-flight
+  // request so an out-of-order response can't overwrite fresher data.
+  const abortRef = useRef<AbortController | null>(null)
 
   const fetchBoard = useCallback(async (silent = false) => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     if (!silent) setLoading(true)
     try {
       const response = await axios.get<BoardResponse>('/api/board', {
         params: { includeDQ: true, includeArchived },
+        signal: controller.signal,
       })
+      if (controller.signal.aborted) return
       setBoard(response.data.items)
       setApiCache(buildBoardCacheKey(includeArchived), response.data.items)
     } catch (err: unknown) {
+      if (controller.signal.aborted) return
       if (!silent) setError(err instanceof Error ? err.message : 'Failed to load board')
     } finally {
-      if (!silent) setLoading(false)
+      if (!controller.signal.aborted && !silent) setLoading(false)
     }
   }, [includeArchived])
+
+  useEffect(() => () => abortRef.current?.abort(), [])
 
   const fetchRoughEstimateConfig = useCallback(() => {
     getRoughEstimateConfig()

@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { getStatusHistory, formatDuration, type StatusHistory } from '../api/statusHistory'
 import { StatusBadge } from './board/StatusBadge'
+import { ERROR_TEXT } from '../constants/colors'
 
 interface StatusHistoryTooltipProps {
   issueKey: string
@@ -94,7 +95,7 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
           <div style={{ fontWeight: 600, color: '#172b4d', marginBottom: 8 }}>Путь по статусам</div>
 
           {loading && <div style={{ color: '#6b778c' }}>Загрузка…</div>}
-          {error && <div style={{ color: '#de350b' }}>Не удалось загрузить</div>}
+          {error && <div style={{ color: ERROR_TEXT }}>Не удалось загрузить</div>}
 
           {history && !loading && (
             <>

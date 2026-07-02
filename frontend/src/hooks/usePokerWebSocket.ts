@@ -40,10 +40,13 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const intentionalCloseRef = useRef(false)
 
   const connect = useCallback(() => {
     if (!roomCode) return
     if (wsRef.current?.readyState === WebSocket.OPEN) return
+
+    intentionalCloseRef.current = false
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${protocol}//${window.location.host}/ws/poker/${roomCode}`
@@ -67,6 +70,7 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
 
     ws.onclose = () => {
       setConnected(false)
+      if (intentionalCloseRef.current) return
       // Try to reconnect after 3 seconds
       reconnectTimeoutRef.current = setTimeout(() => {
         connect()
@@ -137,6 +141,7 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
+      intentionalCloseRef.current = true
       wsRef.current?.close()
     }
   }, [connect])

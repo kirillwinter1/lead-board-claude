@@ -72,6 +72,11 @@ public class SecurityConfig {
                 // Chat status (public - widget needs to know if chat is enabled)
                 .requestMatchers("/api/chat/status").permitAll()
 
+                // Audit request form (public - landing page lead form, submitted by
+                // anonymous visitors before they have any account). Rate limited
+                // separately, see RateLimitFilter#AUDIT_REQUEST_LIMIT.
+                .requestMatchers(HttpMethod.POST, "/api/audit-requests").permitAll()
+
                 // WebSocket endpoint for Poker
                 .requestMatchers("/ws/**").permitAll()
 

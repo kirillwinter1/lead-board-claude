@@ -65,6 +65,34 @@ public class JiraClient {
                 .build();
     }
 
+    /**
+     * Builds the "Bearer &lt;token&gt;" Authorization header value used by every
+     * OAuth-backed request in this client.
+     */
+    private static String bearerAuthHeaderValue(String accessToken) {
+        return "Bearer " + accessToken;
+    }
+
+    /**
+     * Builds the "Basic base64(email:token)" Authorization header value from the
+     * currently configured Jira credentials (see {@link JiraConfigResolver}) — the
+     * fallback used whenever OAuth is unavailable. Extracted because the "get OAuth
+     * access token, else build a Basic Auth header" pattern was duplicated across
+     * ~10 call sites in this client.
+     */
+    private String basicAuthHeaderValue() {
+        return basicAuthHeaderValue(configResolver.getEmail(), configResolver.getApiToken());
+    }
+
+    /**
+     * Same as {@link #basicAuthHeaderValue()} but for credentials that haven't been
+     * saved via {@link JiraConfigResolver} yet (e.g. {@link #testConnection}).
+     */
+    private static String basicAuthHeaderValue(String email, String apiToken) {
+        String auth = email + ":" + apiToken;
+        return "Basic " + Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
+    }
+
     public JiraSearchResponse search(String jql, int startAt, int maxResults) {
         return search(jql, maxResults, null);
     }
@@ -122,7 +150,7 @@ public class JiraClient {
                         }
                         return uriBuilder.build();
                 })
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .retrieve()
                 .bodyToMono(JiraSearchResponse.class)
                 .block();
@@ -132,9 +160,6 @@ public class JiraClient {
         if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
             throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
         }
-
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
 
         return webClient.get()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/search/jql", uriBuilder -> {
@@ -146,7 +171,7 @@ public class JiraClient {
                         }
                         return uriBuilder.build();
                 })
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .retrieve()
                 .bodyToMono(JiraSearchResponse.class)
                 .block();
@@ -204,7 +229,7 @@ public class JiraClient {
         try {
             Map<String, Object> response = webClient.post()
                     .uri(baseUrl + "/rest/api/3/issue")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(Map.class)
@@ -218,12 +243,9 @@ public class JiraClient {
     }
 
     private String createIssueWithBasicAuth(Map<String, Object> body) {
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         Map<String, Object> response = webClient.post()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .bodyValue(body)
                 .retrieve()
                 .bodyToMono(Map.class)
@@ -366,7 +388,7 @@ public class JiraClient {
 
         webClient.put()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .bodyValue(body)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
@@ -376,12 +398,9 @@ public class JiraClient {
     }
 
     private void updateIssueWithBasicAuth(String issueKey, Map<String, Object> body) {
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         webClient.put()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey)
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .bodyValue(body)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
@@ -424,7 +443,7 @@ public class JiraClient {
 
         Map<String, Object> response = webClient.get()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/transitions")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .retrieve()
                 .bodyToMono(Map.class)
                 .block();
@@ -448,7 +467,7 @@ public class JiraClient {
 
         webClient.post()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/transitions?notifyUsers=false")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .bodyValue(Map.of("transition", Map.of("id", transitionId)))
                 .retrieve()
                 .toBodilessEntity()
@@ -466,7 +485,7 @@ public class JiraClient {
 
         webClient.post()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .bodyValue(Map.of(
                         "timeSpentSeconds", timeSpentSeconds,
                         "started", started
@@ -494,7 +513,7 @@ public class JiraClient {
 
         webClient.post()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/comment")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .bodyValue(Map.of("body", adf))
                 .retrieve()
                 .toBodilessEntity()
@@ -513,7 +532,7 @@ public class JiraClient {
 
         webClient.put()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/assignee?notifyUsers=false")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .bodyValue(body)
                 .retrieve()
                 .toBodilessEntity()
@@ -529,12 +548,9 @@ public class JiraClient {
      */
     @SuppressWarnings("unchecked")
     public List<JiraTransition> getTransitionsBasicAuth(String issueKey) {
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         Map<String, Object> response = webClient.get()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .retrieve()
                 .bodyToMono(Map.class)
                 .block();
@@ -554,12 +570,9 @@ public class JiraClient {
      * Transition an issue using Basic Auth (system API token).
      */
     public void transitionIssueBasicAuth(String issueKey, String transitionId) {
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         webClient.post()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/transitions?notifyUsers=false")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .bodyValue(Map.of("transition", Map.of("id", transitionId)))
                 .retrieve()
                 .toBodilessEntity()
@@ -570,12 +583,9 @@ public class JiraClient {
      * Assign an issue to a user using Basic Auth (system API token).
      */
     public void assignIssueBasicAuth(String issueKey, String accountId) {
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         webClient.put()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/assignee?notifyUsers=false")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .bodyValue(Map.of("accountId", accountId))
                 .retrieve()
                 .toBodilessEntity()
@@ -586,14 +596,11 @@ public class JiraClient {
      * Add a worklog using Basic Auth (system API token).
      */
     public void addWorklogBasicAuth(String issueKey, int timeSpentSeconds, LocalDate date) {
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
 
         webClient.post()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .bodyValue(Map.of(
                         "timeSpentSeconds", timeSpentSeconds,
                         "started", started
@@ -623,7 +630,7 @@ public class JiraClient {
 
         JiraChangelogResponse response = webClient.get()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "?expand=changelog&fields=status")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.class)
                 .block();
@@ -657,7 +664,7 @@ public class JiraClient {
 
         return webClient.get()
                 .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.PaginatedChangelog.class)
                 .block();
@@ -668,12 +675,9 @@ public class JiraClient {
             throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
         }
 
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-
         JiraChangelogResponse response = webClient.get()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "?expand=changelog&fields=status")
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.class)
                 .block();
@@ -689,7 +693,7 @@ public class JiraClient {
         if (changelog.getTotal() > changelog.getMaxResults()) {
             int startAt = changelog.getMaxResults();
             while (startAt < changelog.getTotal()) {
-                var page = fetchChangelogPageBasicAuth(issueKey, startAt, encodedAuth);
+                var page = fetchChangelogPageBasicAuth(issueKey, startAt);
                 if (page == null || page.getValues() == null || page.getValues().isEmpty()) break;
                 allHistories.addAll(page.getValues());
                 if (page.isLast()) break;
@@ -701,10 +705,10 @@ public class JiraClient {
     }
 
     private JiraChangelogResponse.PaginatedChangelog fetchChangelogPageBasicAuth(
-            String issueKey, int startAt, String encodedAuth) {
+            String issueKey, int startAt) {
         return webClient.get()
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/changelog?startAt=" + startAt)
-                .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .retrieve()
                 .bodyToMono(JiraChangelogResponse.PaginatedChangelog.class)
                 .block();
@@ -728,18 +732,16 @@ public class JiraClient {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
         return fetchWorklogsPaginated(issueKey,
                 baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog",
-                "Bearer " + accessToken);
+                bearerAuthHeaderValue(accessToken));
     }
 
     private List<JiraWorklogResponse.WorklogEntry> fetchWorklogsWithBasicAuth(String issueKey) {
         if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
             throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
         }
-        String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-        String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
         return fetchWorklogsPaginated(issueKey,
                 configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey + "/worklog",
-                "Basic " + encodedAuth);
+                basicAuthHeaderValue());
     }
 
     private List<JiraWorklogResponse.WorklogEntry> fetchWorklogsPaginated(
@@ -784,16 +786,14 @@ public class JiraClient {
             String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
             components = webClient.get()
                     .uri(baseUrl + "/rest/api/3/project/" + projectKey + "/components")
-                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                     .retrieve()
                     .bodyToMono(List.class)
                     .block();
         } else {
-            String auth = configResolver.getEmail() + ":" + configResolver.getApiToken();
-            String encodedAuth = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
             components = webClient.get()
                     .uri(configResolver.getBaseUrl() + "/rest/api/3/project/" + projectKey + "/components")
-                    .header(HttpHeaders.AUTHORIZATION, "Basic " + encodedAuth)
+                    .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                     .retrieve()
                     .bodyToMono(List.class)
                     .block();
@@ -804,6 +804,51 @@ public class JiraClient {
                 .map(c -> (String) c.get("name"))
                 .filter(name -> name != null && !name.isEmpty())
                 .toList();
+    }
+
+    /**
+     * Verifies Jira credentials that have not been saved yet (e.g. the tenant Jira
+     * config setup wizard), so they can't be resolved via {@link JiraConfigResolver}.
+     * Credentials are passed explicitly and used for a single Basic Auth request.
+     */
+    public String testConnection(String baseUrl, String email, String apiToken) {
+        return webClient.get()
+                .uri(baseUrl + "/rest/api/3/myself")
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue(email, apiToken))
+                .retrieve()
+                .bodyToMono(String.class)
+                .block(Duration.ofSeconds(10));
+    }
+
+    /**
+     * Generic GET against the Jira REST API, using this client's usual OAuth-first
+     * (falling back to Basic Auth) auth logic. Intended for callers that only need
+     * a raw response shape (e.g. metadata lookups) rather than a typed DTO.
+     */
+    public <T> T getRaw(String path, Class<T> responseType) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        if (accessToken != null && cloudId != null) {
+            String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+            return webClient.get()
+                    .uri(baseUrl + path)
+                    .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
+                    .retrieve()
+                    .bodyToMono(responseType)
+                    .block();
+        }
+
+        if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
+            throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
+        }
+
+        return webClient.get()
+                .uri(configResolver.getBaseUrl() + path)
+                .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
+                .retrieve()
+                .bodyToMono(responseType)
+                .block();
     }
 
     private String formatTimeEstimate(int seconds) {

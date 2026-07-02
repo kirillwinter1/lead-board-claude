@@ -141,13 +141,26 @@ export const STATUS_AGE_COLORS: Record<'NORMAL' | 'WARNING' | 'CRITICAL', { bg: 
   CRITICAL: { bg: '#FFEBE6', fg: '#bf2600' },
 }
 
+// Helper: parse a hex color (#RRGGBB) into its RGB components — shared by lightenColor/hexToRgba
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  return {
+    r: parseInt(hex.slice(1, 3), 16),
+    g: parseInt(hex.slice(3, 5), 16),
+    b: parseInt(hex.slice(5, 7), 16),
+  }
+}
+
 // Helper: lighten a hex color by a factor (0 = original, 1 = white)
 export function lightenColor(hex: string, factor: number): string {
-  const r = parseInt(hex.slice(1, 3), 16)
-  const g = parseInt(hex.slice(3, 5), 16)
-  const b = parseInt(hex.slice(5, 7), 16)
+  const { r, g, b } = hexToRgb(hex)
   const lr = Math.round(r + (255 - r) * factor)
   const lg = Math.round(g + (255 - g) * factor)
   const lb = Math.round(b + (255 - b) * factor)
   return `#${lr.toString(16).padStart(2, '0')}${lg.toString(16).padStart(2, '0')}${lb.toString(16).padStart(2, '0')}`
+}
+
+// Helper: convert a hex color to an rgba() string with the given alpha (0-1)
+export function hexToRgba(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

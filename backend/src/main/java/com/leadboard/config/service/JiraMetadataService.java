@@ -1,18 +1,15 @@
 package com.leadboard.config.service;
 
-import com.leadboard.auth.OAuthService;
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.entity.TrackerMetadataCacheEntity;
 import com.leadboard.config.repository.TrackerMetadataCacheRepository;
+import com.leadboard.jira.JiraClient;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
-import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.*;
 
@@ -24,24 +21,20 @@ import java.util.*;
 public class JiraMetadataService {
 
     private static final Logger log = LoggerFactory.getLogger(JiraMetadataService.class);
-    private static final String ATLASSIAN_API_BASE = "https://api.atlassian.com";
 
     private final JiraConfigResolver jiraConfigResolver;
-    private final OAuthService oauthService;
-    private final WebClient webClient;
+    private final JiraClient jiraClient;
     private final TrackerMetadataCacheRepository cacheRepo;
     private final ObjectMapper objectMapper;
 
     public JiraMetadataService(
             JiraConfigResolver jiraConfigResolver,
-            OAuthService oauthService,
-            WebClient.Builder webClientBuilder,
+            JiraClient jiraClient,
             TrackerMetadataCacheRepository cacheRepo,
             ObjectMapper objectMapper
     ) {
         this.jiraConfigResolver = jiraConfigResolver;
-        this.oauthService = oauthService;
-        this.webClient = webClientBuilder.build();
+        this.jiraClient = jiraClient;
         this.cacheRepo = cacheRepo;
         this.objectMapper = objectMapper;
     }
@@ -330,62 +323,12 @@ public class JiraMetadataService {
 
     @SuppressWarnings("unchecked")
     private Map<String, Object> callJiraApi(String path) {
-        String url = buildUrl(path);
-        HttpHeaders headers = buildAuthHeaders();
-
-        return webClient.get()
-                .uri(url)
-                .headers(h -> h.addAll(headers))
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block();
+        return jiraClient.getRaw(path, Map.class);
     }
 
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> callJiraApiList(String path) {
-        String url = buildUrl(path);
-        HttpHeaders headers = buildAuthHeaders();
-
-        return webClient.get()
-                .uri(url)
-                .headers(h -> h.addAll(headers))
-                .retrieve()
-                .bodyToMono(List.class)
-                .block();
-    }
-
-    private String buildUrl(String path) {
-        try {
-            String accessToken = oauthService.getValidAccessToken();
-            if (accessToken != null) {
-                String cloudId = oauthService.getCloudIdForCurrentUser();
-                return ATLASSIAN_API_BASE + "/ex/jira/" + cloudId + path;
-            }
-        } catch (Exception e) {
-            // Fall through to basic auth
-        }
-
-        // Basic auth fallback
-        return jiraConfigResolver.getBaseUrl() + path;
-    }
-
-    private HttpHeaders buildAuthHeaders() {
-        HttpHeaders headers = new HttpHeaders();
-        try {
-            String accessToken = oauthService.getValidAccessToken();
-            if (accessToken != null) {
-                headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken);
-                return headers;
-            }
-        } catch (Exception e) {
-            // Fall through to basic auth
-        }
-
-        // Basic auth
-        String auth = jiraConfigResolver.getEmail() + ":" + jiraConfigResolver.getApiToken();
-        String encoded = Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8));
-        headers.set(HttpHeaders.AUTHORIZATION, "Basic " + encoded);
-        return headers;
+        return jiraClient.getRaw(path, List.class);
     }
 
     private String getCachedValue(String key, int ttlMinutes) {

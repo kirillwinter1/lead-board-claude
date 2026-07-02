@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Modal } from './Modal'
 import { Absence, AbsenceType, CreateAbsenceRequest } from '../api/teams'
+import { ERROR_BG, ERROR_TEXT } from '../constants/colors'
 
 const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
   VACATION: 'Vacation',
@@ -89,7 +90,7 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
     <Modal isOpen={isOpen} onClose={onClose} title={absence ? 'Edit Absence' : 'Add Absence'}>
       <form onSubmit={handleSubmit} className="modal-form">
         {error && (
-          <div style={{ color: '#de350b', fontSize: 13, marginBottom: 12, padding: '8px 12px', background: '#ffebe6', borderRadius: 4 }}>
+          <div style={{ color: ERROR_TEXT, fontSize: 13, marginBottom: 12, padding: '8px 12px', background: ERROR_BG, borderRadius: 4 }}>
             {error}
           </div>
         )}

@@ -110,11 +110,10 @@ export function DesiredQuarterPicker({
       if (latestTargetRef.current !== target) return
       setError(err instanceof Error ? err.message : 'Не удалось сохранить квартал')
     } finally {
-      if (cancelledRef.current) return
       // Only the most recent request should clear the saving indicator;
       // older overlapping requests would otherwise hide the spinner while
       // a newer save is still in flight.
-      if (latestTargetRef.current === target) {
+      if (!cancelledRef.current && latestTargetRef.current === target) {
         setSaving(false)
       }
     }

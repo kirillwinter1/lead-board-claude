@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { mockTimelineData, TimelineStory } from '../mockData'
+// Design-system exception: static marketing mock rendered outside any tenant, so there is
+// no WorkflowConfigContext / Jira metadata for getIssueIcon() to resolve icons from. Direct
+// local icon imports are intentional here.
 import epicIcon from '../../../icons/epic.png'
 import storyIcon from '../../../icons/story.png'
 

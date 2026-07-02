@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { riceApi, RiceTemplate, RiceTemplateListItem, RiceAssessment, RiceAssessmentRequest, AssessmentAnswerEntry, RiceCriteria } from '../../api/rice'
+import { BG_SUBTLE, INFO_BG } from '../../constants/colors'
 
 interface RiceFormProps {
   issueKey: string
@@ -238,7 +239,7 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
                             cursor: 'pointer',
                             padding: '3px 8px',
                             borderRadius: 3,
-                            background: isSelected ? '#DEEBFF' : '#F4F5F7',
+                            background: isSelected ? INFO_BG : BG_SUBTLE,
                             border: isSelected ? '1px solid #B3D4FF' : '1px solid transparent',
                             transition: 'all 0.1s',
                           }}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { WorkflowConfigPage } from './WorkflowConfigPage'
+import { BG_SUBTLE } from '../constants/colors'
 import './SetupWizardPage.css'
 
 interface SetupWizardPageProps {
@@ -365,7 +366,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
             {jiraIssueTypes.map(t => (
               <span key={t.name} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '4px 10px', background: '#F4F5F7', borderRadius: 12,
+                padding: '4px 10px', background: BG_SUBTLE, borderRadius: 12,
                 fontSize: 13, color: '#42526E'
               }}>
                 {t.iconUrl && <img src={t.iconUrl} alt="" style={{ width: 16, height: 16 }} />}

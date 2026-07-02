@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+// Design-system exception: brand logo asset for the static marketing landing page, not an
+// issue-type icon — outside the scope of getIssueIcon()/WorkflowConfigContext, and there is
+// no tenant context on this page anyway.
 import logoIcon from '../../../icons/logo.png'
 
 interface LandingHeaderProps {

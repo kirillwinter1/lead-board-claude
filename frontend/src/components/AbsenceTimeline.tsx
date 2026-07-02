@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { teamsApi, Absence, TeamMember, CreateAbsenceRequest } from '../api/teams'
 import { AbsenceModal, ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from './AbsenceModal'
+import { ERROR_BG, ERROR_TEXT } from '../constants/colors'
 import './AbsenceTimeline.css'
 
 const DAY_WIDTH = 32
@@ -366,7 +367,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
 
       {loading && <div className="absence-loading">Loading...</div>}
       {fetchError && (
-        <div style={{ marginTop: 8, padding: '8px 12px', background: '#ffebe6', color: '#de350b', borderRadius: 4, fontSize: 13 }}>
+        <div style={{ marginTop: 8, padding: '8px 12px', background: ERROR_BG, color: ERROR_TEXT, borderRadius: 4, fontSize: 13 }}>
           {fetchError}
         </div>
       )}

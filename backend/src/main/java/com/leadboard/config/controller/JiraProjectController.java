@@ -1,7 +1,9 @@
 package com.leadboard.config.controller;
 
+import com.leadboard.config.dto.JiraProjectUpdateRequest;
 import com.leadboard.config.entity.JiraProjectEntity;
 import com.leadboard.config.service.JiraProjectService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -41,12 +43,10 @@ public class JiraProjectController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
-        String displayName = body.get("displayName") != null ? body.get("displayName").toString() : null;
-        Boolean active = body.get("active") instanceof Boolean b ? b : null;
-        Boolean syncEnabled = body.get("syncEnabled") instanceof Boolean b2 ? b2 : null;
+    public ResponseEntity<?> update(@PathVariable Long id, @Valid @RequestBody JiraProjectUpdateRequest request) {
         try {
-            JiraProjectEntity entity = jiraProjectService.update(id, displayName, active, syncEnabled);
+            JiraProjectEntity entity = jiraProjectService.update(
+                    id, request.displayName(), request.active(), request.syncEnabled());
             return ResponseEntity.ok(entity);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

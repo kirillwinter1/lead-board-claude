@@ -178,6 +178,7 @@ export function BoardPage() {
   }
 
   const filteredEpicKeys = useMemo(() => new Set(filteredBoard.map(epic => epic.issueKey)), [filteredBoard])
+  const epicTitles = useMemo(() => board.map(e => e.title), [board])
 
   return (
     <StatusStylesProvider value={statusStyles}>
@@ -221,7 +222,7 @@ export function BoardPage() {
             includeArchived={includeArchived}
             onHideNewToggle={() => setHideNew(v => !v)}
             onIncludeArchivedToggle={() => setIncludeArchived(v => !v)}
-            epicTitles={useMemo(() => board.map(e => e.title), [board])}
+            epicTitles={epicTitles}
           />
         </div>
 
