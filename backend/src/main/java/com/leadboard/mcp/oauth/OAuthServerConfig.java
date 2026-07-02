@@ -170,19 +170,40 @@ public class OAuthServerConfig {
                             .refreshTokenTimeToLive(Duration.ofDays(30))
                             .build());
 
-            if (props.getClientSecret() != null && !props.getClientSecret().isBlank()) {
-                // claude.ai может слать секрет и в заголовке (basic), и в теле (post) — принимаем оба.
-                // Плюс NONE для public-client + PKCE (если секрет не передан).
-                b.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
-                        .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
-                        .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
-                        .clientSecret("{noop}" + props.getClientSecret());
-            } else {
-                b.clientAuthenticationMethod(ClientAuthenticationMethod.NONE); // public client
-            }
+            boolean hasSecret = applyClientAuthenticationMethods(b, props.getClientSecret());
             repo.save(b.build());
-            log.info("Registered/updated OAuth client '{}' for MCP (basic+post+none auth)", props.getClientId());
+            log.info("Registered/updated OAuth client '{}' for MCP ({} auth)", props.getClientId(),
+                    hasSecret ? "basic+post" : "none/PKCE public-client");
         };
+    }
+
+    /**
+     * Sets the client-authentication method(s) on the builder based on whether a client
+     * secret is configured. Extracted as a static, side-effect-free method for unit testing
+     * without booting the OAuth authorization server.
+     *
+     * <p>SECURITY_AUDIT.md §14: {@link ClientAuthenticationMethod#NONE} must NOT be
+     * registered alongside {@code CLIENT_SECRET_BASIC}/{@code CLIENT_SECRET_POST} — doing so
+     * makes a configured secret effectively optional (any request presenting no credentials
+     * would still authenticate). When a secret IS configured, only secret-based methods are
+     * registered. When no secret is configured (public client), {@code NONE} is registered —
+     * PKCE (mandatory via {@code requireProofKey(true)}) is the sole client-auth guarantee
+     * in that case.</p>
+     *
+     * @return true if a non-blank secret was applied (basic+post), false if the client was
+     *         configured as a public client (NONE)
+     */
+    static boolean applyClientAuthenticationMethods(RegisteredClient.Builder builder, String clientSecret) {
+        if (clientSecret != null && !clientSecret.isBlank()) {
+            // claude.ai может слать секрет и в заголовке (basic), и в теле (post) — принимаем оба.
+            builder.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_POST)
+                    .clientSecret("{noop}" + clientSecret);
+            return true;
+        }
+        // Public client (без секрета): NONE + обязательный PKCE (requireProofKey(true) выше).
+        builder.clientAuthenticationMethod(ClientAuthenticationMethod.NONE);
+        return false;
     }
 
     @Bean

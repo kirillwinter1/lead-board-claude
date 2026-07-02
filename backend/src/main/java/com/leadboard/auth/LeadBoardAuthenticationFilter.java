@@ -60,16 +60,18 @@ public class LeadBoardAuthenticationFilter extends OncePerRequestFilter {
 
                     if (tenantId != null) {
                         // BUG-94: Require tenant membership — do NOT fall back to global role
+                        // F82: also require the membership to be active — a deactivated row
+                        // (Jira access lost) must be treated exactly like "not a member".
                         Optional<TenantUserEntity> tenantUserOpt =
-                                tenantUserRepository.findByTenantIdAndUserId(tenantId, user.getId());
+                                tenantUserRepository.findByTenantIdAndUserIdAndActiveTrue(tenantId, user.getId());
                         if (tenantUserOpt.isPresent()) {
                             AppRole tenantRole = tenantUserOpt.get().getAppRole();
                             LeadBoardAuthentication auth = new LeadBoardAuthentication(user, tenantId, tenantRole);
                             SecurityContextHolder.getContext().setAuthentication(auth);
                         } else {
-                            // User is not a member of this tenant — do not authenticate.
-                            // They will get 401 on authenticated endpoints, but OAuth flow can still add them.
-                            log.debug("User {} is not a member of tenant {}", user.getId(), tenantId);
+                            // User is not a member of this tenant (or membership is deactivated)
+                            // — do not authenticate. They will get 401 on authenticated endpoints.
+                            log.debug("User {} is not an active member of tenant {}", user.getId(), tenantId);
                         }
                     } else {
                         // No tenant context — use global role (legacy / public schema mode)

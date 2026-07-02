@@ -103,8 +103,9 @@ public class McpJwtContextFilter extends OncePerRequestFilter {
                 return;
             }
             schema = tenant.get().getSchemaName();
-            // F80 §4.3: отзыв доступа — если пользователь больше не в tenant_users, не аутентифицируем
-            Optional<TenantUserEntity> tu = tenantUserRepository.findByTenantIdAndUserId(tenantId, user.get().getId());
+            // F80 §4.3 / F82: отзыв доступа — если пользователь больше не в tenant_users, ИЛИ
+            // членство деактивировано (потерян доступ к Jira-сайту тенанта), не аутентифицируем.
+            Optional<TenantUserEntity> tu = tenantUserRepository.findByTenantIdAndUserIdAndActiveTrue(tenantId, user.get().getId());
             if (tu.isEmpty()) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Access revoked for tenant");
                 return;

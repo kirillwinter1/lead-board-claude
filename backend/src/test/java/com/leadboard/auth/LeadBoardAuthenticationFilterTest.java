@@ -154,7 +154,7 @@ class LeadBoardAuthenticationFilterTest {
 
         TenantUserEntity tenantUser = new TenantUserEntity();
         tenantUser.setAppRole(AppRole.ADMIN); // per-tenant role is ADMIN
-        when(tenantUserRepository.findByTenantIdAndUserId(100L, 1L))
+        when(tenantUserRepository.findByTenantIdAndUserIdAndActiveTrue(100L, 1L))
                 .thenReturn(Optional.of(tenantUser));
 
         request.setCookies(new Cookie("LEAD_SESSION", "session-abc"));
@@ -193,10 +193,42 @@ class LeadBoardAuthenticationFilterTest {
                 .thenReturn(Optional.of(session));
 
         // User is NOT a member of tenant 200 — no fallback to global role
-        when(tenantUserRepository.findByTenantIdAndUserId(200L, 7L))
+        when(tenantUserRepository.findByTenantIdAndUserIdAndActiveTrue(200L, 7L))
                 .thenReturn(Optional.empty());
 
         request.setCookies(new Cookie("LEAD_SESSION", "session-cross"));
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        assertNull(SecurityContextHolder.getContext().getAuthentication());
+    }
+
+    @Test
+    @DisplayName("F82: should reject a deactivated membership (Jira access lost) exactly like a non-member")
+    void shouldRejectDeactivatedMembership() throws Exception {
+        TenantContext.setTenant(300L, "tenant_c");
+
+        UserEntity user = new UserEntity();
+        user.setId(9L);
+        user.setAtlassianAccountId("acc-999");
+        user.setDisplayName("Offboarded User");
+        user.setEmail("offboarded@test.com");
+        user.setAppRole(AppRole.ADMIN); // global role would otherwise grant access
+
+        SessionEntity session = new SessionEntity();
+        session.setId("session-deactivated");
+        session.setUser(user);
+        session.setExpiresAt(OffsetDateTime.now().plusDays(30));
+
+        when(sessionRepository.findValidSession(eq("session-deactivated"), any(OffsetDateTime.class)))
+                .thenReturn(Optional.of(session));
+
+        // Membership exists but is deactivated — the active-aware lookup must not return it.
+        when(tenantUserRepository.findByTenantIdAndUserIdAndActiveTrue(300L, 9L))
+                .thenReturn(Optional.empty());
+
+        request.setCookies(new Cookie("LEAD_SESSION", "session-deactivated"));
 
         filter.doFilterInternal(request, response, filterChain);
 

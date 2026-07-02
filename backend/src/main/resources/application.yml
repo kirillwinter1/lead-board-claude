@@ -11,7 +11,14 @@ app:
     cookie-name: LEAD_SESSION
     max-age-days: 30
     cookie-domain: ${APP_SESSION_COOKIE_DOMAIN:}
-    cookie-secure: ${APP_SESSION_COOKIE_SECURE:false}
+    # SECURITY_AUDIT.md §9: fail-closed default. Local dev over plain http://localhost needs
+    # APP_SESSION_COOKIE_SECURE=false in backend/.env (see .env.example), otherwise the browser
+    # silently drops the LEAD_SESSION cookie and login will appear broken.
+    cookie-secure: ${APP_SESSION_COOKIE_SECURE:true}
+  # F82: periodic re-check that tenant membership still has Jira access (offboarding revoke)
+  access-reconcile:
+    enabled: ${APP_ACCESS_RECONCILE_ENABLED:true}
+    interval-seconds: ${APP_ACCESS_RECONCILE_INTERVAL_SECONDS:14400}
 
 # CORS configuration
 cors:

@@ -68,6 +68,10 @@ DB_PORT=5432
 DB_NAME=leadboard
 DB_USERNAME=leadboard
 DB_PASSWORD=leadboard
+# Session cookie defaults to Secure=true (fail-closed, см. ai-ru/SECURITY_AUDIT.md §9).
+# Локально фронт/бэк работают по http://localhost без TLS — без этой строки браузер
+# тихо отбросит LEAD_SESSION и логин будет выглядеть сломанным. НЕ ставить false в проде.
+APP_SESSION_COOKIE_SECURE=false
 ```
 
 ## Документация (ai-ru/)

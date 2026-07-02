@@ -117,6 +117,37 @@ public class AuthorizationService {
     }
 
     /**
+     * Check if the current user has any of the given roles. Used to mirror
+     * REST {@code @PreAuthorize("hasAnyRole(...)")} checks in call sites that
+     * cannot use Spring Security method security directly (e.g. chat/MCP tool
+     * execution, which is a single generic entry point rather than one
+     * {@code @PreAuthorize}-annotated method per action).
+     */
+    public boolean hasAnyRole(AppRole... roles) {
+        LeadBoardAuthentication auth = getCurrentAuth();
+        if (auth == null) {
+            return false;
+        }
+        for (AppRole role : roles) {
+            if (auth.getRole() == role) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if the current user may perform write operations against Jira
+     * (transition, log work, comment, assign, create) via chat/MCP tools.
+     * These actions have no dedicated REST endpoint/role gate of their own,
+     * so the minimum bar is: authenticated and not read-only (VIEWER).
+     */
+    public boolean canWriteJira() {
+        LeadBoardAuthentication auth = getCurrentAuth();
+        return auth != null && auth.getRole() != AppRole.VIEWER;
+    }
+
+    /**
      * Get the set of team IDs the current user belongs to. Uses a JPQL
      * projection so we don't fan-out into N LAZY {@code team} proxy SELECTs.
      */

@@ -1,6 +1,7 @@
 package com.leadboard.chat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.auth.AppRole;
 import com.leadboard.auth.AuthorizationService;
 import com.leadboard.board.BoardNode;
 import com.leadboard.board.BoardResponse;
@@ -90,6 +91,7 @@ class ChatToolExecutorTest {
     @DisplayName("transition_issue delegates to JiraWriteService")
     void transitionIssueWrites() {
         when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.canWriteJira()).thenReturn(true);
         when(jiraWriteService.transition("LB-1", "in progress")).thenReturn("Developing");
 
         String result = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"in progress\"}");
@@ -102,6 +104,7 @@ class ChatToolExecutorTest {
     @DisplayName("log_work converts hours to seconds")
     void logWorkConvertsHours() {
         when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.canWriteJira()).thenReturn(true);
 
         String result = executor.executeTool("log_work", "{\"issueKey\":\"LB-1\",\"hours\":5}");
 
@@ -124,12 +127,236 @@ class ChatToolExecutorTest {
     @DisplayName("create_issue delegates and returns key")
     void createIssueWrites() {
         when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.canWriteJira()).thenReturn(true);
         when(jiraWriteService.createIssue("story", "New story", "LB-100")).thenReturn("LB-555");
 
         String result = executor.executeTool("create_issue", "{\"kind\":\"story\",\"summary\":\"New story\",\"parentEpicKey\":\"LB-100\"}");
 
         assertTrue(result.contains("LB-555"));
         verify(jiraWriteService).createIssue("story", "New story", "LB-100");
+    }
+
+    // ===================== F81 security fix: role checks on write tools =====================
+    // SECURITY_AUDIT.md HIGH #3 — chat/MCP write tools previously only checked
+    // isAuthenticated(), letting VIEWER/MEMBER bypass the role checks their
+    // REST equivalents enforce (MatrixController, QuarterlyPlanningController,
+    // EpicController all require ADMIN/PROJECT_MANAGER/TEAM_LEAD).
+
+    @Test
+    @DisplayName("Jira-write tools (transition/log_work/create/comment/assign) are denied for VIEWER")
+    void jiraWriteToolsDeniedForViewer() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.canWriteJira()).thenReturn(false);
+
+        String transition = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"done\"}");
+        String logWork = executor.executeTool("log_work", "{\"issueKey\":\"LB-1\",\"hours\":2}");
+        String create = executor.executeTool("create_issue", "{\"summary\":\"New\"}");
+        String comment = executor.executeTool("add_comment", "{\"issueKey\":\"LB-1\",\"text\":\"hi\"}");
+        String assign = executor.executeTool("assign_issue", "{\"issueKey\":\"LB-1\"}");
+
+        assertTrue(transition.contains("Forbidden"));
+        assertTrue(logWork.contains("Forbidden"));
+        assertTrue(create.contains("Forbidden"));
+        assertTrue(comment.contains("Forbidden"));
+        assertTrue(assign.contains("Forbidden"));
+        verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    @DisplayName("Jira-write tools succeed for MEMBER (not VIEWER)")
+    void jiraWriteToolsAllowedForMember() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.canWriteJira()).thenReturn(true);
+        when(jiraWriteService.transition("LB-1", "done")).thenReturn("Done");
+
+        String result = executor.executeTool("transition_issue", "{\"issueKey\":\"LB-1\",\"targetStatus\":\"done\"}");
+
+        assertFalse(result.contains("Forbidden"));
+        verify(jiraWriteService).transition("LB-1", "done");
+    }
+
+    @Test
+    @DisplayName("triage_matrix denied for MEMBER/VIEWER (mirrors MatrixController hasAnyRole check)")
+    void triageMatrixDeniedForMember() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)).thenReturn(false);
+
+        String result = executor.executeTool("triage_matrix", "{\"issueKey\":\"LB-1\",\"quadrant\":\"Q1\"}");
+
+        assertTrue(result.contains("Forbidden"));
+        verifyNoInteractions(matrixService);
+    }
+
+    @Test
+    @DisplayName("triage_matrix succeeds for TEAM_LEAD+")
+    void triageMatrixAllowedForTeamLead() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)).thenReturn(true);
+        when(matrixService.triage("LB-1", "Q1")).thenReturn(new com.leadboard.matrix.MatrixCardDto(
+                "LB-1", "Summary", "Story", "Medium", null, null, "Open", "Q1", null, null, null));
+
+        String result = executor.executeTool("triage_matrix", "{\"issueKey\":\"LB-1\",\"quadrant\":\"Q1\"}");
+
+        assertFalse(result.contains("Forbidden"));
+        verify(matrixService).triage("LB-1", "Q1");
+    }
+
+    @Test
+    @DisplayName("assign_epic_quarter denied for MEMBER/VIEWER (mirrors QuarterlyPlanningController)")
+    void assignEpicQuarterDeniedForMember() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)).thenReturn(false);
+
+        String result = executor.executeTool("assign_epic_quarter", "{\"epicKey\":\"LB-1\",\"quarter\":\"2026Q3\"}");
+
+        assertTrue(result.contains("Forbidden"));
+        verifyNoInteractions(quarterlyPlanningService);
+    }
+
+    @Test
+    @DisplayName("set_epic_boost denied for MEMBER/VIEWER (mirrors QuarterlyPlanningController)")
+    void setEpicBoostDeniedForMember() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)).thenReturn(false);
+
+        String result = executor.executeTool("set_epic_boost", "{\"epicKey\":\"LB-1\",\"boost\":2}");
+
+        assertTrue(result.contains("Forbidden"));
+        verifyNoInteractions(quarterlyPlanningService);
+    }
+
+    @Test
+    @DisplayName("set_rough_estimate denied for MEMBER/VIEWER (mirrors EpicController)")
+    void setRoughEstimateDeniedForMember() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)).thenReturn(false);
+
+        String result = executor.executeTool("set_rough_estimate", "{\"epicKey\":\"LB-1\",\"role\":\"DEV\",\"days\":3}");
+
+        assertTrue(result.contains("Forbidden"));
+        verifyNoInteractions(epicService);
+    }
+
+    @Test
+    @DisplayName("set_rough_estimate succeeds for TEAM_LEAD+")
+    void setRoughEstimateAllowedForTeamLead() {
+        when(authorizationService.isAuthenticated()).thenReturn(true);
+        when(authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)).thenReturn(true);
+        when(authorizationService.getCurrentAuth()).thenReturn(null);
+        when(epicService.updateRoughEstimate(eq("LB-1"), eq("DEV"), any()))
+                .thenReturn(new com.leadboard.epic.RoughEstimateResponseDto("LB-1", "DEV", new BigDecimal("3"), Map.of(), null, null));
+
+        String result = executor.executeTool("set_rough_estimate", "{\"epicKey\":\"LB-1\",\"role\":\"DEV\",\"days\":3}");
+
+        assertFalse(result.contains("Forbidden"));
+        verify(epicService).updateRoughEstimate(eq("LB-1"), eq("DEV"), any());
+    }
+
+    // ===================== F81 security fix: read team-scoping =====================
+    // SECURITY_AUDIT.md MEDIUM #6 — omitting teamId used to bypass team scoping
+    // entirely for every role. Non-admin/PM callers must now be limited to
+    // authorizationService.getUserTeamIds() when teamId is not given.
+
+    @Test
+    @DisplayName("board_summary with no teamId scopes non-admin caller to their own teams")
+    void boardSummaryScopesNonAdminToOwnTeams() {
+        when(authorizationService.isAdmin()).thenReturn(false);
+        when(authorizationService.isProjectManager()).thenReturn(false);
+        when(authorizationService.getUserTeamIds()).thenReturn(Set.of(7L));
+        when(issueRepository.findByBoardCategoryAndTeamIdIn("EPIC", Set.of(7L))).thenReturn(List.of());
+
+        String result = executor.executeTool("board_summary", "{}");
+
+        assertFalse(result.contains("error"));
+        verify(issueRepository).findByBoardCategoryAndTeamIdIn("EPIC", Set.of(7L));
+        verify(issueRepository, never()).findByBoardCategory("EPIC");
+    }
+
+    @Test
+    @DisplayName("board_summary with no teamId returns empty result for a user with no teams")
+    void boardSummaryEmptyForUserWithNoTeams() {
+        when(authorizationService.isAdmin()).thenReturn(false);
+        when(authorizationService.isProjectManager()).thenReturn(false);
+        when(authorizationService.getUserTeamIds()).thenReturn(Set.of());
+
+        String result = executor.executeTool("board_summary", "{}");
+
+        assertTrue(result.contains("\"totalEpics\":0"));
+        verify(issueRepository, never()).findByBoardCategory(anyString());
+        verify(issueRepository, never()).findByBoardCategoryAndTeamIdIn(anyString(), anySet());
+    }
+
+    @Test
+    @DisplayName("board_summary with no teamId keeps the unrestricted view for ADMIN")
+    void boardSummaryUnrestrictedForAdmin() {
+        // isAdmin() defaults to true from setUp()
+        when(issueRepository.findByBoardCategory("EPIC")).thenReturn(List.of());
+
+        String result = executor.executeTool("board_summary", "{}");
+
+        assertFalse(result.contains("error"));
+        verify(issueRepository).findByBoardCategory("EPIC");
+        verify(issueRepository, never()).findByBoardCategoryAndTeamIdIn(anyString(), anySet());
+    }
+
+    @Test
+    @DisplayName("project_list with no explicit filter hides projects with no epic in the caller's teams")
+    void projectListScopesNonAdminToOwnTeams() {
+        when(authorizationService.isAdmin()).thenReturn(false);
+        when(authorizationService.isProjectManager()).thenReturn(false);
+        when(authorizationService.getUserTeamIds()).thenReturn(Set.of(7L));
+
+        var visibleProject = new ProjectDto(
+                "PROJ-1", "Initiative", "Visible Project", null, "In Progress",
+                null, null, 1, 0, 0, null, null, null, null, null, null);
+        var hiddenProject = new ProjectDto(
+                "PROJ-2", "Initiative", "Hidden Project", null, "In Progress",
+                null, null, 1, 0, 0, null, null, null, null, null, null);
+        when(projectService.listProjects()).thenReturn(List.of(visibleProject, hiddenProject));
+
+        JiraIssueEntity visibleEpic = makeIssue("PROJ-1-E1", "Epic", "EPIC", "In Progress");
+        visibleEpic.setTeamId(7L);
+        when(issueRepository.findByParentKeyAndBoardCategory("PROJ-1", "EPIC")).thenReturn(List.of(visibleEpic));
+
+        JiraIssueEntity hiddenEpic = makeIssue("PROJ-2-E1", "Epic", "EPIC", "In Progress");
+        hiddenEpic.setTeamId(99L);
+        when(issueRepository.findByParentKeyAndBoardCategory("PROJ-2", "EPIC")).thenReturn(List.of(hiddenEpic));
+
+        String result = executor.executeTool("project_list", "{}");
+
+        assertTrue(result.contains("Visible Project"));
+        assertFalse(result.contains("Hidden Project"));
+        assertTrue(result.contains("\"totalProjects\":1"));
+    }
+
+    @Test
+    @DisplayName("rice_ranking with no explicit filter hides entries outside the caller's teams")
+    void riceRankingScopesNonAdminToOwnTeams() {
+        when(authorizationService.isAdmin()).thenReturn(false);
+        when(authorizationService.isProjectManager()).thenReturn(false);
+        when(authorizationService.getUserTeamIds()).thenReturn(Set.of(7L));
+
+        var visibleEntry = new RiceRankingEntryDto(
+                "LB-1", "Visible Epic", "In Progress", "Business",
+                new BigDecimal("90"), new BigDecimal("85"),
+                new BigDecimal("100"), new BigDecimal("3"), new BigDecimal("80"), new BigDecimal("2.5"));
+        var hiddenEntry = new RiceRankingEntryDto(
+                "LB-2", "Hidden Epic", "In Progress", "Business",
+                new BigDecimal("90"), new BigDecimal("85"),
+                new BigDecimal("100"), new BigDecimal("3"), new BigDecimal("80"), new BigDecimal("2.5"));
+        when(riceAssessmentService.getRanking(null)).thenReturn(List.of(visibleEntry, hiddenEntry));
+
+        JiraIssueEntity visibleIssue = makeIssue("LB-1", "Epic", "EPIC", "In Progress");
+        visibleIssue.setTeamId(7L);
+        JiraIssueEntity hiddenIssue = makeIssue("LB-2", "Epic", "EPIC", "In Progress");
+        hiddenIssue.setTeamId(99L);
+        when(issueRepository.findByIssueKeyIn(anyList())).thenReturn(List.of(visibleIssue, hiddenIssue));
+
+        String result = executor.executeTool("rice_ranking", "{}");
+
+        assertTrue(result.contains("Visible Epic"));
+        assertFalse(result.contains("Hidden Epic"));
+        assertTrue(result.contains("\"totalRanked\":1"));
     }
 
     @Test

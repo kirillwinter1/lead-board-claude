@@ -6,6 +6,8 @@ import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
 import com.leadboard.tenant.TenantContext;
 import com.leadboard.tenant.TenantEntity;
+import com.leadboard.tenant.TenantJiraConfigEntity;
+import com.leadboard.tenant.TenantJiraConfigRepository;
 import com.leadboard.tenant.TenantService;
 import com.leadboard.tenant.TenantUserEntity;
 import org.slf4j.Logger;
@@ -40,24 +42,33 @@ public class OAuthService {
     private final OAuthTokenRepository tokenRepository;
     private final SessionRepository sessionRepository;
     private final TenantService tenantService;
+    private final TenantJiraConfigRepository tenantJiraConfigRepository;
     private final WebClient webClient;
 
     // Support concurrent OAuth flows (multiple users logging in simultaneously)
     // State → (expiry, tenantId) for tenant-aware OAuth
     private final ConcurrentHashMap<String, OAuthState> pendingStates = new ConcurrentHashMap<>();
 
+    // SECURITY_AUDIT.md §7: how long a `state` value stays valid, both server-side (this map)
+    // and in the browser-bound state cookie OAuthController sets alongside it. Keep both in
+    // sync — the cookie is what proves the callback is being followed by the same browser that
+    // started the flow; this map is the pre-existing "does state exist / hasn't expired" layer.
+    static final int STATE_TTL_SECONDS = 600;
+
     public OAuthService(AtlassianOAuthProperties oauthProperties,
                         AppProperties appProperties,
                         UserRepository userRepository,
                         OAuthTokenRepository tokenRepository,
                         SessionRepository sessionRepository,
-                        TenantService tenantService) {
+                        TenantService tenantService,
+                        TenantJiraConfigRepository tenantJiraConfigRepository) {
         this.oauthProperties = oauthProperties;
         this.appProperties = appProperties;
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.sessionRepository = sessionRepository;
         this.tenantService = tenantService;
+        this.tenantJiraConfigRepository = tenantJiraConfigRepository;
         // Use the JDK/OS DNS resolver instead of Netty's native UDP resolver, which
         // fails to resolve auth.atlassian.com on some networks (UnknownHostException)
         // and breaks the OAuth token exchange.
@@ -69,16 +80,39 @@ public class OAuthService {
 
     private record OAuthState(Instant expiry, Long tenantId) {}
 
+    /**
+     * SECURITY_AUDIT.md §7: result of starting an OAuth flow — the Atlassian authorize URL
+     * plus the raw {@code state} value, so the caller (OAuthController) can bind it to the
+     * initiating browser via a short-lived HttpOnly state cookie. Without this, `state` is
+     * only checked for existence/expiry server-side, which does not stop an attacker from
+     * handing a victim a callback URL for a flow *the attacker* started (login CSRF).
+     */
+    public record AuthorizationRequest(String url, String state) {}
+
+    public AuthorizationRequest createAuthorizationRequest(Long tenantId) {
+        String state = registerState(tenantId);
+        String url = buildAuthorizationUrl(state);
+        return new AuthorizationRequest(url, state);
+    }
+
     public String getAuthorizationUrl(Long tenantId) {
+        return createAuthorizationRequest(tenantId).url();
+    }
+
+    private String registerState(Long tenantId) {
         String state = UUID.randomUUID().toString();
         if (tenantId == null) {
             tenantId = TenantContext.getCurrentTenantId();
         }
-        pendingStates.put(state, new OAuthState(Instant.now().plusSeconds(600), tenantId));
+        pendingStates.put(state, new OAuthState(Instant.now().plusSeconds(STATE_TTL_SECONDS), tenantId));
 
         // Cleanup expired states
         pendingStates.entrySet().removeIf(e -> e.getValue().expiry().isBefore(Instant.now()));
 
+        return state;
+    }
+
+    private String buildAuthorizationUrl(String state) {
         return UriComponentsBuilder.fromUriString(oauthProperties.getAuthorizationUri())
                 .queryParam("audience", "api.atlassian.com")
                 .queryParam("client_id", oauthProperties.getClientId())
@@ -97,7 +131,7 @@ public class OAuthService {
         OAuthState oauthState = pendingStates.remove(state);
         if (oauthState == null || oauthState.expiry().isBefore(Instant.now())) {
             log.warn("Invalid or expired OAuth state: {}", state);
-            return new CallbackResult(false, "Invalid state parameter", null, null);
+            return CallbackResult.failure("Invalid state parameter", null, null);
         }
         Long tenantId = oauthState.tenantId();
 
@@ -105,17 +139,19 @@ public class OAuthService {
             // Exchange code for tokens
             TokenResponse tokenResponse = exchangeCodeForTokens(code);
             if (tokenResponse == null) {
-                return new CallbackResult(false, "Failed to exchange code for tokens", null, tenantId);
+                return CallbackResult.failure("Failed to exchange code for tokens", null, tenantId);
             }
 
             // Get user info
             UserInfo userInfo = getUserInfo(tokenResponse.accessToken);
             if (userInfo == null) {
-                return new CallbackResult(false, "Failed to get user info", null, tenantId);
+                return CallbackResult.failure("Failed to get user info", null, tenantId);
             }
 
-            // Get cloud ID for the site
-            String cloudId = getCloudId(tokenResponse.accessToken);
+            // F82: fetch ALL Jira sites this account can access (not just the first) — needed
+            // to gate/re-check tenant membership against Jira access below.
+            List<String> accessibleCloudIds = getAccessibleCloudIds(tokenResponse.accessToken);
+            String cloudId = accessibleCloudIds.isEmpty() ? null : accessibleCloudIds.get(0);
 
             // Save or update user
             boolean isFirstUser = userRepository.count() == 0;
@@ -155,19 +191,16 @@ public class OAuthService {
 
             tokenRepository.save(token);
 
-            // Create tenant_users association if tenant context exists
+            // F82: tenant membership is gated by Jira access (SECURITY_AUDIT.md §2 — was:
+            // any authenticated Atlassian account could self-join any tenant via ?tenant=<slug>).
             if (tenantId != null) {
                 Optional<TenantEntity> tenantOpt = tenantService.findById(tenantId);
                 if (tenantOpt.isPresent()) {
                     TenantEntity tenant = tenantOpt.get();
-                    // BUG-96: Check if this user is already in this tenant
-                    boolean alreadyMember = tenantService.findTenantUser(tenantId, user.getId()).isPresent();
-                    if (!alreadyMember) {
-                        // BUG-96: First user in tenant gets ADMIN, subsequent users get MEMBER
-                        boolean tenantHasAnyUsers = tenantService.tenantHasUsers(tenantId);
-                        AppRole tenantRole = tenantHasAnyUsers ? AppRole.MEMBER : AppRole.ADMIN;
-                        tenantService.addUserToTenant(tenant, user, tenantRole);
-                        log.info("Added user {} to tenant {} with role {}", user.getEmail(), tenant.getSlug(), tenantRole);
+                    MembershipGateResult gateResult = applyMembershipGate(tenant, user, accessibleCloudIds);
+                    if (!gateResult.allowed()) {
+                        return CallbackResult.failure(
+                                "Jira access denied for this tenant", null, tenantId, gateResult.errorCode());
                     }
                 }
             }
@@ -182,11 +215,119 @@ public class OAuthService {
 
             log.info("OAuth successful for user: {} ({}) tenant: {}", user.getDisplayName(), user.getEmail(), tenantId);
 
-            return new CallbackResult(true, null, session.getId(), tenantId);
+            return CallbackResult.success(session.getId(), tenantId);
 
         } catch (Exception e) {
             log.error("OAuth callback failed", e);
-            return new CallbackResult(false, e.getMessage(), null, tenantId);
+            return CallbackResult.failure(e.getMessage(), null, tenantId);
+        }
+    }
+
+    /**
+     * F82: gates/reconciles tenant membership against the user's current Jira site access.
+     * See ai-ru/features/F82_JIRA_ACCESS_MEMBERSHIP.md and ai-ru/SECURITY_AUDIT.md §2.
+     *
+     * <ul>
+     *   <li>First user of a brand-new tenant (bootstrap) — always ADMIN, no Jira config yet
+     *       to check against.</li>
+     *   <li>Not yet a member, tenant has a configured cloudId — join allowed only if that
+     *       cloudId is in the user's accessible sites; otherwise the join is denied.</li>
+     *   <li>Not yet a member, tenant has NO configured cloudId — auto-join is closed (cannot
+     *       verify access), so we simply deny rather than silently admitting anyone.</li>
+     *   <li>Already a member — deactivated if access was lost, reactivated if access is
+     *       restored. Either way the login itself is allowed to proceed; enforcement of the
+     *       {@code active} flag happens downstream (LeadBoardAuthenticationFilter /
+     *       McpJwtContextFilter), exactly like "not a member" is handled today.</li>
+     * </ul>
+     *
+     * Package-private (not private) so unit tests can exercise the branching logic directly,
+     * without going through the network calls in {@link #handleCallback}.
+     */
+    MembershipGateResult applyMembershipGate(TenantEntity tenant, UserEntity user, List<String> accessibleCloudIds) {
+        Optional<TenantUserEntity> existing = tenantService.findTenantUser(tenant.getId(), user.getId());
+
+        if (existing.isEmpty()) {
+            boolean tenantHasAnyUsers = tenantService.tenantHasUsers(tenant.getId());
+            if (!tenantHasAnyUsers) {
+                // Bootstrap: first user sets up a brand-new tenant — no Jira config yet.
+                tenantService.addUserToTenant(tenant, user, AppRole.ADMIN);
+                log.info("Added first user {} to tenant {} as ADMIN (bootstrap)", user.getEmail(), tenant.getSlug());
+                return MembershipGateResult.allow();
+            }
+
+            String tenantCloudId = resolveTenantJiraCloudId(tenant);
+            if (tenantCloudId == null || tenantCloudId.isBlank()) {
+                log.warn("Tenant '{}' has no Jira cloudId configured — denying auto-join for user {}",
+                        tenant.getSlug(), user.getEmail());
+                return MembershipGateResult.deny("jira_access_denied");
+            }
+            if (!accessibleCloudIds.contains(tenantCloudId)) {
+                log.warn("User {} lacks Jira access to tenant '{}' (cloudId {}) — denying join",
+                        user.getEmail(), tenant.getSlug(), tenantCloudId);
+                return MembershipGateResult.deny("jira_access_denied");
+            }
+
+            tenantService.addUserToTenant(tenant, user, AppRole.MEMBER);
+            log.info("Added user {} to tenant {} with role MEMBER (Jira access verified)", user.getEmail(), tenant.getSlug());
+            return MembershipGateResult.allow();
+        }
+
+        // Already a member — reconcile membership status against current Jira access.
+        TenantUserEntity tenantUser = existing.get();
+        String tenantCloudId = resolveTenantJiraCloudId(tenant);
+        if (tenantCloudId == null || tenantCloudId.isBlank()) {
+            log.debug("Tenant '{}' has no Jira cloudId configured — skipping access re-check for existing member {}",
+                    tenant.getSlug(), user.getEmail());
+            return MembershipGateResult.allow();
+        }
+
+        boolean hasAccess = accessibleCloudIds.contains(tenantCloudId);
+        if (!hasAccess && tenantUser.isActive()) {
+            tenantService.deactivateMembership(tenantUser, "jira_access_lost");
+            log.warn("Deactivated membership: user {} lost Jira access to tenant '{}'", user.getEmail(), tenant.getSlug());
+        } else if (hasAccess && !tenantUser.isActive()) {
+            tenantService.reactivateMembership(tenantUser);
+            log.info("Reactivated membership: user {} regained Jira access to tenant '{}'", user.getEmail(), tenant.getSlug());
+        }
+
+        return MembershipGateResult.allow();
+    }
+
+    /**
+     * Resolves the tenant's configured Jira cloudId. {@code tenant_jira_config} lives per
+     * tenant schema (no {@code tenant_id} column), so this temporarily switches
+     * {@link TenantContext} to the given tenant, then restores whatever context was active
+     * before (normally none — the OAuth callback is hit on the bare backend host, not a
+     * tenant subdomain).
+     */
+    String resolveTenantJiraCloudId(TenantEntity tenant) {
+        Long previousTenantId = TenantContext.getCurrentTenantId();
+        String previousSchema = TenantContext.hasTenant() ? TenantContext.getCurrentSchema() : null;
+        try {
+            TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
+            return tenantJiraConfigRepository.findActive()
+                    .map(TenantJiraConfigEntity::getJiraCloudId)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("Failed to resolve Jira cloudId for tenant '{}': {}", tenant.getSlug(), e.getMessage());
+            return null;
+        } finally {
+            if (previousTenantId != null) {
+                TenantContext.setTenant(previousTenantId, previousSchema);
+            } else {
+                TenantContext.clear();
+            }
+        }
+    }
+
+    /** Outcome of {@link #applyMembershipGate}. */
+    record MembershipGateResult(boolean allowed, String errorCode) {
+        static MembershipGateResult allow() {
+            return new MembershipGateResult(true, null);
+        }
+
+        static MembershipGateResult deny(String errorCode) {
+            return new MembershipGateResult(false, errorCode);
         }
     }
 
@@ -216,7 +357,7 @@ public class OAuthService {
 
     @Transactional
     public String getValidAccessToken() {
-        Optional<OAuthTokenEntity> tokenOpt = tokenRepository.findLatestToken();
+        Optional<OAuthTokenEntity> tokenOpt = resolveLatestToken();
         if (tokenOpt.isEmpty()) {
             return null;
         }
@@ -234,9 +375,27 @@ public class OAuthService {
     }
 
     public String getCloudIdForCurrentUser() {
-        return tokenRepository.findLatestToken()
+        return resolveLatestToken()
                 .map(OAuthTokenEntity::getCloudId)
                 .orElse(null);
+    }
+
+    /**
+     * Resolves the most recently updated OAuth token, scoped to the current tenant
+     * whenever a tenant context is active.
+     *
+     * SECURITY: in multi-tenant mode (TenantContext set — e.g. per-request via
+     * TenantFilter, or per-tenant in TenantSyncScheduler's background sync loop),
+     * we must NOT fall back to the globally-latest token across all tenants — that
+     * would let tenant A's sync/chat/write use tenant B's Jira OAuth token and cloudId.
+     * Only single-tenant deployments (no TenantContext, .env-driven JiraProperties)
+     * use the unscoped global lookup.
+     */
+    private Optional<OAuthTokenEntity> resolveLatestToken() {
+        if (TenantContext.hasTenant()) {
+            return tokenRepository.findLatestTokenForTenant(TenantContext.getCurrentTenantId());
+        }
+        return tokenRepository.findLatestToken();
     }
 
     private boolean refreshToken(OAuthTokenEntity token) {
@@ -290,6 +449,42 @@ public class OAuthService {
     }
 
     private String getCloudId(String accessToken) {
+        List<String> ids = getAccessibleCloudIds(accessToken);
+        if (!ids.isEmpty()) {
+            log.info("Found cloud ID: {}", ids.get(0));
+            return ids.get(0);
+        }
+        return null;
+    }
+
+    /**
+     * F82: returns ALL Jira/Confluence site cloudIds this Atlassian account can access
+     * (unlike {@link #getCloudId}, which only returns the first). Used to gate/re-check
+     * tenant membership against Jira site access — see {@link #applyMembershipGate}.
+     */
+    public List<String> getAccessibleCloudIds(String accessToken) {
+        List<AccessibleResource> resources = fetchAccessibleResources(accessToken);
+        if (resources == null) {
+            return List.of();
+        }
+        return resources.stream()
+                .map(r -> r.id)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+    }
+
+    /**
+     * F82: true if the given Atlassian account has access to the Jira site identified by
+     * {@code tenantCloudId}.
+     */
+    public boolean userHasJiraAccess(String accessToken, String tenantCloudId) {
+        if (tenantCloudId == null || tenantCloudId.isBlank()) {
+            return false;
+        }
+        return getAccessibleCloudIds(accessToken).contains(tenantCloudId);
+    }
+
+    private List<AccessibleResource> fetchAccessibleResources(String accessToken) {
         try {
             String responseBody = webClient.get()
                     .uri(oauthProperties.getAccessibleResourcesUri())
@@ -301,17 +496,12 @@ public class OAuthService {
             log.info("Accessible resources response received");
 
             com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            List<AccessibleResource> resources = mapper.readValue(responseBody,
+            return mapper.readValue(responseBody,
                     mapper.getTypeFactory().constructCollectionType(List.class, AccessibleResource.class));
-
-            if (resources != null && !resources.isEmpty()) {
-                log.info("Found cloud ID: {}", resources.get(0).id);
-                return resources.get(0).id;
-            }
         } catch (Exception e) {
             log.error("Failed to get accessible resources", e);
+            return null;
         }
-        return null;
     }
 
     /**
@@ -412,7 +602,21 @@ public class OAuthService {
         public String url;
     }
 
-    public record CallbackResult(boolean success, String error, String sessionId, Long tenantId) {}
+    public record CallbackResult(boolean success, String error, String sessionId, Long tenantId, String errorCode) {
+        public static CallbackResult success(String sessionId, Long tenantId) {
+            return new CallbackResult(true, null, sessionId, tenantId, null);
+        }
+
+        public static CallbackResult failure(String error, String sessionId, Long tenantId) {
+            return new CallbackResult(false, error, sessionId, tenantId, null);
+        }
+
+        /** F82: failure with a machine-readable errorCode (e.g. "jira_access_denied") the
+         * controller can surface to the frontend without leaking internal error details. */
+        public static CallbackResult failure(String error, String sessionId, Long tenantId, String errorCode) {
+            return new CallbackResult(false, error, sessionId, tenantId, errorCode);
+        }
+    }
 
     public record AuthenticatedUser(
             Long id,

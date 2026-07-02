@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 @Component
 public class JiraClient {
@@ -30,6 +31,10 @@ public class JiraClient {
     private static final Logger log = LoggerFactory.getLogger(JiraClient.class);
     private static final String ATLASSIAN_API_BASE = "https://api.atlassian.com";
     private static final int MAX_BUFFER_SIZE = 16 * 1024 * 1024; // 16MB
+
+    // Well-formed Jira issue key, e.g. "ABC-123". Used to guard values that get
+    // interpolated into JQL (see #validateIssueKey) — SECURITY_AUDIT.md #4.
+    private static final Pattern ISSUE_KEY_PATTERN = Pattern.compile("^[A-Z][A-Z0-9]+-\\d+$");
 
     private final WebClient webClient;
     private final JiraConfigResolver configResolver;
@@ -264,11 +269,19 @@ public class JiraClient {
     }
 
     /**
-     * Get subtasks of an issue
+     * Get subtasks of an issue.
+     *
+     * SECURITY (SECURITY_AUDIT.md #4): {@code parentKey} historically came straight
+     * from user input (Planning Poker's {@code existingStoryKey}) and was concatenated
+     * directly into JQL, allowing JQL injection (e.g. {@code "X OR project = SECRET"})
+     * that would then be used to write estimates onto arbitrary issues. The DTO now
+     * also validates this at the edge (AddStoryRequest#existingStoryKey), but this
+     * method re-validates independently — it must never trust its caller.
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getSubtasks(String parentKey) {
-        String jql = "parent = " + parentKey;
+        String safeParentKey = validateIssueKey(parentKey);
+        String jql = "parent = \"" + escapeJqlLiteral(safeParentKey) + "\"";
         JiraSearchResponse response = search(jql, 50, null);
         return response.getIssues().stream()
                 .map(issue -> {
@@ -283,6 +296,28 @@ public class JiraClient {
                     return map;
                 })
                 .toList();
+    }
+
+    /**
+     * Validates that {@code issueKey} is a well-formed Jira issue key (e.g. "ABC-123")
+     * before it is allowed anywhere near a hand-built JQL string. Throws
+     * {@link IllegalArgumentException} instead of building/executing any query when
+     * the value doesn't match — see SECURITY_AUDIT.md #4 (JQL injection).
+     */
+    private static String validateIssueKey(String issueKey) {
+        if (issueKey == null || !ISSUE_KEY_PATTERN.matcher(issueKey).matches()) {
+            throw new IllegalArgumentException("Invalid Jira issue key");
+        }
+        return issueKey;
+    }
+
+    /**
+     * Escapes a string literal for safe inclusion inside a double-quoted JQL value
+     * (defense-in-depth on top of {@link #validateIssueKey}). JQL uses backslash
+     * escaping for {@code \} and {@code "} inside quoted literals.
+     */
+    private static String escapeJqlLiteral(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     /**

@@ -96,6 +96,29 @@ public class TenantService {
         return tenantUserRepository.findByTenantIdAndUserId(tenantId, userId);
     }
 
+    /**
+     * F82: deactivates a tenant membership (Jira access lost). Never deletes the row —
+     * deactivation is reversible via {@link #reactivateMembership}.
+     */
+    @Transactional
+    public void deactivateMembership(TenantUserEntity tenantUser, String reason) {
+        tenantUser.deactivate(reason);
+        tenantUserRepository.save(tenantUser);
+        log.info("Deactivated tenant membership: user {} tenant {} reason='{}'",
+                tenantUser.getUser().getId(), tenantUser.getTenant().getId(), reason);
+    }
+
+    /**
+     * F82: restores a previously deactivated membership once Jira access is regained.
+     */
+    @Transactional
+    public void reactivateMembership(TenantUserEntity tenantUser) {
+        tenantUser.reactivate();
+        tenantUserRepository.save(tenantUser);
+        log.info("Reactivated tenant membership: user {} tenant {}",
+                tenantUser.getUser().getId(), tenantUser.getTenant().getId());
+    }
+
     public List<TenantUserEntity> findUserTenants(Long userId) {
         return tenantUserRepository.findByUserId(userId);
     }

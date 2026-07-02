@@ -132,4 +132,46 @@ class TenantServiceTest {
         assertEquals(AppRole.MEMBER, result.getAppRole()); // existing not overwritten
         verify(tenantUserRepository, never()).save(any());
     }
+
+    // ==================== F82: membership lifecycle ====================
+
+    @Test
+    @DisplayName("deactivateMembership() marks membership inactive with reason and persists it")
+    void shouldDeactivateMembership() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        TenantUserEntity membership = new TenantUserEntity();
+        membership.setTenant(tenant);
+        membership.setUser(user);
+        membership.setActive(true);
+
+        tenantService.deactivateMembership(membership, "jira_access_lost");
+
+        assertFalse(membership.isActive());
+        assertEquals("jira_access_lost", membership.getDeactivatedReason());
+        assertNotNull(membership.getDeactivatedAt());
+        verify(tenantUserRepository).save(membership);
+    }
+
+    @Test
+    @DisplayName("reactivateMembership() restores an inactive membership and clears deactivation metadata")
+    void shouldReactivateMembership() {
+        TenantEntity tenant = new TenantEntity();
+        tenant.setId(1L);
+        UserEntity user = new UserEntity();
+        user.setId(1L);
+        TenantUserEntity membership = new TenantUserEntity();
+        membership.setTenant(tenant);
+        membership.setUser(user);
+        membership.deactivate("jira_access_lost");
+
+        tenantService.reactivateMembership(membership);
+
+        assertTrue(membership.isActive());
+        assertNull(membership.getDeactivatedReason());
+        assertNull(membership.getDeactivatedAt());
+        verify(tenantUserRepository).save(membership);
+    }
 }

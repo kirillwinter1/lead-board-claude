@@ -20,6 +20,12 @@ public class OAuthController {
 
     private static final Logger log = LoggerFactory.getLogger(OAuthController.class);
 
+    // SECURITY_AUDIT.md §7: binds the OAuth `state` to the browser that started the flow, on
+    // top of the existing server-side (exists/not-expired) check in OAuthService. Local
+    // constant — not in AppProperties, this isn't operator-configurable.
+    private static final String STATE_COOKIE_NAME = "oauth_state";
+    private static final String STATE_COOKIE_PATH = "/oauth/atlassian";
+
     private final OAuthService oauthService;
     private final AppProperties appProperties;
     private final TenantService tenantService;
@@ -37,8 +43,9 @@ public class OAuthController {
         // Browser navigation doesn't send X-Tenant-Slug header,
         // so tenant slug is passed as query param
         Long tenantId = resolveTenantId(tenantSlug);
-        String authUrl = oauthService.getAuthorizationUrl(tenantId);
-        response.sendRedirect(authUrl);
+        OAuthService.AuthorizationRequest authRequest = oauthService.createAuthorizationRequest(tenantId);
+        addStateCookie(response, authRequest.state());
+        response.sendRedirect(authRequest.url());
     }
 
     private Long resolveTenantId(String slug) {
@@ -54,7 +61,23 @@ public class OAuthController {
     public void callback(
             @RequestParam("code") String code,
             @RequestParam("state") String state,
+            HttpServletRequest request,
             HttpServletResponse response) throws IOException {
+
+        // SECURITY_AUDIT.md §7 — login CSRF / session fixation: `state` alone (checked
+        // server-side in OAuthService for existence/expiry) doesn't prove this callback is
+        // being followed by the browser that started the flow. An attacker could start the
+        // flow themselves and hand the victim their own callback URL, logging the victim into
+        // the attacker's account. Bind `state` to the browser via a short-lived HttpOnly
+        // cookie set on /authorize (and /login-url) and require it to match here. One-time use
+        // — always clear it, whether or not it matches.
+        String cookieState = extractStateCookie(request);
+        clearStateCookie(response);
+        if (cookieState == null || !cookieState.equals(state)) {
+            log.warn("OAuth callback rejected: state cookie missing or mismatched (possible login CSRF)");
+            response.sendRedirect(buildTenantRedirectUrl(null) + "/?auth=error&reason=state_mismatch");
+            return;
+        }
 
         OAuthService.CallbackResult result = oauthService.handleCallback(code, state);
 
@@ -65,8 +88,15 @@ public class OAuthController {
             response.sendRedirect(redirectUrl + "/?auth=success");
         } else {
             log.warn("OAuth callback failed: {}", result.error());
-            // Don't expose internal error details in URL — use generic error code
-            response.sendRedirect(redirectUrl + "/?auth=error");
+            // Don't expose internal error details in URL — use a generic error code, plus an
+            // optional machine-readable `reason` (e.g. F82 "jira_access_denied") the frontend
+            // can use to show a more specific message. Existing failure paths pass no
+            // errorCode, so their redirect is unchanged (?auth=error).
+            String redirect = redirectUrl + "/?auth=error";
+            if (result.errorCode() != null) {
+                redirect += "&reason=" + result.errorCode();
+            }
+            response.sendRedirect(redirect);
         }
     }
 
@@ -76,9 +106,12 @@ public class OAuthController {
     }
 
     @GetMapping("/login-url")
-    public ResponseEntity<LoginUrlResponse> getLoginUrl() {
-        String url = oauthService.getAuthorizationUrl(null);
-        return ResponseEntity.ok(new LoginUrlResponse(url));
+    public ResponseEntity<LoginUrlResponse> getLoginUrl(HttpServletResponse response) {
+        // Also starts a flow (frontend then navigates the browser to the returned URL), so it
+        // needs the same state-cookie binding as /authorize.
+        OAuthService.AuthorizationRequest authRequest = oauthService.createAuthorizationRequest(null);
+        addStateCookie(response, authRequest.state());
+        return ResponseEntity.ok(new LoginUrlResponse(authRequest.url()));
     }
 
     @PostMapping("/logout")
@@ -128,6 +161,45 @@ public class OAuthController {
             cookie.setDomain(cookieDomain);
         }
         response.addCookie(cookie);
+    }
+
+    private void addStateCookie(HttpServletResponse response, String state) {
+        Cookie cookie = new Cookie(STATE_COOKIE_NAME, state);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(appProperties.getSession().isCookieSecure());
+        cookie.setPath(STATE_COOKIE_PATH);
+        cookie.setMaxAge(OAuthService.STATE_TTL_SECONDS);
+        cookie.setAttribute("SameSite", "Lax");
+        String cookieDomain = appProperties.getSession().getCookieDomain();
+        if (cookieDomain != null && !cookieDomain.isBlank()) {
+            cookie.setDomain(cookieDomain);
+        }
+        response.addCookie(cookie);
+    }
+
+    private void clearStateCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie(STATE_COOKIE_NAME, "");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(appProperties.getSession().isCookieSecure());
+        cookie.setPath(STATE_COOKIE_PATH);
+        cookie.setMaxAge(0);
+        cookie.setAttribute("SameSite", "Lax");
+        String cookieDomain = appProperties.getSession().getCookieDomain();
+        if (cookieDomain != null && !cookieDomain.isBlank()) {
+            cookie.setDomain(cookieDomain);
+        }
+        response.addCookie(cookie);
+    }
+
+    private String extractStateCookie(HttpServletRequest request) {
+        if (request.getCookies() == null) {
+            return null;
+        }
+        return Arrays.stream(request.getCookies())
+                .filter(c -> STATE_COOKIE_NAME.equals(c.getName()))
+                .map(Cookie::getValue)
+                .findFirst()
+                .orElse(null);
     }
 
     private String extractSessionId(HttpServletRequest request) {

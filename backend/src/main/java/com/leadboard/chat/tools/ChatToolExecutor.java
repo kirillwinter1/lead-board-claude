@@ -3,6 +3,7 @@ package com.leadboard.chat.tools;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leadboard.auth.AppRole;
 import com.leadboard.auth.AuthorizationService;
 import com.leadboard.auth.LeadBoardAuthentication;
 import com.leadboard.board.BoardNode;
@@ -15,6 +16,7 @@ import com.leadboard.epic.RoughEstimateRequestDto;
 import com.leadboard.insight.InsightEngine;
 import com.leadboard.jira.JiraWriteService;
 import com.leadboard.matrix.MatrixService;
+import com.leadboard.metrics.dto.BugMetricsResponse;
 import com.leadboard.metrics.dto.TeamMetricsSummary;
 import com.leadboard.metrics.repository.StatusChangelogRepository;
 import com.leadboard.planning.ForecastService;
@@ -25,6 +27,7 @@ import com.leadboard.metrics.service.TeamMetricsService;
 import com.leadboard.project.ProjectService;
 import com.leadboard.quality.BugSlaService;
 import com.leadboard.rice.RiceAssessmentService;
+import com.leadboard.rice.dto.RiceRankingEntryDto;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
@@ -169,12 +172,7 @@ public class ChatToolExecutor {
             return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
         }
 
-        List<JiraIssueEntity> epics;
-        if (teamId != null) {
-            epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
-        } else {
-            epics = issueRepository.findByBoardCategory("EPIC");
-        }
+        List<JiraIssueEntity> epics = fetchByCategoryScoped("EPIC", teamId);
 
         Map<String, Long> epicsByStatus = epics.stream()
                 .collect(Collectors.groupingBy(
@@ -286,27 +284,14 @@ public class ChatToolExecutor {
         }
 
         List<JiraIssueEntity> issues;
-        if (teamId != null && typeFilter != null) {
-            issues = issueRepository.findByBoardCategoryAndTeamId(typeFilter, teamId);
-        } else if (teamId != null) {
-            List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
-            List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryAndTeamId("STORY", teamId);
-            List<JiraIssueEntity> bugs = issueRepository.findByBoardCategoryAndTeamId("BUG", teamId);
-            issues = new ArrayList<>();
-            issues.addAll(epics);
-            issues.addAll(stories);
-            issues.addAll(bugs);
-        } else if (typeFilter != null) {
-            issues = issueRepository.findByBoardCategory(typeFilter);
+        if (typeFilter != null) {
+            issues = fetchByCategoryScoped(typeFilter, teamId);
         } else {
             // All main types
-            List<JiraIssueEntity> epics = issueRepository.findByBoardCategory("EPIC");
-            List<JiraIssueEntity> stories = issueRepository.findByBoardCategory("STORY");
-            List<JiraIssueEntity> bugs = issueRepository.findByBoardCategory("BUG");
             issues = new ArrayList<>();
-            issues.addAll(epics);
-            issues.addAll(stories);
-            issues.addAll(bugs);
+            issues.addAll(fetchByCategoryScoped("EPIC", teamId));
+            issues.addAll(fetchByCategoryScoped("STORY", teamId));
+            issues.addAll(fetchByCategoryScoped("BUG", teamId));
         }
 
         // Filter by status category if specified
@@ -347,7 +332,7 @@ public class ChatToolExecutor {
         boolean usedSemantic = false;
 
         if (query != null && !query.isBlank()) {
-            List<JiraIssueEntity> semanticResults = embeddingService.search(query, teamId, 20);
+            List<JiraIssueEntity> semanticResults = semanticSearchScoped(query, teamId);
             if (!semanticResults.isEmpty()) {
                 issues = new ArrayList<>(semanticResults);
                 usedSemantic = true;
@@ -370,23 +355,13 @@ public class ChatToolExecutor {
 
         // Fallback to substring match
         if (issues == null || issues.isEmpty()) {
-            if (teamId != null && typeFilter != null) {
-                issues = issueRepository.findByBoardCategoryAndTeamId(typeFilter, teamId);
-            } else if (teamId != null) {
-                List<JiraIssueEntity> epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
-                List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryAndTeamId("STORY", teamId);
-                List<JiraIssueEntity> bugs = issueRepository.findByBoardCategoryAndTeamId("BUG", teamId);
-                issues = new ArrayList<>();
-                issues.addAll(epics);
-                issues.addAll(stories);
-                issues.addAll(bugs);
-            } else if (typeFilter != null) {
-                issues = issueRepository.findByBoardCategory(typeFilter);
+            if (typeFilter != null) {
+                issues = fetchByCategoryScoped(typeFilter, teamId);
             } else {
                 issues = new ArrayList<>();
-                issues.addAll(issueRepository.findByBoardCategory("EPIC"));
-                issues.addAll(issueRepository.findByBoardCategory("STORY"));
-                issues.addAll(issueRepository.findByBoardCategory("BUG"));
+                issues.addAll(fetchByCategoryScoped("EPIC", teamId));
+                issues.addAll(fetchByCategoryScoped("STORY", teamId));
+                issues.addAll(fetchByCategoryScoped("BUG", teamId));
             }
 
             // Filter by status category
@@ -440,12 +415,7 @@ public class ChatToolExecutor {
         }
 
         // Reuse the same logic as DataQualityController but return a simplified summary
-        List<JiraIssueEntity> epics;
-        if (teamId != null) {
-            epics = issueRepository.findByBoardCategoryAndTeamId("EPIC", teamId);
-        } else {
-            epics = issueRepository.findByBoardCategory("EPIC");
-        }
+        List<JiraIssueEntity> epics = fetchByCategoryScoped("EPIC", teamId);
 
         List<String> epicKeys = epics.stream().map(JiraIssueEntity::getIssueKey).toList();
         List<JiraIssueEntity> stories = new ArrayList<>();
@@ -481,7 +451,7 @@ public class ChatToolExecutor {
         }
 
         try {
-            var metrics = bugMetricsService.getBugMetrics(teamId);
+            BugMetricsResponse metrics = fetchBugMetricsScoped(teamId);
 
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("openBugs", metrics.openBugs());
@@ -525,6 +495,20 @@ public class ChatToolExecutor {
         try {
             var projects = projectService.listProjects();
 
+            // F81 security fix (SECURITY_AUDIT.md MEDIUM #6): project_list had no
+            // team scoping at all. A project itself carries no teamId (it can span
+            // several teams), so non-admin/PM visibility is derived from whether
+            // any of the project's child epics belongs to one of the caller's teams.
+            Set<Long> scope = scopeForOmittedTeamId();
+            if (scope != null) {
+                if (scope.isEmpty()) {
+                    return toJson(Map.of("projects", List.of(), "totalProjects", 0));
+                }
+                projects = projects.stream()
+                        .filter(p -> projectHasEpicInScope(p.issueKey(), scope))
+                        .toList();
+            }
+
             List<Map<String, Object>> projectData = projects.stream().map(p -> {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("key", p.issueKey());
@@ -549,6 +533,23 @@ public class ChatToolExecutor {
     private String riceRanking() {
         try {
             var ranking = riceAssessmentService.getRanking(null);
+
+            // F81 security fix (SECURITY_AUDIT.md MEDIUM #6): rice_ranking had no
+            // team scoping at all. Entries are epics (team on the issue itself) or
+            // top-level projects (team derived from child epics, like project_list).
+            Set<Long> scope = scopeForOmittedTeamId();
+            if (scope != null) {
+                if (scope.isEmpty()) {
+                    return toJson(Map.of("ranking", List.of(), "totalRanked", 0, "showing", 0));
+                }
+                Set<String> keys = ranking.stream().map(RiceRankingEntryDto::issueKey).collect(Collectors.toSet());
+                Map<String, JiraIssueEntity> issueMap = keys.isEmpty() ? Map.of()
+                        : issueRepository.findByIssueKeyIn(new ArrayList<>(keys)).stream()
+                                .collect(Collectors.toMap(JiraIssueEntity::getIssueKey, i -> i));
+                ranking = ranking.stream()
+                        .filter(r -> isRankingEntryInScope(issueMap.get(r.issueKey()), scope))
+                        .toList();
+            }
 
             List<Map<String, Object>> entries = ranking.stream().limit(20).map(r -> {
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -665,7 +666,19 @@ public class ChatToolExecutor {
         }
 
         try {
-            List<Long> teamIds = teamId != null ? List.of(teamId) : null;
+            List<Long> teamIds;
+            if (teamId != null) {
+                teamIds = List.of(teamId);
+            } else {
+                Set<Long> scope = scopeForOmittedTeamId();
+                if (scope == null) {
+                    teamIds = null;
+                } else if (scope.isEmpty()) {
+                    return toJson(Map.of("epics", List.of(), "totalEpics", 0, "showing", 0));
+                } else {
+                    teamIds = new ArrayList<>(scope);
+                }
+            }
             BoardResponse board = boardService.getBoard(query, null, teamIds, 0, 20, false);
 
             List<Map<String, Object>> epics = board.getItems().stream().map(epic -> {
@@ -753,7 +766,26 @@ public class ChatToolExecutor {
         if (!checkTeamAccess(teamId)) {
             return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
         }
-        return toJson(insightEngine.briefing(teamId));
+        if (teamId != null) {
+            return toJson(insightEngine.briefing(teamId));
+        }
+        Set<Long> scope = scopeForOmittedTeamId();
+        if (scope == null) {
+            return toJson(insightEngine.briefing(null));
+        }
+        if (scope.isEmpty()) {
+            return toJson(Map.of("error", "No accessible teams"));
+        }
+        if (scope.size() == 1) {
+            return toJson(insightEngine.briefing(scope.iterator().next()));
+        }
+        // Multiple team memberships: readiness lenses (RED/YELLOW/GREEN) are
+        // per-team by design, so return one briefing per team rather than
+        // guessing how to merge qualitative levels across unrelated teams.
+        List<Object> readinessByTeam = scope.stream()
+                .<Object>map(insightEngine::briefing)
+                .toList();
+        return toJson(Map.of("readinessByTeam", readinessByTeam));
     }
 
     // ===================== F80 write tools =====================
@@ -762,9 +794,45 @@ public class ChatToolExecutor {
         return args.has(name) && !args.get(name).isNull() ? args.get(name).asText() : null;
     }
 
-    private String transitionIssue(JsonNode args) {
+    /**
+     * Minimum bar for Jira-write tools (transition/log-work/create/comment/assign).
+     * These have no dedicated REST endpoint of their own to mirror, so the rule
+     * (SECURITY_AUDIT.md HIGH #3) is: must be authenticated, and read-only VIEWER
+     * may never write. Returns {@code null} when allowed, or the error message
+     * to surface to the caller otherwise.
+     */
+    private String requireJiraWriteAccess() {
         if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+            return "Authentication required";
+        }
+        if (!authorizationService.canWriteJira()) {
+            return "Forbidden: your role is read-only and cannot modify Jira";
+        }
+        return null;
+    }
+
+    /**
+     * Role gate for planning/board write tools that DO have a REST equivalent
+     * (MatrixController.triage, QuarterlyPlanningController.assignEpicToQuarter/
+     * setEpicBoost, EpicController.updateRoughEstimate) — all of them require
+     * {@code hasAnyRole('ADMIN','PROJECT_MANAGER','TEAM_LEAD')}. Replicated here
+     * so chat/MCP cannot bypass the role check the REST controller enforces
+     * (SECURITY_AUDIT.md HIGH #3).
+     */
+    private String requirePlanningWriteAccess() {
+        if (!authorizationService.isAuthenticated()) {
+            return "Authentication required";
+        }
+        if (!authorizationService.hasAnyRole(AppRole.ADMIN, AppRole.PROJECT_MANAGER, AppRole.TEAM_LEAD)) {
+            return "Forbidden: requires ADMIN, PROJECT_MANAGER, or TEAM_LEAD role";
+        }
+        return null;
+    }
+
+    private String transitionIssue(JsonNode args) {
+        String denied = requireJiraWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String issueKey = strParam(args, "issueKey");
         String target = strParam(args, "targetStatus");
@@ -780,8 +848,9 @@ public class ChatToolExecutor {
     }
 
     private String logWork(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requireJiraWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String issueKey = strParam(args, "issueKey");
         if (issueKey == null || !args.has("hours")) {
@@ -810,8 +879,9 @@ public class ChatToolExecutor {
     }
 
     private String createIssueTool(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requireJiraWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String kind = strParam(args, "kind");
         String summary = strParam(args, "summary");
@@ -828,8 +898,9 @@ public class ChatToolExecutor {
     }
 
     private String addCommentTool(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requireJiraWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String issueKey = strParam(args, "issueKey");
         String text = strParam(args, "text");
@@ -845,8 +916,9 @@ public class ChatToolExecutor {
     }
 
     private String assignIssueTool(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requireJiraWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String issueKey = strParam(args, "issueKey");
         String accountId = strParam(args, "accountId");
@@ -943,7 +1015,7 @@ public class ChatToolExecutor {
         if (!checkTeamAccess(teamId)) {
             return toJson(Map.of("error", "Access denied: you can only view your own team's data"));
         }
-        List<Map<String, Object>> tasks = issueRepository.findWithWorklog(teamId).stream()
+        List<Map<String, Object>> tasks = fetchWithWorklogScoped(teamId).stream()
                 .filter(i -> !isDoneIssue(i))
                 .limit(30)
                 .map(i -> {
@@ -995,7 +1067,7 @@ public class ChatToolExecutor {
             myAccountId = auth != null ? auth.getAtlassianAccountId() : null;
         }
 
-        List<JiraIssueEntity> closed = issueRepository.findClosedBetween(from, to, teamId);
+        List<JiraIssueEntity> closed = fetchClosedBetweenScoped(from, to, teamId);
         List<Map<String, Object>> tasks = new ArrayList<>();
         int total = 0;
         for (JiraIssueEntity i : closed) {
@@ -1054,8 +1126,9 @@ public class ChatToolExecutor {
     // ===================== F80 write: board =====================
 
     private String triageMatrix(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requirePlanningWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String issueKey = strParam(args, "issueKey");
         String quadrant = strParam(args, "quadrant");
@@ -1070,8 +1143,9 @@ public class ChatToolExecutor {
     }
 
     private String assignEpicQuarter(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requirePlanningWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String epicKey = strParam(args, "epicKey");
         String quarter = strParam(args, "quarter");
@@ -1086,8 +1160,9 @@ public class ChatToolExecutor {
     }
 
     private String setEpicBoost(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requirePlanningWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String epicKey = strParam(args, "epicKey");
         if (epicKey == null || !args.has("boost")) {
@@ -1101,8 +1176,9 @@ public class ChatToolExecutor {
     }
 
     private String setRoughEstimate(JsonNode args) {
-        if (!authorizationService.isAuthenticated()) {
-            return toJson(Map.of("error", "Authentication required"));
+        String denied = requirePlanningWriteAccess();
+        if (denied != null) {
+            return toJson(Map.of("error", denied));
         }
         String epicKey = strParam(args, "epicKey");
         String role = strParam(args, "role");
@@ -1135,15 +1211,215 @@ public class ChatToolExecutor {
         return null;
     }
 
+    /**
+     * Gate for an EXPLICIT {@code teamId} argument only: is the caller allowed
+     * to see that specific team's data? {@code teamId == null} is intentionally
+     * "no explicit filter requested" here, NOT "no restriction" — every read
+     * tool that accepts an optional teamId must additionally consult
+     * {@link #scopeForOmittedTeamId()} to decide what "no filter" means for a
+     * non-admin caller (F81 fix for SECURITY_AUDIT.md MEDIUM #6: previously
+     * {@code teamId == null} bypassed team-scoping entirely for every role).
+     */
     private boolean checkTeamAccess(Long teamId) {
         if (teamId == null) {
-            return true; // No filter = OK (will see all accessible data)
+            return true; // No explicit filter = OK; scoping handled by scopeForOmittedTeamId()
         }
         if (authorizationService.isAdmin() || authorizationService.isProjectManager()) {
             return true;
         }
         Set<Long> userTeamIds = authorizationService.getUserTeamIds();
         return userTeamIds.contains(teamId);
+    }
+
+    /**
+     * Effective team scope for read tools when the caller omitted {@code teamId}.
+     * ADMIN/PROJECT_MANAGER get the unrestricted (whole tenant) view, matching
+     * {@link #checkTeamAccess}; every other role (TEAM_LEAD/MEMBER/VIEWER) is
+     * confined to the teams they belong to.
+     *
+     * @return {@code null} when the caller may see every team (no filter should
+     *         be applied); otherwise the (possibly empty) set of team ids the
+     *         caller may see. An empty set means "no accessible teams" and
+     *         callers should short-circuit to an empty/zeroed result instead of
+     *         querying with an empty IN-clause.
+     */
+    private Set<Long> scopeForOmittedTeamId() {
+        if (authorizationService.isAdmin() || authorizationService.isProjectManager()) {
+            return null;
+        }
+        return authorizationService.getUserTeamIds();
+    }
+
+    /**
+     * Fetches issues of a board category, honoring an explicit teamId or,
+     * absent one, the caller's team scope (see {@link #scopeForOmittedTeamId()}).
+     * Used by board_summary/task_count/task_search/data_quality_summary so the
+     * "no teamId given" path can no longer see every team's data for non-admins.
+     */
+    private List<JiraIssueEntity> fetchByCategoryScoped(String category, Long teamId) {
+        if (teamId != null) {
+            return issueRepository.findByBoardCategoryAndTeamId(category, teamId);
+        }
+        Set<Long> scope = scopeForOmittedTeamId();
+        if (scope == null) {
+            return issueRepository.findByBoardCategory(category);
+        }
+        if (scope.isEmpty()) {
+            return List.of();
+        }
+        return issueRepository.findByBoardCategoryAndTeamIdIn(category, scope);
+    }
+
+    /**
+     * Semantic (embedding) search scoped like {@link #fetchByCategoryScoped}.
+     * {@link EmbeddingService#search} only accepts a single nullable teamId, so
+     * a caller scoped to more than one team cannot be served semantically —
+     * falls back to {@code List.of()} so the caller's substring-search fallback
+     * (already scoped via {@link #fetchByCategoryScoped}) takes over instead of
+     * silently searching every team.
+     */
+    private List<JiraIssueEntity> semanticSearchScoped(String query, Long teamId) {
+        if (teamId != null) {
+            return embeddingService.search(query, teamId, 20);
+        }
+        Set<Long> scope = scopeForOmittedTeamId();
+        if (scope == null) {
+            return embeddingService.search(query, null, 20);
+        }
+        if (scope.size() == 1) {
+            return embeddingService.search(query, scope.iterator().next(), 20);
+        }
+        return List.of(); // empty scope, or multi-team — defer to scoped substring fallback
+    }
+
+    /**
+     * Bug metrics scoped like {@link #fetchByCategoryScoped}. {@link BugMetricsService}
+     * only accepts a single nullable teamId, so a caller belonging to more than
+     * one team gets a merged result (per-team calls combined; see
+     * {@link #mergeBugMetrics}).
+     */
+    private BugMetricsResponse fetchBugMetricsScoped(Long teamId) {
+        if (teamId != null) {
+            return bugMetricsService.getBugMetrics(teamId);
+        }
+        Set<Long> scope = scopeForOmittedTeamId();
+        if (scope == null) {
+            return bugMetricsService.getBugMetrics(null);
+        }
+        if (scope.isEmpty()) {
+            return new BugMetricsResponse(0, 0, 0, 0, 0.0, List.of(), List.of());
+        }
+        List<BugMetricsResponse> parts = scope.stream().map(bugMetricsService::getBugMetrics).toList();
+        return mergeBugMetrics(parts);
+    }
+
+    /**
+     * Combines per-team {@link BugMetricsResponse} results for a multi-team
+     * caller. Counts/lists are summed/concatenated exactly; rate-like fields
+     * (avgResolutionHours, slaCompliancePercent) are a simple (unweighted)
+     * average across teams — an acceptable approximation since multi-team
+     * membership is the rare case (most callers hit the single-team branch).
+     */
+    private BugMetricsResponse mergeBugMetrics(List<BugMetricsResponse> parts) {
+        if (parts.size() == 1) {
+            return parts.get(0);
+        }
+        int openBugs = 0;
+        int resolvedBugs = 0;
+        int staleBugs = 0;
+        long avgResolutionHoursSum = 0;
+        double slaSum = 0;
+        Map<String, BugMetricsResponse.PriorityMetrics> byPriority = new LinkedHashMap<>();
+        List<BugMetricsResponse.OpenBugDto> openBugList = new ArrayList<>();
+        for (BugMetricsResponse p : parts) {
+            openBugs += p.openBugs();
+            resolvedBugs += p.resolvedBugs();
+            staleBugs += p.staleBugs();
+            avgResolutionHoursSum += p.avgResolutionHours();
+            slaSum += p.slaCompliancePercent();
+            openBugList.addAll(p.openBugList());
+            for (BugMetricsResponse.PriorityMetrics pm : p.byPriority()) {
+                byPriority.merge(pm.priority(), pm, (a, b) -> new BugMetricsResponse.PriorityMetrics(
+                        a.priority(),
+                        a.openCount() + b.openCount(),
+                        a.resolvedCount() + b.resolvedCount(),
+                        (a.avgResolutionHours() + b.avgResolutionHours()) / 2,
+                        a.slaLimitHours() != null ? a.slaLimitHours() : b.slaLimitHours(),
+                        (a.slaCompliancePercent() + b.slaCompliancePercent()) / 2));
+            }
+        }
+        int teamCount = parts.size();
+        return new BugMetricsResponse(openBugs, resolvedBugs, staleBugs,
+                avgResolutionHoursSum / teamCount, slaSum / teamCount,
+                new ArrayList<>(byPriority.values()), openBugList);
+    }
+
+    /** Issues with worklog, scoped like {@link #fetchByCategoryScoped}. */
+    private List<JiraIssueEntity> fetchWithWorklogScoped(Long teamId) {
+        if (teamId != null) {
+            return issueRepository.findWithWorklog(teamId);
+        }
+        Set<Long> scope = scopeForOmittedTeamId();
+        if (scope == null) {
+            return issueRepository.findWithWorklog(null);
+        }
+        if (scope.isEmpty()) {
+            return List.of();
+        }
+        List<JiraIssueEntity> merged = new ArrayList<>();
+        for (Long id : scope) {
+            merged.addAll(issueRepository.findWithWorklog(id));
+        }
+        return merged;
+    }
+
+    /** Closed issues in a period, scoped like {@link #fetchByCategoryScoped}. */
+    private List<JiraIssueEntity> fetchClosedBetweenScoped(java.time.OffsetDateTime from, java.time.OffsetDateTime to, Long teamId) {
+        if (teamId != null) {
+            return issueRepository.findClosedBetween(from, to, teamId);
+        }
+        Set<Long> scope = scopeForOmittedTeamId();
+        if (scope == null) {
+            return issueRepository.findClosedBetween(from, to, null);
+        }
+        if (scope.isEmpty()) {
+            return List.of();
+        }
+        List<JiraIssueEntity> merged = new ArrayList<>();
+        for (Long id : scope) {
+            merged.addAll(issueRepository.findClosedBetween(from, to, id));
+        }
+        return merged;
+    }
+
+    /**
+     * Whether a top-level project (board_category PROJECT, no teamId of its
+     * own) is visible to a non-admin caller: true if any of its child epics
+     * belongs to one of the caller's teams. Used by project_list.
+     */
+    private boolean projectHasEpicInScope(String projectKey, Set<Long> scope) {
+        return issueRepository.findByParentKeyAndBoardCategory(projectKey, "EPIC").stream()
+                .anyMatch(e -> e.getTeamId() != null && scope.contains(e.getTeamId()));
+    }
+
+    /**
+     * Whether a RICE ranking entry is visible to a non-admin caller: the
+     * underlying issue's own teamId is in scope (covers epics), or — if the
+     * issue is a top-level project (no teamId of its own) — one of its child
+     * epics is (see {@link #projectHasEpicInScope}). Unknown/untracked issues
+     * are excluded (conservative default). Used by rice_ranking.
+     */
+    private boolean isRankingEntryInScope(JiraIssueEntity issue, Set<Long> scope) {
+        if (issue == null) {
+            return false;
+        }
+        if (issue.getTeamId() != null) {
+            return scope.contains(issue.getTeamId());
+        }
+        if ("PROJECT".equals(issue.getBoardCategory())) {
+            return projectHasEpicInScope(issue.getIssueKey(), scope);
+        }
+        return false;
     }
 
     private static String normalizeRussian(String text) {

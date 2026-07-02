@@ -8,6 +8,7 @@ public class AppProperties {
     private String frontendUrl = "http://localhost:5173";
     private Session session = new Session();
     private Encryption encryption = new Encryption();
+    private AccessReconcile accessReconcile = new AccessReconcile();
 
     public String getFrontendUrl() {
         return frontendUrl;
@@ -33,10 +34,20 @@ public class AppProperties {
         this.encryption = encryption;
     }
 
+    public AccessReconcile getAccessReconcile() {
+        return accessReconcile;
+    }
+
+    public void setAccessReconcile(AccessReconcile accessReconcile) {
+        this.accessReconcile = accessReconcile;
+    }
+
     public static class Session {
         private String cookieName = "LEAD_SESSION";
         private int maxAgeDays = 30;
         private String cookieDomain;
+        // SECURITY_AUDIT.md §9: fail-closed default. application.yml's
+        // ${APP_SESSION_COOKIE_SECURE:true} placeholder must not override this to false.
         private boolean cookieSecure = true;
 
         public String getCookieName() {
@@ -81,6 +92,31 @@ public class AppProperties {
 
         public void setTokenKey(String tokenKey) {
             this.tokenKey = tokenKey;
+        }
+    }
+
+    /**
+     * F82: background reconciliation of tenant membership vs. Jira access
+     * (see {@code com.leadboard.tenant.TenantAccessReconciler}).
+     */
+    public static class AccessReconcile {
+        private boolean enabled = true;
+        private int intervalSeconds = 14400; // 4 hours
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public int getIntervalSeconds() {
+            return intervalSeconds;
+        }
+
+        public void setIntervalSeconds(int intervalSeconds) {
+            this.intervalSeconds = intervalSeconds;
         }
     }
 }

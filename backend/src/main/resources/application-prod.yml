@@ -35,6 +35,10 @@ logging:
 
 app:
   frontend-url: ${APP_FRONTEND_URL:https://onelane.ru}
+  session:
+    # SECURITY_AUDIT.md §9: pinned explicitly for prod (defense-in-depth) — must not depend
+    # on the shared default in application.yml staying correct.
+    cookie-secure: true
 
 # CORS - настраивается через env
 cors:
