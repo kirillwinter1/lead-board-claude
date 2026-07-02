@@ -6,9 +6,11 @@ import { StatusBadge } from './StatusBadge'
 import { ExpectedDoneCell } from './ExpectedDoneCell'
 import { StoryExpectedDoneCell } from './StoryExpectedDoneCell'
 import { AlertIcon } from './AlertIcon'
+import { EpicTooltip } from './EpicTooltip'
 import { TeamBadge } from '../TeamBadge'
 import { StatusAgeBadge } from '../StatusAgeBadge'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
+import { ERROR_BG, INFO_BG, SUCCESS_BG } from '../../constants/colors'
 import type { BoardRowProps } from './types'
 
 export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEstimateConfig, onRoughEstimateUpdate, forecast, canReorder, isJustDropped, actualPosition, recommendedPosition, dragHandleProps, storyPlanning }: BoardRowProps) {
@@ -59,11 +61,22 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
             <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType), getIssueTypeCategory(node.issueType))} alt={node.issueType} className="issue-type-icon" />
             <div className="name-text">
               <div className="name-text-line">
-                <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-                  {node.issueKey}
-                </a>
-                {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
-                <span className="issue-title">{node.title}</span>
+                {isEpicRow ? (
+                  <EpicTooltip epicKey={node.issueKey}>
+                    <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
+                      {node.issueKey}
+                    </a>
+                    <span className="issue-title">{node.title}</span>
+                  </EpicTooltip>
+                ) : (
+                  <>
+                    <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
+                      {node.issueKey}
+                    </a>
+                    {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }}>FLG</span>}
+                    <span className="issue-title">{node.title}</span>
+                  </>
+                )}
               </div>
               {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel || node.daysInStatus != null) && (
                 <div className="name-row-labels">
@@ -87,7 +100,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                     fontSize: 10,
                     padding: '1px 5px',
                     borderRadius: 3,
-                    background: '#DEEBFF',
+                    background: INFO_BG,
                     color: '#0747A6',
                     fontWeight: 500,
                     whiteSpace: 'nowrap',
@@ -103,7 +116,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   fontSize: 10,
                   padding: '1px 5px',
                   borderRadius: 3,
-                  background: '#E3FCEF',
+                  background: SUCCESS_BG,
                   color: '#006644',
                   fontWeight: 500,
                   whiteSpace: 'nowrap',
