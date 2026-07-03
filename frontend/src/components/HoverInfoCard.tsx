@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 interface HoverInfoCardProps<T> {
-  title: string
+  title?: string
   width?: number
   loadData: (signal: AbortSignal) => Promise<T>
   render: (data: T) => ReactNode
@@ -87,7 +87,7 @@ export function HoverInfoCard<T>({ title, width = 300, loadData, render, childre
             pointerEvents: 'none',
           }}
         >
-          <div style={{ fontWeight: 600, color: '#172b4d', marginBottom: 8 }}>{title}</div>
+          {title && <div style={{ fontWeight: 600, color: '#172b4d', marginBottom: 8 }}>{title}</div>}
           {loading && <div style={{ color: '#6b778c' }}>Загрузка…</div>}
           {error && <div style={{ color: '#de350b' }}>Не удалось загрузить</div>}
           {data && !loading && render(data)}

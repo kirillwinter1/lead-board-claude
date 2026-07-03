@@ -129,7 +129,7 @@ public class JiraClient {
     }
 
     private String buildFieldsList() {
-        String baseFields = "summary,status,issuetype,parent,project,timetracking,priority,duedate,created,updated,assignee,flagged,customfield_10021,issuelinks,components,labels";
+        String baseFields = "summary,description,status,issuetype,parent,project,timetracking,priority,duedate,created,updated,assignee,flagged,customfield_10021,issuelinks,components,labels";
         String teamFieldId = configResolver.getTeamFieldId();
         if (teamFieldId != null && !teamFieldId.isEmpty()) {
             return baseFields + "," + teamFieldId;

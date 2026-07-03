@@ -2,17 +2,14 @@ import type { ReactNode } from 'react'
 import { projectsApi, type ProjectDetailDto } from '../../api/projects'
 import { HoverInfoCard } from '../HoverInfoCard'
 import { TeamBadge } from '../TeamBadge'
-import { getIssueIcon } from './helpers'
-import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
+import { TooltipIssueHeader } from './TooltipIssueHeader'
 
-// F85 — tooltip проекта: иконка типа, имя, прогресс, дедлайн, команды.
+// F85 — tooltip проекта: иконка+ключ / название / описание, затем прогресс, дедлайн, команды.
 // Команды выводятся из списка эпиков проекта (distinct по имени).
 export function ProjectTooltip({ projectKey, children }: { projectKey: string; children: ReactNode }) {
-  const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   return (
     <HoverInfoCard<ProjectDetailDto>
-      title={projectKey}
-      width={320}
+      width={340}
       loadData={() => projectsApi.getDetail(projectKey)}
       render={(p) => {
         const teamsMap = new Map<string, string | null>()
@@ -20,16 +17,14 @@ export function ProjectTooltip({ projectKey, children }: { projectKey: string; c
         const teams = Array.from(teamsMap, ([name, color]) => ({ name, color }))
         return (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#172b4d' }}>
-              <img
-                src={getIssueIcon(p.issueType, getIssueTypeIconUrl(p.issueType), getIssueTypeCategory(p.issueType))}
-                alt={p.issueType}
-                width={16}
-                height={16}
-                style={{ flexShrink: 0 }}
-              />
-              <span>{p.summary}</span>
-            </div>
+            <TooltipIssueHeader issueType={p.issueType} issueKey={p.issueKey} summary={p.summary} />
+            {p.description ? (
+              <div style={{ color: '#42526e', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'hidden', lineHeight: 1.4 }}>
+                {p.description}
+              </div>
+            ) : (
+              <div style={{ color: '#97a0af', fontStyle: 'italic' }}>Без описания</div>
+            )}
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#42526e' }}>
               <span>Прогресс</span>
               <span style={{ fontWeight: 600, color: '#172b4d' }}>

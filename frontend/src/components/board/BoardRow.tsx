@@ -6,7 +6,7 @@ import { StatusBadge } from './StatusBadge'
 import { ExpectedDoneCell } from './ExpectedDoneCell'
 import { StoryExpectedDoneCell } from './StoryExpectedDoneCell'
 import { AlertIcon } from './AlertIcon'
-import { EpicTooltip } from './EpicTooltip'
+import { IssueTooltip } from './IssueTooltip'
 import { ProjectTooltip } from './ProjectTooltip'
 import { TeamBadge } from '../TeamBadge'
 import { StatusAgeBadge } from '../StatusAgeBadge'
@@ -61,23 +61,13 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
             <img src={getIssueIcon(node.issueType, getIssueTypeIconUrl(node.issueType), getIssueTypeCategory(node.issueType))} alt={node.issueType} className="issue-type-icon" />
             <div className="name-text">
               <div className="name-text-line">
-                {isEpicRow ? (
-                  <EpicTooltip epicKey={node.issueKey}>
-                    <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-                      {node.issueKey}
-                    </a>
-                    {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
-                    <span className="issue-title">{node.title}</span>
-                  </EpicTooltip>
-                ) : (
-                  <>
-                    <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
-                      {node.issueKey}
-                    </a>
-                    {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
-                    <span className="issue-title">{node.title}</span>
-                  </>
-                )}
+                <IssueTooltip issueKey={node.issueKey}>
+                  <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
+                    {node.issueKey}
+                  </a>
+                  {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
+                  <span className="issue-title">{node.title}</span>
+                </IssueTooltip>
               </div>
               {((node.priority && priorityIconUrl) || node.parentProjectKey || node.quarterLabel || node.daysInStatus != null) && (
                 <div className="name-row-labels">
