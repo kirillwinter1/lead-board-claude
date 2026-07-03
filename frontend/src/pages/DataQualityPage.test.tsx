@@ -471,7 +471,9 @@ describe('DataQualityPage', () => {
       fireEvent.click(fixBtn)
 
       await waitFor(() => {
-        // Modal title comes from the fetched preview
+        // Modal title is derived from the rule label (consistent with the table)
+        expect(screen.getByText('Fix: Epic without team')).toBeInTheDocument()
+        // The preview's neutral title renders as a lead/description line
         expect(screen.getByText('Set epic team')).toBeInTheDocument()
       })
     })

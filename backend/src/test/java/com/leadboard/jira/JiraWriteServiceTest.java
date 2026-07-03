@@ -116,6 +116,39 @@ class JiraWriteServiceTest {
     }
 
     @Nested
+    @DisplayName("listTransitionsWithFallback()")
+    class ListTransitionsFallback {
+        @Test
+        @DisplayName("reads via OAuth when the user has a token, without writing")
+        void oauthPath() {
+            withOAuth();
+            when(jiraClient.getTransitions(eq("LB-1"), anyString(), anyString()))
+                    .thenReturn(List.of(inProgressTransition()));
+
+            List<JiraTransition> result = service.listTransitionsWithFallback("LB-1");
+
+            assertEquals(1, result.size());
+            assertEquals("In Progress", result.get(0).to().name());
+            verify(jiraClient, never()).getTransitionsBasicAuth(anyString());
+            verify(jiraClient, never()).transitionIssue(anyString(), anyString(), anyString(), anyString());
+        }
+
+        @Test
+        @DisplayName("falls back to BasicAuth read when no token")
+        void basicAuthPath() {
+            withoutOAuth();
+            when(jiraClient.getTransitionsBasicAuth("LB-2"))
+                    .thenReturn(List.of(inProgressTransition()));
+
+            List<JiraTransition> result = service.listTransitionsWithFallback("LB-2");
+
+            assertEquals(1, result.size());
+            verify(jiraClient).getTransitionsBasicAuth("LB-2");
+            verify(jiraClient, never()).getTransitions(anyString(), anyString(), anyString());
+        }
+    }
+
+    @Nested
     @DisplayName("assignWithFallback()")
     class AssignFallback {
         @Test

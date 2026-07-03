@@ -4,6 +4,7 @@ import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.JiraMetadataService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
+import com.leadboard.jira.JiraTransition;
 import com.leadboard.jira.JiraWorklogResponse;
 import com.leadboard.jira.JiraWriteService;
 import com.leadboard.quality.DataQualityService;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -74,6 +76,18 @@ class FixHandlersTest {
         return e;
     }
 
+    /** A Jira transition whose target status is {@code toName} (statusCategory unused — the test
+     *  stubs {@code wfc.categorize} to classify names instead). */
+    private JiraTransition tr(String toName) {
+        return new JiraTransition("id-" + toName, "Move to " + toName,
+                new JiraTransition.TransitionTarget("s-" + toName, toName, null));
+    }
+
+    private List<String> optionValues(FixPreview preview) {
+        return preview.inputs().get(0).options().stream()
+                .map(com.leadboard.quality.fix.dto.FixInput.Option::value).toList();
+    }
+
     // ---------- Group A ----------
 
     @Test
@@ -83,7 +97,12 @@ class FixHandlersTest {
         JiraIssueEntity epic = issue("LB-1", "Epic", "New");
         when(issues.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
         when(wfc.categorizeIssueType("Epic", "LB")).thenReturn(BoardCategory.EPIC);
-        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.EPIC)).thenReturn("In Progress");
+        // Live Jira transitions on the epic; only In-Progress-category targets survive the filter.
+        when(jiraWrite.listTransitionsWithFallback("LB-1"))
+                .thenReturn(List.of(tr("In Progress"), tr("Done")));
+        when(wfc.categorize("In Progress", "Epic", "LB")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(wfc.categorize("Done", "Epic", "LB")).thenReturn(StatusCategory.DONE);
+        when(wfc.orderStatusNames(eq(BoardCategory.EPIC), anyList())).thenAnswer(i -> i.getArgument(1));
         when(jiraWrite.transitionWithFallback("LB-1", "In Progress")).thenReturn("In Progress");
 
         var handler = new ChildInProgressEpicNotFixHandler(support);
@@ -91,11 +110,22 @@ class FixHandlersTest {
         FixPreview preview = handler.preview(child);
         assertEquals("LB-1", preview.changes().get(0).issueKey()); // change points at epic, not child
         assertEquals("Epic", preview.changes().get(0).issueType()); // carries the epic's type for the preview icon
+        // The user picks the destination: a required select with only the In-Progress option, defaulting to it.
+        assertEquals("targetStatus", preview.inputs().get(0).name());
+        assertTrue(preview.inputs().get(0).required());
+        assertEquals(List.of("In Progress"), optionValues(preview));
+        assertEquals("In Progress", preview.inputs().get(0).defaultValue());
 
-        FixResult result = handler.apply(child, null, Map.of());
+        FixResult result = handler.apply(child, null, Map.of("targetStatus", "In Progress"));
         assertTrue(result.success());
         assertEquals(List.of("LB-1"), result.updatedIssues());
         verify(jiraWrite).transitionWithFallback("LB-1", "In Progress");
+
+        // A target status outside the computed options must be rejected server-side.
+        assertThrows(IllegalArgumentException.class,
+                () -> handler.apply(child, null, Map.of("targetStatus", "Done")));
+        // Missing targetStatus is rejected too.
+        assertThrows(IllegalArgumentException.class, () -> handler.apply(child, null, Map.of()));
     }
 
     @Test
@@ -288,14 +318,21 @@ class FixHandlersTest {
     void storyFullyLoggedNotDone_isRiskyTransition() {
         JiraIssueEntity story = issue("LB-2", "Story", "In Progress");
         when(wfc.categorizeIssueType("Story", "LB")).thenReturn(BoardCategory.STORY);
-        when(wfc.getFirstStatusNameForCategory(StatusCategory.DONE, BoardCategory.STORY)).thenReturn("Done");
+        when(jiraWrite.listTransitionsWithFallback("LB-2"))
+                .thenReturn(List.of(tr("Done"), tr("In Review")));
+        when(wfc.categorize("Done", "Story", "LB")).thenReturn(StatusCategory.DONE);
+        when(wfc.categorize("In Review", "Story", "LB")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(wfc.orderStatusNames(eq(BoardCategory.STORY), anyList())).thenAnswer(i -> i.getArgument(1));
         when(jiraWrite.transitionWithFallback("LB-2", "Done")).thenReturn("Done");
 
         var handler = new StoryFullyLoggedNotDoneFixHandler(support);
         FixPreview preview = handler.preview(story);
         assertTrue(preview.risky());
+        // Only Done-category targets are offered; default is the first.
+        assertEquals(List.of("Done"), optionValues(preview));
+        assertEquals("Done", preview.inputs().get(0).defaultValue());
 
-        FixResult result = handler.apply(story, null, Map.of());
+        FixResult result = handler.apply(story, null, Map.of("targetStatus", "Done"));
         assertTrue(result.success());
         verify(jiraWrite).transitionWithFallback("LB-2", "Done");
     }
@@ -345,19 +382,31 @@ class FixHandlersTest {
     void storyTodoButHasWork_movesStoryToInProgress() {
         JiraIssueEntity story = issue("LB-2", "Story", "New");
         when(wfc.categorizeIssueType("Story", "LB")).thenReturn(BoardCategory.STORY);
-        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY)).thenReturn("Аналитика");
+        // Live Jira transitions unavailable → falls back to config-mapped statuses (already ordered).
+        when(jiraWrite.listTransitionsWithFallback("LB-2")).thenThrow(new RuntimeException("jira down"));
+        when(wfc.getStatusNamesForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY))
+                .thenReturn(List.of("Аналитика", "In Progress"));
         when(jiraWrite.transitionWithFallback("LB-2", "Аналитика")).thenReturn("Аналитика");
 
         var handler = new StoryTodoButHasWorkFixHandler(support);
 
         FixPreview preview = handler.preview(story);
         assertTrue(preview.applicable());
+        // Default (change.to + input default) is the config-ordered first status.
         assertEquals("Аналитика", preview.changes().get(0).to());
+        assertEquals("Аналитика", preview.inputs().get(0).defaultValue());
+        assertEquals(List.of("Аналитика", "In Progress"), optionValues(preview));
 
-        FixResult result = handler.apply(story, null, Map.of());
+        FixResult result = handler.apply(story, null, Map.of("targetStatus", "Аналитика"));
         assertTrue(result.success());
         assertEquals(List.of("LB-2"), result.updatedIssues());
         verify(jiraWrite).transitionWithFallback("LB-2", "Аналитика");
+
+        // The user may pick a non-default valid option.
+        when(jiraWrite.transitionWithFallback("LB-2", "In Progress")).thenReturn("In Progress");
+        FixResult picked = handler.apply(story, null, Map.of("targetStatus", "In Progress"));
+        assertTrue(picked.success());
+        verify(jiraWrite).transitionWithFallback("LB-2", "In Progress");
     }
 
     @Test
@@ -367,7 +416,9 @@ class FixHandlersTest {
         JiraIssueEntity story = issue("LB-2", "Story", "New");
         when(issues.findByIssueKey("LB-2")).thenReturn(Optional.of(story));
         when(wfc.categorizeIssueType("Story", "LB")).thenReturn(BoardCategory.STORY);
-        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.STORY)).thenReturn("Аналитика");
+        when(jiraWrite.listTransitionsWithFallback("LB-2")).thenReturn(List.of(tr("Аналитика")));
+        when(wfc.categorize("Аналитика", "Story", "LB")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(wfc.orderStatusNames(eq(BoardCategory.STORY), anyList())).thenAnswer(i -> i.getArgument(1));
         when(jiraWrite.transitionWithFallback("LB-2", "Аналитика")).thenReturn("Аналитика");
 
         var handler = new SubtaskInProgressStoryNotFixHandler(support);
@@ -375,8 +426,9 @@ class FixHandlersTest {
         FixPreview preview = handler.preview(sub);
         assertEquals("LB-2", preview.changes().get(0).issueKey()); // targets the story, not the subtask
         assertEquals("Story", preview.changes().get(0).issueType());
+        assertEquals("Аналитика", preview.inputs().get(0).defaultValue());
 
-        FixResult result = handler.apply(sub, null, Map.of());
+        FixResult result = handler.apply(sub, null, Map.of("targetStatus", "Аналитика"));
         assertEquals(List.of("LB-2"), result.updatedIssues());
         verify(jiraWrite).transitionWithFallback("LB-2", "Аналитика");
     }
@@ -395,15 +447,18 @@ class FixHandlersTest {
     void subtaskTimeLoggedButTodo_movesSubtaskItself() {
         JiraIssueEntity sub = issue("LB-5", "Sub-task", "New");
         when(wfc.categorizeIssueType("Sub-task", "LB")).thenReturn(BoardCategory.SUBTASK);
-        when(wfc.getFirstStatusNameForCategory(StatusCategory.IN_PROGRESS, BoardCategory.SUBTASK)).thenReturn("In Progress");
+        when(jiraWrite.listTransitionsWithFallback("LB-5")).thenReturn(List.of(tr("In Progress")));
+        when(wfc.categorize("In Progress", "Sub-task", "LB")).thenReturn(StatusCategory.IN_PROGRESS);
+        when(wfc.orderStatusNames(eq(BoardCategory.SUBTASK), anyList())).thenAnswer(i -> i.getArgument(1));
         when(jiraWrite.transitionWithFallback("LB-5", "In Progress")).thenReturn("In Progress");
 
         var handler = new SubtaskTimeLoggedButTodoFixHandler(support);
 
         FixPreview preview = handler.preview(sub);
         assertEquals("LB-5", preview.changes().get(0).issueKey());
+        assertEquals("In Progress", preview.inputs().get(0).defaultValue());
 
-        FixResult result = handler.apply(sub, null, Map.of());
+        FixResult result = handler.apply(sub, null, Map.of("targetStatus", "In Progress"));
         assertEquals(List.of("LB-5"), result.updatedIssues());
         verify(jiraWrite).transitionWithFallback("LB-5", "In Progress");
     }

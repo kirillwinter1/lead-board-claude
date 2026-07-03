@@ -3,6 +3,7 @@ package com.leadboard.quality.fix.handlers;
 import com.leadboard.quality.DataQualityRule;
 import com.leadboard.quality.fix.FixHandler;
 import com.leadboard.quality.fix.FixSupport;
+import com.leadboard.quality.fix.dto.FixInput;
 import com.leadboard.quality.fix.dto.FixPreview;
 import com.leadboard.quality.fix.dto.FixResult;
 import com.leadboard.status.StatusCategory;
@@ -33,16 +34,20 @@ public class SubtaskInProgressStoryNotFixHandler implements FixHandler {
     @Override
     public FixPreview preview(JiraIssueEntity issue) {
         FixPreview.Builder b = FixPreview.builder(issue.getIssueKey(), rule(), "TRANSITION",
-                "Move story to In Progress").authMode(support.authMode());
+                "Change story status").authMode(support.authMode());
         JiraIssueEntity story = story(issue);
         if (story == null) {
             return b.notApplicable("Parent story not found.").build();
         }
-        String target = support.targetStatusName(story, StatusCategory.IN_PROGRESS);
-        if (target == null) {
-            return b.notApplicable("No In Progress status configured.").build();
+        FixSupport.TargetStatusOptions options = support.targetStatusOptions(story, StatusCategory.IN_PROGRESS);
+        if (options.isEmpty()) {
+            return b.notApplicable("No In Progress status is available for this story.").build();
         }
-        return b.changes(List.of(support.statusChange(story, target))).build();
+        return b
+                .inputs(List.of(FixInput.select("targetStatus", "New status", true,
+                        FixSupport.statusOptions(options.names()), options.defaultName())))
+                .changes(List.of(support.statusChange(story, options.defaultName())))
+                .build();
     }
 
     @Override
@@ -51,7 +56,7 @@ public class SubtaskInProgressStoryNotFixHandler implements FixHandler {
         if (story == null) {
             throw new IllegalArgumentException("Parent story not found.");
         }
-        String target = support.targetStatusName(story, StatusCategory.IN_PROGRESS);
+        String target = support.requireTargetStatus(story, StatusCategory.IN_PROGRESS, params);
         String newStatus = support.jiraWrite().transitionWithFallback(story.getIssueKey(), target);
         return FixResult.ok(story.getIssueKey() + " → " + newStatus, List.of(story.getIssueKey()));
     }

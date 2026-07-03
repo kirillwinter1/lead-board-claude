@@ -62,10 +62,56 @@ describe('FixModal', () => {
     render(<FixModal issueKey="LB-42" rule="EPIC_NO_DUE_DATE" ruleLabel="Epic without due date" onClose={noop} onApplied={noop} />)
 
     await waitFor(() => {
+      // Modal title is derived from the human rule label, not the preview title
+      expect(screen.getByText('Fix: Epic without due date')).toBeInTheDocument()
+      // The neutral preview title renders as a lead/description line
       expect(screen.getByText('Set epic due date')).toBeInTheDocument()
       expect(screen.getByText('LB-42')).toBeInTheDocument()
       expect(screen.getByText('2026-08-01')).toBeInTheDocument()
     })
+  })
+
+  it('drives the right-hand StatusBadge from the selected targetStatus input', async () => {
+    const preview: FixPreview = {
+      ...basePreview,
+      rule: 'STATUS_MISMATCH',
+      title: 'Change story status',
+      changes: [
+        { issueKey: 'LB-500', summary: 'Some story', issueType: 'Story', field: 'Status', from: 'Новое', to: 'In Review', local: false },
+      ],
+      inputs: [
+        {
+          name: 'targetStatus',
+          type: 'select',
+          label: 'New status',
+          required: true,
+          defaultValue: 'In Review',
+          options: [
+            { value: 'In Review', label: 'In Review' },
+            { value: 'Done', label: 'Done' },
+          ],
+        },
+      ],
+    }
+    mockPreview(preview)
+    render(<FixModal issueKey="LB-500" rule="STATUS_MISMATCH" ruleLabel="Status mismatch" onClose={noop} onApplied={noop} />)
+
+    await waitFor(() => expect(screen.getByText('LB-500')).toBeInTheDocument())
+
+    // The right-hand badge (2nd) initially reflects the default targetStatus
+    const badges = () => document.querySelectorAll('.fix-change-status .status-badge')
+    expect(badges()).toHaveLength(2)
+    expect(badges()[1].textContent).toBe('In Review')
+
+    // Pick "Done" from the "New status" dropdown
+    const trigger = document.querySelector('.filter-dropdown-trigger') as HTMLElement
+    fireEvent.click(trigger)
+    const doneOption = Array.from(document.querySelectorAll('.filter-dropdown-item-label'))
+      .find(el => el.textContent === 'Done') as HTMLElement
+    fireEvent.click(doneOption)
+
+    // The right-hand badge now reflects the new selection
+    await waitFor(() => expect(badges()[1].textContent).toBe('Done'))
   })
 
   it('renders the issue-type icon and StatusBadge for Status changes', async () => {

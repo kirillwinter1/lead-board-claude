@@ -4,6 +4,7 @@ import com.leadboard.config.entity.BoardCategory;
 import com.leadboard.config.service.JiraMetadataService;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
+import com.leadboard.jira.JiraTransition;
 import com.leadboard.jira.JiraWriteService;
 import com.leadboard.quality.DataQualityRule;
 import com.leadboard.quality.DataQualityService;
@@ -18,11 +19,14 @@ import com.leadboard.team.TeamEntity;
 import com.leadboard.team.TeamMemberRepository;
 import com.leadboard.team.TeamRepository;
 import com.leadboard.team.TeamService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -35,6 +39,8 @@ import java.util.Optional;
  */
 @Component
 public class FixSupport {
+
+    private static final Logger log = LoggerFactory.getLogger(FixSupport.class);
 
     private final JiraWriteService jiraWriteService;
     private final JiraClient jiraClient;
@@ -139,6 +145,81 @@ public class FixSupport {
     /** A FixChange describing a Jira status transition of the given issue to {@code toName}. */
     public FixChange statusChange(JiraIssueEntity issue, String toName) {
         return FixChange.jira(issue.getIssueKey(), issue.getSummary(), issue.getIssueType(), "Status", issue.getStatus(), toName);
+    }
+
+    // ==================== Transition target statuses (F84 user choice) ====================
+
+    /**
+     * The statuses a transition fix can actually move {@code issue} to, within a target category,
+     * plus the default (pipeline-first) option.
+     *
+     * @param names       ordered option list (may be empty when nothing is available)
+     * @param defaultName the option to pre-select (pipeline-first), or null when {@code names} is empty
+     */
+    public record TargetStatusOptions(List<String> names, String defaultName) {
+        public boolean isEmpty() { return names.isEmpty(); }
+        public boolean contains(String name) { return name != null && names.contains(name); }
+    }
+
+    /**
+     * Computes the selectable destination statuses for a transition fix on {@code issue}, filtered
+     * to {@code category} (IN_PROGRESS / DONE). Primary source is the issue's live Jira transitions
+     * (attributed to the current user via OAuth, else the BasicAuth service account); when that call
+     * fails or yields nothing, falls back to the statuses mapped to {@code category} for the issue's
+     * board category in workflow config. Options are ordered pipeline-first; the default is the
+     * first option.
+     */
+    public TargetStatusOptions targetStatusOptions(JiraIssueEntity issue, StatusCategory category) {
+        BoardCategory boardCat = boardCategoryOf(issue);
+        List<String> live = liveTransitionTargets(issue, category);
+        List<String> names = live.isEmpty()
+                ? workflowConfigService.getStatusNamesForCategory(category, boardCat)
+                : workflowConfigService.orderStatusNames(boardCat, live);
+        String def = names.isEmpty() ? null : names.get(0);
+        return new TargetStatusOptions(names, def);
+    }
+
+    /** Wraps status names as select {@link FixInput.Option}s (value == label == status name). */
+    public static List<FixInput.Option> statusOptions(List<String> names) {
+        return names.stream().map(n -> new FixInput.Option(n, n)).toList();
+    }
+
+    /**
+     * Reads the user-selected {@code targetStatus} param, re-validates it against the options
+     * recomputed server-side (same pattern as priority validation) and returns it. Throws
+     * {@link IllegalArgumentException} when missing or not one of the current options.
+     */
+    public String requireTargetStatus(JiraIssueEntity issue, StatusCategory category, Map<String, Object> params) {
+        String target = stringParam(params, "targetStatus");
+        if (target == null || target.isBlank()) {
+            throw new IllegalArgumentException("targetStatus is required");
+        }
+        TargetStatusOptions options = targetStatusOptions(issue, category);
+        if (!options.contains(target)) {
+            throw new IllegalArgumentException("Invalid target status: " + target);
+        }
+        return target;
+    }
+
+    /**
+     * Distinct target status names of {@code issue}'s live Jira transitions whose configured
+     * category equals {@code category}. Returns an empty list (not an error) when the Jira call
+     * fails — callers fall back to config-mapped statuses.
+     */
+    private List<String> liveTransitionTargets(JiraIssueEntity issue, StatusCategory category) {
+        try {
+            return jiraWriteService.listTransitionsWithFallback(issue.getIssueKey()).stream()
+                    .map(t -> t.to() != null ? t.to().name() : null)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .filter(name -> workflowConfigService.categorize(
+                            name, issue.getIssueType(), issue.getProjectKey()) == category)
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Live Jira transitions unavailable for {} (category {}), using config fallback: {}",
+                    issue.getIssueKey(), category, e.getMessage());
+            return List.of();
+        }
     }
 
     /** Active team members as select options (value = Jira account id, label = display name). */

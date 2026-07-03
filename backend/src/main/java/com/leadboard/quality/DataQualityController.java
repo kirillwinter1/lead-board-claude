@@ -15,6 +15,9 @@ import com.leadboard.status.StatusAge;
 import com.leadboard.status.StatusAgeService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -30,6 +33,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/data-quality")
 public class DataQualityController {
+
+    private static final Logger log = LoggerFactory.getLogger(DataQualityController.class);
 
     private final JiraIssueRepository issueRepository;
     private final JiraConfigResolver jiraConfigResolver;
@@ -297,6 +302,23 @@ public class DataQualityController {
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException e) {
         return ResponseEntity.badRequest().body(Map.of("success", false, "message", safeMessage(e)));
+    }
+
+    /**
+     * F84: a request that cannot resolve the tenant-scoped issue tables (e.g. no tenant
+     * subdomain/slug, so Hibernate's search_path stays on {@code public} where {@code jira_issues}
+     * does not exist) surfaces as {@link InvalidDataAccessResourceUsageException} ("relation ...
+     * does not exist"). Degrade to a clean 400 instead of a generic 500 — the message is sanitized
+     * (no SQL / stack trace). Genuine DB outages are a different DataAccessException type and still
+     * fall through to the 500 handler.
+     */
+    @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
+    public ResponseEntity<Map<String, Object>> handleNoTenantSchema(InvalidDataAccessResourceUsageException e) {
+        log.warn("Data-quality request could not resolve tenant-scoped tables (missing tenant context?): {}",
+                e.getMostSpecificCause().getMessage());
+        return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "No tenant context for this request — open the board from your workspace URL."));
     }
 
     private String safeMessage(Exception e) {
