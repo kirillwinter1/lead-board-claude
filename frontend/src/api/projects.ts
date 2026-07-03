@@ -36,6 +36,7 @@ export interface ChildEpicDto {
 
 export interface ProjectDetailDto {
   issueKey: string
+  issueType: string
   summary: string
   description: string | null
   status: string

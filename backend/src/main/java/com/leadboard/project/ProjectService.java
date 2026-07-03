@@ -142,6 +142,7 @@ public class ProjectService {
 
         return new ProjectDetailDto(
                 project.getIssueKey(),
+                project.getIssueType(),
                 project.getSummary(),
                 project.getDescription(),
                 project.getStatus(),

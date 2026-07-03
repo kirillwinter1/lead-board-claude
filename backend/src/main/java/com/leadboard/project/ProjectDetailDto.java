@@ -6,6 +6,7 @@ import java.util.List;
 
 public record ProjectDetailDto(
         String issueKey,
+        String issueType,
         String summary,
         String description,
         String status,
