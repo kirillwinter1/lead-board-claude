@@ -16,7 +16,7 @@ export function HoverInfoCard<T>({ title, width = 300, loadData, render, childre
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [pos, setPos] = useState<{ top: number; left: number; above: boolean } | null>(null)
 
   const triggerRef = useRef<HTMLSpanElement>(null)
   const abortRef = useRef<AbortController | null>(null)
@@ -46,9 +46,13 @@ export function HoverInfoCard<T>({ title, width = 300, loadData, render, childre
       let left = rect.left + rect.width / 2 - width / 2
       if (left + width > window.innerWidth - 8) left = window.innerWidth - width - 8
       if (left < 8) left = 8
+      // Flip above only when there is not enough room below. When flipping up we
+      // anchor the card's BOTTOM to the row via translateY(-100%), so it hugs the
+      // trigger regardless of the card's (variable) height — no disconnected gap.
       const spaceBelow = window.innerHeight - rect.bottom
-      const top = spaceBelow >= 180 ? rect.bottom + 6 : Math.max(8, rect.top - 6 - 200)
-      setPos({ top, left })
+      const above = spaceBelow < 220
+      const top = above ? rect.top - 6 : rect.bottom + 6
+      setPos({ top, left, above })
     }
     if (!data && !loading) {
       debounceRef.current = setTimeout(fetchData, 300)
@@ -76,6 +80,7 @@ export function HoverInfoCard<T>({ title, width = 300, loadData, render, childre
             position: 'fixed',
             top: pos.top,
             left: pos.left,
+            transform: pos.above ? 'translateY(-100%)' : undefined,
             width,
             zIndex: 10000,
             background: '#fff',
