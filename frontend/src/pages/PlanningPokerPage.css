@@ -670,32 +670,15 @@
 }
 
 /* Planning Poker Create Modal */
-.poker-create-modal {
-  min-width: 400px;
-  text-align: center;
-}
-
 .modal-header-icon {
   font-size: 48px;
   margin-bottom: 8px;
-}
-
-.poker-create-modal h3 {
-  margin: 0 0 8px 0;
 }
 
 .modal-description {
   color: #6b778c;
   margin: 0 0 24px 0;
   font-size: 14px;
-}
-
-.poker-create-modal .form-group {
-  text-align: left;
-}
-
-.poker-create-modal .filter-input {
-  width: 100%;
 }
 
 .loading-small {
@@ -728,11 +711,6 @@
 }
 
 /* Import Stories Modal */
-.import-stories-modal {
-  min-width: 500px;
-  max-width: 600px;
-}
-
 .import-stories-list {
   max-height: 300px;
   overflow-y: auto;

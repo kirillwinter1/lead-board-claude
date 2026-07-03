@@ -1,5 +1,6 @@
 import { EpicRoleChip } from './EpicRoleChip'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
+import { hexToRgba } from '../../constants/colors'
 import type { RoleMetrics, RoleChipsProps } from './types'
 
 function RoleChip({ label, metrics, roleColor }: { label: string; metrics: RoleMetrics | null; roleColor: string }) {
@@ -7,11 +8,8 @@ function RoleChip({ label, metrics, roleColor }: { label: string; metrics: RoleM
   const progress = hasEstimate ? Math.min(metrics.progress, 100) : 0
 
   // Generate lighter background from roleColor
-  const r = parseInt(roleColor.slice(1, 3), 16)
-  const g = parseInt(roleColor.slice(3, 5), 16)
-  const b = parseInt(roleColor.slice(5, 7), 16)
-  const bgColor = `rgba(${r}, ${g}, ${b}, 0.1)`
-  const fillColor = `rgba(${r}, ${g}, ${b}, 0.5)`
+  const bgColor = hexToRgba(roleColor, 0.1)
+  const fillColor = hexToRgba(roleColor, 0.5)
 
   return (
     <div

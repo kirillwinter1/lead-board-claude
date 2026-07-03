@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { getPriorityColor } from '../helpers/priorityColors'
+import { BG_SUBTLE, ERROR_BG, ERROR_TEXT } from '../constants/colors'
 
 interface BugSlaConfig {
   id: number
@@ -150,9 +151,9 @@ export function BugSlaSettingsPage() {
       </p>
 
       {error && (
-        <div style={{ background: '#ffebe6', color: '#de350b', padding: '12px 16px', borderRadius: 6, marginBottom: 16 }}>
+        <div style={{ background: ERROR_BG, color: ERROR_TEXT, padding: '12px 16px', borderRadius: 6, marginBottom: 16 }}>
           {error}
-          <button onClick={() => setError(null)} style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer', color: '#de350b', fontWeight: 600 }}>x</button>
+          <button onClick={() => setError(null)} style={{ float: 'right', background: 'none', border: 'none', cursor: 'pointer', color: ERROR_TEXT, fontWeight: 600 }}>x</button>
         </div>
       )}
 
@@ -228,7 +229,7 @@ export function BugSlaSettingsPage() {
                       onClick={cancelEdit}
                       style={{
                         padding: '4px 12px',
-                        background: '#f4f5f7',
+                        background: BG_SUBTLE,
                         color: '#42526e',
                         border: 'none',
                         borderRadius: 4,
@@ -245,7 +246,7 @@ export function BugSlaSettingsPage() {
                       onClick={() => startEdit(config)}
                       style={{
                         padding: '4px 12px',
-                        background: '#f4f5f7',
+                        background: BG_SUBTLE,
                         color: '#42526e',
                         border: 'none',
                         borderRadius: 4,
@@ -259,8 +260,8 @@ export function BugSlaSettingsPage() {
                       onClick={() => deleteSla(config.priority)}
                       style={{
                         padding: '4px 12px',
-                        background: '#f4f5f7',
-                        color: '#de350b',
+                        background: BG_SUBTLE,
+                        color: ERROR_TEXT,
                         border: 'none',
                         borderRadius: 4,
                         cursor: 'pointer',
@@ -344,7 +345,7 @@ export function BugSlaSettingsPage() {
               onClick={() => { setShowAddForm(false); setNewPriority(''); setNewHours('168') }}
               style={{
                 padding: '6px 14px',
-                background: '#f4f5f7',
+                background: BG_SUBTLE,
                 color: '#42526e',
                 border: 'none',
                 borderRadius: 4,
@@ -360,7 +361,7 @@ export function BugSlaSettingsPage() {
             onClick={() => setShowAddForm(true)}
             style={{
               padding: '8px 16px',
-              background: '#f4f5f7',
+              background: BG_SUBTLE,
               color: '#172b4d',
               border: 'none',
               borderRadius: 4,

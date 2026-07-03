@@ -4,6 +4,7 @@ import { getConfig } from '../api/config'
 import { teamsApi, TeamMember } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { useAuth, type AuthUser } from '../contexts/AuthContext'
+import { Modal } from '../components/Modal'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -784,112 +785,107 @@ export function PokerRoomPage() {
       </div>
 
       {/* Add Story Modal */}
-      {showAddStory && (
-        <div className="modal-overlay" onClick={() => setShowAddStory(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>Добавить стори</h3>
-            <div className="form-group">
-              <label className="filter-label">Название</label>
-              <input
-                type="text"
-                className="filter-input"
-                placeholder="Описание стори..."
-                value={newStoryTitle}
-                onChange={e => setNewStoryTitle(e.target.value)}
-                autoFocus
-              />
-            </div>
-            <div className="form-group">
-              <label className="filter-label">Роли</label>
-              <div className="checkbox-group">
-                {getRoleCodes().map(code => (
-                  <label key={code}>
-                    <input
-                      type="checkbox"
-                      checked={newStoryNeedsRoles.has(code)}
-                      onChange={() => handleToggleNewStoryRole(code)}
-                    />
-                    {getRoleDisplayName(code)} ({code})
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowAddStory(false)}>
-                Отмена
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleAddStory}
-                disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0}
-              >
-                Добавить
-              </button>
-            </div>
+      <Modal isOpen={showAddStory} onClose={() => setShowAddStory(false)} title="Добавить стори">
+        <div className="form-group">
+          <label className="filter-label">Название</label>
+          <input
+            type="text"
+            className="filter-input"
+            placeholder="Описание стори..."
+            value={newStoryTitle}
+            onChange={e => setNewStoryTitle(e.target.value)}
+            autoFocus
+          />
+        </div>
+        <div className="form-group">
+          <label className="filter-label">Роли</label>
+          <div className="checkbox-group">
+            {getRoleCodes().map(code => (
+              <label key={code}>
+                <input
+                  type="checkbox"
+                  checked={newStoryNeedsRoles.has(code)}
+                  onChange={() => handleToggleNewStoryRole(code)}
+                />
+                {getRoleDisplayName(code)} ({code})
+              </label>
+            ))}
           </div>
         </div>
-      )}
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={() => setShowAddStory(false)}>
+            Отмена
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleAddStory}
+            disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0}
+          >
+            Добавить
+          </button>
+        </div>
+      </Modal>
 
       {/* Import Stories Modal */}
-      {showImportStories && (
-        <div className="modal-overlay" onClick={() => setShowImportStories(false)}>
-          <div className="modal-content import-stories-modal" onClick={e => e.stopPropagation()}>
-            <h3>Импорт сторей из Jira</h3>
-            <p className="modal-description">
-              Выберите существующие стори из эпика {session?.epicKey}
-            </p>
+      <Modal
+        isOpen={showImportStories}
+        onClose={() => setShowImportStories(false)}
+        title="Импорт сторей из Jira"
+        maxWidth={600}
+      >
+        <p className="modal-description">
+          Выберите существующие стори из эпика {session?.epicKey}
+        </p>
 
-            {loadingExisting ? (
-              <div className="loading-small">Загрузка сторей...</div>
-            ) : existingStories.length === 0 ? (
-              <div className="empty-hint">
-                Нет доступных сторей для импорта.
-                <br />
-                <small>Все стори уже добавлены или эпик пустой.</small>
-              </div>
-            ) : (
-              <div className="import-stories-list">
-                {existingStories.map(story => (
-                  <label key={story.storyKey} className="import-story-item">
-                    <input
-                      type="checkbox"
-                      checked={selectedImportKeys.has(story.storyKey)}
-                      onChange={() => handleToggleImportStory(story.storyKey)}
-                    />
-                    <div className="import-story-info">
-                      <div className="import-story-header">
-                        <span className="issue-key">{story.storyKey}</span>
-                        <span className="import-story-status">{story.status}</span>
-                      </div>
-                      <span className="import-story-summary">{story.summary}</span>
-                      <div className="import-story-subtasks">
-                        {story.subtaskRoles.map(role => (
-                          <span key={role} className="subtask-badge" style={roleLightStyle(role)}>
-                            {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}\u0447` : '\u2014'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowImportStories(false)}>
-                Отмена
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleImportSelected}
-                disabled={selectedImportKeys.size === 0}
-              >
-                Импортировать ({selectedImportKeys.size})
-              </button>
-            </div>
+        {loadingExisting ? (
+          <div className="loading-small">Загрузка сторей...</div>
+        ) : existingStories.length === 0 ? (
+          <div className="empty-hint">
+            Нет доступных сторей для импорта.
+            <br />
+            <small>Все стори уже добавлены или эпик пустой.</small>
           </div>
+        ) : (
+          <div className="import-stories-list">
+            {existingStories.map(story => (
+              <label key={story.storyKey} className="import-story-item">
+                <input
+                  type="checkbox"
+                  checked={selectedImportKeys.has(story.storyKey)}
+                  onChange={() => handleToggleImportStory(story.storyKey)}
+                />
+                <div className="import-story-info">
+                  <div className="import-story-header">
+                    <span className="issue-key">{story.storyKey}</span>
+                    <span className="import-story-status">{story.status}</span>
+                  </div>
+                  <span className="import-story-summary">{story.summary}</span>
+                  <div className="import-story-subtasks">
+                    {story.subtaskRoles.map(role => (
+                      <span key={role} className="subtask-badge" style={roleLightStyle(role)}>
+                        {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}\u0447` : '\u2014'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={() => setShowImportStories(false)}>
+            Отмена
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleImportSelected}
+            disabled={selectedImportKeys.size === 0}
+          >
+            Импортировать ({selectedImportKeys.size})
+          </button>
         </div>
-      )}
+      </Modal>
     </main>
   )
 }

@@ -1,6 +1,8 @@
 package com.leadboard.audit;
 
 import com.leadboard.telegram.TelegramService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -22,7 +24,7 @@ public class AuditRequestController {
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> submitAuditRequest(@RequestBody AuditRequest request) {
+    public ResponseEntity<Map<String, Object>> submitAuditRequest(@Valid @RequestBody AuditRequest request) {
         log.info("Received audit request from: {}", request.name());
 
         String message = formatTelegramMessage(request);
@@ -70,9 +72,9 @@ public class AuditRequestController {
     }
 
     public record AuditRequest(
-        String name,
+        @NotBlank String name,
         String company,
         String role,
-        String contact
+        @NotBlank String contact
     ) {}
 }

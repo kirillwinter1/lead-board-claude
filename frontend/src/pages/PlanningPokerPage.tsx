@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getConfig } from '../api/config'
+import { Modal } from '../components/Modal'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -10,6 +11,7 @@ import {
   getEligibleEpics,
   createSession,
 } from '../api/poker'
+import { BG_SUBTLE, INFO_BG, SUCCESS_BG } from '../constants/colors'
 
 export function PlanningPokerPage() {
   const navigate = useNavigate()
@@ -112,9 +114,9 @@ export function PlanningPokerPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PREPARING':
-        return <span className="status-badge" style={{ background: '#deebff', color: '#0747a6' }}>Подготовка</span>
+        return <span className="status-badge" style={{ background: INFO_BG, color: '#0747a6' }}>Подготовка</span>
       case 'ACTIVE':
-        return <span className="status-badge" style={{ background: '#e3fcef', color: '#006644' }}>Активна</span>
+        return <span className="status-badge" style={{ background: SUCCESS_BG, color: '#006644' }}>Активна</span>
       case 'COMPLETED':
         return <span className="status-badge" style={{ background: '#dfe1e6', color: '#42526e' }}>Завершена</span>
       default:
@@ -203,7 +205,7 @@ export function PlanningPokerPage() {
                   </td>
                   <td>
                     <code style={{
-                      background: '#f4f5f7',
+                      background: BG_SUBTLE,
                       padding: '2px 8px',
                       borderRadius: 4,
                       fontWeight: 600,
@@ -231,114 +233,107 @@ export function PlanningPokerPage() {
       </div>
 
       {/* Create Session Modal */}
-      {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content poker-create-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header-icon">🎯</div>
-            <h3>Создать сессию Planning Poker</h3>
-            <p className="modal-description">
-              Выберите эпик для оценки задач командой
-            </p>
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Создать сессию Planning Poker">
+        <div style={{ textAlign: 'center' }}>
+          <div className="modal-header-icon">🎯</div>
+          <p className="modal-description">
+            Выберите эпик для оценки задач командой
+          </p>
+        </div>
 
-            <div className="form-group">
-              <label className="filter-label">Эпик</label>
-              {loadingEpics ? (
-                <div className="loading-small">Загрузка эпиков...</div>
-              ) : eligibleEpics.length === 0 ? (
-                <div className="empty-hint">
-                  Нет доступных эпиков в статусах: Планирование, Грязная оценка, В работе
-                </div>
-              ) : (
-                <select
-                  className="filter-input"
-                  value={selectedEpicKey}
-                  onChange={e => setSelectedEpicKey(e.target.value)}
-                  autoFocus
-                >
-                  <option value="">Выберите эпик...</option>
+        <div className="form-group">
+          <label className="filter-label">Эпик</label>
+          {loadingEpics ? (
+            <div className="loading-small">Загрузка эпиков...</div>
+          ) : eligibleEpics.length === 0 ? (
+            <div className="empty-hint">
+              Нет доступных эпиков в статусах: Планирование, Грязная оценка, В работе
+            </div>
+          ) : (
+            <select
+              className="filter-input"
+              style={{ width: '100%' }}
+              value={selectedEpicKey}
+              onChange={e => setSelectedEpicKey(e.target.value)}
+              autoFocus
+            >
+              <option value="">Выберите эпик...</option>
+              {eligibleEpics
+                .filter(e => !e.hasPokerSession)
+                .map(epic => (
+                  <option key={epic.epicKey} value={epic.epicKey}>
+                    {epic.epicKey} — {epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}
+                  </option>
+                ))}
+              {eligibleEpics.some(e => e.hasPokerSession) && (
+                <optgroup label="Уже есть сессия">
                   {eligibleEpics
-                    .filter(e => !e.hasPokerSession)
+                    .filter(e => e.hasPokerSession)
                     .map(epic => (
-                      <option key={epic.epicKey} value={epic.epicKey}>
+                      <option key={epic.epicKey} value={epic.epicKey} disabled>
                         {epic.epicKey} — {epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}
                       </option>
                     ))}
-                  {eligibleEpics.some(e => e.hasPokerSession) && (
-                    <optgroup label="Уже есть сессия">
-                      {eligibleEpics
-                        .filter(e => e.hasPokerSession)
-                        .map(epic => (
-                          <option key={epic.epicKey} value={epic.epicKey} disabled>
-                            {epic.epicKey} — {epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
-                </select>
+                </optgroup>
               )}
-              {selectedEpicKey && (
-                <div className="selected-epic-hint">
-                  <a
-                    href={`${jiraBaseUrl}${selectedEpicKey}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="issue-key"
-                  >
-                    Открыть в Jira ↗
-                  </a>
-                </div>
-              )}
-            </div>
-
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
-                Отмена
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleCreateSession}
-                disabled={creating || !selectedEpicKey}
+            </select>
+          )}
+          {selectedEpicKey && (
+            <div className="selected-epic-hint">
+              <a
+                href={`${jiraBaseUrl}${selectedEpicKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="issue-key"
               >
-                {creating ? 'Создание...' : 'Создать →'}
-              </button>
+                Открыть в Jira ↗
+              </a>
             </div>
-          </div>
+          )}
         </div>
-      )}
+
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
+            Отмена
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleCreateSession}
+            disabled={creating || !selectedEpicKey}
+          >
+            {creating ? 'Создание...' : 'Создать →'}
+          </button>
+        </div>
+      </Modal>
 
       {/* Join Room Modal */}
-      {showJoinModal && (
-        <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>Войти в комнату</h3>
-            <div className="form-group">
-              <label className="filter-label">Код комнаты</label>
-              <input
-                type="text"
-                className="filter-input"
-                placeholder="Например: ABC123"
-                value={joinRoomCode}
-                onChange={e => setJoinRoomCode(e.target.value.toUpperCase())}
-                autoFocus
-                maxLength={6}
-                style={{ letterSpacing: '0.2em', textAlign: 'center', fontSize: 18 }}
-              />
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-secondary" onClick={() => setShowJoinModal(false)}>
-                Отмена
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleJoinRoom}
-                disabled={joinRoomCode.trim().length !== 6}
-              >
-                Войти
-              </button>
-            </div>
-          </div>
+      <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Войти в комнату">
+        <div className="form-group">
+          <label className="filter-label">Код комнаты</label>
+          <input
+            type="text"
+            className="filter-input"
+            placeholder="Например: ABC123"
+            value={joinRoomCode}
+            onChange={e => setJoinRoomCode(e.target.value.toUpperCase())}
+            autoFocus
+            maxLength={6}
+            style={{ letterSpacing: '0.2em', textAlign: 'center', fontSize: 18 }}
+          />
         </div>
-      )}
+        <div className="modal-actions">
+          <button className="btn btn-secondary" onClick={() => setShowJoinModal(false)}>
+            Отмена
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={handleJoinRoom}
+            disabled={joinRoomCode.trim().length !== 6}
+          >
+            Войти
+          </button>
+        </div>
+      </Modal>
     </main>
   )
 }

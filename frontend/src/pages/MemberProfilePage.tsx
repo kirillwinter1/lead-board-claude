@@ -5,6 +5,7 @@ import { CompetencyRating } from '../components/competency/CompetencyRating'
 import { teamsApi, MemberProfileResponse, WeeklyTrend, Absence } from '../api/teams'
 import { competencyApi, CompetencyLevel } from '../api/competency'
 import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
+import { ERROR_TEXT } from '../constants/colors'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 
@@ -152,8 +153,9 @@ export function MemberProfilePage() {
     try {
       const result = await teamsApi.getMemberProfile(Number(teamId), Number(memberId), from, to)
       setData(result)
-    } catch (e: any) {
-      setError(e.response?.data?.error || e.message || 'Ошибка загрузки профиля')
+    } catch (e: unknown) {
+      const axiosErr = e as { response?: { data?: { error?: string } }; message?: string }
+      setError(axiosErr.response?.data?.error || axiosErr.message || 'Ошибка загрузки профиля')
     } finally {
       setLoading(false)
     }
@@ -203,7 +205,7 @@ export function MemberProfilePage() {
             <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#de350b' }}>{error || 'Нет данных'}</div>
+        <div style={{ padding: 40, textAlign: 'center', color: ERROR_TEXT }}>{error || 'Нет данных'}</div>
       </main>
     )
   }

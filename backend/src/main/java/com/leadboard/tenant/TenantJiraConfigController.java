@@ -2,12 +2,12 @@ package com.leadboard.tenant;
 
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.JiraMetadataService;
+import com.leadboard.jira.JiraClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.Map;
 import java.util.Optional;
@@ -26,18 +26,16 @@ public class TenantJiraConfigController {
     private final TenantJiraConfigRepository configRepository;
     private final JiraConfigResolver jiraConfigResolver;
     private final JiraMetadataService metadataService;
-    private final WebClient webClient;
+    private final JiraClient jiraClient;
 
     public TenantJiraConfigController(TenantJiraConfigRepository configRepository,
                                        JiraConfigResolver jiraConfigResolver,
                                        JiraMetadataService metadataService,
-                                       WebClient.Builder webClientBuilder) {
+                                       JiraClient jiraClient) {
         this.configRepository = configRepository;
         this.jiraConfigResolver = jiraConfigResolver;
         this.metadataService = metadataService;
-        // Build from the Spring-managed builder so the global OS-resolver
-        // WebClientCustomizer applies (avoids reactor-netty native DNS failures).
-        this.webClient = webClientBuilder.build();
+        this.jiraClient = jiraClient;
     }
 
     @GetMapping
@@ -161,16 +159,8 @@ public class TenantJiraConfigController {
 
         try {
             // Try a lightweight API call to verify credentials
-            String auth = request.jiraEmail() + ":" + request.jiraApiToken();
-            String encodedAuth = java.util.Base64.getEncoder()
-                    .encodeToString(auth.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-
-            String response = webClient.get()
-                    .uri(request.jiraBaseUrl().trim() + "/rest/api/3/myself")
-                    .header("Authorization", "Basic " + encodedAuth)
-                    .retrieve()
-                    .bodyToMono(String.class)
-                    .block(java.time.Duration.ofSeconds(10));
+            String response = jiraClient.testConnection(
+                    request.jiraBaseUrl().trim(), request.jiraEmail(), request.jiraApiToken());
 
             if (response != null) {
                 return ResponseEntity.ok(Map.of("success", true, "message", "Connection successful"));

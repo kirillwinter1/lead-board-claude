@@ -14,6 +14,8 @@ import com.leadboard.team.TeamMemberRepository;
 import com.leadboard.tenant.TenantContext;
 import com.leadboard.tenant.TenantUserEntity;
 import com.leadboard.tenant.TenantUserRepository;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -80,7 +82,7 @@ public class AdminController {
     @PatchMapping("/users/{id}/role")
     public ResponseEntity<UserDto> updateUserRole(
             @PathVariable Long id,
-            @RequestBody UpdateRoleRequest request) {
+            @Valid @RequestBody UpdateRoleRequest request) {
 
         // Prevent admin from changing their own role (self-lockout protection)
         var auth = SecurityContextHolder.getContext().getAuthentication();
@@ -152,7 +154,7 @@ public class AdminController {
             String role
     ) {}
 
-    public record UpdateRoleRequest(String role) {}
+    public record UpdateRoleRequest(@NotBlank String role) {}
 
     /**
      * Auto-assign unassigned subtasks in Jira based on issue_type → role → team_member mapping.

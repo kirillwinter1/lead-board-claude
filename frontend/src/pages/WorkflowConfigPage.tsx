@@ -16,6 +16,7 @@ import {
   ProjectConfigInfo,
 } from '../api/workflowConfig'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { BG_SUBTLE, ERROR_BG, ERROR_TEXT, SUCCESS_BG } from '../constants/colors'
 import './WorkflowConfigPage.css'
 
 type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
@@ -151,6 +152,12 @@ function StatusColorPicker({ value, onChange }: { value: string; onChange: (colo
 }
 
 // --- Auto-suggest functions ---
+//
+// Design-system note: the 'SA'/'DEV'/'QA' literals below are NOT hardcoded business logic —
+// this page IS the source of truth for role configuration. They are seed defaults offered by
+// the setup wizard when auto-suggesting a starting config from Jira metadata; the user can
+// rename/remove/add roles freely afterwards, and runtime code reads roles from this config
+// via WorkflowConfigService, never from these literals.
 
 function guessRoleFromSubtaskName(name: string): string {
   const lower = name.toLowerCase()
@@ -190,12 +197,15 @@ function suggestRolesFromIssueTypes(suggestedTypes: IssueTypeMappingDto[]): Work
     }
   })
 
+  // Seed defaults for the setup wizard only (display name/color/order for a fresh config) —
+  // not a runtime role registry. See note at top of "Auto-suggest functions".
   const roleDefaults: Record<string, { displayName: string; color: string; order: number; isDefault: boolean }> = {
     SA: { displayName: 'System Analysis', color: '#1868DB', order: 1, isDefault: false },
     DEV: { displayName: 'Development', color: '#1F845A', order: 2, isDefault: true },
     QA: { displayName: 'Quality Assurance', color: '#227D9B', order: 3, isDefault: false },
   }
 
+  // No subtask types mapped to a role yet — fall back to the standard SA/DEV/QA starter set.
   if (roleSet.size === 0) {
     roleSet.add('SA')
     roleSet.add('DEV')
@@ -311,6 +321,8 @@ function suggestStatuses(
               statusCategory = 'IN_PROGRESS'
             }
           } else {
+            // Seed guess of a subtask status's role by name, offered as a wizard suggestion —
+            // not a runtime role lookup. See note at top of "Auto-suggest functions".
             if (lower.includes('analy') || lower.includes('анализ') || lower.includes('requirement') || lower.includes('требовани')) {
               workflowRoleCode = 'SA'
             } else if (lower.includes('develop') || lower.includes('разработ') || lower.includes('coding') || lower.includes('implement')) {
@@ -476,7 +488,7 @@ function EpicLinkModeSection({ epicLinkType, setEpicLinkType, epicLinkName, setE
   }
 
   return (
-    <div style={{ marginTop: 24, padding: '16px 20px', background: '#F4F5F7', borderRadius: 8 }}>
+    <div style={{ marginTop: 24, padding: '16px 20px', background: BG_SUBTLE, borderRadius: 8 }}>
       <h3 style={{ margin: '0 0 12px', fontSize: 14, color: '#172B4D' }}>Project → Epic Link Mode</h3>
 
       {detecting && <p style={{ fontSize: 13, color: '#6B778C' }}>Analyzing synced data...</p>}
@@ -484,7 +496,7 @@ function EpicLinkModeSection({ epicLinkType, setEpicLinkType, epicLinkName, setE
       {detectResult?.detected && (
         <div style={{
           marginBottom: 12, padding: '8px 14px', borderRadius: 6, fontSize: 13,
-          background: '#E3FCEF', border: '1px solid #ABF5D1', display: 'flex', alignItems: 'center', gap: 8
+          background: SUCCESS_BG, border: '1px solid #ABF5D1', display: 'flex', alignItems: 'center', gap: 8
         }}>
           <span>
             Detected: <strong>{detectResult.epicLinkType === 'parent' ? 'Parent' : 'Issue Link'}</strong>
@@ -1120,7 +1132,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       {projectConfigs.length > 1 && (
         <div className="workflow-project-selector" style={{
           display: 'flex', gap: 4, marginBottom: 16, padding: '4px',
-          background: '#F4F5F7', borderRadius: 6, width: 'fit-content'
+          background: BG_SUBTLE, borderRadius: 6, width: 'fit-content'
         }}>
           {projectConfigs.map(pc => (
             <button
@@ -1150,7 +1162,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       )}
 
       {error && (
-        <div style={{ color: '#DE350B', marginBottom: 16, padding: '8px 12px', background: '#FFEBE6', borderRadius: 4 }}>
+        <div style={{ color: ERROR_TEXT, marginBottom: 16, padding: '8px 12px', background: ERROR_BG, borderRadius: 4 }}>
           {error}
         </div>
       )}

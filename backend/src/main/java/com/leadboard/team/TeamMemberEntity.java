@@ -22,6 +22,11 @@ public class TeamMemberEntity {
     @Column(name = "display_name", length = 255)
     private String displayName;
 
+    // Hardcoded last resort: real creation flows (TeamService.addTeamMember,
+    // TeamSyncService.createMember) always call setRole(...) explicitly, falling back to
+    // WorkflowConfigService.getDefaultRoleCode() rather than this field. This default only
+    // backstops test fixtures that build a member without calling setRole() and don't
+    // exercise role-dependent logic — do not rely on it for anything role-aware.
     @Column(name = "role", nullable = false, length = 50)
     private String role = "DEV";
 

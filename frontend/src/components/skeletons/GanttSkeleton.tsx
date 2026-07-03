@@ -1,4 +1,5 @@
 import { Skeleton } from '../Skeleton'
+import { BG_SUBTLE } from '../../constants/colors'
 
 const ROWS = 6
 const BAR_CONFIGS = [
@@ -30,7 +31,7 @@ export function GanttSkeleton() {
         <div style={{
           minHeight: 64,
           padding: '10px 16px',
-          background: '#f4f5f7',
+          background: BG_SUBTLE,
           borderBottom: '1px solid #dfe1e6',
           display: 'flex',
           alignItems: 'flex-end',
@@ -64,7 +65,7 @@ export function GanttSkeleton() {
         {/* Header with date columns */}
         <div style={{
           minHeight: 64,
-          background: '#f4f5f7',
+          background: BG_SUBTLE,
           borderBottom: '1px solid #dfe1e6',
           display: 'flex',
           alignItems: 'flex-end',

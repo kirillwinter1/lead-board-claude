@@ -6,7 +6,7 @@ import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, Unifie
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
-import { useStatusStyles } from '../components/board/StatusStylesContext'
+import { StatusBadge } from '../components/board/StatusBadge'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { FilterBar } from '../components/FilterBar'
@@ -16,9 +16,14 @@ import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import './TimelinePage.css'
 
 import { getIssueIcon } from '../components/board/helpers'
-import { lightenColor } from '../constants/colors'
+import { ERROR_BG, lightenColor } from '../constants/colors'
+import {
+  ZoomLevel, DateRange,
+  daysBetween,
+  calculateDateRangeFromCandidates, generateTimelineHeaders, generateGroupHeaders,
+  generateWeekHeaders, isWeekend, formatDateShort, formatHours,
+} from '../utils/dateGrid'
 
-type ZoomLevel = 'day' | 'week' | 'month'
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
 type TimelineCache = { forecast: ForecastResponse; unifiedPlan: UnifiedPlanningResult }
 
@@ -27,47 +32,6 @@ const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
   day: 40,    // 40px per day - detailed view
   week: 120,  // 120px per week - default view
   month: 100  // 100px per month - overview
-}
-
-interface DateRange {
-  start: Date
-  end: Date
-}
-
-// --- Utility functions ---
-
-function formatDateShort(date: Date): string {
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-function toLocalMidnight(date: Date): Date {
-  const d = new Date(date)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function daysBetween(start: Date, end: Date): number {
-  const s = toLocalMidnight(start)
-  const e = toLocalMidnight(end)
-  return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24))
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
-}
-
-function startOfWeek(date: Date): Date {
-  const d = new Date(date)
-  const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
-  return d
-}
-
-function startOfMonth(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), 1)
 }
 
 // --- Date range & timeline ---
@@ -81,34 +45,19 @@ export function calculateDateRange(
   forecast: ForecastResponse | null,
   clampPastDays: number | null = null,
 ): DateRange {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  let minDate: Date = today
-  let maxDate: Date = addDays(today, 30)
+  const startCandidates: Date[] = []
+  const endCandidates: Date[] = []
 
   // Use unified plan dates if available (hybrid data includes both retro and forecast)
   if (unifiedPlan) {
     for (const epic of unifiedPlan.epics) {
       if (epic.isRoughEstimate) {
-        if (epic.startDate) {
-          const d = new Date(epic.startDate)
-          if (d < minDate) minDate = d
-        }
-        if (epic.endDate) {
-          const d = new Date(epic.endDate)
-          if (d > maxDate) maxDate = d
-        }
+        if (epic.startDate) startCandidates.push(new Date(epic.startDate))
+        if (epic.endDate) endCandidates.push(new Date(epic.endDate))
       } else {
         for (const story of epic.stories) {
-          if (story.startDate) {
-            const d = new Date(story.startDate)
-            if (d < minDate) minDate = d
-          }
-          if (story.endDate) {
-            const d = new Date(story.endDate)
-            if (d > maxDate) maxDate = d
-          }
+          if (story.startDate) startCandidates.push(new Date(story.startDate))
+          if (story.endDate) endCandidates.push(new Date(story.endDate))
         }
       }
     }
@@ -117,199 +66,13 @@ export function calculateDateRange(
   // Also consider forecast due dates
   if (forecast) {
     for (const epic of forecast.epics) {
-      if (epic.dueDate) {
-        const d = new Date(epic.dueDate)
-        if (d > maxDate) maxDate = d
-      }
+      if (epic.dueDate) endCandidates.push(new Date(epic.dueDate))
     }
   }
 
-  // Clamp how far back we render: hide work completed more than clampPastDays ago
-  // (keeps the initial view focused; a "Show earlier" toggle passes null to disable).
-  if (clampPastDays != null) {
-    const clamp = addDays(today, -clampPastDays)
-    if (minDate < clamp) minDate = clamp
-  }
-
-  // Align to week boundaries so date % matches header grid exactly
-  minDate = startOfWeek(addDays(minDate, -3))
-  const paddedMax = addDays(maxDate, 7)
-  const numWeeks = Math.ceil(daysBetween(minDate, paddedMax) / 7)
-  maxDate = addDays(minDate, numWeeks * 7)
-
-  return { start: minDate, end: maxDate }
-}
-
-interface TimelineHeader {
-  date: Date
-  label: string
-}
-
-interface GroupHeader {
-  label: string
-  span: number  // number of columns this group spans
-}
-
-function generateTimelineHeaders(range: DateRange, zoom: ZoomLevel): TimelineHeader[] {
-  const headers: TimelineHeader[] = []
-  let current = new Date(range.start)
-
-  if (zoom === 'day') {
-    while (current <= range.end) {
-      headers.push({ date: new Date(current), label: current.getDate().toString() })
-      current = addDays(current, 1)
-    }
-  } else if (zoom === 'week') {
-    current = startOfWeek(current)
-    while (current <= range.end) {
-      headers.push({ date: new Date(current), label: formatDateShort(current) })
-      current = addDays(current, 7)
-    }
-  } else {
-    current = startOfMonth(current)
-    while (current <= range.end) {
-      headers.push({
-        date: new Date(current),
-        label: current.toLocaleDateString('en-US', { month: 'short' })
-      })
-      current = new Date(current.getFullYear(), current.getMonth() + 1, 1)
-    }
-  }
-
-  return headers
-}
-
-// Generate group headers (month for day/week zoom, quarter for month zoom)
-function generateGroupHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupHeader[] {
-  if (headers.length === 0) return []
-
-  const groups: GroupHeader[] = []
-
-  if (zoom === 'day' || zoom === 'week') {
-    // Group by month
-    let currentMonth = -1
-    let currentYear = -1
-    let currentSpan = 0
-
-    for (const header of headers) {
-      const month = header.date.getMonth()
-      const year = header.date.getFullYear()
-
-      if (month !== currentMonth || year !== currentYear) {
-        if (currentSpan > 0) {
-          groups.push({
-            label: new Date(currentYear, currentMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-            span: currentSpan
-          })
-        }
-        currentMonth = month
-        currentYear = year
-        currentSpan = 1
-      } else {
-        currentSpan++
-      }
-    }
-
-    // Add last group
-    if (currentSpan > 0) {
-      groups.push({
-        label: new Date(currentYear, currentMonth, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }),
-        span: currentSpan
-      })
-    }
-  } else {
-    // Group by quarter for month zoom
-    let currentQuarter = -1
-    let currentYear = -1
-    let currentSpan = 0
-
-    for (const header of headers) {
-      const quarter = Math.floor(header.date.getMonth() / 3) + 1
-      const year = header.date.getFullYear()
-
-      if (quarter !== currentQuarter || year !== currentYear) {
-        if (currentSpan > 0) {
-          groups.push({
-            label: `Q${currentQuarter} ${currentYear}`,
-            span: currentSpan
-          })
-        }
-        currentQuarter = quarter
-        currentYear = year
-        currentSpan = 1
-      } else {
-        currentSpan++
-      }
-    }
-
-    // Add last group
-    if (currentSpan > 0) {
-      groups.push({
-        label: `Q${currentQuarter} ${currentYear}`,
-        span: currentSpan
-      })
-    }
-  }
-
-  return groups
-}
-
-// Generate week headers for day zoom (shows week numbers)
-function generateWeekHeaders(headers: TimelineHeader[], zoom: ZoomLevel): GroupHeader[] {
-  if (zoom !== 'day' || headers.length === 0) return []
-
-  const weeks: GroupHeader[] = []
-  let currentWeekStart: Date | null = null
-  let currentSpan = 0
-
-  for (const header of headers) {
-    const weekStart = startOfWeek(header.date)
-
-    if (!currentWeekStart || weekStart.getTime() !== currentWeekStart.getTime()) {
-      if (currentSpan > 0 && currentWeekStart) {
-        weeks.push({
-          label: `Week ${getWeekNumber(currentWeekStart)}`,
-          span: currentSpan
-        })
-      }
-      currentWeekStart = weekStart
-      currentSpan = 1
-    } else {
-      currentSpan++
-    }
-  }
-
-  // Add last week
-  if (currentSpan > 0 && currentWeekStart) {
-    weeks.push({
-      label: `Week ${getWeekNumber(currentWeekStart)}`,
-      span: currentSpan
-    })
-  }
-
-  return weeks
-}
-
-// Get ISO week number
-function getWeekNumber(date: Date): number {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
-  const dayNum = d.getUTCDay() || 7
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum)
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
-  return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
-}
-
-// Check if a date is a weekend (Saturday or Sunday)
-function isWeekend(date: Date): boolean {
-  const day = date.getDay()
-  return day === 0 || day === 6
-}
-
-
-// Format seconds to hours
-function formatHours(seconds: number | null): string {
-  if (seconds === null || seconds === 0) return '0h'
-  return `${Math.round(seconds / 3600)}h`
+  // Clamping (hide work completed more than clampPastDays ago) keeps the initial view
+  // focused; a "Show earlier" toggle passes null to disable it.
+  return calculateDateRangeFromCandidates(startCandidates, endCandidates, clampPastDays)
 }
 
 // Check if phase has hours
@@ -358,27 +121,6 @@ function calculateRowHeight(epic: PlannedEpic): number {
   return Math.max(MIN_ROW_HEIGHT, numLanes * (BAR_HEIGHT + LANE_GAP) + 8)
 }
 
-// --- Status color helper (uses StatusStylesContext data) ---
-function getContrastColor(hex: string): string {
-  const c = hex.replace('#', '')
-  const r = parseInt(c.substring(0, 2), 16)
-  const g = parseInt(c.substring(2, 4), 16)
-  const b = parseInt(c.substring(4, 6), 16)
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return luminance > 0.6 ? '#172b4d' : '#ffffff'
-}
-
-function getStatusColor(
-  status: string | null,
-  styles: Record<string, StatusStyle>
-): { bg: string; text: string } {
-  const fallback = { bg: '#dfe1e6', text: '#42526e' }
-  if (!status) return fallback
-  const style = styles[status]
-  if (style?.color) return { bg: style.color, text: getContrastColor(style.color) }
-  return fallback
-}
-
 // --- Epic Label Component with Tooltip ---
 interface EpicLabelProps {
   epic: PlannedEpic
@@ -389,7 +131,6 @@ interface EpicLabelProps {
 
 function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
-  const statusStyles = useStatusStyles()
   // Resolve the real Jira epic type name (e.g. 'Эпик') so the icon matches the board.
   const epicTypeName = getTypeNameByCategory('EPIC') ?? 'Epic'
   const epicIconUrl = getIssueIcon(epicTypeName, getIssueTypeIconUrl(epicTypeName), 'EPIC')
@@ -405,7 +146,6 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
     setTooltipPos({ x: e.clientX + 12, y: e.clientY + 12 })
   }
 
-  const statusColor = getStatusColor(epic.status, statusStyles)
   const progress = epic.progressPercent ?? 0
   const dueDateDelta = epicForecast?.dueDateDeltaDays ?? null
 
@@ -420,11 +160,6 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
       dueDateIndicator = <span style={{ color: '#FF5630', fontSize: 10 }}>●</span>
     }
   }
-
-  // Shorten status for display
-  const shortStatus = (epic.status || '').length > 18
-    ? (epic.status || '').substring(0, 16) + '…'
-    : (epic.status || 'Unknown')
 
   return (
     <>
@@ -449,21 +184,11 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               {epic.epicKey}
             </a>
             {dueDateIndicator}
-            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }} title="Flagged">FLG</span>}
+            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span
-              style={{
-                backgroundColor: statusColor.bg,
-                color: statusColor.text,
-                padding: '1px 5px',
-                borderRadius: 3,
-                fontSize: 9,
-                fontWeight: 500,
-              }}
-              title={epic.status || ''}
-            >
-              {shortStatus}
+            <span title={epic.status || ''}>
+              <StatusBadge status={epic.status || 'Unknown'} />
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <div style={{
@@ -513,18 +238,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{epic.epicKey}</span>
               <span style={{ color: '#8993A4', fontSize: 11 }}>({epic.autoScore?.toFixed(0)})</span>
             </div>
-            <span
-              style={{
-                backgroundColor: statusColor.bg,
-                color: statusColor.text,
-                padding: '2px 8px',
-                borderRadius: 3,
-                fontSize: 11,
-                fontWeight: 500
-              }}
-            >
-              {epic.status || 'Unknown'}
-            </span>
+            <StatusBadge status={epic.status || 'Unknown'} />
           </div>
 
           {/* Summary */}
@@ -826,7 +540,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         }}
       >
         {storyNumber}
-        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6' }}>FLG</span>}
+        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG }}>FLG</span>}
         {hasWarning && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff8b00', backgroundColor: '#fffae6' }}>!</span>}
       </span>
     </div>
@@ -843,7 +557,6 @@ interface StoryBarsProps {
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
-  const statusStyles = useStatusStyles()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -921,21 +634,10 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
                 <span style={{ color: '#9ca3af', fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
               )}
               {hoveredStory.flagged && (
-                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }} title="Flagged">FLG</span>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>
               )}
             </div>
-            <span
-              style={{
-                fontSize: '11px',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                background: getStatusColor(hoveredStory.status, statusStyles).bg,
-                color: getStatusColor(hoveredStory.status, statusStyles).text,
-                fontWeight: 500
-              }}
-            >
-              {hoveredStory.status}
-            </span>
+            <StatusBadge status={hoveredStory.status} />
           </div>
 
           {/* Summary */}

@@ -1,5 +1,6 @@
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
+import { ERROR_TEXT } from '../../constants/colors'
 import type { StoryExpectedDoneCellProps } from './types'
 
 export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: StoryExpectedDoneCellProps) {
@@ -70,7 +71,7 @@ export function StoryExpectedDoneCell({ endDate, assignee, storyPlanning }: Stor
           </div>
 
           {storyPlanning.blockedBy && storyPlanning.blockedBy.length > 0 && (
-            <div className="forecast-tooltip-footer" style={{ color: '#de350b' }}>
+            <div className="forecast-tooltip-footer" style={{ color: ERROR_TEXT }}>
               Blocked by: {storyPlanning.blockedBy.join(', ')}
             </div>
           )}
