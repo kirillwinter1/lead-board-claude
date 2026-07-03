@@ -103,14 +103,18 @@ export function QuarterlyPlanningPage() {
   }, [])
 
   // ==================== Data load ====================
-  const loadQuarter = useCallback(async (q: string, onlyDesiredFlag: boolean) => {
+  const loadQuarter = useCallback(async (q: string) => {
     if (!q) return
     const generation = ++loadGenerationRef.current
     setRefreshing(true)
     setError(null)
     try {
       const [epicsRes, teamsRes] = await Promise.all([
-        quarterlyPlanningApi.getEpicsForQuarter(q, onlyDesiredFlag),
+        // Always fetch the full backlog. The "Only requested for this quarter"
+        // filter is applied client-side (see backlogEpics) so toggling it never
+        // triggers a refetch that would discard unpublished moves — and it never
+        // affects the InQuarter column.
+        quarterlyPlanningApi.getEpicsForQuarter(q, false),
         quarterlyPlanningApi.getTeamsOverview(q),
       ])
       // Stale response — a newer loadQuarter has been issued. Discard.
@@ -136,17 +140,15 @@ export function QuarterlyPlanningPage() {
     }
   }, [])
 
-  useEffect(() => { if (quarter) loadQuarter(quarter, onlyDesired) }, [quarter, onlyDesired, loadQuarter])
+  useEffect(() => { if (quarter) loadQuarter(quarter) }, [quarter, loadQuarter])
 
   // L5: keep latest values in refs so the visibilitychange handler can be
-  // installed once. Re-subscribing on every state change (quarter/onlyDesired/
-  // refreshing) adds and removes the global listener many times per session.
+  // installed once. Re-subscribing on every state change (quarter/refreshing)
+  // adds and removes the global listener many times per session.
   const quarterRef = useRef(quarter)
-  const onlyDesiredRef = useRef(onlyDesired)
   const refreshingRef = useRef(refreshing)
   const loadQuarterRef = useRef(loadQuarter)
   quarterRef.current = quarter
-  onlyDesiredRef.current = onlyDesired
   refreshingRef.current = refreshing
   loadQuarterRef.current = loadQuarter
 
@@ -154,7 +156,7 @@ export function QuarterlyPlanningPage() {
   useEffect(() => {
     const handler = () => {
       if (document.visibilityState === 'visible' && quarterRef.current && !refreshingRef.current) {
-        loadQuarterRef.current(quarterRef.current, onlyDesiredRef.current)
+        loadQuarterRef.current(quarterRef.current)
       }
     }
     document.addEventListener('visibilitychange', handler)
@@ -226,9 +228,18 @@ export function QuarterlyPlanningPage() {
     return e.teams.some(t => String(t.id) === teamFilter)
   }, [teamFilter])
 
+  // "Only requested for this quarter" (onlyDesired) is a backlog-only, client-side
+  // filter: keep an epic when its parent project desires this quarter, or when it
+  // is standalone (mirrors the F70 backend rule). Applied here — never on refetch —
+  // so toggling the checkbox is instant and never discards unpublished moves nor
+  // touches the InQuarter column.
   const backlogEpics = useMemo(
-    () => epics.filter(e => !e.inQuarter && epicMatchesTeamFilter(e)),
-    [epics, epicMatchesTeamFilter],
+    () => epics.filter(e =>
+      !e.inQuarter
+      && epicMatchesTeamFilter(e)
+      && (!onlyDesired || e.isStandalone || e.projectDesiredQuarter === quarter),
+    ),
+    [epics, epicMatchesTeamFilter, onlyDesired, quarter],
   )
   const inQuarterEpics = useMemo(
     () => epics.filter(e => e.inQuarter && epicMatchesTeamFilter(e)),
@@ -391,10 +402,10 @@ export function QuarterlyPlanningPage() {
     }
     // After publishing, refetch to reconcile with Jira
     if (results.some(r => r.ok)) {
-      await loadQuarter(quarter, onlyDesired)
+      await loadQuarter(quarter)
     }
     return results
-  }, [pendingChanges, quarter, onlyDesired, epics, loadQuarter])
+  }, [pendingChanges, quarter, epics, loadQuarter])
 
   // ==================== Render ====================
   if (loading) {
@@ -456,7 +467,7 @@ export function QuarterlyPlanningPage() {
           />
           <button
             type="button"
-            onClick={() => loadQuarter(quarter, onlyDesired)}
+            onClick={() => loadQuarter(quarter)}
             disabled={refreshing}
             title="Reload latest from Jira"
             style={{
