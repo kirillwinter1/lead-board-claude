@@ -62,6 +62,18 @@ public class QuarterlyPlanningController {
         return ResponseEntity.ok(planningService.getSummary(quarter));
     }
 
+    /**
+     * F86: Per-epic remaining work (person-days by role) for the given team — both
+     * as of today and as of the selected quarter's start — as computed by the
+     * auto-planner. Drives the "work remaining" markers on needs-planning epics.
+     */
+    @GetMapping("/remaining")
+    public ResponseEntity<QuarterlyRemainingResponse> getRemaining(
+            @RequestParam Long teamId,
+            @RequestParam String quarter) {
+        return ResponseEntity.ok(planningService.getRemainingForQuarter(teamId, quarter));
+    }
+
     @GetMapping("/project-view")
     public ResponseEntity<ProjectViewDto> getProjectView(
             @RequestParam String projectKey,

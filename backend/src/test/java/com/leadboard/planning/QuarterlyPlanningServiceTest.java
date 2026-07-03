@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,6 +42,7 @@ class QuarterlyPlanningServiceTest {
     @Mock private JiraClient jiraClient;
     @Mock private EpicLabelPersistenceService epicLabelPersistenceService;
     @Mock private ProjectLabelPersistenceService projectLabelPersistenceService;
+    @Mock private UnifiedPlanningService unifiedPlanningService;
 
     private QuarterlyPlanningService service;
 
@@ -50,7 +53,7 @@ class QuarterlyPlanningServiceTest {
                 absenceService, workCalendarService, teamService,
                 riceAssessmentRepository, workflowConfigService,
                 jiraClient, epicLabelPersistenceService,
-                projectLabelPersistenceService
+                projectLabelPersistenceService, unifiedPlanningService
         );
 
         when(teamService.getPlanningConfig(anyLong())).thenReturn(PlanningConfigDto.defaults());
@@ -1345,5 +1348,171 @@ class QuarterlyPlanningServiceTest {
     @Test
     void getCurrentQuarterLabelReturnsQ4ForDecember() {
         assertEquals("2026Q4", QuarterlyPlanningService.getCurrentQuarterLabel(java.time.LocalDate.of(2026, 12, 31)));
+    }
+
+    // ==================== F86: getRemainingForQuarter ====================
+
+    private static final Long F86_TEAM = 1L;
+
+    private UnifiedPlanningResult.PhaseSchedule phase(LocalDate start, LocalDate end, double hours) {
+        return new UnifiedPlanningResult.PhaseSchedule(null, null, start, end, BigDecimal.valueOf(hours), false);
+    }
+
+    private UnifiedPlanningResult.PhaseAggregationEntry agg(double hours, LocalDate start, LocalDate end) {
+        return new UnifiedPlanningResult.PhaseAggregationEntry(BigDecimal.valueOf(hours), start, end);
+    }
+
+    private UnifiedPlanningResult.PlannedStory story(Map<String, UnifiedPlanningResult.PhaseSchedule> phases) {
+        return new UnifiedPlanningResult.PlannedStory(
+                "S-1", "Story", null, "In Progress", null, null,
+                phases, List.of(), List.of(),
+                null, null, null, null, null, null, Map.of());
+    }
+
+    private UnifiedPlanningResult.PlannedEpic epic(
+            String key,
+            Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggregation,
+            List<UnifiedPlanningResult.PlannedStory> stories) {
+        return new UnifiedPlanningResult.PlannedEpic(
+                key, "Epic", null, null, null,
+                stories, aggregation,
+                "In Progress", null, null, null, null, Map.of(),
+                stories == null ? 0 : stories.size(), 0,
+                stories == null || stories.isEmpty(), Map.of(), false, false);
+    }
+
+    private void planReturns(UnifiedPlanningResult.PlannedEpic... epics) {
+        when(unifiedPlanningService.calculatePlan(F86_TEAM)).thenReturn(
+                new UnifiedPlanningResult(F86_TEAM, OffsetDateTime.now(),
+                        List.of(epics), List.of(), Map.of()));
+    }
+
+    @Test
+    void remainingNowEqualsPhaseAggregationHoursInDays() {
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+        aggMap.put("SA", agg(40, null, null));
+        aggMap.put("DEV", agg(64, null, null));
+        aggMap.put("QA", agg(16, null, null));
+        planReturns(epic("LB-1", aggMap, List.of()));
+
+        QuarterlyRemainingResponse resp = service.getRemainingForQuarter(F86_TEAM, "2026Q3");
+        EpicRemainingDto dto = resp.epics().get("LB-1");
+
+        assertEquals("2026Q3", resp.quarter());
+        assertEquals(F86_TEAM, resp.teamId());
+        assertTrue(dto.hasEstimate());
+        assertEquals(0, new BigDecimal("5.0").compareTo(dto.remainingNowByRole().get("SA")));
+        assertEquals(0, new BigDecimal("8.0").compareTo(dto.remainingNowByRole().get("DEV")));
+        assertEquals(0, new BigDecimal("2.0").compareTo(dto.remainingNowByRole().get("QA")));
+        assertEquals(0, new BigDecimal("15.0").compareTo(dto.remainingNowDays()));
+    }
+
+    @Test
+    void phaseEntirelyBeforeQuarterStartContributesZeroAtStart() {
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+        aggMap.put("DEV", agg(40, null, null));
+        Map<String, UnifiedPlanningResult.PhaseSchedule> phases = new LinkedHashMap<>();
+        phases.put("DEV", phase(LocalDate.of(2026, 5, 1), LocalDate.of(2026, 6, 15), 40));
+        planReturns(epic("LB-1", aggMap, List.of(story(phases))));
+
+        EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, "2026Q3").epics().get("LB-1");
+
+        assertEquals(0, new BigDecimal("5.0").compareTo(dto.remainingNowByRole().get("DEV")));
+        assertEquals(0, BigDecimal.ZERO.compareTo(dto.remainingAtQuarterStartByRole().get("DEV")));
+        assertEquals(0, BigDecimal.ZERO.compareTo(dto.remainingAtQuarterStartDays()));
+    }
+
+    @Test
+    void phaseEntirelyAfterQuarterStartContributesFullHoursAtStart() {
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+        aggMap.put("DEV", agg(40, null, null));
+        Map<String, UnifiedPlanningResult.PhaseSchedule> phases = new LinkedHashMap<>();
+        phases.put("DEV", phase(LocalDate.of(2026, 7, 5), LocalDate.of(2026, 8, 1), 40));
+        planReturns(epic("LB-1", aggMap, List.of(story(phases))));
+
+        EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, "2026Q3").epics().get("LB-1");
+
+        assertEquals(0, new BigDecimal("5.0").compareTo(dto.remainingAtQuarterStartByRole().get("DEV")));
+        assertEquals(0, new BigDecimal("5.0").compareTo(dto.remainingAtQuarterStartDays()));
+    }
+
+    @Test
+    void phaseCrossingQuarterStartIsProratedByWorkdays() {
+        // Phase 2026-06-25..2026-07-10 straddles Q3 start (2026-07-01).
+        // workdays(whole) = 12, workdays(Ds..end) = 8 → 80h * 8/12 = 53.3333h → 6.7 person-days.
+        when(workCalendarService.countWorkdays(LocalDate.of(2026, 6, 25), LocalDate.of(2026, 7, 10)))
+                .thenReturn(12);
+        when(workCalendarService.countWorkdays(LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 10)))
+                .thenReturn(8);
+
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+        aggMap.put("DEV", agg(80, null, null));
+        Map<String, UnifiedPlanningResult.PhaseSchedule> phases = new LinkedHashMap<>();
+        phases.put("DEV", phase(LocalDate.of(2026, 6, 25), LocalDate.of(2026, 7, 10), 80));
+        planReturns(epic("LB-1", aggMap, List.of(story(phases))));
+
+        EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, "2026Q3").epics().get("LB-1");
+
+        assertEquals(0, new BigDecimal("10.0").compareTo(dto.remainingNowByRole().get("DEV")));
+        assertEquals(0, new BigDecimal("6.7").compareTo(dto.remainingAtQuarterStartByRole().get("DEV")));
+        assertEquals(0, new BigDecimal("6.7").compareTo(dto.remainingAtQuarterStartDays()));
+    }
+
+    @Test
+    void phaseWithNullDatesCountsFullHoursAtStart() {
+        // e.g. noCapacity phase — not placed on the calendar → conservatively remains.
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+        aggMap.put("DEV", agg(24, null, null));
+        Map<String, UnifiedPlanningResult.PhaseSchedule> phases = new LinkedHashMap<>();
+        phases.put("DEV", UnifiedPlanningResult.PhaseSchedule.noCapacity(BigDecimal.valueOf(24)));
+        planReturns(epic("LB-1", aggMap, List.of(story(phases))));
+
+        EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, "2026Q3").epics().get("LB-1");
+
+        assertEquals(0, new BigDecimal("3.0").compareTo(dto.remainingAtQuarterStartByRole().get("DEV")));
+    }
+
+    @Test
+    void epicWithoutEstimateHasNoEstimateAndZeros() {
+        planReturns(epic("LB-1", Map.of(), List.of()));
+
+        EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, "2026Q3").epics().get("LB-1");
+
+        assertFalse(dto.hasEstimate());
+        assertTrue(dto.remainingNowByRole().isEmpty());
+        assertTrue(dto.remainingAtQuarterStartByRole().isEmpty());
+        assertEquals(0, BigDecimal.ZERO.compareTo(dto.remainingNowDays()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(dto.remainingAtQuarterStartDays()));
+    }
+
+    @Test
+    void parsesQuarterLabelToCorrectStartDate() {
+        record QC(String label, LocalDate start) {}
+        List<QC> cases = List.of(
+                new QC("2026Q1", LocalDate.of(2026, 1, 1)),
+                new QC("2026Q2", LocalDate.of(2026, 4, 1)),
+                new QC("2026Q3", LocalDate.of(2026, 7, 1)),
+                new QC("2026Q4", LocalDate.of(2026, 10, 1)));
+
+        for (QC c : cases) {
+            LocalDate ds = c.start();
+            Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+            aggMap.put("DEV", agg(8, ds, ds));                                  // starts on Ds → full
+            aggMap.put("SA", agg(8, ds.minusDays(10), ds.minusDays(1)));         // ends before Ds → zero
+            planReturns(epic("LB-1", aggMap, List.of()));
+
+            EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, c.label()).epics().get("LB-1");
+
+            assertEquals(0, new BigDecimal("1.0").compareTo(dto.remainingAtQuarterStartByRole().get("DEV")), c.label());
+            assertEquals(0, BigDecimal.ZERO.compareTo(dto.remainingAtQuarterStartByRole().get("SA")), c.label());
+        }
+    }
+
+    @Test
+    void getRemainingRejectsInvalidQuarterLabel() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.getRemainingForQuarter(F86_TEAM, "2026Q5"));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.getRemainingForQuarter(F86_TEAM, "bad"));
     }
 }

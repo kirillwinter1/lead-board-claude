@@ -179,6 +179,39 @@ export interface QuarterlyEpicsResponse {
   epics: PlanningEpicDto[]
 }
 
+// ==================== F86: Remaining work per epic ====================
+
+export interface EpicRemainingDto {
+  epicKey: string
+  remainingNowByRole: Record<string, number>
+  remainingAtQuarterStartByRole: Record<string, number>
+  remainingNowDays: number
+  remainingAtQuarterStartDays: number
+  hasEstimate: boolean
+}
+
+export interface QuarterlyRemainingResponse {
+  quarter: string
+  teamId: number
+  epics: Record<string, EpicRemainingDto>
+}
+
+/**
+ * F86: an epic "needs planning" for the selected quarter when it is active work
+ * that is not in the viewed quarter and is not committed to a future quarter —
+ * either uncommitted entirely (quarterLabel == null) or a carryover tail from a
+ * past quarter (quarterLabel < quarter). Quarter labels are YYYYQn and sort
+ * lexicographically by chronology, so a string comparison is enough.
+ *
+ * Pure function so it can be reused by the page filter, the card, and tests.
+ */
+export function needsPlanning(
+  epic: Pick<PlanningEpicDto, 'inQuarter' | 'quarterLabel'>,
+  quarter: string,
+): boolean {
+  return !epic.inQuarter && (epic.quarterLabel == null || epic.quarterLabel < quarter)
+}
+
 // ==================== F70: Project quarter commitment ====================
 
 export interface TeamCommitmentDto {
@@ -253,6 +286,15 @@ export const quarterlyPlanningApi = {
       `/api/quarterly-planning/quarters/${encodeURIComponent(quarter)}/epics`,
       params ? { params } : undefined,
     )
+    return res.data
+  },
+
+  /**
+   * F86: per-epic remaining work for a single team, split into "now" and
+   * "at quarter start". Loaded lazily and independently of the epic list.
+   */
+  async getRemainingForQuarter(quarter: string, teamId: number): Promise<QuarterlyRemainingResponse> {
+    const res = await axios.get('/api/quarterly-planning/remaining', { params: { teamId, quarter } })
     return res.data
   },
 

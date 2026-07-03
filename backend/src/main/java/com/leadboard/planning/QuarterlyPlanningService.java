@@ -35,6 +35,13 @@ public class QuarterlyPlanningService {
      */
     private static final BigDecimal DEFAULT_RISK_BUFFER = new BigDecimal("0.2");
 
+    /**
+     * One person-day = 8 hours (project-wide convention, mirrors
+     * {@code ForecastService.HOURS_PER_DAY}). Used to convert the auto-planner's
+     * per-role hours into person-days for F86 remaining-work reporting.
+     */
+    private static final BigDecimal HOURS_PER_DAY = new BigDecimal("8");
+
     /** Canonical quarter-label format used throughout F67-F70 (YYYYQn, e.g. "2026Q2"). */
     private static final Pattern QUARTER_LABEL_PATTERN = Pattern.compile("\\d{4}Q[1-4]");
 
@@ -65,6 +72,7 @@ public class QuarterlyPlanningService {
     private final JiraClient jiraClient;
     private final EpicLabelPersistenceService epicLabelPersistenceService;
     private final ProjectLabelPersistenceService projectLabelPersistenceService;
+    private final UnifiedPlanningService unifiedPlanningService;
 
     public QuarterlyPlanningService(JiraIssueRepository issueRepository,
                                      TeamRepository teamRepository,
@@ -76,7 +84,8 @@ public class QuarterlyPlanningService {
                                      WorkflowConfigService workflowConfigService,
                                      JiraClient jiraClient,
                                      EpicLabelPersistenceService epicLabelPersistenceService,
-                                     ProjectLabelPersistenceService projectLabelPersistenceService) {
+                                     ProjectLabelPersistenceService projectLabelPersistenceService,
+                                     UnifiedPlanningService unifiedPlanningService) {
         this.issueRepository = issueRepository;
         this.teamRepository = teamRepository;
         this.memberRepository = memberRepository;
@@ -88,6 +97,7 @@ public class QuarterlyPlanningService {
         this.jiraClient = jiraClient;
         this.epicLabelPersistenceService = epicLabelPersistenceService;
         this.projectLabelPersistenceService = projectLabelPersistenceService;
+        this.unifiedPlanningService = unifiedPlanningService;
     }
 
     // ==================== Capacity ====================
@@ -377,6 +387,132 @@ public class QuarterlyPlanningService {
             quarters.sort(Comparator.naturalOrder());
         }
         return quarters;
+    }
+
+    // ==================== F86: Remaining Work per Epic ====================
+
+    /**
+     * Returns, per epic in the auto-planner's plan for {@code teamId}, how much work
+     * remains now and how much remains on/after the selected quarter's start date.
+     *
+     * <p>Both figures are expressed in person-days per role (8h = 1 day). The
+     * "at quarter start" figure prorates phases that straddle the quarter boundary
+     * by working days — it is the residue the auto-planner cannot burn down before
+     * the quarter starts, i.e. the amount a team-lead actually needs to plan into
+     * the new quarter.</p>
+     *
+     * <p>Reuses {@link UnifiedPlanningService#calculatePlan(Long)} (60s cache) — a
+     * single per-team run covers every epic, so the plan is never recomputed here.</p>
+     *
+     * @param teamId       the team whose plan drives the remaining-work figures
+     * @param quarterLabel canonical {@code YYYYQn} label (validated)
+     */
+    public QuarterlyRemainingResponse getRemainingForQuarter(Long teamId, String quarterLabel) {
+        // Validates the label format and yields the quarter's first day (Q1→Jan1, Q2→Apr1, Q3→Jul1, Q4→Oct1).
+        LocalDate quarterStart = QuarterRange.of(quarterLabel).startDate();
+
+        UnifiedPlanningResult result = unifiedPlanningService.calculatePlan(teamId);
+
+        Map<String, EpicRemainingDto> epics = new LinkedHashMap<>();
+        if (result != null && result.epics() != null) {
+            for (UnifiedPlanningResult.PlannedEpic epic : result.epics()) {
+                epics.put(epic.epicKey(), buildEpicRemaining(epic, quarterStart));
+            }
+        }
+        return new QuarterlyRemainingResponse(quarterLabel, teamId, epics);
+    }
+
+    private EpicRemainingDto buildEpicRemaining(UnifiedPlanningResult.PlannedEpic epic, LocalDate quarterStart) {
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggregation =
+                epic.phaseAggregation() != null ? epic.phaseAggregation() : Map.of();
+
+        // Remaining now: per-role hours straight from the aggregated schedule → person-days.
+        Map<String, BigDecimal> remainingNowByRole = new LinkedHashMap<>();
+        boolean hasEstimate = false;
+        for (Map.Entry<String, UnifiedPlanningResult.PhaseAggregationEntry> e : aggregation.entrySet()) {
+            UnifiedPlanningResult.PhaseAggregationEntry entry = e.getValue();
+            BigDecimal hours = entry != null ? entry.hours() : null;
+            if (hours == null) continue;
+            if (hours.compareTo(BigDecimal.ZERO) > 0) hasEstimate = true;
+            remainingNowByRole.put(e.getKey(), hoursToDays(hours));
+        }
+
+        // Remaining at quarter start: sum of hours landing on/after Ds, prorated across the boundary.
+        // Prefer story-level phases (more precise); fall back to phaseAggregation for rough epics
+        // that have no stories (the single pseudo-phase set per role).
+        Map<String, BigDecimal> atStartHoursByRole = new LinkedHashMap<>();
+        List<UnifiedPlanningResult.PlannedStory> stories = epic.stories();
+        if (stories != null && !stories.isEmpty()) {
+            for (UnifiedPlanningResult.PlannedStory story : stories) {
+                if (story.phases() == null) continue;
+                for (Map.Entry<String, UnifiedPlanningResult.PhaseSchedule> pe : story.phases().entrySet()) {
+                    UnifiedPlanningResult.PhaseSchedule phase = pe.getValue();
+                    if (phase == null) continue;
+                    BigDecimal atStart = hoursOnOrAfter(phase.startDate(), phase.endDate(), phase.hours(), quarterStart);
+                    atStartHoursByRole.merge(pe.getKey(), atStart, BigDecimal::add);
+                }
+            }
+        } else {
+            for (Map.Entry<String, UnifiedPlanningResult.PhaseAggregationEntry> e : aggregation.entrySet()) {
+                UnifiedPlanningResult.PhaseAggregationEntry entry = e.getValue();
+                if (entry == null) continue;
+                BigDecimal atStart = hoursOnOrAfter(entry.startDate(), entry.endDate(), entry.hours(), quarterStart);
+                atStartHoursByRole.merge(e.getKey(), atStart, BigDecimal::add);
+            }
+        }
+
+        Map<String, BigDecimal> remainingAtStartByRole = new LinkedHashMap<>();
+        for (Map.Entry<String, BigDecimal> e : atStartHoursByRole.entrySet()) {
+            remainingAtStartByRole.put(e.getKey(), hoursToDays(e.getValue()));
+        }
+
+        BigDecimal remainingNowDays = sumDays(remainingNowByRole);
+        BigDecimal remainingAtStartDays = sumDays(remainingAtStartByRole);
+
+        return new EpicRemainingDto(
+                epic.epicKey(),
+                remainingNowByRole,
+                remainingAtStartByRole,
+                remainingNowDays,
+                remainingAtStartDays,
+                hasEstimate
+        );
+    }
+
+    /**
+     * Hours of a single phase that land on/after the quarter start {@code Ds}:
+     * <ul>
+     *   <li>{@code start}/{@code end} null (e.g. noCapacity) → full hours (conservative — work not placed);</li>
+     *   <li>{@code end < Ds} → 0 (closed before the quarter starts);</li>
+     *   <li>{@code start >= Ds} → full hours (entirely inside the quarter);</li>
+     *   <li>otherwise straddles Ds → {@code hours * workdays(max(start,Ds)..end) / workdays(start..end)}.</li>
+     * </ul>
+     * A zero workday denominator falls back to the full hours.
+     */
+    private BigDecimal hoursOnOrAfter(LocalDate start, LocalDate end, BigDecimal hours, LocalDate quarterStart) {
+        if (hours == null || hours.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
+        if (start == null || end == null) return hours;
+        if (end.isBefore(quarterStart)) return BigDecimal.ZERO;
+        if (!start.isBefore(quarterStart)) return hours;
+
+        int totalWorkdays = workCalendarService.countWorkdays(start, end);
+        if (totalWorkdays <= 0) return hours;
+        LocalDate effectiveStart = start.isBefore(quarterStart) ? quarterStart : start;
+        int remainingWorkdays = workCalendarService.countWorkdays(effectiveStart, end);
+        return hours.multiply(BigDecimal.valueOf(remainingWorkdays))
+                .divide(BigDecimal.valueOf(totalWorkdays), 4, RoundingMode.HALF_UP);
+    }
+
+    /** Converts hours to person-days (8h = 1 day), one decimal place, HALF_UP. */
+    private BigDecimal hoursToDays(BigDecimal hours) {
+        if (hours == null) return BigDecimal.ZERO.setScale(1, RoundingMode.HALF_UP);
+        return hours.divide(HOURS_PER_DAY, 1, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal sumDays(Map<String, BigDecimal> byRole) {
+        return byRole.values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(1, RoundingMode.HALF_UP);
     }
 
     // ==================== Projects Overview ====================

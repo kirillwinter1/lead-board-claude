@@ -4,6 +4,8 @@ import {
   PlanningEpicDto,
   QuarterlyTeamOverviewDto,
   TeamRef,
+  EpicRemainingDto,
+  needsPlanning,
 } from '../api/quarterlyPlanning'
 import { getConfig } from '../api/config'
 import { CapacityBars } from '../components/planning/CapacityBars'
@@ -58,6 +60,10 @@ export function QuarterlyPlanningPage() {
   // ==================== Server data ====================
   const [epics, setEpics] = useState<PlanningEpicDto[]>([])
   const [teamsOverview, setTeamsOverview] = useState<QuarterlyTeamOverviewDto[]>([])
+  // F86: per-epic remaining work (now vs at quarter start), keyed by epicKey.
+  // Loaded lazily and independently of loadQuarter so the board renders
+  // immediately and these numbers stream in.
+  const [remainingByEpic, setRemainingByEpic] = useState<Record<string, EpicRemainingDto>>({})
   // baseline of inQuarter and boost values from server — used to compute diff
   const baselineRef = useRef<Map<string, { inQuarter: boolean; quarterLabel: string | null; boost: number }>>(new Map())
 
@@ -76,6 +82,9 @@ export function QuarterlyPlanningPage() {
   // Monotonic counter used to discard responses from stale loadQuarter calls
   // when the user switches quarters quickly or hits Refresh mid-flight.
   const loadGenerationRef = useRef(0)
+  // F86: separate generation counter for the lazy remaining-work fetch so its
+  // stale responses are discarded independently of the main list load.
+  const remainingGenerationRef = useRef(0)
 
   // ==================== Initial load ====================
   useEffect(() => {
@@ -141,6 +150,31 @@ export function QuarterlyPlanningPage() {
   }, [])
 
   useEffect(() => { if (quarter) loadQuarter(quarter) }, [quarter, loadQuarter])
+
+  // F86: lazily load per-epic remaining work whenever the quarter or the
+  // selected team changes. Runs independently of loadQuarter — the board is
+  // never blocked on it, and any failure is swallowed (numbers just stay
+  // absent, cards fall back to "нет оценки"). teamFilter is '' on the very
+  // first render (before the initial team is picked) — skip until it's set.
+  useEffect(() => {
+    if (!quarter || !teamFilter) return
+    const teamId = Number(teamFilter)
+    if (!Number.isFinite(teamId)) return
+    let cancelled = false
+    const generation = ++remainingGenerationRef.current
+    quarterlyPlanningApi.getRemainingForQuarter(quarter, teamId)
+      .then(res => {
+        if (cancelled || generation !== remainingGenerationRef.current) return
+        setRemainingByEpic(res.epics ?? {})
+      })
+      .catch(err => {
+        if (cancelled || generation !== remainingGenerationRef.current) return
+        // Non-fatal: log and clear so cards degrade to "нет оценки".
+        console.warn('Failed to load remaining work for quarter', quarter, err)
+        setRemainingByEpic({})
+      })
+    return () => { cancelled = true }
+  }, [quarter, teamFilter])
 
   // L5: keep latest values in refs so the visibilitychange handler can be
   // installed once. Re-subscribing on every state change (quarter/refreshing)
@@ -233,11 +267,14 @@ export function QuarterlyPlanningPage() {
   // is standalone (mirrors the F70 backend rule). Applied here — never on refetch —
   // so toggling the checkbox is instant and never discards unpublished moves nor
   // touches the InQuarter column.
+  // F86: needs-planning epics (active work not committed to the viewed or a
+  // future quarter) always pass the onlyDesired filter — otherwise they'd be
+  // hidden exactly when the tech lead needs to see and schedule their tail.
   const backlogEpics = useMemo(
     () => epics.filter(e =>
       !e.inQuarter
       && epicMatchesTeamFilter(e)
-      && (!onlyDesired || e.isStandalone || e.projectDesiredQuarter === quarter),
+      && (!onlyDesired || e.isStandalone || e.projectDesiredQuarter === quarter || needsPlanning(e, quarter)),
     ),
     [epics, epicMatchesTeamFilter, onlyDesired, quarter],
   )
@@ -541,8 +578,10 @@ export function QuarterlyPlanningPage() {
         <BacklogColumn
           epics={backlogEpics}
           targetQuarter={quarter}
+          currentQuarter={quarter}
           jiraBaseUrl={jiraBaseUrl}
           teamsById={teamsById}
+          remainingByEpic={remainingByEpic}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
           onlyDesired={onlyDesired}

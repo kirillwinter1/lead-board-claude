@@ -3,7 +3,7 @@ import { TeamBadge } from '../TeamBadge'
 import { RiceScoreBadge } from '../rice/RiceScoreBadge'
 import { getIssueIcon } from '../board/helpers'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
-import { PlanningEpicDto, TeamRef } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto, TeamRef, EpicRemainingDto } from '../../api/quarterlyPlanning'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
@@ -40,6 +40,11 @@ interface EpicCardProps {
   currentQuarter: string
   jiraBaseUrl: string
   teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
+  /**
+   * F86: remaining work for this epic (now vs at quarter start). Loaded lazily
+   * by the page — undefined until it arrives, or when the epic has no estimate.
+   */
+  remaining?: EpicRemainingDto
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -54,6 +59,15 @@ function formatBoost(boost: number): string {
   return boost > 0 ? `+${boost}` : String(boost)
 }
 
+/**
+ * F86: round person-days to 1 decimal, but drop a trailing `.0` so whole
+ * numbers read as `5` not `5.0` (5.5 stays 5.5).
+ */
+function formatDays(value: number): string {
+  const rounded = Math.round(value * 10) / 10
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+}
+
 export function EpicCard({
   epic,
   mode,
@@ -61,6 +75,7 @@ export function EpicCard({
   currentQuarter,
   jiraBaseUrl,
   teamsById,
+  remaining,
   onMove,
   onBoostChange,
 }: EpicCardProps) {
@@ -126,9 +141,63 @@ export function EpicCard({
     return ordered.filter(code => (epic.demandByRole[code] || 0) > 0)
   }, [epic.demandByRole, getRoleCodes])
 
+  // F86: in the backlog column, flag epics whose remaining work still needs to
+  // be planned into the viewed quarter — either uncommitted (no quarterLabel)
+  // or a carryover tail from a past quarter (quarterLabel < currentQuarter).
+  const needsPlanningWork = mode === 'backlog' && (!epic.quarterLabel || epic.quarterLabel < currentQuarter)
+
+  // Stable role order for the remaining-work rows, union of both maps, ordered
+  // by workflow config first (matching the demand row above).
+  const orderedRemainingRoles: string[] = useMemo(() => {
+    if (!remaining) return []
+    const keys = new Set([
+      ...Object.keys(remaining.remainingNowByRole || {}),
+      ...Object.keys(remaining.remainingAtQuarterStartByRole || {}),
+    ])
+    const codes = getRoleCodes()
+    const ordered: string[] = []
+    codes.forEach(code => { if (keys.has(code)) ordered.push(code) })
+    keys.forEach(code => { if (!codes.includes(code)) ordered.push(code) })
+    return ordered
+  }, [remaining, getRoleCodes])
+
   const moveAction = mode === 'backlog'
     ? { label: 'В квартал →', handler: () => onMove(epic.epicKey, targetQuarter) }
     : { label: '← Вернуть', handler: () => onMove(epic.epicKey, null) }
+
+  // Role-chips row for remaining work — same chip styling as the demand row,
+  // colored via getRoleColor (never hardcode role colors).
+  const renderRemainingLine = (label: string, byRole: Record<string, number>, totalDays: number) => (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', fontSize: 11 }}>
+      <span style={{ color: TEXT_MUTED, fontWeight: 600 }}>{label}</span>
+      {orderedRemainingRoles.map(code => {
+        const val = byRole[code] || 0
+        const color = getRoleColor(code)
+        const bg = color.startsWith('#') && color.length === 7 ? lightenColor(color, 0.92) : BG_SUBTLE
+        return (
+          <span
+            key={code}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '2px 8px',
+              borderRadius: 3,
+              fontWeight: 700,
+              color,
+              background: bg,
+              borderLeft: `2px solid ${color}`,
+            }}
+          >
+            {code} {formatDays(val)}
+          </span>
+        )
+      })}
+      <span style={{ marginLeft: 'auto', color: TEXT_MUTED, fontWeight: 600 }}>
+        Σ {formatDays(totalDays)}д
+      </span>
+    </div>
+  )
 
   return (
     <div
@@ -294,6 +363,25 @@ export function EpicCard({
           <span style={{ marginLeft: 'auto', fontSize: 11, color: TEXT_MUTED, fontWeight: 600 }}>
             Σ {Math.round(epic.totalDemandDays)}d
           </span>
+        </div>
+      )}
+
+      {/* F86: remaining-work section — only for needs-planning backlog epics */}
+      {needsPlanningWork && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <WarningBadge tone="warn">Осталась работа</WarningBadge>
+          </div>
+          {remaining && remaining.hasEstimate ? (
+            <>
+              {renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole, remaining.remainingNowDays)}
+              {renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole, remaining.remainingAtQuarterStartDays)}
+            </>
+          ) : (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <WarningBadge tone="warn">нет оценки</WarningBadge>
+            </div>
+          )}
         </div>
       )}
 

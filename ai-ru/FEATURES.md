@@ -84,6 +84,7 @@
 | F82 | Membership тенанта привязан к доступу в Jira (security fix: закрытие само-присоединения) | 2026-07-02 | [features/F82](features/F82_JIRA_ACCESS_MEMBERSHIP.md) |
 | F83 | Data Quality: категории правил + новые правила (38 правил) | 2026-07-02 | [features/F83](features/F83_DQ_CATEGORIES_AND_RULES.md) |
 | F85 | Board Tooltips (эпик + проект hover-карточки) | 2026-07-02 | [features/F85](features/F85-board-tooltips.md) |
+| F86 | Quarterly Planning: остаток работы по эпикам (needs-planning фильтр + остаток сейчас/на старте квартала) | 2026-07-03 | [features/F86](features/F86_QUARTERLY_REMAINING_WORK.md) |
 
 ## Бэклог (BF)
 
