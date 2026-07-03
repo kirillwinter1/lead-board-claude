@@ -259,6 +259,21 @@ public class JiraWriteService {
         return newStatus;
     }
 
+    /**
+     * List the transitions currently available for an issue, using the current user's OAuth
+     * token when present, otherwise the BasicAuth service account (F84). Unlike
+     * {@link #transitionWithFallback} this performs no write — it is used by Data Quality fix
+     * previews to offer the user the statuses the issue can actually move to right now.
+     *
+     * @return available transitions (possibly empty); never null
+     */
+    public List<JiraTransition> listTransitionsWithFallback(String issueKey) {
+        Creds c = optionalCreds();
+        return c != null
+                ? jiraClient.getTransitions(issueKey, c.accessToken(), c.cloudId())
+                : jiraClient.getTransitionsBasicAuth(issueKey);
+    }
+
     /** Assign an issue, falling back to BasicAuth when no OAuth token is present. */
     public void assignWithFallback(String issueKey, String accountId) {
         Creds c = optionalCreds();

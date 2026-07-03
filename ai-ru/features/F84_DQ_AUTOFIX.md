@@ -40,14 +40,18 @@
 
 ## Fixes by Group
 
-### Group A — one-click (5 правил, без ввода)
+### Group A — транзишены статуса (5 правил)
+Целевой статус **выбирает пользователь** в модале: select `targetStatus` из реально доступных переходов Jira (`listTransitionsWithFallback`), отфильтрованных по целевой категории (IN_PROGRESS / DONE); при недоступности Jira — fallback на статусы категории из конфига. Дефолт — первый по `sort_order` конфига. Выбранное значение валидируется на сервере повторным вычислением опций.
+
 | Правило | Что делает Fix |
 |---|---|
-| `CHILD_IN_PROGRESS_EPIC_NOT` | Переводит **эпик** в In Progress |
-| `STORY_TODO_BUT_HAS_WORK` | Переводит **историю** в In Progress |
-| `SUBTASK_IN_PROGRESS_STORY_NOT` | Переводит родительскую **историю** в In Progress |
-| `SUBTASK_TIME_LOGGED_BUT_TODO` | Переводит **подзадачу** в In Progress |
-| `SUBTASK_DONE_NO_TIME_LOGGED` | Логирует ворклог = original estimate подзадачи (не применим, если оценки нет) |
+| `CHILD_IN_PROGRESS_EPIC_NOT` | Переводит **эпик** в выбранный in-progress статус |
+| `STORY_TODO_BUT_HAS_WORK` | Переводит **историю** в выбранный in-progress статус |
+| `SUBTASK_IN_PROGRESS_STORY_NOT` | Переводит родительскую **историю** в выбранный in-progress статус |
+| `SUBTASK_TIME_LOGGED_BUT_TODO` | Переводит **подзадачу** в выбранный in-progress статус |
+| `SUBTASK_DONE_NO_TIME_LOGGED` | One-click: логирует ворклог = original estimate подзадачи (не применим, если оценки нет) |
+
+`STORY_FULLY_LOGGED_NOT_DONE` (Group C) аналогично даёт выбор целевого Done-статуса. Заголовок модала — `Fix: <название правила>`; описание действия (например «Change story status») — отдельной строкой. Запрос без tenant-контекста возвращает 400 (не 500).
 
 ### Group B — с вводом (10 правил, включая RICE)
 | Правило | fixType | Ввод / выбор |

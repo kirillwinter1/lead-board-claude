@@ -53,11 +53,18 @@ function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : 'Unexpected error'
 }
 
-function ChangeRow({ change }: { change: FixChange }) {
+/**
+ * A single change line, styled like the DataQuality table rows:
+ * one header line (icon + key + truncated summary), then a from → to detail line.
+ * `toOverride` lets the parent reflect a live input selection (e.g. targetStatus)
+ * in the right-hand value instead of the static preview `to`.
+ */
+function ChangeRow({ change, toOverride }: { change: FixChange; toOverride?: string }) {
   const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const isStatus = change.field === 'Status'
+  const toValue = toOverride ?? change.to
   return (
-    <div className="fix-change-row" style={{ borderColor: BORDER_DEFAULT, background: BG_PAGE }}>
+    <div className="fix-change-card" style={{ borderColor: BORDER_DEFAULT, background: BG_SUBTLE }}>
       <div className="fix-change-head">
         {change.issueType && (
           <img
@@ -67,28 +74,28 @@ function ChangeRow({ change }: { change: FixChange }) {
           />
         )}
         <span className="fix-change-key" style={{ color: LINK_COLOR }}>{change.issueKey}</span>
+        {change.summary && (
+          <span className="fix-change-summary" style={{ color: TEXT_MUTED }}>{change.summary}</span>
+        )}
         {change.local && (
           <span className="fix-local-hint" style={{ color: TEXT_MUTED, borderColor: BORDER_DEFAULT }}>
             local
           </span>
         )}
       </div>
-      {change.summary && (
-        <div className="fix-change-summary" style={{ color: TEXT_MUTED }}>{change.summary}</div>
-      )}
       <div className="fix-change-detail" style={{ color: TEXT_SECONDARY }}>
         {change.field && <span className="fix-change-field">{change.field}: </span>}
         {isStatus ? (
           <span className="fix-change-status">
             {change.from ? <StatusBadge status={change.from} /> : <span>∅</span>}
             <span className="fix-change-arrow" style={{ color: TEXT_MUTED }}> → </span>
-            {change.to ? <StatusBadge status={change.to} /> : <span>∅</span>}
+            {toValue ? <StatusBadge status={toValue} /> : <span>∅</span>}
           </span>
         ) : (
           <>
             <span>{change.from || '∅'}</span>
             <span className="fix-change-arrow" style={{ color: TEXT_MUTED }}> → </span>
-            <span style={{ color: TEXT_PRIMARY, fontWeight: 600 }}>{change.to || '∅'}</span>
+            <span style={{ color: TEXT_PRIMARY, fontWeight: 600 }}>{toValue || '∅'}</span>
           </>
         )}
       </div>
@@ -138,6 +145,10 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
 
   const activeChanges: FixChange[] = activeChoice ? activeChoice.changes : preview?.changes ?? []
   const activeInputs: FixInput[] = activeChoice ? activeChoice.inputs : preview?.inputs ?? []
+
+  // A transition fix may expose a "targetStatus" select; the status change line
+  // should track the currently selected value rather than the static preview `to`.
+  const hasTargetStatusInput = activeInputs.some(inp => inp.name === 'targetStatus')
 
   // Default the selected choice to the first one once the preview loads.
   useEffect(() => {
@@ -212,14 +223,14 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
   // ---- RICE special case: embed the existing RiceForm, no preview fetch. ----
   if (isRice) {
     return (
-      <Modal isOpen onClose={onClose} title={ruleLabel} maxWidth={640}>
+      <Modal isOpen onClose={onClose} title={`Fix: ${ruleLabel}`} maxWidth={640}>
         <RiceForm issueKey={issueKey} onSaved={onApplied} />
       </Modal>
     )
   }
 
   return (
-    <Modal isOpen onClose={onClose} title={preview?.title || ruleLabel} maxWidth={640}>
+    <Modal isOpen onClose={onClose} title={`Fix: ${ruleLabel}`} maxWidth={640}>
       {loading && <div className="fix-modal-loading" style={{ color: TEXT_MUTED }}>Loading preview...</div>}
 
       {!loading && loadError && (
@@ -255,6 +266,11 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
 
       {!loading && !loadError && preview && preview.applicable && (
         <>
+          {/* Lead line — neutral description of what the fix does */}
+          {preview.title && (
+            <div className="fix-lead" style={{ color: TEXT_SECONDARY }}>{preview.title}</div>
+          )}
+
           {/* Choices (radio group) */}
           {hasChoices && (
             <div className="fix-choice-group" role="radiogroup" aria-label="Fix options">
@@ -284,12 +300,19 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
             </div>
           )}
 
-          {/* Change lines */}
+          {/* Change lines. When a transition fix exposes a `targetStatus` select,
+              the right-hand status badge reflects the user's live selection. */}
           {activeChanges.length > 0 && (
             <div className="fix-change-list">
-              {activeChanges.map((c, idx) => (
-                <ChangeRow key={`${c.issueKey}-${c.field}-${idx}`} change={c} />
-              ))}
+              {activeChanges.map((c, idx) => {
+                const toOverride =
+                  c.field === 'Status' && hasTargetStatusInput
+                    ? inputValues.targetStatus || c.to
+                    : undefined
+                return (
+                  <ChangeRow key={`${c.issueKey}-${c.field}-${idx}`} change={c} toOverride={toOverride} />
+                )
+              })}
             </div>
           )}
 

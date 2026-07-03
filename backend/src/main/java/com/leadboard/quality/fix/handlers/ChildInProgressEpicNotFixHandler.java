@@ -3,6 +3,7 @@ package com.leadboard.quality.fix.handlers;
 import com.leadboard.quality.DataQualityRule;
 import com.leadboard.quality.fix.FixHandler;
 import com.leadboard.quality.fix.FixSupport;
+import com.leadboard.quality.fix.dto.FixInput;
 import com.leadboard.quality.fix.dto.FixPreview;
 import com.leadboard.quality.fix.dto.FixResult;
 import com.leadboard.status.StatusCategory;
@@ -33,16 +34,20 @@ public class ChildInProgressEpicNotFixHandler implements FixHandler {
     @Override
     public FixPreview preview(JiraIssueEntity issue) {
         FixPreview.Builder b = FixPreview.builder(issue.getIssueKey(), rule(), "TRANSITION",
-                "Move epic to In Progress").authMode(support.authMode());
+                "Change epic status").authMode(support.authMode());
         JiraIssueEntity epic = support.resolveEpicOf(issue);
         if (epic == null) {
             return b.notApplicable("Parent epic not found.").build();
         }
-        String target = support.targetStatusName(epic, StatusCategory.IN_PROGRESS);
-        if (target == null) {
-            return b.notApplicable("No In Progress status configured for epics.").build();
+        FixSupport.TargetStatusOptions options = support.targetStatusOptions(epic, StatusCategory.IN_PROGRESS);
+        if (options.isEmpty()) {
+            return b.notApplicable("No In Progress status is available for this epic.").build();
         }
-        return b.changes(List.of(support.statusChange(epic, target))).build();
+        return b
+                .inputs(List.of(FixInput.select("targetStatus", "New status", true,
+                        FixSupport.statusOptions(options.names()), options.defaultName())))
+                .changes(List.of(support.statusChange(epic, options.defaultName())))
+                .build();
     }
 
     @Override
@@ -51,7 +56,7 @@ public class ChildInProgressEpicNotFixHandler implements FixHandler {
         if (epic == null) {
             throw new IllegalArgumentException("Parent epic not found.");
         }
-        String target = support.targetStatusName(epic, StatusCategory.IN_PROGRESS);
+        String target = support.requireTargetStatus(epic, StatusCategory.IN_PROGRESS, params);
         String newStatus = support.jiraWrite().transitionWithFallback(epic.getIssueKey(), target);
         return FixResult.ok(epic.getIssueKey() + " → " + newStatus, List.of(epic.getIssueKey()));
     }

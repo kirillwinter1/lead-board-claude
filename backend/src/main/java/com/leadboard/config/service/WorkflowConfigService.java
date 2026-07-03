@@ -844,6 +844,48 @@ public class WorkflowConfigService {
         return new ArrayList<>(names);
     }
 
+    /**
+     * All status names configured for a {@code boardCat} that map to {@code target}, ordered by
+     * pipeline sort order (lowest first; ties broken by name). Unlike
+     * {@link #getFirstStatusNameForCategory} (single default), this returns the full option list
+     * a user can pick from — used by Data Quality transition fixes (F84) as the offline/fallback
+     * source when live Jira transitions are unavailable.
+     */
+    public List<String> getStatusNamesForCategory(StatusCategory target, BoardCategory boardCat) {
+        if (target == null || boardCat == null) return List.of();
+        ensureLoaded();
+        String prefix = boardCat.name() + ":";
+        List<String> names = new ArrayList<>();
+        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith(prefix) && entry.getValue() == target) {
+                names.add(key.substring(prefix.length()));
+            }
+        }
+        return orderStatusNames(boardCat, names);
+    }
+
+    /**
+     * Orders arbitrary status names by the configured pipeline sort order of {@code boardCat}
+     * (lowest {@code statusSortOrder} first; unknown → last; ties broken by name for determinism).
+     * Used to order Jira-derived transition targets so the first option is the pipeline-first
+     * status (F84).
+     */
+    public List<String> orderStatusNames(BoardCategory boardCat, List<String> names) {
+        if (names == null || names.isEmpty()) return List.of();
+        ensureLoaded();
+        String prefix = boardCat == null ? null : boardCat.name() + ":";
+        return names.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(Comparator
+                        .comparingInt((String n) -> prefix == null
+                                ? Integer.MAX_VALUE
+                                : statusSortOrder.getOrDefault(prefix + n, Integer.MAX_VALUE))
+                        .thenComparing(Comparator.naturalOrder()))
+                .collect(Collectors.toList());
+    }
+
     // ==================== Link Types ====================
 
     public LinkCategory categorizeLinkType(String linkTypeName) {
