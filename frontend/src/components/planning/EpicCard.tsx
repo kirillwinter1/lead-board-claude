@@ -143,6 +143,12 @@ export function EpicCard({
   // or a carryover tail from a past quarter (quarterLabel < currentQuarter).
   const needsPlanningWork = mode === 'backlog' && (!epic.quarterLabel || epic.quarterLabel < currentQuarter)
 
+  // The «Осталась работа» badge is a measured fact, not an assumption: it only
+  // shows when the planner actually computed a non-zero remainder. Unestimated
+  // needs-planning epics get the plain «нет оценки» badge instead.
+  const showRemainingWork =
+    needsPlanningWork && !!remaining && remaining.hasEstimate && remaining.remainingNowDays > 0
+
   // Stable role order for the remaining-work rows, union of both maps, ordered
   // by workflow config first (matching the demand row above).
   const orderedRemainingRoles: string[] = useMemo(() => {
@@ -353,22 +359,14 @@ export function EpicCard({
         </div>
       )}
 
-      {/* F86: remaining-work section — only for needs-planning backlog epics */}
-      {needsPlanningWork && (
+      {/* F86: remaining-work section — needs-planning backlog epics with a computed remainder */}
+      {showRemainingWork && remaining && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <WarningBadge tone="warn">Осталась работа</WarningBadge>
           </div>
-          {remaining && remaining.hasEstimate ? (
-            <>
-              {renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole, remaining.remainingNowDays)}
-              {renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole, remaining.remainingAtQuarterStartDays)}
-            </>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <WarningBadge tone="warn">нет оценки</WarningBadge>
-            </div>
-          )}
+          {renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole, remaining.remainingNowDays)}
+          {renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole, remaining.remainingAtQuarterStartDays)}
         </div>
       )}
 
@@ -376,12 +374,12 @@ export function EpicCard({
           shown here: standalone epics already sit under the «Без проекта»
           group header, and overload is a team-level signal covered by the
           capacity bars above the columns. */}
-      {((!epic.hasEstimate && !needsPlanningWork)
+      {((!epic.hasEstimate && !showRemainingWork)
         || !epic.hasTeamMapping
         || inOtherQuarter
         || pmDesiresDifferentQuarter) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {!epic.hasEstimate && !needsPlanningWork && (
+          {!epic.hasEstimate && !showRemainingWork && (
             <WarningBadge tone="warn">нет оценки</WarningBadge>
           )}
           {!epic.hasTeamMapping && (
