@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useMemo, KeyboardEvent, ReactNode } from 'react'
-import { TeamBadge } from '../TeamBadge'
 import { RiceScoreBadge } from '../rice/RiceScoreBadge'
 import { getIssueIcon } from '../board/helpers'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
@@ -45,6 +44,12 @@ interface EpicCardProps {
    * by the page — undefined until it arrives, or when the epic has no estimate.
    */
   remaining?: EpicRemainingDto
+  /**
+   * The team the page is filtered by. Its name is implied by the page context,
+   * so the overload badge drops it and only names OTHER overloaded teams
+   * (possible on multi-team epics).
+   */
+  selectedTeamId?: number
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -76,6 +81,7 @@ export function EpicCard({
   jiraBaseUrl,
   teamsById,
   remaining,
+  selectedTeamId,
   onMove,
   onBoostChange,
 }: EpicCardProps) {
@@ -97,11 +103,15 @@ export function EpicCard({
 
   const iconUrl = getIssueIcon(epic.typeName, epic.iconUrl ?? getIssueTypeIconUrl(epic.typeName), getIssueTypeCategory(epic.typeName))
 
+  // The selected team is implied by the page filter — the badge names only OTHER
+  // overloaded teams (multi-team epics); when it's just the selected one, a bare
+  // «перегруз» is enough.
   const overloadedTeamNames: string[] = epic.overloadedTeams
+    .filter(id => id !== selectedTeamId)
     .map(id => teamsById.get(id)?.name)
     .filter((n): n is string => Boolean(n))
 
-  const overloads = mode === 'in-quarter' && overloadedTeamNames.length > 0
+  const overloads = mode === 'in-quarter' && epic.overloadedTeams.length > 0
   const inOtherQuarter = !!epic.quarterLabel && !epic.inQuarter
 
   // F70: PM is asking for a different quarter than the one the tech lead is viewing.
@@ -318,15 +328,6 @@ export function EpicCard({
         </div>
       )}
 
-      {/* Teams */}
-      {epic.teams.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {epic.teams.map(t => (
-            <TeamBadge key={t.id} name={t.name} color={t.color} />
-          ))}
-        </div>
-      )}
-
       {/* Roles demand */}
       {orderedRoles.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
@@ -409,7 +410,9 @@ export function EpicCard({
             <WarningBadge tone="neutral">Standalone</WarningBadge>
           )}
           {overloads && (
-            <WarningBadge tone="error">перегруз: {overloadedTeamNames.join(', ')}</WarningBadge>
+            <WarningBadge tone="error">
+              {overloadedTeamNames.length > 0 ? `перегруз: ${overloadedTeamNames.join(', ')}` : 'перегруз'}
+            </WarningBadge>
           )}
         </div>
       )}

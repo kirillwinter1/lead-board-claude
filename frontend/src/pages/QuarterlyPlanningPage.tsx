@@ -592,6 +592,7 @@ export function QuarterlyPlanningPage() {
           targetQuarter={quarter}
           jiraBaseUrl={jiraBaseUrl}
           teamsById={teamsById}
+          selectedTeamId={teamFilter ? Number(teamFilter) : undefined}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
         />

@@ -25,6 +25,8 @@ interface InQuarterColumnProps {
   targetQuarter: string
   jiraBaseUrl: string
   teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
+  // Team the page is filtered by — EpicCard drops its name from the overload badge.
+  selectedTeamId?: number
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -42,6 +44,7 @@ export function InQuarterColumn({
   targetQuarter,
   jiraBaseUrl,
   teamsById,
+  selectedTeamId,
   onMove,
   onBoostChange,
 }: InQuarterColumnProps) {
@@ -236,6 +239,7 @@ export function InQuarterColumn({
                       currentQuarter={targetQuarter}
                       jiraBaseUrl={jiraBaseUrl}
                       teamsById={teamsById}
+                      selectedTeamId={selectedTeamId}
                       onMove={onMove}
                       onBoostChange={onBoostChange}
                     />
