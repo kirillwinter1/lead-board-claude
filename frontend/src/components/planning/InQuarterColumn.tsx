@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { TeamBadge } from '../TeamBadge'
 import { EpicCard } from './EpicCard'
+import { RoughEstimateConfig } from '../../api/epics'
 import { PlanningEpicDto } from '../../api/quarterlyPlanning'
 import {
   NO_PROJECT_KEY,
@@ -24,6 +25,8 @@ interface InQuarterColumnProps {
   epics: PlanningEpicDto[]
   targetQuarter: string
   jiraBaseUrl: string
+  estimateConfig?: RoughEstimateConfig | null
+  onEstimateChange?: (epicKey: string, role: string, days: number | null) => Promise<void>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -40,6 +43,8 @@ export function InQuarterColumn({
   epics,
   targetQuarter,
   jiraBaseUrl,
+  estimateConfig,
+  onEstimateChange,
   onMove,
   onBoostChange,
 }: InQuarterColumnProps) {
@@ -234,6 +239,8 @@ export function InQuarterColumn({
                       currentQuarter={targetQuarter}
                       jiraBaseUrl={jiraBaseUrl}
                       showProject={groupMode === 'team'}
+                      estimateConfig={estimateConfig}
+                      onEstimateChange={onEstimateChange}
                       onMove={onMove}
                       onBoostChange={onBoostChange}
                     />

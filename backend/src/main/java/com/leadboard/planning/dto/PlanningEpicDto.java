@@ -32,6 +32,10 @@ public record PlanningEpicDto(
         Map<String, BigDecimal> demandByRole,
         BigDecimal totalDemandDays,
         boolean hasEstimate,
+        // Rough estimate is editable while the epic's status category is
+        // NEW/REQUIREMENTS/TODO (WorkflowConfigService.isAllowedForRoughEstimate) —
+        // same rule the Board's epicInTodo flag and the PATCH endpoint enforce.
+        boolean estimateEditable,
         boolean hasTeamMapping,
         List<Long> overloadedTeams,
         String projectDesiredQuarter,

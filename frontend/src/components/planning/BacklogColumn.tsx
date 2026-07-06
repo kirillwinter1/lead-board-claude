@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { SearchInput } from '../SearchInput'
 import { MultiSelectDropdown } from '../MultiSelectDropdown'
 import { EpicCard } from './EpicCard'
+import { RoughEstimateConfig } from '../../api/epics'
 import { PlanningEpicDto, EpicRemainingDto } from '../../api/quarterlyPlanning'
 import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './constants'
 import {
@@ -21,6 +22,8 @@ interface BacklogColumnProps {
   jiraBaseUrl: string
   // F86: per-epic remaining work, keyed by epicKey. Loaded lazily by the page.
   remainingByEpic: Record<string, EpicRemainingDto>
+  estimateConfig?: RoughEstimateConfig | null
+  onEstimateChange?: (epicKey: string, role: string, days: number | null) => Promise<void>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
   // F70: when true the parent has already filtered the epic list down to
@@ -46,6 +49,8 @@ export function BacklogColumn({
   currentQuarter,
   jiraBaseUrl,
   remainingByEpic,
+  estimateConfig,
+  onEstimateChange,
   onMove,
   onBoostChange,
   onlyDesired,
@@ -246,6 +251,8 @@ export function BacklogColumn({
                       jiraBaseUrl={jiraBaseUrl}
                       remaining={remainingByEpic[epic.epicKey]}
                       showProject={false}
+                      estimateConfig={estimateConfig}
+                      onEstimateChange={onEstimateChange}
                       onMove={onMove}
                       onBoostChange={onBoostChange}
                     />

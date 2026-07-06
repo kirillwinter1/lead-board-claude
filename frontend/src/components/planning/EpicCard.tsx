@@ -4,6 +4,8 @@ import { StatusBadge } from '../board/StatusBadge'
 import { getIssueIcon } from '../board/helpers'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { PlanningEpicDto, EpicRemainingDto } from '../../api/quarterlyPlanning'
+import { RoughEstimateConfig } from '../../api/epics'
+import { PlanningRoleChip } from './PlanningRoleChip'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
@@ -48,6 +50,13 @@ interface EpicCardProps {
    * already sits under a project group header that names the same project.
    */
   showProject?: boolean
+  /**
+   * Rough-estimate editing (same rules as the Board page): chips become
+   * click-to-edit when the config allows the epic's status. Null/undefined
+   * config keeps chips read-only.
+   */
+  estimateConfig?: RoughEstimateConfig | null
+  onEstimateChange?: (epicKey: string, role: string, days: number | null) => Promise<void>
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -79,6 +88,8 @@ export function EpicCard({
   jiraBaseUrl,
   remaining,
   showProject = true,
+  estimateConfig,
+  onEstimateChange,
   onMove,
   onBoostChange,
 }: EpicCardProps) {
@@ -129,15 +140,21 @@ export function EpicCard({
     }
   }
 
-  // Build a stable order of roles based on workflow config
+  // Rough estimates are editable under the same rules as the Board page:
+  // feature enabled and the epic's status is in the allowed list.
+  const estimateEditable = !!estimateConfig?.enabled && !!onEstimateChange && epic.estimateEditable
+
+  // Build a stable order of roles based on workflow config. Editable epics show
+  // ALL pipeline roles (empty ones render a pencil placeholder, as on the
+  // Board); read-only epics show only roles that carry an estimate.
   const orderedRoles: string[] = useMemo(() => {
     const codes = getRoleCodes()
     const present = new Set(Object.keys(epic.demandByRole))
     const ordered: string[] = []
-    codes.forEach(code => { if (present.has(code)) ordered.push(code) })
+    codes.forEach(code => { if (estimateEditable || present.has(code)) ordered.push(code) })
     present.forEach(code => { if (!codes.includes(code)) ordered.push(code) })
-    return ordered.filter(code => (epic.demandByRole[code] || 0) > 0)
-  }, [epic.demandByRole, getRoleCodes])
+    return estimateEditable ? ordered : ordered.filter(code => (epic.demandByRole[code] || 0) > 0)
+  }, [epic.demandByRole, getRoleCodes, estimateEditable])
 
   // F86: in the backlog column, flag epics whose remaining work still needs to
   // be planned into the viewed quarter — either uncommitted (no quarterLabel)
@@ -341,42 +358,26 @@ export function EpicCard({
         </div>
       )}
 
-      {/* Roles demand */}
+      {/* Roles estimate — Board-style chips, click-to-edit when the config allows it */}
       {orderedRoles.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
-          {orderedRoles.map(code => {
-            const days = epic.demandByRole[code] || 0
-            const color = getRoleColor(code)
-            // Only call lightenColor for full 6-digit hex (#RRGGBB). For other
-            // formats (3-digit hex `#abc`, 4-char fallback `#666`, rgb(...),
-            // CSS vars), fall back to a neutral subtle background so the chip
-            // remains visible — otherwise bg would equal text color.
-            const bg = color.startsWith('#') && color.length === 7
-              ? lightenColor(color, 0.92)
-              : BG_SUBTLE
-            return (
-              <span
-                key={code}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  padding: '2px 8px',
-                  borderRadius: 3,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color,
-                  background: bg,
-                  borderLeft: `2px solid ${color}`,
-                }}
-              >
-                {code} {days}d
-              </span>
-            )
-          })}
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: TEXT_MUTED, fontWeight: 600 }}>
-            Σ {Math.round(epic.totalDemandDays)}d
-          </span>
+          {orderedRoles.map(code => (
+            <PlanningRoleChip
+              key={code}
+              epicKey={epic.epicKey}
+              role={code}
+              days={epic.demandByRole[code] ?? null}
+              roleColor={getRoleColor(code)}
+              editable={estimateEditable}
+              config={estimateConfig ?? null}
+              onSave={onEstimateChange ?? (async () => {})}
+            />
+          ))}
+          {epic.totalDemandDays > 0 && (
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: TEXT_MUTED, fontWeight: 600 }}>
+              Σ {Math.round(epic.totalDemandDays)}d
+            </span>
+          )}
         </div>
       )}
 
@@ -397,12 +398,13 @@ export function EpicCard({
           shown here: standalone epics already sit under the «Без проекта»
           group header, and overload is a team-level signal covered by the
           capacity bars above the columns. */}
-      {((!epic.hasEstimate && !showRemainingWork)
+      {((!epic.hasEstimate && !showRemainingWork && !estimateEditable)
         || !epic.hasTeamMapping
         || inOtherQuarter
         || pmDesiresDifferentQuarter) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {!epic.hasEstimate && !showRemainingWork && (
+          {/* Pencil chips already scream "no estimate" on editable epics */}
+          {!epic.hasEstimate && !showRemainingWork && !estimateEditable && (
             <WarningBadge tone="warn">нет оценки</WarningBadge>
           )}
           {!epic.hasTeamMapping && (

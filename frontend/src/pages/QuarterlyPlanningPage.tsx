@@ -9,6 +9,7 @@ import {
 } from '../api/quarterlyPlanning'
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
+import { getRoughEstimateConfig, updateRoughEstimate, RoughEstimateConfig } from '../api/epics'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { CapacityBars } from '../components/planning/CapacityBars'
 import { BacklogColumn } from '../components/planning/BacklogColumn'
@@ -64,6 +65,8 @@ export function QuarterlyPlanningPage() {
   const [teamsOverview, setTeamsOverview] = useState<QuarterlyTeamOverviewDto[]>([])
   // Status colors for the epic StatusBadge — same source as Board/Projects pages.
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
+  // Rough-estimate editing config (enabled flag, allowed statuses, step/min/max).
+  const [estimateConfig, setEstimateConfig] = useState<RoughEstimateConfig | null>(null)
   // F86: per-epic remaining work (now vs at quarter start), keyed by epicKey.
   // Loaded lazily and independently of loadQuarter so the board renders
   // immediately and these numbers stream in.
@@ -98,9 +101,11 @@ export function QuarterlyPlanningPage() {
       quarterlyPlanningApi.getAvailableQuarters().catch(() => [] as string[]),
       getConfig().then(c => c.jiraBaseUrl || '').catch(() => ''),
       getStatusStyles().catch(() => ({} as Record<string, StatusStyle>)),
-    ]).then(([qs, baseUrl, styles]) => {
+      getRoughEstimateConfig().catch(() => null),
+    ]).then(([qs, baseUrl, styles, roughCfg]) => {
       if (cancelled) return
       setStatusStyles(styles)
+      setEstimateConfig(roughCfg)
       // Planning is forward-looking: hide past quarters from the dropdown so
       // a user cannot accidentally schedule work into a quarter that already
       // ended. The current quarter is always retained (backend guarantees it).
@@ -228,6 +233,22 @@ export function QuarterlyPlanningPage() {
         manualBoost: boost,
         priorityScore: rawPriority,
       }
+    }))
+  }, [])
+
+  // Save a rough estimate (same endpoint as the Board page) and sync the epic's
+  // demand figures from the server response, so chips, Σ, group totals and the
+  // optimistic capacity math all update without a full reload.
+  const handleEstimateChange = useCallback(async (epicKey: string, role: string, days: number | null) => {
+    const resp = await updateRoughEstimate(epicKey, role, { days })
+    setEpics(prev => prev.map(e => {
+      if (e.epicKey !== epicKey) return e
+      const demandByRole: Record<string, number> = {}
+      for (const [r, v] of Object.entries(resp.roughEstimates)) {
+        if (v !== null && v > 0) demandByRole[r] = v
+      }
+      const totalDemandDays = Object.values(demandByRole).reduce((s, v) => s + v, 0)
+      return { ...e, demandByRole, totalDemandDays, hasEstimate: totalDemandDays > 0 }
     }))
   }, [])
 
@@ -588,6 +609,8 @@ export function QuarterlyPlanningPage() {
           currentQuarter={quarter}
           jiraBaseUrl={jiraBaseUrl}
           remainingByEpic={remainingByEpic}
+          estimateConfig={estimateConfig}
+          onEstimateChange={handleEstimateChange}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
           onlyDesired={onlyDesired}
@@ -597,6 +620,8 @@ export function QuarterlyPlanningPage() {
           epics={inQuarterEpics}
           targetQuarter={quarter}
           jiraBaseUrl={jiraBaseUrl}
+          estimateConfig={estimateConfig}
+          onEstimateChange={handleEstimateChange}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
         />

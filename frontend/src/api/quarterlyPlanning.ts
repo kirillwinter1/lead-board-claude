@@ -169,6 +169,8 @@ export interface PlanningEpicDto {
   demandByRole: Record<string, number>
   totalDemandDays: number
   hasEstimate: boolean
+  // Server-computed: rough estimate editable while epic status category is NEW/REQUIREMENTS/TODO.
+  estimateEditable: boolean
   hasTeamMapping: boolean
   overloadedTeams: number[]
   // F70: project-level "desired" quarter (parent project label) — null when standalone
