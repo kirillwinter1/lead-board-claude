@@ -212,28 +212,19 @@ export function EpicCard({
       {orderedRemainingRoles.map(code => {
         const val = byRole[code] || 0
         const color = getRoleColor(code)
-        const bg = color.startsWith('#') && color.length === 7 ? lightenColor(color, 0.92) : BG_SUBTLE
         return (
-          <span
+          <div
             key={code}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              padding: '2px 8px',
-              borderRadius: 3,
-              fontWeight: 700,
-              color,
-              background: bg,
-              borderLeft: `2px solid ${color}`,
-            }}
+            className="planning-role-chip epic-role-chip todo readonly"
+            style={{ color, borderColor: lightenColor(color, 0.6) }}
           >
-            {code} {formatDays(val)}д
-          </span>
+            <span className="epic-role-label">{code}</span>
+            <span className="epic-role-value">{formatDays(val)}d</span>
+          </div>
         )
       })}
       <span style={{ marginLeft: 'auto', color: TEXT_MUTED, fontWeight: 600 }}>
-        Σ {formatDays(totalDays)}д
+        Σ {formatDays(totalDays)}d
       </span>
     </div>
   )
