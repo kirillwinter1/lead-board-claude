@@ -47,10 +47,3 @@
   height: 30px;
   padding: 2px 8px;
 }
-
-/* Read-only chips: calm solid background instead of the Board's hatched
- * rough-only pattern, which reads as "disabled" on planning cards. */
-.planning-role-chip.epic-role-chip.rough-only {
-  background: #f4f5f7;
-  border: 1px solid #dfe1e6;
-}
