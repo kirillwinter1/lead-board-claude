@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
-import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay } from '../api/forecast'
+import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay, StatusInterval } from '../api/forecast'
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider, useStatusStyles } from '../components/board/StatusStylesContext'
+import { resolveStatusBgColor } from '../components/board/StatusBadge'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
@@ -27,9 +28,6 @@ import {
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
 type ActualsMode = 'worklog' | 'status'
 type TimelineCache = { forecast: ForecastResponse; unifiedPlan: UnifiedPlanningResult }
-
-// Neutral color for statuses without configured color (fail-safe, not a design palette)
-const STATUS_FALLBACK_COLOR = '#9ca3af'
 
 // Width per unit in pixels for each zoom level
 const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
@@ -368,12 +366,6 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const storySource: PhaseSource = (story as PlannedStory & { _source?: PhaseSource })._source || 'forecast'
   const worklogDays: WorklogDay[] | null = (story as PlannedStory & { _worklogDays?: WorklogDay[] | null })._worklogDays || null
 
-  interface StatusInterval {
-    status: string
-    startDate: string
-    endDate: string
-  }
-
   const statusIntervals: StatusInterval[] | null =
     (story as PlannedStory & { _statusIntervals?: StatusInterval[] | null })._statusIntervals || null
   const statusStyles = useStatusStyles()
@@ -450,7 +442,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       const segDuration = daysBetween(clipStart, clipEnd) + 1
       const segLeft = (segOffset / duration) * 100
       const segWidth = Math.min((segDuration / duration) * 100, 100 - segLeft)
-      const color = statusStyles[interval.status]?.color || STATUS_FALLBACK_COLOR
+      const color = resolveStatusBgColor(interval.status, statusStyles)
 
       segments.push(
         <div

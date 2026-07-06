@@ -279,7 +279,7 @@ describe('TimelinePage', () => {
       })
     })
 
-    it('falls back to neutral color for status without configured color', async () => {
+    it('falls back to StatusBadge palette for status without configured color', async () => {
       vi.mocked(boardApi.getStatusStyles).mockResolvedValue({} as any)
       const { container } = renderTimelinePage()
 
@@ -291,11 +291,13 @@ describe('TimelinePage', () => {
       fireEvent.click(screen.getByText('Story statuses'))
 
       await waitFor(() => {
-        // STATUS_FALLBACK_COLOR = #9ca3af → rgb(156, 163, 175)
-        const fallbackSeg = Array.from(container.querySelectorAll('.story-bar div')).find(
-          el => (el as HTMLElement).style.backgroundColor === 'rgb(156, 163, 175)'
+        const bgColors = Array.from(container.querySelectorAll('.story-bar div')).map(
+          el => (el as HTMLElement).style.backgroundColor
         )
-        expect(fallbackSeg).toBeTruthy()
+        // 'To Do' → .status-badge.to-do bg #f4f5f7 → rgb(244, 245, 247)
+        expect(bgColors).toContain('rgb(244, 245, 247)')
+        // 'In Development' → default .status-badge bg #dfe1e6 → rgb(223, 225, 230)
+        expect(bgColors).toContain('rgb(223, 225, 230)')
       })
     })
   })

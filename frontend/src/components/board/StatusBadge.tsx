@@ -1,5 +1,29 @@
 import type { CSSProperties } from 'react'
+import type { StatusStyle } from '../../api/board'
 import { useStatusStyles } from './StatusStylesContext'
+
+// Backgrounds of the .status-badge CSS fallback classes (BoardPage.css) — keep in sync.
+// Lets non-badge renderers (timeline/chart segments) paint the exact color a StatusBadge
+// would get for statuses that have no configured color.
+const SLUG_BG: Record<string, string> = {
+  'в-работе': '#deebff',
+  'in-progress': '#deebff',
+  'готово': '#e3fcef',
+  'done': '#e3fcef',
+  'closed': '#e3fcef',
+  'backlog': '#f4f5f7',
+  'planning': '#f4f5f7',
+  'to-do': '#f4f5f7',
+  'selected-for-development': '#eae6ff',
+}
+const DEFAULT_STATUS_BG = '#dfe1e6'
+
+/** Background a StatusBadge would use for this status: configured color → CSS-class palette → default grey. */
+export function resolveStatusBgColor(status: string, statusStyles: Record<string, StatusStyle>): string {
+  const explicit = statusStyles[status]?.color
+  if (explicit) return explicit
+  return SLUG_BG[status.toLowerCase().replace(/\s+/g, '-')] ?? DEFAULT_STATUS_BG
+}
 
 function getContrastColor(hex: string): string {
   const c = hex.replace('#', '')

@@ -26,7 +26,7 @@ import { StatusBadge } from '../board/StatusBadge'
 
 NEVER: manually read useStatusStyles(), apply opacity hacks, use getContrastColor() outside StatusBadge, hardcode status color values, use foreignObject in SVG.
 
-Exception: chart/timeline **segments** that use the status color as data (bar fills, not labels) may read `statusStyles[status]?.color` directly with a neutral fallback — precedents: `DsrBreakdownChart`, F87 `StoryBar`. Status **labels/badges** must still go through `StatusBadge`.
+Exception: chart/timeline **segments** that use the status color as data (bar fills, not labels) must use `resolveStatusBgColor(status, statusStyles)` from `StatusBadge.tsx` — it returns exactly the background a StatusBadge would render (configured color → CSS-class palette → default grey). Precedents: `DsrBreakdownChart`, F87 `StoryBar`. Status **labels/badges** must still go through `StatusBadge`.
 
 ## Charts with Rich Labels — Two-Column HTML Layout
 
