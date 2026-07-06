@@ -43,7 +43,9 @@ export function PlanningRoleChip({ epicKey, role, days, roleColor, editable, con
       await onSave(epicKey, role, parsed)
       setEditing(false)
     } catch (err) {
+      // Same user feedback as the Board's EpicRoleChip — the input stays open.
       console.error('Failed to save rough estimate:', err)
+      alert('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'))
     } finally {
       setSaving(false)
     }

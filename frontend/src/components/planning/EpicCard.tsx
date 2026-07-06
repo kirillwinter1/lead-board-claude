@@ -166,13 +166,14 @@ export function EpicCard({
   const showRemainingWork =
     needsPlanningWork && !!remaining && remaining.hasEstimate && remaining.remainingNowDays > 0
 
-  // Deduplicate the three number rows: a remaining row is rendered only when it
-  // actually differs from the row above it (per-role, 0.05d tolerance). For an
-  // untouched epic all three match — the badge alone carries the signal.
+  // Deduplicate the number rows: a remaining row is rendered only when it
+  // differs from the row above it. Tolerance is half a day — values are
+  // DISPLAYED as whole days, so a smaller tolerance would render a row that
+  // looks identical to the one above it.
   const sameByRole = (a: Record<string, number>, b: Record<string, number>) => {
     const keys = new Set([...Object.keys(a), ...Object.keys(b)])
     for (const k of keys) {
-      if (Math.abs((a[k] || 0) - (b[k] || 0)) >= 0.05) return false
+      if (Math.abs((a[k] || 0) - (b[k] || 0)) >= 0.5) return false
     }
     return true
   }
