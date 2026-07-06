@@ -177,8 +177,11 @@ export function EpicCard({
     }
     return true
   }
+  // Compare against the estimate row only when that row is actually visible
+  // (estimation phase) — for in-work epics the remaining row is the only
+  // numbers row and must always render.
   const remainingEqualsEstimate =
-    !!remaining && sameByRole(epic.demandByRole, remaining.remainingNowByRole)
+    epic.estimateEditable && !!remaining && sameByRole(epic.demandByRole, remaining.remainingNowByRole)
   const atStartEqualsNow =
     !!remaining && sameByRole(remaining.remainingNowByRole, remaining.remainingAtQuarterStartByRole)
 
@@ -358,8 +361,11 @@ export function EpicCard({
         </div>
       )}
 
-      {/* Roles estimate — Board-style chips, click-to-edit when the config allows it */}
-      {orderedRoles.length > 0 && (
+      {/* Roles estimate — Board-style chips, click-to-edit when the config allows it.
+          Shown only while the epic is still in its estimation phase (server flag);
+          once work starts the stale rough estimate hides and the card speaks in
+          remaining work only. */}
+      {epic.estimateEditable && orderedRoles.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {orderedRoles.map(code => (
             <PlanningRoleChip
