@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, KeyboardEvent, ReactNode } from '
 import { RiceScoreBadge } from '../rice/RiceScoreBadge'
 import { getIssueIcon } from '../board/helpers'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
-import { PlanningEpicDto, TeamRef, EpicRemainingDto } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto, EpicRemainingDto } from '../../api/quarterlyPlanning'
 import {
   TEXT_PRIMARY,
   TEXT_MUTED,
@@ -23,7 +23,6 @@ import {
   INFO_BG,
   INFO_TEXT,
   INFO_BORDER,
-  DSR_RED,
   lightenColor,
 } from '../../constants/colors'
 
@@ -38,18 +37,16 @@ interface EpicCardProps {
    */
   currentQuarter: string
   jiraBaseUrl: string
-  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   /**
    * F86: remaining work for this epic (now vs at quarter start). Loaded lazily
    * by the page — undefined until it arrives, or when the epic has no estimate.
    */
   remaining?: EpicRemainingDto
   /**
-   * The team the page is filtered by. Its name is implied by the page context,
-   * so the overload badge drops it and only names OTHER overloaded teams
-   * (possible on multi-team epics).
+   * Whether to render the `Project: …` row. Columns pass false when the card
+   * already sits under a project group header that names the same project.
    */
-  selectedTeamId?: number
+  showProject?: boolean
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -79,9 +76,8 @@ export function EpicCard({
   targetQuarter,
   currentQuarter,
   jiraBaseUrl,
-  teamsById,
   remaining,
-  selectedTeamId,
+  showProject = true,
   onMove,
   onBoostChange,
 }: EpicCardProps) {
@@ -103,15 +99,6 @@ export function EpicCard({
 
   const iconUrl = getIssueIcon(epic.typeName, epic.iconUrl ?? getIssueTypeIconUrl(epic.typeName), getIssueTypeCategory(epic.typeName))
 
-  // The selected team is implied by the page filter — the badge names only OTHER
-  // overloaded teams (multi-team epics); when it's just the selected one, a bare
-  // «перегруз» is enough.
-  const overloadedTeamNames: string[] = epic.overloadedTeams
-    .filter(id => id !== selectedTeamId)
-    .map(id => teamsById.get(id)?.name)
-    .filter((n): n is string => Boolean(n))
-
-  const overloads = mode === 'in-quarter' && epic.overloadedTeams.length > 0
   const inOtherQuarter = !!epic.quarterLabel && !epic.inQuarter
 
   // F70: PM is asking for a different quarter than the one the tech lead is viewing.
@@ -219,8 +206,7 @@ export function EpicCard({
         gap: 10,
         padding: 12,
         background: BG_PAGE,
-        border: `1px solid ${overloads ? DSR_RED : BORDER_DEFAULT}`,
-        borderLeft: overloads ? `4px solid ${DSR_RED}` : `1px solid ${BORDER_DEFAULT}`,
+        border: `1px solid ${BORDER_DEFAULT}`,
         borderRadius: 8,
       }}
     >
@@ -307,8 +293,8 @@ export function EpicCard({
         </div>
       </div>
 
-      {/* Project link (hidden for orphan epics without a parent project) */}
-      {epic.projectKey && (
+      {/* Project link (hidden for orphan epics and when the group header already names the project) */}
+      {showProject && epic.projectKey && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: TEXT_SECONDARY }}>
           <span style={{ color: TEXT_MUTED }}>Project:</span>
           <a
@@ -386,15 +372,16 @@ export function EpicCard({
         </div>
       )}
 
-      {/* Warning badges */}
-      {(!epic.hasEstimate
+      {/* Warning badges. Standalone and team-overload are deliberately NOT
+          shown here: standalone epics already sit under the «Без проекта»
+          group header, and overload is a team-level signal covered by the
+          capacity bars above the columns. */}
+      {((!epic.hasEstimate && !needsPlanningWork)
         || !epic.hasTeamMapping
         || inOtherQuarter
-        || overloads
-        || pmDesiresDifferentQuarter
-        || epic.isStandalone) && (
+        || pmDesiresDifferentQuarter) && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {!epic.hasEstimate && (
+          {!epic.hasEstimate && !needsPlanningWork && (
             <WarningBadge tone="warn">нет оценки</WarningBadge>
           )}
           {!epic.hasTeamMapping && (
@@ -405,14 +392,6 @@ export function EpicCard({
           )}
           {pmDesiresDifferentQuarter && (
             <WarningBadge tone="info">PM желает {epic.projectDesiredQuarter}</WarningBadge>
-          )}
-          {epic.isStandalone && (
-            <WarningBadge tone="neutral">Standalone</WarningBadge>
-          )}
-          {overloads && (
-            <WarningBadge tone="error">
-              {overloadedTeamNames.length > 0 ? `перегруз: ${overloadedTeamNames.join(', ')}` : 'перегруз'}
-            </WarningBadge>
           )}
         </div>
       )}

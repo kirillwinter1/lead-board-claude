@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { TeamBadge } from '../TeamBadge'
 import { EpicCard } from './EpicCard'
-import { PlanningEpicDto, TeamRef } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto } from '../../api/quarterlyPlanning'
 import {
   NO_PROJECT_KEY,
   NO_PROJECT_LABEL,
@@ -24,9 +24,6 @@ interface InQuarterColumnProps {
   epics: PlanningEpicDto[]
   targetQuarter: string
   jiraBaseUrl: string
-  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
-  // Team the page is filtered by — EpicCard drops its name from the overload badge.
-  selectedTeamId?: number
   onMove: (epicKey: string, toQuarter: string | null) => void
   onBoostChange: (epicKey: string, boost: number) => void
 }
@@ -43,8 +40,6 @@ export function InQuarterColumn({
   epics,
   targetQuarter,
   jiraBaseUrl,
-  teamsById,
-  selectedTeamId,
   onMove,
   onBoostChange,
 }: InQuarterColumnProps) {
@@ -238,8 +233,7 @@ export function InQuarterColumn({
                       targetQuarter={targetQuarter}
                       currentQuarter={targetQuarter}
                       jiraBaseUrl={jiraBaseUrl}
-                      teamsById={teamsById}
-                      selectedTeamId={selectedTeamId}
+                      showProject={groupMode === 'team'}
                       onMove={onMove}
                       onBoostChange={onBoostChange}
                     />

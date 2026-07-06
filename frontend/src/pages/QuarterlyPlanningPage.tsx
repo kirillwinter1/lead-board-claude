@@ -580,7 +580,6 @@ export function QuarterlyPlanningPage() {
           targetQuarter={quarter}
           currentQuarter={quarter}
           jiraBaseUrl={jiraBaseUrl}
-          teamsById={teamsById}
           remainingByEpic={remainingByEpic}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
@@ -591,8 +590,6 @@ export function QuarterlyPlanningPage() {
           epics={inQuarterEpics}
           targetQuarter={quarter}
           jiraBaseUrl={jiraBaseUrl}
-          teamsById={teamsById}
-          selectedTeamId={teamFilter ? Number(teamFilter) : undefined}
           onMove={handleMove}
           onBoostChange={handleBoostChange}
         />

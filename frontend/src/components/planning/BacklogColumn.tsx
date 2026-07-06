@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { SearchInput } from '../SearchInput'
 import { MultiSelectDropdown } from '../MultiSelectDropdown'
 import { EpicCard } from './EpicCard'
-import { PlanningEpicDto, TeamRef, EpicRemainingDto } from '../../api/quarterlyPlanning'
+import { PlanningEpicDto, EpicRemainingDto } from '../../api/quarterlyPlanning'
 import { NO_PROJECT_KEY, NO_PROJECT_LABEL } from './constants'
 import {
   TEXT_PRIMARY,
@@ -19,7 +19,6 @@ interface BacklogColumnProps {
   // F86: the quarter being planned — used by EpicCard to decide needs-planning.
   currentQuarter: string
   jiraBaseUrl: string
-  teamsById: Map<number, Pick<TeamRef, 'id' | 'name' | 'color'>>
   // F86: per-epic remaining work, keyed by epicKey. Loaded lazily by the page.
   remainingByEpic: Record<string, EpicRemainingDto>
   onMove: (epicKey: string, toQuarter: string | null) => void
@@ -46,7 +45,6 @@ export function BacklogColumn({
   targetQuarter,
   currentQuarter,
   jiraBaseUrl,
-  teamsById,
   remainingByEpic,
   onMove,
   onBoostChange,
@@ -246,8 +244,8 @@ export function BacklogColumn({
                       targetQuarter={targetQuarter}
                       currentQuarter={currentQuarter}
                       jiraBaseUrl={jiraBaseUrl}
-                      teamsById={teamsById}
                       remaining={remainingByEpic[epic.epicKey]}
+                      showProject={false}
                       onMove={onMove}
                       onBoostChange={onBoostChange}
                     />
