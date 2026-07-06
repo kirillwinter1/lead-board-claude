@@ -47,7 +47,7 @@ export function InQuarterColumn({
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const totalEstimatedDays = useMemo(() => {
-    return epics.reduce((sum, e) => sum + (e.hasEstimate ? e.totalEstimateDays : 0), 0)
+    return epics.reduce((sum, e) => sum + (e.hasEstimate ? e.totalDemandDays : 0), 0)
   }, [epics])
 
   const groups: Group[] = useMemo(() => {
@@ -70,7 +70,7 @@ export function InQuarterColumn({
           map.set(k, g)
         }
         g.epics.push(e)
-        if (e.hasEstimate) g.totalEstimated += e.totalEstimateDays
+        if (e.hasEstimate) g.totalEstimated += e.totalDemandDays
       })
       const arr = Array.from(map.values())
       arr.forEach(g => g.epics.sort((a, b) => b.priorityScore - a.priorityScore))
@@ -92,7 +92,7 @@ export function InQuarterColumn({
           map.set(UNASSIGNED_KEY, g)
         }
         g.epics.push(e)
-        if (e.hasEstimate) g.totalEstimated += e.totalEstimateDays
+        if (e.hasEstimate) g.totalEstimated += e.totalDemandDays
         return
       }
       e.teams.forEach(t => {
@@ -103,7 +103,7 @@ export function InQuarterColumn({
           map.set(key, g)
         }
         g.epics.push(e)
-        if (e.hasEstimate) g.totalEstimated += e.totalEstimateDays
+        if (e.hasEstimate) g.totalEstimated += e.totalDemandDays
       })
     })
     const arr = Array.from(map.values())

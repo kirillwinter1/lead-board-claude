@@ -129,17 +129,15 @@ export function EpicCard({
     }
   }
 
-  // Build a stable order of roles based on workflow config. Cards display RAW
-  // estimates (no risk buffer) so the numbers match the Board page; the
-  // buffered demand feeds only the capacity math.
+  // Build a stable order of roles based on workflow config
   const orderedRoles: string[] = useMemo(() => {
     const codes = getRoleCodes()
-    const present = new Set(Object.keys(epic.estimateByRole))
+    const present = new Set(Object.keys(epic.demandByRole))
     const ordered: string[] = []
     codes.forEach(code => { if (present.has(code)) ordered.push(code) })
     present.forEach(code => { if (!codes.includes(code)) ordered.push(code) })
-    return ordered.filter(code => (epic.estimateByRole[code] || 0) > 0)
-  }, [epic.estimateByRole, getRoleCodes])
+    return ordered.filter(code => (epic.demandByRole[code] || 0) > 0)
+  }, [epic.demandByRole, getRoleCodes])
 
   // F86: in the backlog column, flag epics whose remaining work still needs to
   // be planned into the viewed quarter — either uncommitted (no quarterLabel)
@@ -332,7 +330,7 @@ export function EpicCard({
       {orderedRoles.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
           {orderedRoles.map(code => {
-            const days = epic.estimateByRole[code] || 0
+            const days = epic.demandByRole[code] || 0
             const color = getRoleColor(code)
             // Only call lightenColor for full 6-digit hex (#RRGGBB). For other
             // formats (3-digit hex `#abc`, 4-char fallback `#666`, rgb(...),
@@ -362,7 +360,7 @@ export function EpicCard({
             )
           })}
           <span style={{ marginLeft: 'auto', fontSize: 11, color: TEXT_MUTED, fontWeight: 600 }}>
-            Σ {Math.round(epic.totalEstimateDays)}d
+            Σ {Math.round(epic.totalDemandDays)}d
           </span>
         </div>
       )}

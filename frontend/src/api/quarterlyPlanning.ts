@@ -164,12 +164,10 @@ export interface PlanningEpicDto {
   manualBoost: number
   priorityScore: number
   teams: TeamRef[]
-  // Capacity demand: rough estimate × (1 + risk buffer). Feeds capacity math, not card display.
+  // Raw rough estimates (person-days), no risk buffer — the safety margin is
+  // expressed on the capacity side (bars turn yellow above 80% utilization).
   demandByRole: Record<string, number>
   totalDemandDays: number
-  // Raw rough estimates (no risk buffer) — what cards display, consistent with the Board page.
-  estimateByRole: Record<string, number>
-  totalEstimateDays: number
   hasEstimate: boolean
   hasTeamMapping: boolean
   overloadedTeams: number[]

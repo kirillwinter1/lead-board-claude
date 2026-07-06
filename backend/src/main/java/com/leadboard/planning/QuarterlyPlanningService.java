@@ -29,13 +29,6 @@ public class QuarterlyPlanningService {
     private static final Logger log = LoggerFactory.getLogger(QuarterlyPlanningService.class);
 
     /**
-     * Default risk buffer multiplier applied to rough estimates when a team has
-     * no explicit {@code planning_config.riskBuffer}. 20% reflects the historical
-     * average overhead observed across teams.
-     */
-    private static final BigDecimal DEFAULT_RISK_BUFFER = new BigDecimal("0.2");
-
-    /**
      * One person-day = 8 hours (project-wide convention, mirrors
      * {@code ForecastService.HOURS_PER_DAY}). Used to convert the auto-planner's
      * per-role hours into person-days for F86 remaining-work reporting.
@@ -207,10 +200,6 @@ public class QuarterlyPlanningService {
             }
         }
 
-        // Get risk buffer
-        PlanningConfigDto config = teamService.getPlanningConfig(teamId);
-        BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : DEFAULT_RISK_BUFFER;
-
         // Build project demand DTOs sorted by priority score
         List<ProjectDemandDto> projectDemands = new ArrayList<>();
         Map<String, BigDecimal> remainingCapacity = new LinkedHashMap<>(capacity.capacityByRole());
@@ -227,7 +216,7 @@ public class QuarterlyPlanningService {
 
             projectDemands.add(buildProjectDemand(
                     projectKey, project, epics, priorityScore, riceScore, boost,
-                    riskBuffer, remainingCapacity, quarterLabel
+                    remainingCapacity, quarterLabel
             ));
         }
 
@@ -238,14 +227,14 @@ public class QuarterlyPlanningService {
         remainingCapacity = new LinkedHashMap<>(capacity.capacityByRole());
         List<ProjectDemandDto> sortedProjects = new ArrayList<>();
         for (ProjectDemandDto pd : projectDemands) {
-            ProjectDemandDto recalculated = recalculateCapacityFit(pd, riskBuffer, remainingCapacity);
+            ProjectDemandDto recalculated = recalculateCapacityFit(pd, remainingCapacity);
             sortedProjects.add(recalculated);
         }
 
         // Build unassigned epic demands
         List<EpicDemandDto> unassignedDemands = new ArrayList<>();
         for (JiraIssueEntity epic : unassigned) {
-            unassignedDemands.add(buildEpicDemand(epic, riskBuffer, remainingCapacity, quarterLabel));
+            unassignedDemands.add(buildEpicDemand(epic, remainingCapacity, quarterLabel));
         }
 
         return new QuarterlyDemandDto(
@@ -318,8 +307,6 @@ public class QuarterlyPlanningService {
                 .filter(e -> e.getTeamId() != null)
                 .collect(Collectors.groupingBy(JiraIssueEntity::getTeamId));
 
-        PlanningConfigDto defaultConfig = PlanningConfigDto.defaults();
-
         List<ProjectViewDto.TeamAllocationDto> teamAllocations = new ArrayList<>();
         for (Map.Entry<Long, List<JiraIssueEntity>> entry : epicsByTeam.entrySet()) {
             Long teamId = entry.getKey();
@@ -330,13 +317,10 @@ public class QuarterlyPlanningService {
 
             QuarterlyCapacityDto capacity = getTeamCapacity(teamId, quarterLabel);
 
-            PlanningConfigDto config = teamService.getPlanningConfig(teamId);
-            BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : DEFAULT_RISK_BUFFER;
-
             Map<String, BigDecimal> projectDemand = new LinkedHashMap<>();
             List<EpicDemandDto> epicDemands = new ArrayList<>();
             for (JiraIssueEntity epic : epics) {
-                Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, riskBuffer);
+                Map<String, BigDecimal> epicDemand = computeEpicDemand(epic);
                 epicDemands.add(new EpicDemandDto(
                         epic.getIssueKey(), epic.getSummary(), epic.getStatus(),
                         epic.getManualOrder(), epicDemand, false, quarterLabel
@@ -622,7 +606,7 @@ public class QuarterlyPlanningService {
             if (inQuarter && roughCoverage == 100) {
                 BigDecimal totalDemand = BigDecimal.ZERO;
                 for (JiraIssueEntity epic : quarterEpics) {
-                    Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, DEFAULT_RISK_BUFFER);
+                    Map<String, BigDecimal> epicDemand = computeEpicDemand(epic);
                     for (BigDecimal val : epicDemand.values()) {
                         totalDemand = totalDemand.add(val);
                     }
@@ -798,15 +782,12 @@ public class QuarterlyPlanningService {
                 }
 
                 // Compute demand by role
-                PlanningConfigDto config = teamService.getPlanningConfig(team.getId());
-                BigDecimal riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : DEFAULT_RISK_BUFFER;
-
                 Map<String, BigDecimal> demandByRole = new LinkedHashMap<>();
                 Map<String, BigDecimal> remainingCap = new LinkedHashMap<>(capacity.capacityByRole());
                 int overloadedEpics = 0;
 
                 for (JiraIssueEntity epic : quarterEpics) {
-                    Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, riskBuffer);
+                    Map<String, BigDecimal> epicDemand = computeEpicDemand(epic);
                     boolean epicOverloaded = false;
                     for (Map.Entry<String, BigDecimal> entry : epicDemand.entrySet()) {
                         demandByRole.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
@@ -933,17 +914,12 @@ public class QuarterlyPlanningService {
         // TODO: batch capacity loads (pre-existing N+1 — getTeamCapacity loads members/absences
         //       per team). Mirrors the same pattern in getSummary/getTeamsOverview. See ai-ru/TECH_DEBT.md.
         Map<Long, Map<String, BigDecimal>> capacityByTeam = new HashMap<>();
-        Map<Long, BigDecimal> riskBufferByTeam = new HashMap<>();
         for (TeamEntity team : teamsById.values()) {
             try {
                 capacityByTeam.put(team.getId(), getTeamCapacity(team.getId(), quarterLabel).capacityByRole());
-                PlanningConfigDto cfg = teamService.getPlanningConfig(team.getId());
-                riskBufferByTeam.put(team.getId(),
-                        cfg.riskBuffer() != null ? cfg.riskBuffer() : DEFAULT_RISK_BUFFER);
             } catch (Exception e) {
                 log.warn("Failed to compute capacity for team {}: {}", team.getName(), e.getMessage());
                 capacityByTeam.put(team.getId(), Map.of());
-                riskBufferByTeam.put(team.getId(), DEFAULT_RISK_BUFFER);
             }
         }
 
@@ -958,8 +934,7 @@ public class QuarterlyPlanningService {
             if (!quarterLabel.equals(epicQuarter)) continue;
             Long teamId = epic.getTeamId();
             if (teamId == null) continue;
-            BigDecimal risk = riskBufferByTeam.getOrDefault(teamId, DEFAULT_RISK_BUFFER);
-            Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, risk);
+            Map<String, BigDecimal> epicDemand = computeEpicDemand(epic);
             Map<String, BigDecimal> teamDemand = demandByTeamInQuarter.computeIfAbsent(teamId, k -> new LinkedHashMap<>());
             for (Map.Entry<String, BigDecimal> e : epicDemand.entrySet()) {
                 teamDemand.merge(e.getKey(), e.getValue(), BigDecimal::add);
@@ -1025,13 +1000,8 @@ public class QuarterlyPlanningService {
             Integer boost = epic.getManualBoost() != null ? epic.getManualBoost() : 0;
             BigDecimal priorityScore = computePriorityScore(riceScore, boost);
 
-            BigDecimal riskBuffer = epic.getTeamId() != null
-                    ? riskBufferByTeam.getOrDefault(epic.getTeamId(), DEFAULT_RISK_BUFFER)
-                    : DEFAULT_RISK_BUFFER;
-            Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
+            Map<String, BigDecimal> demand = computeEpicDemand(epic);
             BigDecimal totalDemand = demand.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            Map<String, BigDecimal> rawEstimates = rawEpicEstimates(epic);
-            BigDecimal totalEstimate = rawEstimates.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
             boolean hasEstimate = epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty();
             boolean hasTeamMapping = epic.getTeamId() != null;
@@ -1066,8 +1036,6 @@ public class QuarterlyPlanningService {
                     epicTeams,
                     demand,
                     totalDemand,
-                    rawEstimates,
-                    totalEstimate,
                     hasEstimate,
                     hasTeamMapping,
                     epicOverloaded,
@@ -1218,11 +1186,10 @@ public class QuarterlyPlanningService {
             String quarterLabel,
             Map<Long, Map<String, BigDecimal>> capacityByTeam,
             Map<Long, Map<String, BigDecimal>> demandByTeam,
-            Map<Long, BigDecimal> riskBufferByTeam,
             Set<Long> overloadedTeamIds
     ) {
         static QuarterSnapshot empty() {
-            return new QuarterSnapshot(null, Map.of(), Map.of(), Map.of(), Set.of());
+            return new QuarterSnapshot(null, Map.of(), Map.of(), Set.of());
         }
     }
 
@@ -1250,19 +1217,14 @@ public class QuarterlyPlanningService {
 
         List<TeamEntity> teams = teamRepository.findByActiveTrue();
         Map<Long, Map<String, BigDecimal>> capacityByTeam = new HashMap<>();
-        Map<Long, BigDecimal> riskBufferByTeam = new HashMap<>();
         for (TeamEntity team : teams) {
             try {
                 capacityByTeam.put(team.getId(),
                         getTeamCapacity(team.getId(), quarterLabel).capacityByRole());
-                PlanningConfigDto cfg = teamService.getPlanningConfig(team.getId());
-                riskBufferByTeam.put(team.getId(),
-                        cfg.riskBuffer() != null ? cfg.riskBuffer() : DEFAULT_RISK_BUFFER);
             } catch (Exception e) {
                 log.warn("Failed to compute capacity for team {} in snapshot: {}",
                         team.getName(), e.getMessage());
                 capacityByTeam.put(team.getId(), Map.of());
-                riskBufferByTeam.put(team.getId(), DEFAULT_RISK_BUFFER);
             }
         }
 
@@ -1277,8 +1239,7 @@ public class QuarterlyPlanningService {
             if (!quarterLabel.equals(epicQuarter)) continue;
             Long teamId = epic.getTeamId();
             if (teamId == null) continue;
-            BigDecimal risk = riskBufferByTeam.getOrDefault(teamId, DEFAULT_RISK_BUFFER);
-            Map<String, BigDecimal> epicDemand = computeEpicDemand(epic, risk);
+            Map<String, BigDecimal> epicDemand = computeEpicDemand(epic);
             Map<String, BigDecimal> teamDemand = demandByTeam.computeIfAbsent(teamId, k -> new LinkedHashMap<>());
             for (Map.Entry<String, BigDecimal> e : epicDemand.entrySet()) {
                 teamDemand.merge(e.getKey(), e.getValue(), BigDecimal::add);
@@ -1299,7 +1260,7 @@ public class QuarterlyPlanningService {
         }
 
         return new QuarterSnapshot(quarterLabel, capacityByTeam, demandByTeam,
-                riskBufferByTeam, overloadedTeamIds);
+                overloadedTeamIds);
     }
 
     /**
@@ -1361,24 +1322,8 @@ public class QuarterlyPlanningService {
         Integer boost = epic.getManualBoost() != null ? epic.getManualBoost() : 0;
         BigDecimal priorityScore = computePriorityScore(riceScore, boost);
 
-        BigDecimal riskBuffer = DEFAULT_RISK_BUFFER;
-        if (epic.getTeamId() != null) {
-            BigDecimal snapshotRisk = snapshot.riskBufferByTeam().get(epic.getTeamId());
-            if (snapshotRisk != null) {
-                riskBuffer = snapshotRisk;
-            } else {
-                try {
-                    PlanningConfigDto cfg = teamService.getPlanningConfig(epic.getTeamId());
-                    if (cfg.riskBuffer() != null) riskBuffer = cfg.riskBuffer();
-                } catch (Exception ignore) {
-                    // Use default risk buffer
-                }
-            }
-        }
-        Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
+        Map<String, BigDecimal> demand = computeEpicDemand(epic);
         BigDecimal totalDemand = demand.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        Map<String, BigDecimal> rawEstimates = rawEpicEstimates(epic);
-        BigDecimal totalEstimate = rawEstimates.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<PlanningEpicDto.TeamRef> teamRefs = team != null
                 ? List.of(new PlanningEpicDto.TeamRef(team.getId(), team.getName(), team.getColor()))
@@ -1426,8 +1371,6 @@ public class QuarterlyPlanningService {
                 teamRefs,
                 demand,
                 totalDemand,
-                rawEstimates,
-                totalEstimate,
                 epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty(),
                 epic.getTeamId() != null,
                 overloadedTeams,
@@ -1711,21 +1654,20 @@ public class QuarterlyPlanningService {
         return epicToProject;
     }
 
-    /** Raw rough estimates as entered in Jira — no risk buffer, for card display. */
-    private Map<String, BigDecimal> rawEpicEstimates(JiraIssueEntity epic) {
-        Map<String, BigDecimal> roughEstimates = epic.getRoughEstimates();
-        return roughEstimates != null ? new LinkedHashMap<>(roughEstimates) : Map.of();
-    }
-
-    private Map<String, BigDecimal> computeEpicDemand(JiraIssueEntity epic, BigDecimal riskBuffer) {
+    /**
+     * Epic demand = raw rough estimates as entered in Jira. No risk buffer is
+     * baked in: the safety margin lives on the CAPACITY side instead — the UI
+     * flags utilization above 80% (yellow) and above 100% (red), so the numbers
+     * on cards, totals and bars all match the Board page.
+     */
+    private Map<String, BigDecimal> computeEpicDemand(JiraIssueEntity epic) {
         Map<String, BigDecimal> roughEstimates = epic.getRoughEstimates();
         if (roughEstimates == null || roughEstimates.isEmpty()) {
             return Map.of();
         }
-        BigDecimal multiplier = BigDecimal.ONE.add(riskBuffer);
         Map<String, BigDecimal> demand = new LinkedHashMap<>();
         for (Map.Entry<String, BigDecimal> entry : roughEstimates.entrySet()) {
-            demand.put(entry.getKey(), entry.getValue().multiply(multiplier).setScale(1, RoundingMode.HALF_UP));
+            demand.put(entry.getKey(), entry.getValue().setScale(1, RoundingMode.HALF_UP));
         }
         return demand;
     }
@@ -1749,14 +1691,14 @@ public class QuarterlyPlanningService {
             String projectKey, JiraIssueEntity project,
             List<JiraIssueEntity> epics,
             BigDecimal priorityScore, BigDecimal riceScore, Integer boost,
-            BigDecimal riskBuffer, Map<String, BigDecimal> remainingCapacity,
+            Map<String, BigDecimal> remainingCapacity,
             String quarterLabel
     ) {
         Map<String, BigDecimal> totalDemand = new LinkedHashMap<>();
         List<EpicDemandDto> epicDemands = new ArrayList<>();
 
         for (JiraIssueEntity epic : epics) {
-            EpicDemandDto epicDemand = buildEpicDemand(epic, riskBuffer, remainingCapacity, quarterLabel);
+            EpicDemandDto epicDemand = buildEpicDemand(epic, remainingCapacity, quarterLabel);
             epicDemands.add(epicDemand);
             for (Map.Entry<String, BigDecimal> entry : epicDemand.demandByRole().entrySet()) {
                 totalDemand.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
@@ -1775,10 +1717,10 @@ public class QuarterlyPlanningService {
     }
 
     private EpicDemandDto buildEpicDemand(
-            JiraIssueEntity epic, BigDecimal riskBuffer,
+            JiraIssueEntity epic,
             Map<String, BigDecimal> remainingCapacity, String quarterLabel
     ) {
-        Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
+        Map<String, BigDecimal> demand = computeEpicDemand(epic);
         boolean overCapacity = false;
 
         for (Map.Entry<String, BigDecimal> entry : demand.entrySet()) {
@@ -1796,7 +1738,7 @@ public class QuarterlyPlanningService {
     }
 
     private ProjectDemandDto recalculateCapacityFit(
-            ProjectDemandDto original, BigDecimal riskBuffer,
+            ProjectDemandDto original,
             Map<String, BigDecimal> remainingCapacity
     ) {
         List<EpicDemandDto> recalcEpics = new ArrayList<>();
