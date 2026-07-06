@@ -8,6 +8,8 @@ import {
   needsPlanning,
 } from '../api/quarterlyPlanning'
 import { getConfig } from '../api/config'
+import { getStatusStyles, StatusStyle } from '../api/board'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { CapacityBars } from '../components/planning/CapacityBars'
 import { BacklogColumn } from '../components/planning/BacklogColumn'
 import { InQuarterColumn } from '../components/planning/InQuarterColumn'
@@ -60,6 +62,8 @@ export function QuarterlyPlanningPage() {
   // ==================== Server data ====================
   const [epics, setEpics] = useState<PlanningEpicDto[]>([])
   const [teamsOverview, setTeamsOverview] = useState<QuarterlyTeamOverviewDto[]>([])
+  // Status colors for the epic StatusBadge — same source as Board/Projects pages.
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
   // F86: per-epic remaining work (now vs at quarter start), keyed by epicKey.
   // Loaded lazily and independently of loadQuarter so the board renders
   // immediately and these numbers stream in.
@@ -93,8 +97,10 @@ export function QuarterlyPlanningPage() {
     Promise.all([
       quarterlyPlanningApi.getAvailableQuarters().catch(() => [] as string[]),
       getConfig().then(c => c.jiraBaseUrl || '').catch(() => ''),
-    ]).then(([qs, baseUrl]) => {
+      getStatusStyles().catch(() => ({} as Record<string, StatusStyle>)),
+    ]).then(([qs, baseUrl, styles]) => {
       if (cancelled) return
+      setStatusStyles(styles)
       // Planning is forward-looking: hide past quarters from the dropdown so
       // a user cannot accidentally schedule work into a quarter that already
       // ended. The current quarter is always retained (backend guarantees it).
@@ -467,6 +473,7 @@ export function QuarterlyPlanningPage() {
   const quarterOptions = availableQuarters.map(q => ({ value: q, label: q }))
 
   return (
+    <StatusStylesProvider value={statusStyles}>
     <div style={pageStyle}>
       {/* Header */}
       <div
@@ -602,6 +609,7 @@ export function QuarterlyPlanningPage() {
         onConfirm={publishChanges}
       />
     </div>
+    </StatusStylesProvider>
   )
 }
 

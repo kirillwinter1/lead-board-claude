@@ -1051,6 +1051,7 @@ public class QuarterlyPlanningService {
             result.add(new PlanningEpicDto(
                     epic.getIssueKey(),
                     epic.getSummary(),
+                    epic.getStatus(),
                     null, // iconUrl resolved by frontend via WorkflowConfigContext
                     epic.getIssueType(),
                     projectKey,
@@ -1406,6 +1407,7 @@ public class QuarterlyPlanningService {
         return new PlanningEpicDto(
                 epic.getIssueKey(),
                 epic.getSummary(),
+                epic.getStatus(),
                 null,
                 epic.getIssueType(),
                 projectKey,

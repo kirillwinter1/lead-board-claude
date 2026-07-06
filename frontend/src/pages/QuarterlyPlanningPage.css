@@ -26,3 +26,11 @@
 .planning-epic-move-btn:hover {
   filter: brightness(0.95);
 }
+
+/* TimelinePage.css leaks a global `.status-badge { max-width: 130px; … }`
+ * (page CSS is bundled globally, not scoped). On planning cards the badge
+ * must never be ellipsized — long Russian statuses like «Запланировано»
+ * were getting cut. */
+.planning-epic-card .status-badge {
+  max-width: none;
+}

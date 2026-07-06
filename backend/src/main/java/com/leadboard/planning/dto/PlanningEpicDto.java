@@ -16,6 +16,7 @@ import java.util.Map;
 public record PlanningEpicDto(
         String epicKey,
         String epicSummary,
+        String status,
         String iconUrl,
         String typeName,
         String projectKey,

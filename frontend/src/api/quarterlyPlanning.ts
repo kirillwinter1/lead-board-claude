@@ -153,6 +153,7 @@ export interface QuarterlyTeamOverviewDto {
 export interface PlanningEpicDto {
   epicKey: string
   epicSummary: string
+  status: string | null
   iconUrl: string | null
   typeName: string
   projectKey: string | null

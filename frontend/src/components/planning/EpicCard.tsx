@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, KeyboardEvent, ReactNode } from 'react'
 import { RiceScoreBadge } from '../rice/RiceScoreBadge'
+import { StatusBadge } from '../board/StatusBadge'
 import { getIssueIcon } from '../board/helpers'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import { PlanningEpicDto, EpicRemainingDto } from '../../api/quarterlyPlanning'
@@ -281,6 +282,11 @@ export function EpicCard({
               >
                 Boost {formatBoost(epic.manualBoost)}
               </button>
+            )}
+            {epic.status && (
+              <span style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                <StatusBadge status={epic.status} />
+              </span>
             )}
           </div>
           <div

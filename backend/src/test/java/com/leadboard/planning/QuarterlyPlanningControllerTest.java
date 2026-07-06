@@ -323,6 +323,7 @@ class QuarterlyPlanningControllerTest {
         return new PlanningEpicDto(
                 key,
                 "Sample epic",
+                "In Progress",
                 null,
                 "Epic",
                 "PROJ-1",
