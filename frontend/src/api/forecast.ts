@@ -338,6 +338,12 @@ export interface WorklogDay {
   timeSpentSeconds: number
 }
 
+export interface StatusInterval {
+  status: string
+  startDate: string
+  endDate: string
+}
+
 export interface RetroStory {
   storyKey: string
   summary: string
@@ -353,6 +359,7 @@ export interface RetroStory {
   roleProgress: Record<string, PhaseProgressInfo> | null
   phases: Record<string, RetroPhase>
   worklogDays: WorklogDay[] | null
+  statusIntervals: StatusInterval[] | null
 }
 
 export interface RetroEpic {

@@ -132,6 +132,14 @@ describe('TimelinePage', () => {
         expect(screen.getByText('EPIC-1')).toBeInTheDocument()
       })
     })
+
+    it('should render actuals mode dropdown with Logged time default', async () => {
+      renderTimelinePage()
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Logged time').length).toBeGreaterThan(0)
+      })
+    })
   })
 
   describe('Team selection', () => {

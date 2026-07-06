@@ -25,6 +25,7 @@ import {
 } from '../utils/dateGrid'
 
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
+type ActualsMode = 'worklog' | 'status'
 type TimelineCache = { forecast: ForecastResponse; unifiedPlan: UnifiedPlanningResult }
 
 // Width per unit in pixels for each zoom level
@@ -342,9 +343,10 @@ interface StoryBarProps {
   jiraBaseUrl: string
   globalWarnings: PlanningWarning[]
   onHover: (story: PlannedStory | null, pos?: { x: number; y: number }) => void
+  actualsMode: ActualsMode
 }
 
-function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover }: StoryBarProps) {
+function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover, actualsMode: _actualsMode }: StoryBarProps) {
   const { getRoleColor } = useWorkflowConfig()
   const totalDays = daysBetween(dateRange.start, dateRange.end)
   const startDate = new Date(story.startDate!)
@@ -553,9 +555,10 @@ interface StoryBarsProps {
   dateRange: DateRange
   jiraBaseUrl: string
   globalWarnings: PlanningWarning[]
+  actualsMode: ActualsMode
 }
 
-function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBarsProps) {
+function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMode }: StoryBarsProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
@@ -591,6 +594,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings }: StoryBar
             jiraBaseUrl={jiraBaseUrl}
             globalWarnings={globalWarnings}
             onHover={handleHover}
+            actualsMode={actualsMode}
           />
         ))}
       </div>
@@ -978,7 +982,7 @@ function mergeHybridEpics(
     return planEpics.map(epic => ({
       ...epic,
       stories: epic.stories.map(s => {
-        const tagged = { ...s, _source: 'forecast' as PhaseSource, _worklogDays: null }
+        const tagged = { ...s, _source: 'forecast' as PhaseSource, _worklogDays: null, _statusIntervals: null }
         return tagged
       })
     }))
@@ -1006,7 +1010,7 @@ function mergeHybridEpics(
 
       if (!retroStory) {
         // No retro data — pure forecast
-        return { ...story, _source: 'forecast' as PhaseSource, _worklogDays: null }
+        return { ...story, _source: 'forecast' as PhaseSource, _worklogDays: null, _statusIntervals: null }
       }
 
       // Has retro data — merge phases
@@ -1089,7 +1093,8 @@ function mergeHybridEpics(
         endDate: mergedEnd,
         phases: mergedPhases,
         _source: source,
-        _worklogDays: retroStory.worklogDays || null
+        _worklogDays: retroStory.worklogDays || null,
+        _statusIntervals: retroStory.statusIntervals || null
       }
     })
 
@@ -1152,7 +1157,8 @@ function mergeHybridEpics(
         progressPercent: rs.progressPercent,
         roleProgress: rs.roleProgress,
         _source: 'retro' as PhaseSource,
-        _worklogDays: rs.worklogDays || null
+        _worklogDays: rs.worklogDays || null,
+        _statusIntervals: rs.statusIntervals || null
       } as PlannedStory
     })
 
@@ -1193,9 +1199,10 @@ interface GanttRowProps {
   rowHeight: number
   epicIndex: number
   shouldAnimate: boolean
+  actualsMode: ActualsMode
 }
 
-function GanttRow({ plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate }: GanttRowProps) {
+function GanttRow({ plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl, rowHeight, epicIndex, shouldAnimate, actualsMode }: GanttRowProps) {
   const totalDays = daysBetween(dateRange.start, dateRange.end)
 
   // Due date line calculation
@@ -1235,6 +1242,7 @@ function GanttRow({ plannedEpic, stories, globalWarnings, dateRange, jiraBaseUrl
             dateRange={dateRange}
             jiraBaseUrl={jiraBaseUrl}
             globalWarnings={globalWarnings}
+            actualsMode={actualsMode}
           />
         )}
       </div>
@@ -1285,6 +1293,7 @@ export function TimelineContent({
   const [forecast, setForecast] = useState<ForecastResponse | null>(initialCache?.forecast ?? null)
   const [unifiedPlan, setUnifiedPlan] = useState<UnifiedPlanningResult | null>(initialCache?.unifiedPlan ?? null)
   const [zoom, setZoom] = useState<ZoomLevel>('week')
+  const [actualsMode, setActualsMode] = useState<ActualsMode>('worklog')
   // When true, render the full history instead of clamping to DEFAULT_PAST_DAYS.
   const [showEarlier, setShowEarlier] = useState(false)
   const [loading, setLoading] = useState(selectedTeamId ? !initialCache : false)
@@ -1651,6 +1660,17 @@ export function TimelineContent({
               onChange={v => handleHistoricalDateChange(v ?? '')}
               placeholder="Today (live)"
             />
+
+            <SingleSelectDropdown
+              label="Actuals"
+              options={[
+                { value: 'worklog', label: 'Logged time' },
+                { value: 'status', label: 'Story statuses' },
+              ]}
+              selected={actualsMode}
+              onChange={v => v && setActualsMode(v as ActualsMode)}
+              allowClear={false}
+            />
           </FilterBar>
         </div>
       ) : (
@@ -1700,6 +1720,17 @@ export function TimelineContent({
               selected={selectedHistoricalDate || null}
               onChange={v => handleHistoricalDateChange(v ?? '')}
               placeholder="Today (live)"
+            />
+
+            <SingleSelectDropdown
+              label="Actuals"
+              options={[
+                { value: 'worklog', label: 'Logged time' },
+                { value: 'status', label: 'Story statuses' },
+              ]}
+              selected={actualsMode}
+              onChange={v => v && setActualsMode(v as ActualsMode)}
+              allowClear={false}
             />
           </FilterBar>
         </div>
@@ -1845,6 +1876,7 @@ export function TimelineContent({
                     rowHeight={rowHeight}
                     epicIndex={epicIndex}
                     shouldAnimate={shouldAnimate}
+                    actualsMode={actualsMode}
                   />
                 )
               })}
