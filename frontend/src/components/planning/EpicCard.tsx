@@ -72,12 +72,11 @@ function formatBoost(boost: number): string {
 }
 
 /**
- * F86: round person-days to 1 decimal, but drop a trailing `.0` so whole
- * numbers read as `5` not `5.0` (5.5 stays 5.5).
+ * F86: quarterly planning is deliberately coarse — person-days are shown as
+ * whole numbers (5.3 → 5), fractional tails carry no signal at this scale.
  */
 function formatDays(value: number): string {
-  const rounded = Math.round(value * 10) / 10
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
+  return String(Math.round(value))
 }
 
 export function EpicCard({
@@ -206,7 +205,9 @@ export function EpicCard({
 
   // Role-chips row for remaining work — same chip styling as the demand row,
   // colored via getRoleColor (never hardcode role colors).
-  const renderRemainingLine = (label: string, byRole: Record<string, number>, totalDays: number) => (
+  const renderRemainingLine = (label: string, byRole: Record<string, number>) => {
+    const totalDays = orderedRemainingRoles.reduce((sum, code) => sum + Math.round(byRole[code] || 0), 0)
+    return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center', fontSize: 11 }}>
       <span style={{ color: TEXT_MUTED, fontWeight: 600 }}>{label}</span>
       {orderedRemainingRoles.map(code => {
@@ -224,10 +225,11 @@ export function EpicCard({
         )
       })}
       <span style={{ marginLeft: 'auto', color: TEXT_MUTED, fontWeight: 600 }}>
-        Σ {formatDays(totalDays)}d
+        Σ {totalDays}d
       </span>
     </div>
-  )
+    )
+  }
 
   return (
     <div
@@ -385,9 +387,9 @@ export function EpicCard({
             <WarningBadge tone="warn">Осталась работа</WarningBadge>
           </div>
           {!remainingEqualsEstimate &&
-            renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole, remaining.remainingNowDays)}
+            renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole)}
           {!atStartEqualsNow &&
-            renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole, remaining.remainingAtQuarterStartDays)}
+            renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole)}
         </div>
       )}
 
