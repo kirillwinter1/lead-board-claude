@@ -5,6 +5,7 @@ import { TimelinePage, calculateDateRange, DEFAULT_PAST_DAYS } from './TimelineP
 import { teamsApi } from '../api/teams'
 import * as forecastApi from '../api/forecast'
 import * as configApi from '../api/config'
+import * as boardApi from '../api/board'
 
 vi.mock('../api/teams', () => ({
   teamsApi: {
@@ -190,6 +191,111 @@ describe('TimelinePage', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Failed to load teams/i)).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Actuals mode', () => {
+    const daysAgo = (n: number) => {
+      const d = new Date()
+      d.setHours(0, 0, 0, 0)
+      d.setDate(d.getDate() - n)
+      return d.toISOString().slice(0, 10)
+    }
+
+    const retroWithStatuses = {
+      teamId: 1,
+      calculatedAt: new Date().toISOString(),
+      epics: [
+        {
+          epicKey: 'EPIC-9',
+          summary: 'Retro Epic',
+          status: 'Done',
+          startDate: daysAgo(10),
+          endDate: daysAgo(2),
+          progressPercent: 100,
+          stories: [
+            {
+              storyKey: 'PROJ-9',
+              summary: 'Retro Story',
+              status: 'Done',
+              issueType: 'Story',
+              completed: true,
+              startDate: daysAgo(10),
+              endDate: daysAgo(2),
+              progressPercent: 100,
+              autoScore: null,
+              totalEstimateSeconds: null,
+              totalLoggedSeconds: null,
+              roleProgress: null,
+              phases: {
+                DEV: { roleCode: 'DEV', startDate: daysAgo(10), endDate: daysAgo(2), durationDays: 8, active: false },
+              },
+              worklogDays: [{ date: daysAgo(9), roleCode: 'DEV', timeSpentSeconds: 3600 }],
+              statusIntervals: [
+                { status: 'To Do', startDate: daysAgo(10), endDate: daysAgo(7) },
+                { status: 'In Development', startDate: daysAgo(7), endDate: daysAgo(2) },
+              ],
+            },
+          ],
+        },
+      ],
+    }
+
+    beforeEach(() => {
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retroWithStatuses as any)
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+        'In Development': { color: '#B55FEB', statusCategory: 'indeterminate' },
+      } as any)
+    })
+
+    const findStatusSegment = (container: HTMLElement) =>
+      Array.from(container.querySelectorAll('.story-bar div')).find(
+        el => (el as HTMLElement).style.backgroundColor === 'rgb(181, 95, 235)'
+      )
+
+    it('does not render status segments in default worklog mode', async () => {
+      const { container } = renderTimelinePage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Retro Epic')).toBeInTheDocument()
+      })
+
+      expect(findStatusSegment(container)).toBeUndefined()
+    })
+
+    it('renders status-colored segments after switching to Story statuses', async () => {
+      const { container } = renderTimelinePage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Retro Epic')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+
+      await waitFor(() => {
+        expect(findStatusSegment(container)).toBeTruthy()
+      })
+    })
+
+    it('falls back to neutral color for status without configured color', async () => {
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({} as any)
+      const { container } = renderTimelinePage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Retro Epic')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+
+      await waitFor(() => {
+        // STATUS_FALLBACK_COLOR = #9ca3af → rgb(156, 163, 175)
+        const fallbackSeg = Array.from(container.querySelectorAll('.story-bar div')).find(
+          el => (el as HTMLElement).style.backgroundColor === 'rgb(156, 163, 175)'
+        )
+        expect(fallbackSeg).toBeTruthy()
       })
     })
   })

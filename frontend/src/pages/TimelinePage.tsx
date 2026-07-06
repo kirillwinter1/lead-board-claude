@@ -5,7 +5,7 @@ import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay } from '../api/forecast'
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
-import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { StatusStylesProvider, useStatusStyles } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
@@ -27,6 +27,9 @@ import {
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
 type ActualsMode = 'worklog' | 'status'
 type TimelineCache = { forecast: ForecastResponse; unifiedPlan: UnifiedPlanningResult }
+
+// Neutral color for statuses without configured color (fail-safe, not a design palette)
+const STATUS_FALLBACK_COLOR = '#9ca3af'
 
 // Width per unit in pixels for each zoom level
 const ZOOM_UNIT_WIDTH: Record<ZoomLevel, number> = {
@@ -346,7 +349,7 @@ interface StoryBarProps {
   actualsMode: ActualsMode
 }
 
-function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover, actualsMode: _actualsMode }: StoryBarProps) {
+function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover, actualsMode }: StoryBarProps) {
   const { getRoleColor } = useWorkflowConfig()
   const totalDays = daysBetween(dateRange.start, dateRange.end)
   const startDate = new Date(story.startDate!)
@@ -364,6 +367,16 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   // Determine story source for visual styling
   const storySource: PhaseSource = (story as PlannedStory & { _source?: PhaseSource })._source || 'forecast'
   const worklogDays: WorklogDay[] | null = (story as PlannedStory & { _worklogDays?: WorklogDay[] | null })._worklogDays || null
+
+  interface StatusInterval {
+    status: string
+    startDate: string
+    endDate: string
+  }
+
+  const statusIntervals: StatusInterval[] | null =
+    (story as PlannedStory & { _statusIntervals?: StatusInterval[] | null })._statusIntervals || null
+  const statusStyles = useStatusStyles()
 
   const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.65)
 
@@ -414,6 +427,44 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       dayIndex++
     }
 
+    return segments
+  }
+
+  // Segments "in which status was the story" from transition history (Story statuses mode).
+  // Clipped to bar boundaries and to today; same-day intervals overlap in DOM order —
+  // last status of the day wins.
+  const renderStatusSegments = () => {
+    if (!statusIntervals || statusIntervals.length === 0) return null
+
+    const segments: React.ReactNode[] = []
+    statusIntervals.forEach((interval, idx) => {
+      const intervalStart = new Date(interval.startDate)
+      const intervalEnd = new Date(interval.endDate)
+
+      const clipStart = intervalStart < startDate ? startDate : intervalStart
+      let clipEnd = intervalEnd > endDate ? endDate : intervalEnd
+      if (clipEnd > today) clipEnd = today
+      if (clipEnd < clipStart) return
+
+      const segOffset = daysBetween(startDate, clipStart)
+      const segDuration = daysBetween(clipStart, clipEnd) + 1
+      const segLeft = (segOffset / duration) * 100
+      const segWidth = Math.min((segDuration / duration) * 100, 100 - segLeft)
+      const color = statusStyles[interval.status]?.color || STATUS_FALLBACK_COLOR
+
+      segments.push(
+        <div
+          key={`${interval.status}-${idx}`}
+          style={{
+            position: 'absolute',
+            left: `${segLeft}%`,
+            width: `${Math.max(segWidth, 1)}%`,
+            height: '100%',
+            backgroundColor: color,
+          }}
+        />
+      )
+    })
     return segments
   }
 
@@ -514,12 +565,14 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       onMouseMove={e => onHover(story, { x: e.clientX, y: e.clientY - 12 })}
       onMouseLeave={() => onHover(null)}
     >
-      {/* Per-day worklog rendering for retro/hybrid stories with worklog data */}
-      {(storySource === 'retro' || storySource === 'hybrid') && worklogDays && worklogDays.length > 0
-        ? renderWorklogSegments()
-        : story.phases && Object.entries(story.phases).map(([role, phase]) =>
-            renderPhaseSegment(phase, role)
-          )
+      {/* Past part: worklog days or story-status intervals depending on actualsMode */}
+      {(storySource === 'retro' || storySource === 'hybrid') && actualsMode === 'status'
+        ? renderStatusSegments()
+        : (storySource === 'retro' || storySource === 'hybrid') && worklogDays && worklogDays.length > 0
+          ? renderWorklogSegments()
+          : story.phases && Object.entries(story.phases).map(([role, phase]) =>
+              renderPhaseSegment(phase, role)
+            )
       }
 
       <span
