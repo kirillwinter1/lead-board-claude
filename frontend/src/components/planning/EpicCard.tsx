@@ -150,6 +150,21 @@ export function EpicCard({
   const showRemainingWork =
     needsPlanningWork && !!remaining && remaining.hasEstimate && remaining.remainingNowDays > 0
 
+  // Deduplicate the three number rows: a remaining row is rendered only when it
+  // actually differs from the row above it (per-role, 0.05d tolerance). For an
+  // untouched epic all three match — the badge alone carries the signal.
+  const sameByRole = (a: Record<string, number>, b: Record<string, number>) => {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)])
+    for (const k of keys) {
+      if (Math.abs((a[k] || 0) - (b[k] || 0)) >= 0.05) return false
+    }
+    return true
+  }
+  const remainingEqualsEstimate =
+    !!remaining && sameByRole(epic.demandByRole, remaining.remainingNowByRole)
+  const atStartEqualsNow =
+    !!remaining && sameByRole(remaining.remainingNowByRole, remaining.remainingAtQuarterStartByRole)
+
   // Stable role order for the remaining-work rows, union of both maps, ordered
   // by workflow config first (matching the demand row above).
   const orderedRemainingRoles: string[] = useMemo(() => {
@@ -371,8 +386,10 @@ export function EpicCard({
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             <WarningBadge tone="warn">Осталась работа</WarningBadge>
           </div>
-          {renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole, remaining.remainingNowDays)}
-          {renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole, remaining.remainingAtQuarterStartDays)}
+          {!remainingEqualsEstimate &&
+            renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole, remaining.remainingNowDays)}
+          {!atStartEqualsNow &&
+            renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole, remaining.remainingAtQuarterStartDays)}
         </div>
       )}
 
