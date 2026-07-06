@@ -1385,6 +1385,28 @@ class QuarterlyPlanningServiceTest {
         when(unifiedPlanningService.calculatePlan(F86_TEAM)).thenReturn(
                 new UnifiedPlanningResult(F86_TEAM, OffsetDateTime.now(),
                         List.of(epics), List.of(), Map.of()));
+        // Proration-math tests below assert planner hours → days 1:1, so pin the
+        // risk buffer to zero; un-buffering itself is covered by a dedicated test.
+        when(teamService.getPlanningConfig(F86_TEAM)).thenReturn(new PlanningConfigDto(
+                PlanningConfigDto.GradeCoefficients.defaults(),
+                BigDecimal.ZERO,
+                PlanningConfigDto.WipLimits.defaults(),
+                PlanningConfigDto.StoryDuration.defaults()));
+    }
+
+    @Test
+    void remainingIsUnbufferedByTeamRiskBuffer() {
+        Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggMap = new LinkedHashMap<>();
+        aggMap.put("DEV", agg(96, null, null)); // planner hours include ×1.2 buffer
+        planReturns(epic("LB-1", aggMap, List.of()));
+        // Override planReturns' zero buffer with the real default (0.2).
+        when(teamService.getPlanningConfig(F86_TEAM)).thenReturn(PlanningConfigDto.defaults());
+
+        EpicRemainingDto dto = service.getRemainingForQuarter(F86_TEAM, "2026Q3").epics().get("LB-1");
+
+        // 96h buffered / 1.2 = 80h raw = 10 person-days
+        assertEquals(0, new BigDecimal("10.0").compareTo(dto.remainingNowByRole().get("DEV")));
+        assertEquals(0, new BigDecimal("10.0").compareTo(dto.remainingAtQuarterStartByRole().get("DEV")));
     }
 
     @Test

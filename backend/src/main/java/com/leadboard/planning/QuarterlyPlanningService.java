@@ -388,6 +388,12 @@ public class QuarterlyPlanningService {
      * <p>Reuses {@link UnifiedPlanningService#calculatePlan(Long)} (60s cache) — a
      * single per-team run covers every epic, so the plan is never recomputed here.</p>
      *
+     * <p>The planner schedules hours WITH the team's risk buffer baked in (every
+     * path multiplies remaining hours by {@code 1 + riskBuffer} before laying them
+     * on the calendar). The planning page shows raw, buffer-free numbers, so the
+     * buffer is divided back out here — otherwise an untouched epic would show a
+     * "remaining" larger than its own estimate.</p>
+     *
      * @param teamId       the team whose plan drives the remaining-work figures
      * @param quarterLabel canonical {@code YYYYQn} label (validated)
      */
@@ -397,16 +403,27 @@ public class QuarterlyPlanningService {
 
         UnifiedPlanningResult result = unifiedPlanningService.calculatePlan(teamId);
 
+        // Mirror of the planner's buffer resolution (UnifiedPlanningService.calculatePlan).
+        BigDecimal riskBuffer;
+        try {
+            PlanningConfigDto config = teamService.getPlanningConfig(teamId);
+            riskBuffer = config.riskBuffer() != null ? config.riskBuffer() : new BigDecimal("0.2");
+        } catch (Exception e) {
+            riskBuffer = new BigDecimal("0.2");
+        }
+        BigDecimal bufferDivisor = BigDecimal.ONE.add(riskBuffer);
+
         Map<String, EpicRemainingDto> epics = new LinkedHashMap<>();
         if (result != null && result.epics() != null) {
             for (UnifiedPlanningResult.PlannedEpic epic : result.epics()) {
-                epics.put(epic.epicKey(), buildEpicRemaining(epic, quarterStart));
+                epics.put(epic.epicKey(), buildEpicRemaining(epic, quarterStart, bufferDivisor));
             }
         }
         return new QuarterlyRemainingResponse(quarterLabel, teamId, epics);
     }
 
-    private EpicRemainingDto buildEpicRemaining(UnifiedPlanningResult.PlannedEpic epic, LocalDate quarterStart) {
+    private EpicRemainingDto buildEpicRemaining(
+            UnifiedPlanningResult.PlannedEpic epic, LocalDate quarterStart, BigDecimal bufferDivisor) {
         Map<String, UnifiedPlanningResult.PhaseAggregationEntry> aggregation =
                 epic.phaseAggregation() != null ? epic.phaseAggregation() : Map.of();
 
@@ -418,7 +435,7 @@ public class QuarterlyPlanningService {
             BigDecimal hours = entry != null ? entry.hours() : null;
             if (hours == null) continue;
             if (hours.compareTo(BigDecimal.ZERO) > 0) hasEstimate = true;
-            remainingNowByRole.put(e.getKey(), hoursToDays(hours));
+            remainingNowByRole.put(e.getKey(), hoursToDays(unbuffer(hours, bufferDivisor)));
         }
 
         // Remaining at quarter start: sum of hours landing on/after Ds, prorated across the boundary.
@@ -447,7 +464,7 @@ public class QuarterlyPlanningService {
 
         Map<String, BigDecimal> remainingAtStartByRole = new LinkedHashMap<>();
         for (Map.Entry<String, BigDecimal> e : atStartHoursByRole.entrySet()) {
-            remainingAtStartByRole.put(e.getKey(), hoursToDays(e.getValue()));
+            remainingAtStartByRole.put(e.getKey(), hoursToDays(unbuffer(e.getValue(), bufferDivisor)));
         }
 
         BigDecimal remainingNowDays = sumDays(remainingNowByRole);
@@ -485,6 +502,12 @@ public class QuarterlyPlanningService {
         int remainingWorkdays = workCalendarService.countWorkdays(effectiveStart, end);
         return hours.multiply(BigDecimal.valueOf(remainingWorkdays))
                 .divide(BigDecimal.valueOf(totalWorkdays), 4, RoundingMode.HALF_UP);
+    }
+
+    /** Divides the planner's buffered hours back to raw (buffer-free) hours. */
+    private BigDecimal unbuffer(BigDecimal bufferedHours, BigDecimal bufferDivisor) {
+        if (bufferedHours == null || BigDecimal.ONE.compareTo(bufferDivisor) == 0) return bufferedHours;
+        return bufferedHours.divide(bufferDivisor, 4, RoundingMode.HALF_UP);
     }
 
     /** Converts hours to person-days (8h = 1 day), one decimal place, HALF_UP. */
