@@ -1,7 +1,7 @@
 # F87 — Timeline: режим отображения факта (worklog / статусы Story)
 
 **Версия:** 0.87.0
-**Статус:** В разработке
+**Статус:** Реализовано (2026-07-06)
 **Ветка:** `feat/f87-timeline-actuals-mode` (stacked поверх `feat/f86-quarterly-remaining-work`)
 
 ## Проблема

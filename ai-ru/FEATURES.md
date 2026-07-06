@@ -85,6 +85,7 @@
 | F83 | Data Quality: категории правил + новые правила (38 правил) | 2026-07-02 | [features/F83](features/F83_DQ_CATEGORIES_AND_RULES.md) |
 | F85 | Board Tooltips (эпик + проект hover-карточки) | 2026-07-02 | [features/F85](features/F85-board-tooltips.md) |
 | F86 | Quarterly Planning: остаток работы по эпикам (needs-planning фильтр + остаток сейчас/на старте квартала) | 2026-07-03 | [features/F86](features/F86_QUARTERLY_REMAINING_WORK.md) |
+| F87 | Timeline: режим отображения факта — worklog сабтасок или интервалы статусов Story (переключатель Logged time / Story statuses) | 2026-07-06 | [features/F87](features/F87_TIMELINE_ACTUALS_MODE.md) |
 
 ## Бэклог (BF)
 
