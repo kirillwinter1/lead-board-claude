@@ -1030,6 +1030,8 @@ public class QuarterlyPlanningService {
                     : DEFAULT_RISK_BUFFER;
             Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
             BigDecimal totalDemand = demand.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+            Map<String, BigDecimal> rawEstimates = rawEpicEstimates(epic);
+            BigDecimal totalEstimate = rawEstimates.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
             boolean hasEstimate = epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty();
             boolean hasTeamMapping = epic.getTeamId() != null;
@@ -1064,6 +1066,8 @@ public class QuarterlyPlanningService {
                     epicTeams,
                     demand,
                     totalDemand,
+                    rawEstimates,
+                    totalEstimate,
                     hasEstimate,
                     hasTeamMapping,
                     epicOverloaded,
@@ -1373,6 +1377,8 @@ public class QuarterlyPlanningService {
         }
         Map<String, BigDecimal> demand = computeEpicDemand(epic, riskBuffer);
         BigDecimal totalDemand = demand.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<String, BigDecimal> rawEstimates = rawEpicEstimates(epic);
+        BigDecimal totalEstimate = rawEstimates.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
         List<PlanningEpicDto.TeamRef> teamRefs = team != null
                 ? List.of(new PlanningEpicDto.TeamRef(team.getId(), team.getName(), team.getColor()))
@@ -1420,6 +1426,8 @@ public class QuarterlyPlanningService {
                 teamRefs,
                 demand,
                 totalDemand,
+                rawEstimates,
+                totalEstimate,
                 epic.getRoughEstimates() != null && !epic.getRoughEstimates().isEmpty(),
                 epic.getTeamId() != null,
                 overloadedTeams,
@@ -1701,6 +1709,12 @@ public class QuarterlyPlanningService {
             }
         }
         return epicToProject;
+    }
+
+    /** Raw rough estimates as entered in Jira — no risk buffer, for card display. */
+    private Map<String, BigDecimal> rawEpicEstimates(JiraIssueEntity epic) {
+        Map<String, BigDecimal> roughEstimates = epic.getRoughEstimates();
+        return roughEstimates != null ? new LinkedHashMap<>(roughEstimates) : Map.of();
     }
 
     private Map<String, BigDecimal> computeEpicDemand(JiraIssueEntity epic, BigDecimal riskBuffer) {

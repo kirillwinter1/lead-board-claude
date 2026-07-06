@@ -336,6 +336,8 @@ class QuarterlyPlanningControllerTest {
                 List.of(),
                 Map.of(),
                 BigDecimal.ZERO,
+                Map.of(),
+                BigDecimal.ZERO,
                 false,
                 false,
                 List.of(),

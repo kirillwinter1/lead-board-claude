@@ -27,8 +27,14 @@ public record PlanningEpicDto(
         Integer manualBoost,
         BigDecimal priorityScore,
         List<TeamRef> teams,
+        // Capacity demand: rough estimate × (1 + team risk buffer). Feeds the
+        // capacity bars and utilization math — NOT for card display.
         Map<String, BigDecimal> demandByRole,
         BigDecimal totalDemandDays,
+        // Raw rough estimates as entered in Jira (no risk buffer) — what the
+        // cards display, consistent with the Board page.
+        Map<String, BigDecimal> estimateByRole,
+        BigDecimal totalEstimateDays,
         boolean hasEstimate,
         boolean hasTeamMapping,
         List<Long> overloadedTeams,
