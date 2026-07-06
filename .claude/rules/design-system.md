@@ -26,6 +26,8 @@ import { StatusBadge } from '../board/StatusBadge'
 
 NEVER: manually read useStatusStyles(), apply opacity hacks, use getContrastColor() outside StatusBadge, hardcode status color values, use foreignObject in SVG.
 
+Exception: chart/timeline **segments** that use the status color as data (bar fills, not labels) may read `statusStyles[status]?.color` directly with a neutral fallback — precedents: `DsrBreakdownChart`, F87 `StoryBar`. Status **labels/badges** must still go through `StatusBadge`.
+
 ## Charts with Rich Labels — Two-Column HTML Layout
 
 When building charts that need rich labels (icons, badges, links), NEVER use Recharts YAxis with custom SVG ticks or foreignObject. Use a two-column HTML layout:
