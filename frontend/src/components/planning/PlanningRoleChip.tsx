@@ -56,7 +56,7 @@ export function PlanningRoleChip({ epicKey, role, days, roleColor, editable, con
 
   if (editable && editing) {
     return (
-      <div className="epic-role-chip todo editing" style={{ color: roleColor, borderColor }}>
+      <div className="planning-role-chip epic-role-chip todo editing" style={{ color: roleColor, borderColor }}>
         <span className="epic-role-label">{role}</span>
         <input
           ref={inputRef}
@@ -78,7 +78,7 @@ export function PlanningRoleChip({ epicKey, role, days, roleColor, editable, con
   if (editable) {
     return (
       <div
-        className={`epic-role-chip todo ${hasValue ? '' : 'needs-estimate'}`}
+        className={`planning-role-chip epic-role-chip todo ${hasValue ? '' : 'needs-estimate'}`}
         style={{ color: roleColor, borderColor }}
         onClick={handleClick}
         title="Click to set estimate"
@@ -91,7 +91,7 @@ export function PlanningRoleChip({ epicKey, role, days, roleColor, editable, con
 
   // Read-only: same rough-only look the Board uses for non-editable epics.
   return (
-    <div className="epic-role-chip rough-only" style={{ color: roleColor, borderColor }}>
+    <div className="planning-role-chip epic-role-chip rough-only" style={{ color: roleColor, borderColor }}>
       <span className="epic-role-label">{role}</span>
       <span className="epic-role-value rough">{hasValue ? `${days}d` : '—'}</span>
     </div>

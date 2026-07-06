@@ -225,7 +225,7 @@ export function EpicCard({
               borderLeft: `2px solid ${color}`,
             }}
           >
-            {code} {formatDays(val)}
+            {code} {formatDays(val)}д
           </span>
         )
       })}
