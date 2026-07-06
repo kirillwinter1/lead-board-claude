@@ -251,6 +251,8 @@ public class RetrospectiveTimelineService {
             progressPercent = (int) Math.round(totalLogged * 100.0 / totalEstimate);
         }
 
+        List<StatusInterval> statusIntervals = buildStatusIntervals(transitions, storyStart, storyDone);
+
         return new RetroStory(
                 story.getIssueKey(),
                 story.getSummary(),
@@ -265,8 +267,45 @@ public class RetrospectiveTimelineService {
                 totalLogged > 0 ? totalLogged : null,
                 roleProgress.isEmpty() ? null : roleProgress,
                 phases,
-                worklogDays != null && !worklogDays.isEmpty() ? worklogDays : null
+                worklogDays != null && !worklogDays.isEmpty() ? worklogDays : null,
+                statusIntervals
         );
+    }
+
+    /**
+     * Интервалы нахождения стори в статусах по её собственному changelog.
+     * Первый интервал — fromStatus первого перехода от начала бара стори (или от даты
+     * первого перехода, если бар начинается позже). Последний — до today для активной
+     * стори, до даты последнего перехода для завершённой. Имена статусов не
+     * интерпретируются (цвет подбирает фронт из конфигурации).
+     */
+    List<StatusInterval> buildStatusIntervals(List<StatusChangelogEntity> transitions,
+                                              LocalDate storyStart, boolean storyDone) {
+        if (transitions.isEmpty()) {
+            return List.of();
+        }
+        List<StatusInterval> intervals = new ArrayList<>();
+
+        LocalDate firstTransitionDate = transitions.get(0).getTransitionedAt().toLocalDate();
+        String initialStatus = transitions.get(0).getFromStatus();
+        if (initialStatus != null) {
+            LocalDate firstStart = storyStart != null && storyStart.isBefore(firstTransitionDate)
+                    ? storyStart : firstTransitionDate;
+            intervals.add(new StatusInterval(initialStatus, firstStart, firstTransitionDate));
+        }
+
+        for (int i = 0; i < transitions.size(); i++) {
+            StatusChangelogEntity transition = transitions.get(i);
+            LocalDate start = transition.getTransitionedAt().toLocalDate();
+            LocalDate end;
+            if (i + 1 < transitions.size()) {
+                end = transitions.get(i + 1).getTransitionedAt().toLocalDate();
+            } else {
+                end = storyDone ? start : LocalDate.now();
+            }
+            intervals.add(new StatusInterval(transition.getToStatus(), start, end));
+        }
+        return intervals;
     }
 
     /** Phase start/end/active windows keyed by role code. */

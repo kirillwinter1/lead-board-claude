@@ -39,7 +39,8 @@ public record RetrospectiveResult(
             Long totalLoggedSeconds,
             Map<String, RoleProgress> roleProgress,
             Map<String, RetroPhase> phases,
-            List<WorklogDay> worklogDays
+            List<WorklogDay> worklogDays,
+            List<StatusInterval> statusIntervals
     ) {}
 
     /** Logged/estimated time and completion for a role, for tooltip parity with the plan view. */
@@ -61,5 +62,12 @@ public record RetrospectiveResult(
             LocalDate endDate,
             long durationDays,
             boolean active
+    ) {}
+
+    /** Интервал нахождения стори в статусе (по её собственному status_changelog). */
+    public record StatusInterval(
+            String status,
+            LocalDate startDate,
+            LocalDate endDate
     ) {}
 }

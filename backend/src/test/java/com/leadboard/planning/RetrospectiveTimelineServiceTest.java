@@ -18,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -566,6 +567,103 @@ class RetrospectiveTimelineServiceTest {
 
             RetroStory retroStory = result.epics().get(0).stories().get(0);
             assertNull(retroStory.worklogDays());
+        }
+    }
+
+    @Nested
+    class StatusIntervals {
+
+        private OffsetDateTime at(int day) {
+            return OffsetDateTime.of(2026, 6, day, 12, 0, 0, 0, ZoneOffset.UTC);
+        }
+
+        @Test
+        void shouldBuildIntervalsFromTransitionChain() {
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", at(2)),
+                    createTransition("PROJ-1", "In Development", "In Testing", at(5)),
+                    createTransition("PROJ-1", "In Testing", "Done", at(8))
+            );
+
+            List<RetrospectiveResult.StatusInterval> intervals = service.buildStatusIntervals(
+                    transitions, LocalDate.of(2026, 6, 1), true);
+
+            assertEquals(4, intervals.size());
+            assertEquals(new RetrospectiveResult.StatusInterval("To Do", LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 2)), intervals.get(0));
+            assertEquals(new RetrospectiveResult.StatusInterval("In Development", LocalDate.of(2026, 6, 2), LocalDate.of(2026, 6, 5)), intervals.get(1));
+            assertEquals(new RetrospectiveResult.StatusInterval("In Testing", LocalDate.of(2026, 6, 5), LocalDate.of(2026, 6, 8)), intervals.get(2));
+            // Стори завершена — хвост последнего интервала не тянем до today
+            assertEquals(new RetrospectiveResult.StatusInterval("Done", LocalDate.of(2026, 6, 8), LocalDate.of(2026, 6, 8)), intervals.get(3));
+        }
+
+        @Test
+        void unfinishedStoryLastIntervalExtendsToToday() {
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", at(2))
+            );
+
+            List<RetrospectiveResult.StatusInterval> intervals = service.buildStatusIntervals(
+                    transitions, LocalDate.of(2026, 6, 1), false);
+
+            assertEquals(2, intervals.size());
+            RetrospectiveResult.StatusInterval last = intervals.get(1);
+            assertEquals("In Development", last.status());
+            assertEquals(LocalDate.of(2026, 6, 2), last.startDate());
+            assertEquals(LocalDate.now(), last.endDate());
+        }
+
+        @Test
+        void emptyTransitionsGiveEmptyList() {
+            assertTrue(service.buildStatusIntervals(List.of(), LocalDate.of(2026, 6, 1), false).isEmpty());
+        }
+
+        @Test
+        void firstIntervalStartsAtTransitionDateWhenStoryStartIsLater() {
+            // storyStart позже первого перехода — интервал не должен быть «вывернут»
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", at(2))
+            );
+
+            List<RetrospectiveResult.StatusInterval> intervals = service.buildStatusIntervals(
+                    transitions, LocalDate.of(2026, 6, 10), false);
+
+            assertEquals(new RetrospectiveResult.StatusInterval("To Do", LocalDate.of(2026, 6, 2), LocalDate.of(2026, 6, 2)), intervals.get(0));
+        }
+
+        @Test
+        void multipleTransitionsSameDayProduceZeroLengthIntervals() {
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", at(3)),
+                    createTransition("PROJ-1", "In Development", "In Testing", at(3).plusHours(2)),
+                    createTransition("PROJ-1", "In Testing", "Done", at(3).plusHours(4))
+            );
+
+            List<RetrospectiveResult.StatusInterval> intervals = service.buildStatusIntervals(
+                    transitions, LocalDate.of(2026, 6, 1), true);
+
+            assertEquals(4, intervals.size());
+            // Все интервалы одного дня валидны (start == end), исключений нет
+            for (RetrospectiveResult.StatusInterval interval : intervals) {
+                assertFalse(interval.endDate().isBefore(interval.startDate()));
+            }
+        }
+
+        @Test
+        void retroStoryCarriesStatusIntervals() {
+            // Через buildRetroStory (fallback-путь по статусам стори — без сабтасок):
+            // проверяем, что интервалы доезжают до DTO.
+            JiraIssueEntity story = createStory("PROJ-1", "In Development", "PROJ-100");
+            List<StatusChangelogEntity> transitions = List.of(
+                    createTransition("PROJ-1", "To Do", "In Development", at(2))
+            );
+
+            RetroStory result = service.buildRetroStory(story, transitions, List.of(), List.of());
+
+            assertNotNull(result);
+            assertNotNull(result.statusIntervals());
+            assertEquals(2, result.statusIntervals().size());
+            assertEquals("To Do", result.statusIntervals().get(0).status());
+            assertEquals("In Development", result.statusIntervals().get(1).status());
         }
     }
 }
