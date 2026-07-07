@@ -1,6 +1,7 @@
 package com.leadboard.poker.controller;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.status.StatusCategory;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
 import com.leadboard.poker.entity.PokerStoryEntity;
@@ -99,9 +100,13 @@ public class PokerController {
 
     @GetMapping("/eligible-epics/{teamId}")
     public ResponseEntity<List<EligibleEpicResponse>> getEligibleEpics(@PathVariable Long teamId) {
-        // Eligible = any epic not yet done, per workflow config (no hardcoded status names)
+        // Planning poker estimates an epic BEFORE development starts, so only epics
+        // in a planning-phase category are eligible: NEW / REQUIREMENTS / PLANNED.
+        // Epics already in development (IN_PROGRESS / DEV_DONE) or DONE are excluded —
+        // their stories are already cut and estimated. Category is config-driven
+        // (no hardcoded status names).
         List<JiraIssueEntity> epics = issueRepository.findEpicsByTeam(teamId).stream()
-                .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
+                .filter(e -> isEligibleForPoker(e.getStatus(), e.getIssueType()))
                 .toList();
 
         // Get epic keys that already have active poker sessions
@@ -131,6 +136,19 @@ public class PokerController {
                 .toList();
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Epic is eligible for planning poker only in a planning-phase category.
+     * Uses the configured status engine (WorkflowConfigService.categorize, which
+     * loads the tenant's status_mappings) — never hardcoded status names or the
+     * substring fallback.
+     */
+    private boolean isEligibleForPoker(String status, String issueType) {
+        StatusCategory category = workflowConfigService.categorize(status, issueType).normalized();
+        return category == StatusCategory.NEW
+                || category == StatusCategory.REQUIREMENTS
+                || category == StatusCategory.PLANNED;
     }
 
     // ===== Session Endpoints =====

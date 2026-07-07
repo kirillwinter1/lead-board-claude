@@ -192,4 +192,29 @@ class PokerIntegrationTest extends IntegrationTestBase {
         }
         assertTrue(foundEligible, "Eligible epic should be in the list");
     }
+
+    @Test
+    @DisplayName("Should exclude in-progress and done epics from eligible list")
+    void shouldExcludeInProgressAndDoneEpics() {
+        // Given
+        var team = createTeam("Phase Filter Team");
+        createEpic("PLANNED-EPIC", "Planned Epic", "Новое", team.getId());
+        createEpic("INPROGRESS-EPIC", "In-Progress Epic", "In Progress", team.getId());
+        createEpic("DONE-EPIC", "Done Epic", "Done", team.getId());
+
+        // When
+        var response = restTemplate.getForEntity(
+                "/api/poker/eligible-epics/" + team.getId(),
+                EligibleEpicResponse[].class);
+
+        // Then — planning-phase epic present, in-progress and done excluded
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        var keys = java.util.Arrays.stream(response.getBody())
+                .map(EligibleEpicResponse::epicKey)
+                .toList();
+        assertTrue(keys.contains("PLANNED-EPIC"), "Planning-phase epic should be eligible");
+        assertFalse(keys.contains("INPROGRESS-EPIC"), "In-progress epic must be excluded");
+        assertFalse(keys.contains("DONE-EPIC"), "Done epic must be excluded");
+    }
 }
