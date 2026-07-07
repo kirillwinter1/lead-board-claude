@@ -249,10 +249,14 @@ class MyWorkServiceTest {
                 28, workdayDates.size(), 8, 1, workdayDates, List.of(new HolidayDto(holiday, "Test Holiday")));
         when(workCalendarService.getWorkdaysInfo(calFrom, calTo)).thenReturn(calendarInfo);
 
-        // Worklogs on 06.07 across two issues.
+        // Worklogs on 06.07 across two issues (1h + 2h).
+        // Worklogs on 16.06 across two issues with non-round seconds (600s + 600s): each rounds to
+        // 0.2h, but the daily total must round the raw sum (1200s -> 0.3h), not sum the rounded parts.
         when(worklogRepository.findDailyWorklogsByAuthorPerIssue("acc-1", calFrom, calTo)).thenReturn(List.of(
                 new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-1", 3600L},
-                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-2", 7200L}
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-2", 7200L},
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 6, 16)), "SUB-3", 600L},
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 6, 16)), "SUB-4", 600L}
         ));
 
         // Vacation absence for team1 membership, 22.06-23.06.
@@ -286,6 +290,15 @@ class MyWorkServiceTest {
         assertEquals("WORKDAY", plainWorkday.dayType());
         assertNull(plainWorkday.absenceType());
         assertEquals(0, new BigDecimal("6.0").compareTo(plainWorkday.normH()));
+        // Rounding: 600s + 600s = 1200s -> 0.3h at the day level (NOT 0.2 + 0.2 = 0.4).
+        assertEquals(0, new BigDecimal("0.3").compareTo(plainWorkday.loggedH()));
+        assertEquals(2, plainWorkday.byIssue().size());
+        MyWorkResponse.DayIssue sub3 = plainWorkday.byIssue().stream()
+                .filter(bi -> bi.issueKey().equals("SUB-3")).findFirst().orElseThrow();
+        MyWorkResponse.DayIssue sub4 = plainWorkday.byIssue().stream()
+                .filter(bi -> bi.issueKey().equals("SUB-4")).findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("0.2").compareTo(sub3.hours()));
+        assertEquals(0, new BigDecimal("0.2").compareTo(sub4.hours()));
     }
 
     private MyWorkResponse.CalendarDay findDay(MyWorkResponse r, LocalDate date) {
