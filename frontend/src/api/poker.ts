@@ -33,6 +33,8 @@ export interface PokerSession {
   id: number
   teamId: number
   epicKey: string
+  epicSummary: string | null
+  epicDescription: string | null
   facilitatorAccountId: string
   status: 'PREPARING' | 'ACTIVE' | 'COMPLETED'
   roomCode: string

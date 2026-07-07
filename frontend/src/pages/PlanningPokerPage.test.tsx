@@ -99,7 +99,7 @@ describe('PlanningPokerPage', () => {
     it('should show loading state initially', () => {
       renderPlanningPokerPage()
 
-      expect(screen.getByText('Загрузка...')).toBeInTheDocument()
+      expect(screen.getByText('Loading...')).toBeInTheDocument()
     })
 
     it('should render team selector with selected team, others on open', async () => {
@@ -115,19 +115,19 @@ describe('PlanningPokerPage', () => {
       expect(screen.getByText('Team Beta')).toBeInTheDocument()
     })
 
-    it('should render "Новая сессия" button', async () => {
+    it('should render "New session" button', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Новая сессия')).toBeInTheDocument()
+        expect(screen.getByText('New session')).toBeInTheDocument()
       })
     })
 
-    it('should render "Войти по коду" button', async () => {
+    it('should render "Join by code" button', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Войти по коду')).toBeInTheDocument()
+        expect(screen.getByText('Join by code')).toBeInTheDocument()
       })
     })
   })
@@ -137,12 +137,12 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Эпик')).toBeInTheDocument()
-        expect(screen.getByText('Код комнаты')).toBeInTheDocument()
-        expect(screen.getByText('Статус')).toBeInTheDocument()
-        expect(screen.getByText('Сторей')).toBeInTheDocument()
-        expect(screen.getByText('Создана')).toBeInTheDocument()
-        expect(screen.getByText('Действия')).toBeInTheDocument()
+        expect(screen.getByText('Epic')).toBeInTheDocument()
+        expect(screen.getByText('Room code')).toBeInTheDocument()
+        expect(screen.getByText('Status')).toBeInTheDocument()
+        expect(screen.getByText('Stories')).toBeInTheDocument()
+        expect(screen.getByText('Created')).toBeInTheDocument()
+        expect(screen.getByText('Actions')).toBeInTheDocument()
       })
     })
 
@@ -170,24 +170,24 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Активна')).toBeInTheDocument()
-        expect(screen.getByText('Завершена')).toBeInTheDocument()
+        expect(screen.getByText('Active')).toBeInTheDocument()
+        expect(screen.getByText('Completed')).toBeInTheDocument()
       })
     })
 
-    it('should show "Войти" for active sessions', async () => {
+    it('should show "Join" for active sessions', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Войти')).toBeInTheDocument()
+        expect(screen.getByText('Join')).toBeInTheDocument()
       })
     })
 
-    it('should show "Просмотр" for completed sessions', async () => {
+    it('should show "View" for completed sessions', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Просмотр')).toBeInTheDocument()
+        expect(screen.getByText('View')).toBeInTheDocument()
       })
     })
   })
@@ -195,17 +195,17 @@ describe('PlanningPokerPage', () => {
   describe('Create session (epic picker)', () => {
     const openPicker = async () => {
       await waitFor(() => {
-        expect(screen.getByText('Новая сессия')).toBeInTheDocument()
+        expect(screen.getByText('New session')).toBeInTheDocument()
       })
-      fireEvent.click(screen.getByText('Новая сессия'))
+      fireEvent.click(screen.getByText('New session'))
     }
 
-    it('should show inline epic picker on "Новая сессия" click', async () => {
+    it('should show inline epic picker on "New session" click', async () => {
       renderPlanningPokerPage()
       await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('Выберите эпик для оценки')).toBeInTheDocument()
+        expect(screen.getByText('Select an epic to estimate')).toBeInTheDocument()
       })
     })
 
@@ -233,7 +233,7 @@ describe('PlanningPokerPage', () => {
       await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('Есть сессия')).toBeInTheDocument()
+        expect(screen.getByText('Has session')).toBeInTheDocument()
       })
 
       // EPIC-4 row is disabled (has a session)
@@ -249,7 +249,7 @@ describe('PlanningPokerPage', () => {
         expect(screen.getByText('EPIC-3')).toBeInTheDocument()
       })
 
-      fireEvent.change(screen.getByPlaceholderText(/Поиск/), { target: { value: 'Another' } })
+      fireEvent.change(screen.getByPlaceholderText(/Search/), { target: { value: 'Another' } })
 
       await waitFor(() => {
         expect(screen.queryByText('New Epic for Poker')).not.toBeInTheDocument()
@@ -257,17 +257,17 @@ describe('PlanningPokerPage', () => {
       })
     })
 
-    it('should return to sessions list on "Отмена" click', async () => {
+    it('should return to sessions list on "Cancel" click', async () => {
       renderPlanningPokerPage()
       await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('Выберите эпик для оценки')).toBeInTheDocument()
+        expect(screen.getByText('Select an epic to estimate')).toBeInTheDocument()
       })
 
-      fireEvent.click(screen.getByText('Отмена'))
+      fireEvent.click(screen.getByText('Cancel'))
 
-      expect(screen.queryByText('Выберите эпик для оценки')).not.toBeInTheDocument()
+      expect(screen.queryByText('Select an epic to estimate')).not.toBeInTheDocument()
     })
 
     it('should create session and navigate on epic row click', async () => {
@@ -294,44 +294,44 @@ describe('PlanningPokerPage', () => {
   })
 
   describe('Join room modal', () => {
-    it('should open modal on "Войти по коду" click', async () => {
+    it('should open modal on "Join by code" click', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Войти по коду'))
+        fireEvent.click(screen.getByText('Join by code'))
       })
 
-      expect(screen.getByText('Войти в комнату')).toBeInTheDocument()
+      expect(screen.getByText('Join room')).toBeInTheDocument()
     })
 
     it('should have room code input', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Войти по коду'))
+        fireEvent.click(screen.getByText('Join by code'))
       })
 
-      expect(screen.getByPlaceholderText('Например: ABC123')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('e.g. ABC123')).toBeInTheDocument()
     })
 
     it('should navigate to room on submit', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Войти по коду')).toBeInTheDocument()
+        expect(screen.getByText('Join by code')).toBeInTheDocument()
       })
 
-      fireEvent.click(screen.getByText('Войти по коду'))
+      fireEvent.click(screen.getByText('Join by code'))
 
       await waitFor(() => {
-        expect(screen.getByText('Войти в комнату')).toBeInTheDocument()
+        expect(screen.getByText('Join room')).toBeInTheDocument()
       })
 
-      const input = screen.getByPlaceholderText('Например: ABC123')
+      const input = screen.getByPlaceholderText('e.g. ABC123')
       fireEvent.change(input, { target: { value: 'ABC123' } })
 
       // Find submit button in modal (the one in modal-actions)
-      const modalActions = screen.getByText('Отмена').parentElement!
+      const modalActions = screen.getByText('Cancel').parentElement!
       const submitButton = modalActions.querySelector('button.btn-primary')!
       fireEvent.click(submitButton)
 
@@ -342,10 +342,10 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Войти по коду'))
+        fireEvent.click(screen.getByText('Join by code'))
       })
 
-      const input = screen.getByPlaceholderText('Например: ABC123')
+      const input = screen.getByPlaceholderText('e.g. ABC123')
       fireEvent.change(input, { target: { value: 'abc123' } })
 
       expect(input).toHaveValue('ABC123')
@@ -355,13 +355,13 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Войти по коду'))
+        fireEvent.click(screen.getByText('Join by code'))
       })
 
-      const input = screen.getByPlaceholderText('Например: ABC123')
+      const input = screen.getByPlaceholderText('e.g. ABC123')
       fireEvent.change(input, { target: { value: 'ABC' } })
 
-      const submitButton = screen.getAllByText('Войти').find(
+      const submitButton = screen.getAllByText('Join').find(
         el => el.tagName === 'BUTTON' && el.closest('.modal-content')
       )
       expect(submitButton).toBeDisabled()
@@ -375,10 +375,10 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Пока нет сессий')).toBeInTheDocument()
+        expect(screen.getByText('No sessions yet')).toBeInTheDocument()
       })
       // CTA buttons present inside the empty state (plus the header ones)
-      expect(screen.getAllByText('Новая сессия').length).toBeGreaterThanOrEqual(1)
+      expect(screen.getAllByText('New session').length).toBeGreaterThanOrEqual(1)
     })
   })
 
@@ -387,7 +387,7 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Войти'))
+        fireEvent.click(screen.getByText('Join'))
       })
 
       expect(mockNavigate).toHaveBeenCalledWith('/poker/room/ABC123')

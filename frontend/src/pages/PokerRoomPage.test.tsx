@@ -83,6 +83,8 @@ const mockSession = {
   id: 1,
   teamId: 1,
   epicKey: 'EPIC-1',
+  epicSummary: 'Mobile App',
+  epicDescription: null,
   facilitatorAccountId: 'user-123',
   status: 'ACTIVE' as const,
   roomCode: 'ABC123',
@@ -179,7 +181,7 @@ describe('PokerRoomPage', () => {
       renderPokerRoomPage()
 
       await waitFor(() => {
-        expect(screen.getByText(/не удалось загрузить/i)).toBeInTheDocument()
+        expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
       })
     })
   })
