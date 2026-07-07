@@ -1,6 +1,8 @@
 package com.leadboard.team;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.calendar.dto.HolidayDto;
+import com.leadboard.calendar.dto.WorkdaysResponseDto;
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.repository.IssueWorklogRepository;
@@ -15,11 +17,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +50,11 @@ class MyWorkServiceTest {
         MemberAnalyticsService analytics = new MemberAnalyticsService(issueRepository, workflowConfigService, workCalendarService);
         service = new MyWorkService(memberRepository, issueRepository, worklogRepository, absenceRepository,
                 absenceService, workflowConfigService, workCalendarService, analytics, jiraConfigResolver);
+
+        // Default empty calendar so tests unrelated to the worklog calendar don't NPE;
+        // tests that care about the calendar override with exact-range stubs (see below).
+        lenient().when(workCalendarService.getWorkdaysInfo(any(), any())).thenReturn(
+                new WorkdaysResponseDto(LocalDate.MIN, LocalDate.MIN, "RU", 0, 0, 0, 0, List.of(), List.of()));
     }
 
     @Test
@@ -210,6 +221,78 @@ class MyWorkServiceTest {
         List<MyWorkResponse.QueueStory> queue = r.teamQueue();
         assertEquals(10, queue.size());
         assertTrue(queue.stream().noneMatch(q -> q.key().equals("STORY-" + doneIndex)));
+    }
+
+    @Test
+    void worklogCalendarCovers4WeeksWithNormAndAbsences() {
+        LocalDate today = LocalDate.of(2026, 7, 7); // Tuesday
+        LocalDate calFrom = LocalDate.of(2026, 6, 15); // Monday, 3 weeks before this week's Monday
+        LocalDate calTo = LocalDate.of(2026, 7, 12);   // Sunday of this week
+        LocalDate holiday = LocalDate.of(2026, 7, 1);
+
+        TeamEntity team1 = createTeam(1L, "Alpha", "#111111");
+        TeamMemberEntity member = createMember(10L, team1); // hoursPerDay = 6.0
+
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of(member));
+
+        // Workdays = every Mon-Fri in range except the holiday.
+        List<LocalDate> workdayDates = new ArrayList<>();
+        LocalDate cursor = calFrom;
+        while (!cursor.isAfter(calTo)) {
+            DayOfWeek dow = cursor.getDayOfWeek();
+            if (dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY && !cursor.equals(holiday)) {
+                workdayDates.add(cursor);
+            }
+            cursor = cursor.plusDays(1);
+        }
+        WorkdaysResponseDto calendarInfo = new WorkdaysResponseDto(calFrom, calTo, "RU",
+                28, workdayDates.size(), 8, 1, workdayDates, List.of(new HolidayDto(holiday, "Test Holiday")));
+        when(workCalendarService.getWorkdaysInfo(calFrom, calTo)).thenReturn(calendarInfo);
+
+        // Worklogs on 06.07 across two issues.
+        when(worklogRepository.findDailyWorklogsByAuthorPerIssue("acc-1", calFrom, calTo)).thenReturn(List.of(
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-1", 3600L},
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-2", 7200L}
+        ));
+
+        // Vacation absence for team1 membership, 22.06-23.06.
+        MemberAbsenceEntity vacation = new MemberAbsenceEntity();
+        vacation.setAbsenceType(AbsenceType.VACATION);
+        vacation.setStartDate(LocalDate.of(2026, 6, 22));
+        vacation.setEndDate(LocalDate.of(2026, 6, 23));
+        when(absenceRepository.findByMemberIdAndDateRange(10L, calFrom, calTo)).thenReturn(List.of(vacation));
+
+        MyWorkResponse r = service.getMyWork("acc-1", from, to, null, today);
+
+        assertEquals(28, r.worklogCalendar().size());
+        assertEquals(LocalDate.of(2026, 6, 15), r.worklogCalendar().get(0).date());
+
+        MyWorkResponse.CalendarDay julySixth = findDay(r, LocalDate.of(2026, 7, 6));
+        assertEquals(0, new BigDecimal("3.0").compareTo(julySixth.loggedH()));
+        assertEquals(2, julySixth.byIssue().size());
+        assertEquals("WORKDAY", julySixth.dayType());
+
+        MyWorkResponse.CalendarDay juneTwentySecond = findDay(r, LocalDate.of(2026, 6, 22));
+        assertEquals("VACATION", juneTwentySecond.absenceType());
+        assertEquals(0, BigDecimal.ZERO.compareTo(juneTwentySecond.normH()));
+
+        MyWorkResponse.CalendarDay julyFirst = findDay(r, holiday);
+        assertEquals("HOLIDAY", julyFirst.dayType());
+
+        MyWorkResponse.CalendarDay juneTwentieth = findDay(r, LocalDate.of(2026, 6, 20)); // Saturday
+        assertEquals("WEEKEND", juneTwentieth.dayType());
+
+        MyWorkResponse.CalendarDay plainWorkday = findDay(r, LocalDate.of(2026, 6, 16)); // Tuesday, no absence
+        assertEquals("WORKDAY", plainWorkday.dayType());
+        assertNull(plainWorkday.absenceType());
+        assertEquals(0, new BigDecimal("6.0").compareTo(plainWorkday.normH()));
+    }
+
+    private MyWorkResponse.CalendarDay findDay(MyWorkResponse r, LocalDate date) {
+        return r.worklogCalendar().stream()
+                .filter(d -> d.date().equals(date))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("No calendar day for " + date));
     }
 
     // ==================== Helpers ====================
