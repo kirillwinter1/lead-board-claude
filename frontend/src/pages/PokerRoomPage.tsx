@@ -320,7 +320,11 @@ export function PokerRoomPage() {
     }
 
     try {
-      const story = await addStory(session.id, request, true)
+      // Add as a local session story (createInJira=false). Creating the issue in
+      // Jira is unreliable — many projects require mandatory fields (description,
+      // components, ...) we don't collect here. Estimates for existing Jira
+      // stories still sync back via the Import flow.
+      const story = await addStory(session.id, request, false)
       setStories(prev => [...prev, story])
       setShowAddStory(false)
       setNewStoryTitle('')

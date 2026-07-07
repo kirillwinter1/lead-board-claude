@@ -1098,6 +1098,12 @@
   color: #42526e;
 }
 
+.poker-field .filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+}
+
 .poker-role-toggles {
   display: flex;
   flex-direction: column;
