@@ -19,8 +19,9 @@ import { MatrixPage } from './pages/MatrixPage'
 import { GuidePage } from './pages/GuidePage'
 import { LandingPage } from './pages/landing/LandingPage'
 import RegistrationPage from './pages/RegistrationPage'
+import { MyWorkPage } from './pages/MyWorkPage'
 import { WorkflowConfigProvider } from './contexts/WorkflowConfigContext'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { getTenantSlug } from './utils/tenant'
 import './App.css'
 
@@ -37,6 +38,15 @@ function LegacyTimelineRedirect() {
   return <Navigate to={{ pathname: '/', search: search ? `?${search}` : '' }} replace />
 }
 
+// F88: MEMBER-role users land on My Work instead of the Board — the Board's
+// epic/story hierarchy isn't relevant to their day-to-day work.
+export function HomeRedirect() {
+  const auth = useAuth()
+  if (auth.loading) return null
+  if (auth.isMember()) return <Navigate to="/my-work" replace />
+  return <BoardPage />
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -46,7 +56,8 @@ function App() {
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/register" element={<RegistrationPage />} />
         <Route path="/" element={<TenantAwareRoot />}>
-          <Route index element={<BoardPage />} />
+          <Route index element={<HomeRedirect />} />
+          <Route path="my-work" element={<MyWorkPage />} />
           <Route path="timeline" element={<LegacyTimelineRedirect />} />
           <Route path="metrics" element={<TeamMetricsPage />} />
           <Route path="data-quality" element={<DataQualityPage />} />
