@@ -102,13 +102,17 @@ describe('PlanningPokerPage', () => {
       expect(screen.getByText('Загрузка...')).toBeInTheDocument()
     })
 
-    it('should render team selector', async () => {
+    it('should render team selector with selected team, others on open', async () => {
       renderPlanningPokerPage()
 
+      // First active team is auto-selected and shown in the pill trigger
       await waitFor(() => {
         expect(screen.getByText('Team Alpha')).toBeInTheDocument()
-        expect(screen.getByText('Team Beta')).toBeInTheDocument()
       })
+      // Other teams appear only after opening the dropdown
+      expect(screen.queryByText('Team Beta')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByText('Team Alpha'))
+      expect(screen.getByText('Team Beta')).toBeInTheDocument()
     })
 
     it('should render "Новая сессия" button', async () => {
