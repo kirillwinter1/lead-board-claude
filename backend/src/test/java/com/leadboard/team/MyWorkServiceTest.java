@@ -169,7 +169,14 @@ class MyWorkServiceTest {
         subC.setParentKey("STORY-1");
         subC.setWorkflowRole("QA_X"); // different phase — must be filtered out
 
-        when(issueRepository.findUnassignedSubtasksByTeam(1L)).thenReturn(List.of(subA, subB, subC));
+        // Matching phase but already done (e.g. left unassigned after completion) — repo doesn't
+        // filter this out, the service must, otherwise it inflates myPhaseSubtasks/myPhaseEstimateH.
+        JiraIssueEntity subD = createSubtask("SUB-D", "Subtask D", "TYPE_X", "STATUS_DONE", 9000L, 9000L,
+                java.time.OffsetDateTime.now());
+        subD.setParentKey("STORY-1");
+        subD.setWorkflowRole("DEV_X");
+
+        when(issueRepository.findUnassignedSubtasksByTeam(1L)).thenReturn(List.of(subA, subB, subC, subD));
 
         JiraIssueEntity story1 = createStory("STORY-1", "Story One", "STORY_TYPE", "STATUS_OPEN", 1);
         JiraIssueEntity story2 = createStory("STORY-2", "Story Two", "STORY_TYPE", "STATUS_OPEN", 5);
@@ -190,6 +197,27 @@ class MyWorkServiceTest {
         assertEquals("STORY-2", queue.get(1).key());
         assertEquals(1, queue.get(1).myPhaseSubtasks());
         assertEquals(0, new BigDecimal("2.0").compareTo(queue.get(1).myPhaseEstimateH()));
+    }
+
+    @Test
+    void teamQueueSkipsStoryWhenOnlyMatchingSubtaskIsAlreadyDone() {
+        TeamEntity team = createTeam(1L, "Alpha", "#111111");
+        TeamMemberEntity member = createMember(10L, team);
+
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of(member));
+
+        JiraIssueEntity doneSub = createSubtask("SUB-DONE", "Subtask done", "TYPE_X", "STATUS_DONE", 3600L, 3600L,
+                java.time.OffsetDateTime.now());
+        doneSub.setParentKey("STORY-1");
+        doneSub.setWorkflowRole("DEV_X");
+
+        when(issueRepository.findUnassignedSubtasksByTeam(1L)).thenReturn(List.of(doneSub));
+
+        MyWorkResponse r = service.getMyWork("acc-1", from, to, null);
+
+        // The only matching-phase subtask for STORY-1 is already done — the story must not
+        // surface in the queue at all, and the parent lookup must not even be attempted.
+        assertTrue(r.teamQueue().isEmpty());
     }
 
     @Test

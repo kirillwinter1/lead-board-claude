@@ -138,10 +138,10 @@ public class MyWorkService {
 
         List<CalendarDay> worklogCalendar = buildWorklogCalendar(accountId, members, primary.getHoursPerDay(), today);
 
-        MyAnalytics analytics = buildAnalytics(accountId, members, primary.getHoursPerDay(), from, to, issueCache);
+        MyAnalytics myAnalytics = buildAnalytics(accountId, members, primary.getHoursPerDay(), from, to, issueCache);
 
         return new MyWorkResponse(true, memberInfo, upcomingAbsences, activeTasks, upcomingAssigned,
-                teamQueue, worklogCalendar, analytics);
+                teamQueue, worklogCalendar, myAnalytics);
     }
 
     /**
@@ -353,6 +353,7 @@ public class MyWorkService {
             Map<String, List<JiraIssueEntity>> byParent = new LinkedHashMap<>();
             for (JiraIssueEntity sub : unassigned) {
                 if (sub.getParentKey() == null) continue;
+                if (sub.getDoneAt() != null) continue;
                 String phase = sub.getWorkflowRole() != null
                         ? sub.getWorkflowRole()
                         : workflowConfigService.getSubtaskRole(sub.getIssueType());

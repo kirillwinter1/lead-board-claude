@@ -40,7 +40,7 @@ export function MyWorklogCalendar({ days }: { days: CalendarDay[] }) {
               title={d.byIssue.map(i => `${i.issueKey}: ${i.hours}h`).join('\n') || 'No worklog'}
             >
               <span className="mywork-cal-daynum">{Number(d.date.slice(8))}</span>
-              {d.dayType === 'WORKDAY' && !d.absenceType && (
+              {d.dayType === 'WORKDAY' && !d.absenceType && !isFuture && (
                 <span className="mywork-cal-hours">{d.loggedH}/{d.normH}h</span>
               )}
             </div>

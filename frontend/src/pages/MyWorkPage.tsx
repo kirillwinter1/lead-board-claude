@@ -133,7 +133,7 @@ function TeamQueueTable({ stories, getIssueTypeIconUrl, getIssueTypeCategory }: 
             </td>
             <td><StatusBadge status={s.status} /></td>
             <td><TeamBadge name={s.teamName} color={s.teamColor} /></td>
-            <td>{s.myPhaseSubtasks} subtasks &middot; {formatHours(s.myPhaseEstimateH)}</td>
+            <td>{s.myPhaseSubtasks} subtask{s.myPhaseSubtasks === 1 ? '' : 's'} &middot; {formatHours(s.myPhaseEstimateH)}</td>
           </tr>
         ))}
       </tbody>

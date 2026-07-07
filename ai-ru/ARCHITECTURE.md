@@ -84,7 +84,8 @@ com.leadboard/
 | CompetencyService | ~150 | Матрица компетенций, bus-factor анализ |
 | SimulationService | ~200 | Запуск и хранение результатов симуляций |
 | MemberProfileService | ~150 | Профиль участника: задачи, DSR тренд |
-| MyWorkService | ~440 | Личный рабочий стол (F88): активные/предстоящие задачи, фазовая очередь команды, worklog-календарь, аналитика — переиспользует DSR-логику MemberProfileService |
+| MemberAnalyticsService | ~180 | Общая DSR-аналитика участника: calculateDsr, weekly trend, summary — используется MemberProfileService и MyWorkService |
+| MyWorkService | ~440 | Личный рабочий стол (F88): активные/предстоящие задачи, фазовая очередь команды, worklog-календарь, аналитика — переиспользует DSR-аналитику MemberAnalyticsService |
 
 ### Entity (23+ сущностей)
 
