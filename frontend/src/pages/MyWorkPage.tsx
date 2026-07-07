@@ -8,6 +8,7 @@ import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
 import { formatHours, formatDate } from '../components/member/dsrFormat'
+import { MyWorklogCalendar } from '../components/member/MyWorklogCalendar'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 import './MyWorkPage.css'
@@ -197,7 +198,7 @@ export function MyWorkPage() {
       <div className="mywork-empty">You are not a member of any team yet. Ask your team lead to add you.</div>
     )
   } else {
-    const { member, upcomingAbsences, activeTasks, upcomingAssigned, teamQueue } = data
+    const { member, upcomingAbsences, activeTasks, upcomingAssigned, teamQueue, worklogCalendar } = data
     const initials = member.displayName ? member.displayName.split(' ').map(w => w[0]).join('') : '?'
 
     content = (
@@ -300,8 +301,13 @@ export function MyWorkPage() {
           </TaskSection>
         </div>
 
-        {/* Calendar section — Task 10 */}
-        <div id="mywork-calendar" />
+        <div className="profile-section full-width">
+          <div className="profile-section-header">
+            <h3>Time Logged &mdash; Last 4 Weeks</h3>
+          </div>
+          <MyWorklogCalendar days={worklogCalendar} />
+        </div>
+
         {/* Analytics section — Task 11 */}
         <div id="mywork-analytics" />
       </>
