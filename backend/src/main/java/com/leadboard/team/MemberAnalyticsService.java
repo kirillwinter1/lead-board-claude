@@ -81,7 +81,7 @@ public class MemberAnalyticsService {
         // Generate last TREND_WEEKS weeks
         List<WeeklyTrend> trend = new ArrayList<>();
         LocalDate currentWeekStart = endDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        DateTimeFormatter weekFormatter = DateTimeFormatter.ofPattern("d MMM", new Locale("ru"));
+        DateTimeFormatter weekFormatter = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH);
 
         for (int i = TREND_WEEKS - 1; i >= 0; i--) {
             LocalDate weekStart = currentWeekStart.minusWeeks(i);

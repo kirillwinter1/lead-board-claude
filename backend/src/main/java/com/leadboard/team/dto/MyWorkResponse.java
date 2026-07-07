@@ -15,9 +15,9 @@ public record MyWorkResponse(
         List<AbsenceDto> upcomingAbsences,
         List<MyTask> activeTasks,
         List<MyTask> upcomingAssigned,
-        List<QueueStory> teamQueue,              // Task 3, до тех пор List.of()
-        List<CalendarDay> worklogCalendar,       // Task 4, до тех пор List.of()
-        MyAnalytics analytics                    // Task 5, до тех пор null
+        List<QueueStory> teamQueue,
+        List<CalendarDay> worklogCalendar,
+        MyAnalytics analytics
 ) {
     public record MyMemberInfo(String displayName, String avatarUrl, String role, String grade,
                                BigDecimal hoursPerDay, List<TeamRef> teams) {}

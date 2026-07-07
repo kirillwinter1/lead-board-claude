@@ -56,6 +56,7 @@
 - [ ] **Poker: in-memory состояние комнат не масштабируется** (остаток BUG-183, QA 2026-07-07) — `roomSessions`/`sessionParticipants` в `PokerWebSocketHandler` и `roomParticipants` в `PokerSessionService` живут в памяти одного инстанса: рестарт рвёт комнаты, >1 инстанс не работает. Очистка при уходе последнего участника добавлена; для масштабирования нужен Redis pub/sub или sticky sessions.
 - [ ] **Poker: удаление story/сессии не выведено в UI** (остаток BUG-179) — REST `DELETE /api/poker/stories/{id}` есть (facilitator-only), кнопки в комнате нет; `DELETE /api/poker/sessions/{id}` не существует — завершённые/брошенные сессии копятся в лобби.
 - [ ] **Poker: языковой микс и hardcoded бейджи лобби** (BUG-185/188) — страницы покера на русском при английской навигации; статус-бейджи сессий в `PlanningPokerPage.tsx` с ручными цветами. Финальная оценка не предзаполняется медианой голосов (UX).
+- [ ] `MyWorkService.buildTeamQueue` (F88) — стори может продублироваться в team queue, если участник состоит в нескольких командах с одинаковой ролью: результаты по membership конкатенируются без дедупа по ключу истории. Осознанный компромисс на релиз F88; дедуп по `story.key()` — при жалобах на UX.
 
 ## Frontend
 
@@ -81,6 +82,7 @@
 | ~~DSR/severity/chart цвета в 6+ файлах~~ | ~~DsrBreakdownChart, ForecastAccuracyChart, AssigneeTable, VelocityChart, DsrGauge, DataQualityPage~~ | Решено: `constants/colors.ts` — единый источник (2026-03-08) |
 | ~~Inline SeverityBadge~~ | ~~DataQualityPage~~ | Решено: `components/SeverityBadge.tsx` — shared component (2026-03-08) |
 | ~~Микс RU/EN в UI~~ | ~~21 файл: метрики, таймлайн, доска, графики~~ | Решено: все продуктовые экраны переведены на EN (2026-03-08) |
+| `.issue-type-icon` CSS-класс | BoardPage.css, DataQualityPage.css, ProjectTimelinePage.css, MyWorkPage.css | Вынести в общий стиль (например `components.css` / shared stylesheet) |
 
 ### Отсутствующее
 
