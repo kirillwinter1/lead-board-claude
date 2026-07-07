@@ -59,7 +59,7 @@ com.leadboard/
 │   └── DTO и entities для логов симуляций
 ├── status/         — StatusCategory enum (TODO/IN_PROGRESS/DONE)
 ├── sync/           — Синхронизация с Jira (SyncService 437 LOC, инкрементальная, ChangelogImportService)
-├── team/           — CRUD команд/участников, MemberProfileService, TeamSyncService
+├── team/           — CRUD команд/участников, MemberProfileService, MyWorkService (F88), TeamSyncService
 └── telegram/       — Интеграция с Telegram (TelegramService)
 ```
 
@@ -84,6 +84,7 @@ com.leadboard/
 | CompetencyService | ~150 | Матрица компетенций, bus-factor анализ |
 | SimulationService | ~200 | Запуск и хранение результатов симуляций |
 | MemberProfileService | ~150 | Профиль участника: задачи, DSR тренд |
+| MyWorkService | ~440 | Личный рабочий стол (F88): активные/предстоящие задачи, фазовая очередь команды, worklog-календарь, аналитика — переиспользует DSR-логику MemberProfileService |
 
 ### Entity (23+ сущностей)
 
@@ -113,7 +114,7 @@ com.leadboard/
 | IssueOrderEntity | issue_order | Ручной порядок эпиков/stories |
 | SimulationLogEntity | simulation_logs | Логи симуляций |
 
-### API Endpoints (23 контроллера)
+### API Endpoints (24 контроллера)
 
 | Контроллер | Endpoints | Путь |
 |------------|-----------|------|
@@ -140,14 +141,16 @@ com.leadboard/
 | CompetencyController | 5 | /api/competencies/* |
 | SimulationController | 5 | /api/simulation/* |
 | AuditRequestController | 1 | /api/audit-requests |
+| MyWorkController | 1 | /api/me/work |
 
 ## Frontend (React + Vite + TypeScript)
 
-### Страницы (14)
+### Страницы (15)
 
 | Страница | Путь | Описание |
 |----------|------|----------|
 | LandingPage | / | Маркетинговая лендинг-страница |
+| MyWorkPage | /my-work | Личный рабочий стол участника (F88): задачи, worklog-календарь, аналитика; стартовая страница для роли MEMBER |
 | BoardPage | /board | Основная доска Epic→Story→Subtask |
 | TimelinePage | /timeline | Gantt-диаграмма с фазами по ролям |
 | TeamMetricsPage | /metrics | Метрики команды: DSR, throughput, forecast accuracy |
