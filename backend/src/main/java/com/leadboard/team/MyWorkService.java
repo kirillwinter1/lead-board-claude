@@ -149,16 +149,18 @@ public class MyWorkService {
         Set<LocalDate> workdayDates = new HashSet<>(calendarInfo.workdayDates());
 
         Map<LocalDate, List<DayIssue>> byIssuePerDay = new HashMap<>();
-        Map<LocalDate, BigDecimal> loggedPerDay = new HashMap<>();
+        Map<LocalDate, Long> secondsPerDay = new HashMap<>();
         List<Object[]> rawWorklogs = worklogRepository.findDailyWorklogsByAuthorPerIssue(accountId, calFrom, calTo);
         for (Object[] row : rawWorklogs) {
             LocalDate date = ((java.sql.Date) row[0]).toLocalDate();
             String issueKey = (String) row[1];
             long totalSeconds = ((Number) row[2]).longValue();
-            BigDecimal hours = analytics.secondsToHours(totalSeconds);
 
-            byIssuePerDay.computeIfAbsent(date, k -> new ArrayList<>()).add(new DayIssue(issueKey, hours));
-            loggedPerDay.merge(date, hours, BigDecimal::add);
+            // Per-issue value is rounded for display; the daily total rounds the raw-second sum once
+            // (rounding each issue then summing would drift, e.g. 600s + 600s = 0.2h + 0.2h = 0.4h ≠ 0.3h).
+            byIssuePerDay.computeIfAbsent(date, k -> new ArrayList<>())
+                    .add(new DayIssue(issueKey, analytics.secondsToHours(totalSeconds)));
+            secondsPerDay.merge(date, totalSeconds, Long::sum);
         }
 
         Map<LocalDate, String> absenceByDate = new HashMap<>();
@@ -188,7 +190,7 @@ public class MyWorkService {
 
             String absenceType = absenceByDate.get(current);
             BigDecimal normH = "WORKDAY".equals(dayType) && absenceType == null ? hoursPerDay : BigDecimal.ZERO;
-            BigDecimal loggedH = loggedPerDay.getOrDefault(current, BigDecimal.ZERO);
+            BigDecimal loggedH = analytics.secondsToHours(secondsPerDay.getOrDefault(current, 0L));
             List<DayIssue> byIssue = byIssuePerDay.getOrDefault(current, List.of());
 
             days.add(new CalendarDay(current, dayType, loggedH, normH, absenceType, byIssue));
