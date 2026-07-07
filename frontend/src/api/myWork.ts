@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AbsenceType } from './teams'
 
 export interface MyTeamRef { teamId: number; teamName: string; teamColor: string | null }
 export interface MyMemberInfo {
@@ -39,7 +40,7 @@ export interface MyAnalytics {
   summary: MySummary; weeklyTrend: MyWeeklyTrend[]; completedTasks: MyCompletedTask[]
   dsrByParentType: DsrBreakdown[]; dsrByEpic: DsrBreakdown[]
 }
-export interface UpcomingAbsence { id: number; memberId: number; absenceType: string; startDate: string; endDate: string; comment: string | null }
+export interface UpcomingAbsence { id: number; memberId: number; absenceType: AbsenceType; startDate: string; endDate: string; comment: string | null; createdAt: string }
 export interface MyWorkResponse {
   hasMembership: boolean; member: MyMemberInfo | null; upcomingAbsences: UpcomingAbsence[]
   activeTasks: MyTask[]; upcomingAssigned: MyTask[]; teamQueue: QueueStory[]
