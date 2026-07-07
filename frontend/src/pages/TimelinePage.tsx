@@ -350,8 +350,32 @@ interface StoryBarProps {
 function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover, actualsMode }: StoryBarProps) {
   const { getRoleColor } = useWorkflowConfig()
   const totalDays = daysBetween(dateRange.start, dateRange.end)
-  const startDate = new Date(story.startDate!)
-  const endDate = new Date(story.endDate!)
+
+  // Determine story source for visual styling
+  const storySource: PhaseSource = (story as PlannedStory & { _source?: PhaseSource })._source || 'forecast'
+  const worklogDays: WorklogDay[] | null = (story as PlannedStory & { _worklogDays?: WorklogDay[] | null })._worklogDays || null
+
+  const statusIntervals: StatusInterval[] | null =
+    (story as PlannedStory & { _statusIntervals?: StatusInterval[] | null })._statusIntervals || null
+  const statusStyles = useStatusStyles()
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  let startDate = new Date(story.startDate!)
+  let endDate = new Date(story.endDate!)
+
+  // Story-status mode: the story's own status history often lags the subtask-derived
+  // bar (statuses move after the work is logged), so widen the bar to cover the
+  // intervals — otherwise clipping leaves only the first (usually NEW) segment visible.
+  if (actualsMode === 'status' && (storySource === 'retro' || storySource === 'hybrid')
+      && statusIntervals && statusIntervals.length > 0) {
+    const intervalsStart = new Date(statusIntervals[0].startDate)
+    let intervalsEnd = new Date(statusIntervals[statusIntervals.length - 1].endDate)
+    if (intervalsEnd > today) intervalsEnd = today
+    if (intervalsStart < startDate) startDate = intervalsStart
+    if (intervalsEnd > endDate) endDate = intervalsEnd
+  }
 
   const daysFromStart = daysBetween(dateRange.start, startDate)
   const duration = daysBetween(startDate, endDate) + 1
@@ -362,18 +386,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const isBlocked = story.blockedBy && story.blockedBy.length > 0
   const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
 
-  // Determine story source for visual styling
-  const storySource: PhaseSource = (story as PlannedStory & { _source?: PhaseSource })._source || 'forecast'
-  const worklogDays: WorklogDay[] | null = (story as PlannedStory & { _worklogDays?: WorklogDay[] | null })._worklogDays || null
-
-  const statusIntervals: StatusInterval[] | null =
-    (story as PlannedStory & { _statusIntervals?: StatusInterval[] | null })._statusIntervals || null
-  const statusStyles = useStatusStyles()
-
   const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.65)
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
 
   // Render per-day worklog segments when worklog data is available
   const renderWorklogSegments = () => {

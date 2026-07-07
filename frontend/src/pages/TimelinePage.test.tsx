@@ -279,6 +279,32 @@ describe('TimelinePage', () => {
       })
     })
 
+    it('widens the bar when status history extends beyond subtask dates', async () => {
+      // Statuses often move after the subtask work is done — the colored interval
+      // lies entirely beyond the subtask-derived bar end and must still render.
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      const story = retro.epics[0].stories[0]
+      story.startDate = daysAgo(12)
+      story.endDate = daysAgo(8)
+      story.statusIntervals = [
+        { status: 'To Do', startDate: daysAgo(12), endDate: daysAgo(6) },
+        { status: 'In Development', startDate: daysAgo(6), endDate: daysAgo(3) },
+      ]
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+      const { container } = renderTimelinePage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Retro Epic')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+
+      await waitFor(() => {
+        expect(findStatusSegment(container)).toBeTruthy()
+      })
+    })
+
     it('falls back to StatusBadge palette for status without configured color', async () => {
       vi.mocked(boardApi.getStatusStyles).mockResolvedValue({} as any)
       const { container } = renderTimelinePage()
