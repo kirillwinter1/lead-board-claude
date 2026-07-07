@@ -93,6 +93,34 @@
 }
 
 /* =====================================================
+   MY PERFORMANCE ANALYTICS (Task 11)
+   Reuses .member-summary-cards, .profile-section,
+   .member-profile-grid, .dsr-badge from MemberProfilePage.css.
+   ===================================================== */
+
+.mywork-analytics {
+  margin-top: 16px;
+}
+
+.mywork-analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.mywork-analytics-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.mywork-performance-cards {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* =====================================================
    MINI WORKLOG CALENDAR (Task 10)
    ===================================================== */
 
