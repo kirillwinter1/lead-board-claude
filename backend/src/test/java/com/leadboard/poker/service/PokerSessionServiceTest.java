@@ -225,6 +225,40 @@ class PokerSessionServiceTest {
             assertThrows(IllegalArgumentException.class, () ->
                     pokerSessionService.castVote(1L, "voter", "John", "SA", 4));
         }
+
+        @Test
+        @DisplayName("should accept -1 as the '?' card")
+        void shouldAcceptUnsureVote() {
+            PokerStoryEntity story = createStory(1L, null, "Story", 0);
+            story.setStatus(StoryStatus.VOTING);
+
+            when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
+            when(voteRepository.findByStoryIdAndVoterAccountIdAndVoterRole(1L, "voter-123", "DEV"))
+                    .thenReturn(Optional.empty());
+            when(voteRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            PokerVoteEntity vote = pokerSessionService.castVote(1L, "voter-123", "John", "DEV", -1);
+
+            assertEquals(-1, vote.getVoteHours());
+        }
+
+        @Test
+        @DisplayName("should reject out-of-range and null votes (BUG-187)")
+        void shouldRejectInvalidVoteHours() {
+            PokerStoryEntity story = createStory(1L, null, "Story", 0);
+            story.setStatus(StoryStatus.VOTING);
+
+            when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
+
+            assertThrows(IllegalArgumentException.class, () ->
+                    pokerSessionService.castVote(1L, "voter", "John", "DEV", null));
+            assertThrows(IllegalArgumentException.class, () ->
+                    pokerSessionService.castVote(1L, "voter", "John", "DEV", 0));
+            assertThrows(IllegalArgumentException.class, () ->
+                    pokerSessionService.castVote(1L, "voter", "John", "DEV", -5));
+            assertThrows(IllegalArgumentException.class, () ->
+                    pokerSessionService.castVote(1L, "voter", "John", "DEV", 999));
+        }
     }
 
     // ==================== revealVotes() Tests ====================
@@ -281,6 +315,32 @@ class PokerSessionServiceTest {
             assertEquals(16, completed.getFinalEstimate("DEV"));
             assertEquals(8, completed.getFinalEstimate("QA"));
             assertEquals(StoryStatus.COMPLETED, completed.getStatus());
+        }
+
+        @Test
+        @DisplayName("should reject final estimate unless votes are revealed (BUG-176)")
+        void shouldRejectFinalEstimateBeforeReveal() {
+            PokerStoryEntity story = createStory(1L, null, "Story", 0);
+            story.setStatus(StoryStatus.PENDING);
+
+            when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
+
+            assertThrows(IllegalStateException.class, () ->
+                    pokerSessionService.setFinalEstimate(1L, Map.of("DEV", 8)));
+        }
+
+        @Test
+        @DisplayName("should reject negative or absurd final estimates (BUG-187)")
+        void shouldRejectInvalidFinalEstimates() {
+            PokerStoryEntity story = createStory(1L, null, "Story", 0);
+            story.setStatus(StoryStatus.REVEALED);
+
+            when(storyRepository.findById(1L)).thenReturn(Optional.of(story));
+
+            assertThrows(IllegalArgumentException.class, () ->
+                    pokerSessionService.setFinalEstimate(1L, Map.of("DEV", -1)));
+            assertThrows(IllegalArgumentException.class, () ->
+                    pokerSessionService.setFinalEstimate(1L, Map.of("DEV", 9999)));
         }
     }
 

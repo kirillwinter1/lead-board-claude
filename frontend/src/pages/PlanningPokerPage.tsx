@@ -159,6 +159,7 @@ export function PlanningPokerPage() {
           <label className="filter-label">Команда</label>
           <select
             className="filter-input"
+            style={{ minWidth: 240 }}
             value={selectedTeamId ?? ''}
             onChange={e => setSelectedTeamId(Number(e.target.value))}
           >
@@ -247,7 +248,7 @@ export function PlanningPokerPage() {
             <div className="loading-small">Загрузка эпиков...</div>
           ) : eligibleEpics.length === 0 ? (
             <div className="empty-hint">
-              Нет доступных эпиков в статусах: Планирование, Грязная оценка, В работе
+              У команды нет незавершённых эпиков для оценки
             </div>
           ) : (
             <select

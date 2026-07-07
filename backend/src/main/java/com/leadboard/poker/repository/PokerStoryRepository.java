@@ -18,6 +18,9 @@ public interface PokerStoryRepository extends JpaRepository<PokerStoryEntity, Lo
     @Query("SELECT s FROM PokerStoryEntity s LEFT JOIN FETCH s.votes WHERE s.id = :id")
     Optional<PokerStoryEntity> findByIdWithVotes(@Param("id") Long id);
 
+    @Query("SELECT s FROM PokerStoryEntity s JOIN FETCH s.session WHERE s.id = :id")
+    Optional<PokerStoryEntity> findByIdWithSession(@Param("id") Long id);
+
     @Query("SELECT s FROM PokerStoryEntity s LEFT JOIN FETCH s.votes WHERE s.session.id = :sessionId ORDER BY s.orderIndex ASC")
     List<PokerStoryEntity> findBySessionIdWithVotes(@Param("sessionId") Long sessionId);
 

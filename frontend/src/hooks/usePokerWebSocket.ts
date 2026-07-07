@@ -40,6 +40,7 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptsRef = useRef(0)
   const intentionalCloseRef = useRef(false)
 
   const connect = useCallback(() => {
@@ -57,6 +58,7 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
     ws.onopen = () => {
       setConnected(true)
       setError(null)
+      reconnectAttemptsRef.current = 0
 
       // Send JOIN message
       ws.send(JSON.stringify({
@@ -71,10 +73,12 @@ export function usePokerWebSocket(options: UsePokerWebSocketOptions) {
     ws.onclose = () => {
       setConnected(false)
       if (intentionalCloseRef.current) return
-      // Try to reconnect after 3 seconds
+      // Reconnect with exponential backoff: 3s, 6s, 12s, ... capped at 30s
+      const delay = Math.min(3000 * 2 ** reconnectAttemptsRef.current, 30000)
+      reconnectAttemptsRef.current += 1
       reconnectTimeoutRef.current = setTimeout(() => {
         connect()
-      }, 3000)
+      }, delay)
     }
 
     ws.onerror = () => {

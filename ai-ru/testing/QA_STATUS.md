@@ -2,7 +2,7 @@
 
 Мастер-документ: что протестировано QA-агентом, что ждёт проверки.
 
-**Последнее обновление:** 2026-07-02
+**Последнее обновление:** 2026-07-07
 
 ---
 
@@ -15,7 +15,7 @@
 | 3 | **Team Metrics** | F22, F24, F32 | ✅ Проверен | 9 багов (1 Critical, 3 High, 4 Medium, 1 Low) | [reports/2026-02-17_TEAM_METRICS.md](reports/2026-02-17_TEAM_METRICS.md) |
 | 4 | **Timeline** | F14, F20, F21, F45 | ✅ Проверен | 0 багов (11 fixed) | [reports/2026-02-25_TIMELINE.md](reports/2026-02-25_TIMELINE.md) |
 | 5 | **Data Quality** | F18, F36, F42, **F83** | ✅ Проверен (F83, 2026-07-02) | 0 багов (F83: категории + новые правила) | (inline QA — API+UI, скриншоты ai-ru/testing/screenshots/f83_dq_*.png) |
-| 6 | **Planning Poker** | F23 | ⏸️ Отложен | Известные баги с Jira | — |
+| 6 | **Planning Poker** | F23 | ✅ Проверен + Исправлен (2026-07-07) | 13/15 fixed (2 Low отложены: язык, бейджи лобби) | [reports/2026-07-07_POKER.md](reports/2026-07-07_POKER.md) |
 | 7 | **Workflow Config** | F17, F29, F38, F48 | ✅ Проверен | 2 Critical, 4 High, 10 Medium, 8 Low | [reports/2026-03-01_F48_PER_PROJECT_WORKFLOW.md](reports/2026-03-01_F48_PER_PROJECT_WORKFLOW.md) |
 | 8 | **Simulation** | F28 | ✅ Проверен | 2 Critical, 4 High, 7 Medium, 5 Low | [reports/2026-02-25_SIMULATION.md](reports/2026-02-25_SIMULATION.md) |
 | 9 | **Projects** | F35 | ✅ Проверен | 1 High (test regression), 1 Low | [reports/2026-02-17_F35_F36_F37.md](reports/2026-02-17_F35_F36_F37.md) |
@@ -57,11 +57,11 @@
 
 | Severity | Открыто | Исправлено | Всего |
 |----------|---------|------------|-------|
-| Critical | 2 | 9 | 11 |
-| High | 23 | 23 | 46 |
-| Medium | 44 | 36 | 80 |
-| Low | 35 | 18 | 53 |
-| **Итого** | **104** | **86** | **190** |
+| Critical | 2 | 10 | 12 |
+| High | 23 | 26 | 49 |
+| Medium | 44 | 42 | 86 |
+| Low | 37 | 21 | 58 |
+| **Итого** | **106** | **99** | **205** |
 
 ---
 

@@ -126,7 +126,8 @@ export async function addStory(
   return response.data
 }
 
-// Note: deleteStory, getStories, revealVotes, setFinalEstimate, moveToNextStory are done via WebSocket
+// Note: revealVotes, setFinalEstimate, moveToNextStory are done via WebSocket.
+// Story deletion is not exposed in the UI yet (REST DELETE /api/poker/stories/{id} exists, facilitator-only).
 
 export async function getVotes(storyId: number): Promise<PokerVote[]> {
   const response = await axios.get(`/api/poker/stories/${storyId}/votes`)

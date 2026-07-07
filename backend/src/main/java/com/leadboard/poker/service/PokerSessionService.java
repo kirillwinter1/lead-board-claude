@@ -26,6 +26,8 @@ public class PokerSessionService {
 
     private static final String ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int ROOM_CODE_LENGTH = 6;
+    private static final int MAX_VOTE_HOURS = 160;
+    private static final int UNSURE_VOTE = -1;
     private static final SecureRandom random = new SecureRandom();
 
     private final PokerSessionRepository sessionRepository;
@@ -123,6 +125,10 @@ public class PokerSessionService {
         PokerSessionEntity session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
+        if (session.getStatus() == SessionStatus.COMPLETED) {
+            throw new IllegalStateException("Cannot add stories to a completed session");
+        }
+
         Integer maxOrder = storyRepository.findMaxOrderIndexBySessionId(sessionId).orElse(-1);
 
         PokerStoryEntity story = new PokerStoryEntity();
@@ -150,6 +156,12 @@ public class PokerSessionService {
     }
 
     @Transactional(readOnly = true)
+    public PokerStoryEntity getStoryWithSession(Long storyId) {
+        return storyRepository.findByIdWithSession(storyId)
+                .orElseThrow(() -> new IllegalArgumentException("Story not found"));
+    }
+
+    @Transactional(readOnly = true)
     public List<PokerStoryEntity> getStoriesWithVotes(Long sessionId) {
         return storyRepository.findBySessionIdWithVotes(sessionId);
     }
@@ -168,6 +180,11 @@ public class PokerSessionService {
         // Check if role is needed for this story
         if (!story.needsRole(role)) {
             throw new IllegalArgumentException("This role is not needed for this story");
+        }
+
+        // -1 is the "?" card; otherwise a sane hour range (BUG-187)
+        if (hours == null || (hours != UNSURE_VOTE && (hours < 1 || hours > MAX_VOTE_HOURS))) {
+            throw new IllegalArgumentException("Vote must be between 1 and " + MAX_VOTE_HOURS + " hours (or -1 for '?')");
         }
 
         // Find or create vote
@@ -204,6 +221,20 @@ public class PokerSessionService {
     public PokerStoryEntity setFinalEstimate(Long storyId, Map<String, Integer> finalEstimates) {
         PokerStoryEntity story = storyRepository.findById(storyId)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
+
+        if (story.getStatus() != StoryStatus.REVEALED) {
+            throw new IllegalStateException("Final estimate can only be set after votes are revealed");
+        }
+
+        if (finalEstimates != null) {
+            for (Map.Entry<String, Integer> entry : finalEstimates.entrySet()) {
+                Integer hours = entry.getValue();
+                if (hours != null && (hours < 0 || hours > MAX_VOTE_HOURS)) {
+                    throw new IllegalArgumentException(
+                            "Final estimate for " + entry.getKey() + " must be between 0 and " + MAX_VOTE_HOURS + " hours");
+                }
+            }
+        }
 
         story.setFinalEstimates(finalEstimates);
         story.setStatus(StoryStatus.COMPLETED);
@@ -243,6 +274,11 @@ public class PokerSessionService {
         if (participants != null) {
             participants.remove(accountId);
         }
+    }
+
+    /** Frees in-memory participant state when the last connection leaves a room (BUG-183). */
+    public void clearRoom(String roomCode) {
+        roomParticipants.remove(roomCode);
     }
 
     public List<ParticipantInfo> getParticipants(String roomCode) {

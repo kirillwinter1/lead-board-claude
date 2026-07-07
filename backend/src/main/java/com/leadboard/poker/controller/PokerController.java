@@ -34,14 +34,6 @@ public class PokerController {
     private final PokerSessionRepository pokerSessionRepository;
     private final WorkflowConfigService workflowConfigService;
 
-    // Statuses of epics eligible for Planning Poker
-    private static final List<String> ELIGIBLE_STATUSES = List.of(
-            "планирование", "planning",
-            "грязная оценка", "rough estimation",
-            "в работе", "in progress",
-            "запланировано", "planned"
-    );
-
     public PokerController(
             PokerSessionService sessionService,
             PokerJiraService jiraService,
@@ -107,8 +99,10 @@ public class PokerController {
 
     @GetMapping("/eligible-epics/{teamId}")
     public ResponseEntity<List<EligibleEpicResponse>> getEligibleEpics(@PathVariable Long teamId) {
-        // Get epics in eligible statuses
-        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeamAndStatuses(teamId, ELIGIBLE_STATUSES);
+        // Eligible = any epic not yet done, per workflow config (no hardcoded status names)
+        List<JiraIssueEntity> epics = issueRepository.findEpicsByTeam(teamId).stream()
+                .filter(e -> !workflowConfigService.isDone(e.getStatus(), e.getIssueType()))
+                .toList();
 
         // Get epic keys that already have active poker sessions
         Set<String> epicsWithSessions = pokerSessionRepository
@@ -141,20 +135,35 @@ public class PokerController {
 
     // ===== Session Endpoints =====
 
+    private String currentAccountId() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth instanceof LeadBoardAuthentication lbAuth) {
+            return lbAuth.getAtlassianAccountId();
+        }
+        return "system";
+    }
+
+    /** Mutating session operations are facilitator-only (BUG-176). */
+    private void requireFacilitator(PokerSessionEntity session) {
+        if (!currentAccountId().equals(session.getFacilitatorAccountId())) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only the session facilitator can perform this action");
+        }
+    }
+
+    private PokerSessionEntity getSessionOrThrow(Long sessionId) {
+        return sessionService.getSession(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("Session not found"));
+    }
+
     @PostMapping("/sessions")
     public ResponseEntity<SessionResponse> createSession(
             @Valid @RequestBody CreateSessionRequest request) {
 
-        String facilitatorId = "system";
-        var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth instanceof LeadBoardAuthentication lbAuth) {
-            facilitatorId = lbAuth.getAtlassianAccountId();
-        }
-
         PokerSessionEntity session = sessionService.createSession(
                 request.teamId(),
                 request.epicKey(),
-                facilitatorId
+                currentAccountId()
         );
 
         return ResponseEntity.ok(SessionResponse.from(session));
@@ -186,12 +195,14 @@ public class PokerController {
 
     @PostMapping("/sessions/{id}/start")
     public ResponseEntity<SessionResponse> startSession(@PathVariable Long id) {
+        requireFacilitator(getSessionOrThrow(id));
         PokerSessionEntity session = sessionService.startSession(id);
         return ResponseEntity.ok(SessionResponse.from(session));
     }
 
     @PostMapping("/sessions/{id}/complete")
     public ResponseEntity<SessionResponse> completeSession(@PathVariable Long id) {
+        requireFacilitator(getSessionOrThrow(id));
         PokerSessionEntity session = sessionService.completeSession(id);
         return ResponseEntity.ok(SessionResponse.from(session));
     }
@@ -204,10 +215,11 @@ public class PokerController {
             @Valid @RequestBody AddStoryRequest request,
             @RequestParam(defaultValue = "false") boolean createInJira) {
 
+        PokerSessionEntity session = getSessionOrThrow(sessionId);
+        requireFacilitator(session);
+
         if (createInJira) {
             // Create in Jira FIRST -- Jira is the single source of truth
-            PokerSessionEntity session = sessionService.getSession(sessionId)
-                    .orElseThrow(() -> new IllegalArgumentException("Session not found"));
             String storyKey = jiraService.createStoryInJira(session.getEpicKey(), request.title(), request.needsRoles());
             // Only save to poker session after Jira succeeds
             AddStoryRequest enriched = new AddStoryRequest(request.title(), request.needsRoles(), storyKey);
@@ -222,6 +234,7 @@ public class PokerController {
 
     @DeleteMapping("/stories/{storyId}")
     public ResponseEntity<Void> deleteStory(@PathVariable Long storyId) {
+        requireFacilitator(sessionService.getStoryWithSession(storyId).getSession());
         sessionService.deleteStory(storyId);
         return ResponseEntity.noContent().build();
     }
@@ -238,6 +251,7 @@ public class PokerController {
 
     @PostMapping("/stories/{storyId}/reveal")
     public ResponseEntity<StoryResponse> revealVotes(@PathVariable Long storyId) {
+        requireFacilitator(sessionService.getStoryWithSession(storyId).getSession());
         PokerStoryEntity story = sessionService.revealVotes(storyId);
         return ResponseEntity.ok(StoryResponse.from(story));
     }
@@ -248,6 +262,7 @@ public class PokerController {
             @RequestBody SetFinalRequest request,
             @RequestParam(defaultValue = "true") boolean updateJira) {
 
+        requireFacilitator(sessionService.getStoryWithSession(storyId).getSession());
         PokerStoryEntity story = sessionService.setFinalEstimate(storyId, request.finalEstimates());
 
         if (updateJira && story.getStoryKey() != null) {
@@ -259,6 +274,7 @@ public class PokerController {
 
     @PostMapping("/sessions/{sessionId}/next")
     public ResponseEntity<StoryResponse> moveToNextStory(@PathVariable Long sessionId) {
+        requireFacilitator(getSessionOrThrow(sessionId));
         PokerStoryEntity nextStory = sessionService.moveToNextStory(sessionId);
         if (nextStory == null) {
             return ResponseEntity.noContent().build();

@@ -164,22 +164,22 @@ class PokerE2ETest extends IntegrationTestBase {
     void shouldLinkExistingJiraStories() {
         // ===== Setup =====
         var team = createTeam("E2E Poker Link Team");
-        var epic = createEpic("LINK-EPIC-1", "Epic with stories", "планирование", team.getId());
+        var epic = createEpic("LINKEPIC-1", "Epic with stories", "планирование", team.getId());
 
         // Create existing stories in Jira (database)
-        var existingStory = createStory("LINK-STORY-1", "Existing Story", "Новое", "LINK-EPIC-1", team.getId());
+        var existingStory = createStory("LINKSTORY-1", "Existing Story", "Новое", "LINKEPIC-1", team.getId());
 
         // Create poker session
         var sessionResponse = restTemplate.postForEntity(
                 "/api/poker/sessions",
-                new CreateSessionRequest(team.getId(), "LINK-EPIC-1"),
+                new CreateSessionRequest(team.getId(), "LINKEPIC-1"),
                 SessionResponse.class);
 
         Long sessionId = sessionResponse.getBody().id();
 
         // ===== Get epic stories from Jira =====
         var epicStoriesResponse = restTemplate.getForEntity(
-                "/api/poker/epic-stories/LINK-EPIC-1",
+                "/api/poker/epic-stories/LINKEPIC-1",
                 EpicStoryResponse[].class);
 
         assertEquals(HttpStatus.OK, epicStoriesResponse.getStatusCode());
@@ -189,7 +189,7 @@ class PokerE2ETest extends IntegrationTestBase {
         var linkedStory = new AddStoryRequest(
                 "Existing Story",
                 List.of("SA", "DEV", "QA"),
-                "LINK-STORY-1" // Link to existing Jira story
+                "LINKSTORY-1" // Link to existing Jira story
         );
 
         var addResponse = restTemplate.postForEntity(
@@ -198,6 +198,6 @@ class PokerE2ETest extends IntegrationTestBase {
                 StoryResponse.class);
 
         assertEquals(HttpStatus.OK, addResponse.getStatusCode());
-        assertEquals("LINK-STORY-1", addResponse.getBody().storyKey());
+        assertEquals("LINKSTORY-1", addResponse.getBody().storyKey());
     }
 }

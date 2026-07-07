@@ -147,12 +147,8 @@ public interface JiraIssueRepository extends JpaRepository<JiraIssueEntity, Long
 
     @Query("SELECT e FROM JiraIssueEntity e WHERE e.teamId = :teamId " +
            "AND e.boardCategory = 'EPIC' " +
-           "AND LOWER(e.status) IN :statuses " +
            "ORDER BY e.issueKey")
-    List<JiraIssueEntity> findEpicsByTeamAndStatuses(
-            @Param("teamId") Long teamId,
-            @Param("statuses") List<String> statuses
-    );
+    List<JiraIssueEntity> findEpicsByTeam(@Param("teamId") Long teamId);
 
     // ==================== Manual order queries (using board_category) ====================
 
