@@ -365,14 +365,16 @@ describe('PlanningPokerPage', () => {
   })
 
   describe('Empty state', () => {
-    it('should show empty message when no sessions', async () => {
+    it('should show empty state with CTA when no sessions', async () => {
       vi.mocked(pokerApi.getSessionsByTeam).mockResolvedValue([])
 
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Нет сессий Planning Poker.')).toBeInTheDocument()
+        expect(screen.getByText('Пока нет сессий')).toBeInTheDocument()
       })
+      // CTA buttons present inside the empty state (plus the header ones)
+      expect(screen.getAllByText('Новая сессия').length).toBeGreaterThanOrEqual(1)
     })
   })
 
