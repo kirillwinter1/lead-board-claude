@@ -60,4 +60,15 @@ public interface IssueWorklogRepository extends JpaRepository<IssueWorklogEntity
             @Param("fromDate") LocalDate fromDate,
             @Param("toDate") LocalDate toDate
     );
+
+    /**
+     * Daily worklogs for a single author, broken down per issue.
+     * Used by the "My Work" worklog calendar to show which issues were logged each day.
+     */
+    @Query(value = "SELECT w.started_date, w.issue_key, SUM(w.time_spent_seconds) " +
+            "FROM issue_worklogs w WHERE w.author_account_id = :accountId " +
+            "AND w.started_date BETWEEN :fromDate AND :toDate " +
+            "GROUP BY w.started_date, w.issue_key ORDER BY w.started_date, w.issue_key", nativeQuery = true)
+    List<Object[]> findDailyWorklogsByAuthorPerIssue(@Param("accountId") String accountId,
+            @Param("fromDate") LocalDate fromDate, @Param("toDate") LocalDate toDate);
 }

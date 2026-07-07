@@ -1,6 +1,8 @@
 package com.leadboard.team;
 
 import com.leadboard.calendar.WorkCalendarService;
+import com.leadboard.calendar.dto.HolidayDto;
+import com.leadboard.calendar.dto.WorkdaysResponseDto;
 import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.metrics.repository.IssueWorklogRepository;
@@ -9,6 +11,8 @@ import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.dto.AbsenceDto;
 import com.leadboard.team.dto.MyWorkResponse;
+import com.leadboard.team.dto.MyWorkResponse.CalendarDay;
+import com.leadboard.team.dto.MyWorkResponse.DayIssue;
 import com.leadboard.team.dto.MyWorkResponse.MyMemberInfo;
 import com.leadboard.team.dto.MyWorkResponse.MyTask;
 import com.leadboard.team.dto.MyWorkResponse.QueueStory;
@@ -16,20 +20,24 @@ import com.leadboard.team.dto.MyWorkResponse.TeamRef;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Personal work desk — F88 "My Work". Aggregates active/upcoming tasks, team queue,
  * worklog calendar and analytics across every active membership of a Jira account.
  *
- * teamQueue / worklogCalendar / analytics are filled in by follow-up tasks (3-5);
- * this skeleton returns empty placeholders for them.
+ * analytics is filled in by the follow-up Task 5; until then it returns null.
  */
 @Service
 public class MyWorkService {
@@ -118,8 +126,76 @@ public class MyWorkService {
 
         List<QueueStory> teamQueue = buildTeamQueue(taskMembers, issueCache);
 
+        List<CalendarDay> worklogCalendar = buildWorklogCalendar(accountId, members, primary.getHoursPerDay(), today);
+
         return new MyWorkResponse(true, memberInfo, upcomingAbsences, activeTasks, upcomingAssigned,
-                teamQueue, List.of(), null);
+                teamQueue, worklogCalendar, null);
+    }
+
+    /**
+     * Full 4-week worklog calendar (Mon-Sun x 4, ending with the current ISO week), independent of
+     * the from/to request range. Shows logged hours per day (broken down by issue), the calendar
+     * day type (WORKDAY/WEEKEND/HOLIDAY) and any absence covering that day across all memberships.
+     */
+    private List<CalendarDay> buildWorklogCalendar(String accountId, List<TeamMemberEntity> allMembers,
+                                                     BigDecimal hoursPerDay, LocalDate today) {
+        LocalDate calFrom = today.with(DayOfWeek.MONDAY).minusWeeks(3);
+        LocalDate calTo = today.with(DayOfWeek.SUNDAY);
+
+        WorkdaysResponseDto calendarInfo = workCalendarService.getWorkdaysInfo(calFrom, calTo);
+        Set<LocalDate> holidayDates = calendarInfo.holidayList().stream()
+                .map(HolidayDto::date)
+                .collect(Collectors.toSet());
+        Set<LocalDate> workdayDates = new HashSet<>(calendarInfo.workdayDates());
+
+        Map<LocalDate, List<DayIssue>> byIssuePerDay = new HashMap<>();
+        Map<LocalDate, BigDecimal> loggedPerDay = new HashMap<>();
+        List<Object[]> rawWorklogs = worklogRepository.findDailyWorklogsByAuthorPerIssue(accountId, calFrom, calTo);
+        for (Object[] row : rawWorklogs) {
+            LocalDate date = ((java.sql.Date) row[0]).toLocalDate();
+            String issueKey = (String) row[1];
+            long totalSeconds = ((Number) row[2]).longValue();
+            BigDecimal hours = analytics.secondsToHours(totalSeconds);
+
+            byIssuePerDay.computeIfAbsent(date, k -> new ArrayList<>()).add(new DayIssue(issueKey, hours));
+            loggedPerDay.merge(date, hours, BigDecimal::add);
+        }
+
+        Map<LocalDate, String> absenceByDate = new HashMap<>();
+        for (TeamMemberEntity member : allMembers) {
+            List<MemberAbsenceEntity> absences = absenceRepository.findByMemberIdAndDateRange(member.getId(), calFrom, calTo);
+            for (MemberAbsenceEntity absence : absences) {
+                LocalDate d = absence.getStartDate().isBefore(calFrom) ? calFrom : absence.getStartDate();
+                LocalDate end = absence.getEndDate().isAfter(calTo) ? calTo : absence.getEndDate();
+                while (!d.isAfter(end)) {
+                    absenceByDate.put(d, absence.getAbsenceType().name());
+                    d = d.plusDays(1);
+                }
+            }
+        }
+
+        List<CalendarDay> days = new ArrayList<>();
+        LocalDate current = calFrom;
+        while (!current.isAfter(calTo)) {
+            String dayType;
+            if (holidayDates.contains(current)) {
+                dayType = "HOLIDAY";
+            } else if (workdayDates.contains(current)) {
+                dayType = "WORKDAY";
+            } else {
+                dayType = "WEEKEND";
+            }
+
+            String absenceType = absenceByDate.get(current);
+            BigDecimal normH = "WORKDAY".equals(dayType) && absenceType == null ? hoursPerDay : BigDecimal.ZERO;
+            BigDecimal loggedH = loggedPerDay.getOrDefault(current, BigDecimal.ZERO);
+            List<DayIssue> byIssue = byIssuePerDay.getOrDefault(current, List.of());
+
+            days.add(new CalendarDay(current, dayType, loggedH, normH, absenceType, byIssue));
+            current = current.plusDays(1);
+        }
+
+        return days;
     }
 
     /**
