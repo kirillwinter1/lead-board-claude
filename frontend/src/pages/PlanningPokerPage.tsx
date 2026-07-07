@@ -19,6 +19,24 @@ import {
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { BG_SUBTLE, INFO_BG, SUCCESS_BG } from '../constants/colors'
 
+// Two overlapping poker cards — line-art empty-state icon (no emoji)
+function PlanningIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3.5" y="5" width="10" height="14" rx="1.6" transform="rotate(-8 8.5 12)" />
+      <rect x="10.5" y="5" width="10" height="14" rx="1.6" transform="rotate(8 15.5 12)" />
+    </svg>
+  )
+}
+
+function pluralSessions(n: number): string {
+  const mod10 = n % 10, mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'сессия'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'сессии'
+  return 'сессий'
+}
+
 export function PlanningPokerPage() {
   const navigate = useNavigate()
   const { getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
@@ -175,25 +193,32 @@ export function PlanningPokerPage() {
 
       {error && <div className="error">{error}</div>}
 
-      <div className="metrics-controls">
-        <div className="filter-group">
-          <label className="filter-label">Команда</label>
-          <select
-            className="filter-input"
-            style={{ minWidth: 240 }}
-            value={selectedTeamId ?? ''}
-            onChange={e => {
-              setSelectedTeamId(Number(e.target.value))
-              handleClosePicker()
-            }}
-          >
-            <option value="" disabled>Выберите команду...</option>
-            {teams.map(team => (
-              <option key={team.id} value={team.id}>{team.name}</option>
-            ))}
-          </select>
+      {!pickingEpic && (
+        <div className="poker-toolbar">
+          <div className="poker-toolbar-team">
+            <label className="filter-label">Команда</label>
+            <select
+              className="filter-input"
+              style={{ minWidth: 220 }}
+              value={selectedTeamId ?? ''}
+              onChange={e => {
+                setSelectedTeamId(Number(e.target.value))
+                handleClosePicker()
+              }}
+            >
+              <option value="" disabled>Выберите команду...</option>
+              {teams.map(team => (
+                <option key={team.id} value={team.id}>{team.name}</option>
+              ))}
+            </select>
+          </div>
+          {sessions.length > 0 && (
+            <span className="poker-toolbar-count">
+              {sessions.length} {pluralSessions(sessions.length)}
+            </span>
+          )}
         </div>
-      </div>
+      )}
 
       {pickingEpic ? (
         <EpicPicker
@@ -206,16 +231,23 @@ export function PlanningPokerPage() {
           creatingEpicKey={creatingEpicKey}
           epicIcon={epicIcon}
         />
+      ) : sessions.length === 0 ? (
+        <div className="poker-empty">
+          <div className="poker-empty-icon"><PlanningIcon /></div>
+          <h3>Пока нет сессий</h3>
+          <p>Создайте сессию Planning Poker, чтобы команда совместно оценила задачи эпика.</p>
+          <div className="poker-empty-actions">
+            <button className="btn btn-secondary" onClick={() => setShowJoinModal(true)}>
+              Войти по коду
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenEpicPicker} disabled={!selectedTeamId}>
+              Новая сессия
+            </button>
+          </div>
+        </div>
       ) : (
       /* Sessions List */
-      <div className="poker-sessions-list">
-        {sessions.length === 0 ? (
-          <div className="chart-empty">
-            Нет сессий Planning Poker.
-            <br />
-            <small>Создайте новую сессию для оценки эпика.</small>
-          </div>
-        ) : (
+      <div className="poker-sessions-card">
           <table className="metrics-table">
             <thead>
               <tr>
@@ -266,7 +298,6 @@ export function PlanningPokerPage() {
               ))}
             </tbody>
           </table>
-        )}
       </div>
       )}
 

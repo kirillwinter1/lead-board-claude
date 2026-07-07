@@ -913,3 +913,112 @@
   font-size: 12px;
   color: #6b778c;
 }
+
+/* ===== Lobby: toolbar ===== */
+.poker-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.poker-toolbar-team {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.poker-toolbar-count {
+  font-size: 13px;
+  color: #6b778c;
+  padding-bottom: 8px;
+  white-space: nowrap;
+}
+
+/* ===== Lobby: sessions card ===== */
+.poker-sessions-card {
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.poker-sessions-card .metrics-table {
+  margin: 0;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.poker-sessions-card .metrics-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b778c;
+  background: #fafbfc;
+  border-bottom: 1px solid #ebecf0;
+  white-space: nowrap;
+}
+
+.poker-sessions-card .metrics-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebecf0;
+  color: #172b4d;
+  vertical-align: middle;
+}
+
+.poker-sessions-card .metrics-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.poker-sessions-card .metrics-table tbody tr:hover {
+  background: #f4f5f7;
+}
+
+/* ===== Lobby: empty state ===== */
+.poker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 24px;
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+}
+
+.poker-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #deebff;
+  color: #0052cc;
+  margin-bottom: 20px;
+}
+
+.poker-empty h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.poker-empty p {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #6b778c;
+  max-width: 380px;
+}
+
+.poker-empty-actions {
+  display: flex;
+  gap: 10px;
+}
