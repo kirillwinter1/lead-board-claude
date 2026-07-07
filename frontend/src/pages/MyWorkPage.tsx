@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
-import { myWorkApi, type MyWorkResponse, type MyTask, type QueueStory } from '../api/myWork'
+import { myWorkApi, type MyWorkResponse, type MyTask, type QueueStory, type MyAnalytics, type MyCompletedTask, type DsrBreakdown } from '../api/myWork'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
@@ -7,7 +7,9 @@ import { TeamBadge } from '../components/TeamBadge'
 import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
-import { formatHours, formatDate } from '../components/member/dsrFormat'
+import { MetricCard } from '../components/metrics/MetricCard'
+import { TrendChart } from '../components/member/TrendChart'
+import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
 import { MyWorklogCalendar } from '../components/member/MyWorklogCalendar'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
@@ -151,6 +153,155 @@ function TaskSection({ title, count, children }: { title: string; count: number;
   )
 }
 
+// ======================== PERFORMANCE ANALYTICS (Task 11) ========================
+
+function DsrBreakdownTable({ title, rows }: { title: string; rows: DsrBreakdown[] }) {
+  return (
+    <div className="profile-section">
+      <div className="profile-section-header">
+        <h3>{title}</h3>
+        <span className="section-badge">{rows.length}</span>
+      </div>
+      {rows.length === 0 ? (
+        <div className="mywork-section-empty">No data for this period</div>
+      ) : (
+        <table className="profile-tasks-table">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th style={{ textAlign: 'right' }}>Tasks</th>
+              <th style={{ textAlign: 'right' }}>Est</th>
+              <th style={{ textAlign: 'right' }}>Spent</th>
+              <th style={{ textAlign: 'center' }}>DSR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.key}>
+                <td className="task-summary-cell">{r.label}</td>
+                <td style={{ textAlign: 'right' }}>{r.taskCount}</td>
+                <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(r.estimateH)}</td>
+                <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(r.spentH)}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <span className={`dsr-badge ${getDsrClass(r.dsr)}`}>{r.dsr?.toFixed(2) ?? '—'}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  )
+}
+
+function CompletedTasksTable({ tasks }: { tasks: MyCompletedTask[] }) {
+  if (tasks.length === 0) {
+    return <div className="mywork-section-empty">No completed tasks in this period</div>
+  }
+  return (
+    <table className="profile-tasks-table">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Summary</th>
+          <th>Epic</th>
+          <th>Team</th>
+          <th style={{ textAlign: 'right' }}>Est</th>
+          <th style={{ textAlign: 'right' }}>Spent</th>
+          <th style={{ textAlign: 'center' }}>DSR</th>
+          <th>Done</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tasks.map(t => (
+          <tr key={t.key}>
+            <td>
+              <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{t.key}</a>
+            </td>
+            <td className="task-summary-cell">{t.summary}</td>
+            <td className="task-summary-cell">{t.epicKey ? `${t.epicKey} ${t.epicSummary ?? ''}`.trim() : '—'}</td>
+            <td><TeamBadge name={t.teamName} color={t.teamColor} /></td>
+            <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(t.estimateH)}</td>
+            <td style={{ textAlign: 'right' }}>
+              <span className={`task-hours ${overHoursClass(t.estimateH, t.spentH)}`}>{formatHours(t.spentH)}</span>
+            </td>
+            <td style={{ textAlign: 'center' }}>
+              <span className={`dsr-badge ${getDsrClass(t.dsr)}`}>{t.dsr?.toFixed(2) ?? '—'}</span>
+            </td>
+            <td>{formatDate(t.doneDate)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+interface MyPerformanceSectionProps {
+  analytics: MyAnalytics
+  from: string
+  to: string
+  onFromChange: (value: string) => void
+  onToChange: (value: string) => void
+}
+
+function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange }: MyPerformanceSectionProps) {
+  const s = analytics.summary
+  return (
+    <div className="mywork-analytics">
+      <div className="mywork-analytics-header">
+        <h3>My Performance</h3>
+        <div className="member-profile-period">
+          <input type="date" aria-label="From" value={from} onChange={e => onFromChange(e.target.value)} />
+          <span>—</span>
+          <input type="date" aria-label="To" value={to} onChange={e => onToChange(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="member-summary-cards mywork-performance-cards">
+        <MetricCard title="Closed tasks" value={s.completedCount} />
+        <MetricCard
+          title="Avg DSR"
+          value={s.avgDsr ?? '—'}
+          tooltip="Time spent / original estimate"
+        />
+        <MetricCard
+          title="Cycle Time"
+          value={s.avgCycleTimeDays != null ? `${s.avgCycleTimeDays} d` : '—'}
+        />
+        <MetricCard
+          title="Hours"
+          value={`${s.totalSpentH} / ${s.totalEstimateH}`}
+          subtitle="spent / estimate"
+        />
+      </div>
+
+      <div className="profile-section full-width" style={{ marginBottom: 16 }}>
+        <div className="profile-section-header">
+          <h3>Weekly Trend</h3>
+        </div>
+        {analytics.weeklyTrend.length > 0 ? (
+          <TrendChart data={analytics.weeklyTrend} />
+        ) : (
+          <div className="mywork-section-empty">No trend data for this period</div>
+        )}
+      </div>
+
+      <div className="profile-section full-width" style={{ marginBottom: 16 }}>
+        <div className="profile-section-header">
+          <h3>Completed</h3>
+          <span className="section-badge">{analytics.completedTasks.length}</span>
+        </div>
+        <CompletedTasksTable tasks={analytics.completedTasks} />
+      </div>
+
+      <div className="member-profile-grid">
+        <DsrBreakdownTable title="DSR by Task Type" rows={analytics.dsrByParentType} />
+        <DsrBreakdownTable title="DSR by Epic" rows={analytics.dsrByEpic} />
+      </div>
+    </div>
+  )
+}
+
 // ======================== MAIN PAGE ========================
 
 export function MyWorkPage() {
@@ -159,8 +310,8 @@ export function MyWorkPage() {
   const [data, setData] = useState<MyWorkResponse | null>(null)
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
   const [teamFilter, setTeamFilter] = useState<number | undefined>(undefined)
-  const [from] = useState(defaultFrom)
-  const [to] = useState(defaultTo)
+  const [from, setFrom] = useState(defaultFrom)
+  const [to, setTo] = useState(defaultTo)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -308,8 +459,15 @@ export function MyWorkPage() {
           <MyWorklogCalendar days={worklogCalendar} />
         </div>
 
-        {/* Analytics section — Task 11 */}
-        <div id="mywork-analytics" />
+        {data.analytics && (
+          <MyPerformanceSection
+            analytics={data.analytics}
+            from={from}
+            to={to}
+            onFromChange={setFrom}
+            onToChange={setTo}
+          />
+        )}
       </>
     )
   }

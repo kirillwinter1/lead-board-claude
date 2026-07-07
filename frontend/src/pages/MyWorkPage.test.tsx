@@ -146,6 +146,101 @@ describe('MyWorkPage', () => {
     })
   })
 
+  it('renders performance cards and breakdowns', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [],
+      upcomingAssigned: [],
+      teamQueue: [],
+      worklogCalendar: [],
+      analytics: {
+        summary: {
+          completedCount: 5,
+          avgDsr: 0.87,
+          avgCycleTimeDays: 3,
+          utilization: 80,
+          totalSpentH: 40,
+          totalEstimateH: 44,
+        },
+        weeklyTrend: [
+          { week: 'W1', weekStart: '2026-06-01', dsr: 0.9, tasksCompleted: 2, hoursLogged: 16 },
+          { week: 'W2', weekStart: '2026-06-08', dsr: 0.95, tasksCompleted: 3, hoursLogged: 24 },
+        ],
+        completedTasks: [{
+          key: 'LB-10', summary: 'Completed task', epicKey: 'LB-200', epicSummary: 'Epic X',
+          teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+          estimateH: 8, spentH: 7, dsr: 0.88, doneDate: '2026-06-10', jiraUrl: 'https://jira.example.com/LB-10',
+        }],
+        dsrByParentType: [
+          { key: 'Story', label: 'Story', taskCount: 4, estimateH: 32, spentH: 30, dsr: 0.94 },
+        ],
+        dsrByEpic: [
+          { key: 'LB-200', label: 'Epic X', taskCount: 3, estimateH: 24, spentH: 22, dsr: 0.92 },
+        ],
+      },
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('My Performance')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('Closed tasks')).toBeInTheDocument()
+    expect(screen.getByText('0.87')).toBeInTheDocument()
+    expect(screen.getByText('DSR by Task Type')).toBeInTheDocument()
+    expect(screen.getByText('DSR by Epic')).toBeInTheDocument()
+    expect(screen.getByText('Epic X')).toBeInTheDocument()
+
+    expect(screen.getByText('LB-10').closest('a')).toHaveAttribute('href', 'https://jira.example.com/LB-10')
+  })
+
+  it('period change refetches analytics', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [],
+      upcomingAssigned: [],
+      teamQueue: [],
+      worklogCalendar: [],
+      analytics: {
+        summary: {
+          completedCount: 1,
+          avgDsr: 1.0,
+          avgCycleTimeDays: 2,
+          utilization: 50,
+          totalSpentH: 8,
+          totalEstimateH: 8,
+        },
+        weeklyTrend: [
+          { week: 'W1', weekStart: '2026-06-01', dsr: 1.0, tasksCompleted: 1, hoursLogged: 8 },
+          { week: 'W2', weekStart: '2026-06-08', dsr: null, tasksCompleted: 0, hoursLogged: 0 },
+        ],
+        completedTasks: [],
+        dsrByParentType: [],
+        dsrByEpic: [],
+      },
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('From')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-01-01' } })
+
+    await waitFor(() => {
+      const lastCall = vi.mocked(myWorkApi.getMyWork).mock.calls.at(-1)
+      expect(lastCall?.[0]).toBe('2026-01-01')
+    })
+  })
+
   it('HomeRedirect sends MEMBER to /my-work', async () => {
     vi.mocked(useAuth).mockReturnValue({
       loading: false,
