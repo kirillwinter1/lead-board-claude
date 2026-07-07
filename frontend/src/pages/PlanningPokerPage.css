@@ -189,8 +189,9 @@
 }
 
 .poker-stories-empty-icon {
-  font-size: 32px;
   margin-bottom: 8px;
+  color: #b3bac5;
+  line-height: 0;
 }
 
 .poker-stories-empty p {
@@ -286,8 +287,16 @@
 
 .poker-preparing-icon,
 .poker-completed-icon {
-  font-size: 48px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  line-height: 0;
+}
+
+.poker-preparing-icon {
+  color: #8993a4;
+}
+
+.poker-completed-icon {
+  color: #36b37e;
 }
 
 .poker-preparing h3,
@@ -639,6 +648,20 @@
 .participant-name {
   font-size: 13px;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.participant-facilitator-tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b778c;
+  background: #ebecf0;
+  padding: 1px 6px;
+  border-radius: 3px;
 }
 
 .participant-role {
@@ -670,11 +693,6 @@
 }
 
 /* Planning Poker Create Modal */
-.modal-header-icon {
-  font-size: 48px;
-  margin-bottom: 8px;
-}
-
 .modal-description {
   color: #6b778c;
   margin: 0 0 24px 0;
@@ -787,3 +805,111 @@
 }
 
 /* Role-specific subtask badge colors are now applied via inline styles */
+
+/* Inline Epic Picker (create session) */
+.epic-picker {
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.epic-picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-bottom: 1px solid #ebecf0;
+}
+
+.epic-picker-header h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #172b4d;
+}
+
+.epic-picker-subtitle {
+  font-size: 13px;
+  color: #6b778c;
+}
+
+.epic-picker-search {
+  padding: 16px 24px 4px;
+}
+
+.epic-picker-list {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px 12px;
+}
+
+.epic-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.epic-picker-row:hover:not(:disabled) {
+  background: #f4f5f7;
+}
+
+.epic-picker-row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.epic-picker-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.epic-picker-key {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0052cc;
+  flex-shrink: 0;
+}
+
+.epic-picker-summary {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: #172b4d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.epic-picker-meta {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.epic-picker-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b778c;
+  background: #f4f5f7;
+  border: 1px solid #dfe1e6;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.epic-picker-creating {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #6b778c;
+}

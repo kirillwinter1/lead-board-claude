@@ -115,7 +115,7 @@ describe('PlanningPokerPage', () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('+ Новая сессия')).toBeInTheDocument()
+        expect(screen.getByText('Новая сессия')).toBeInTheDocument()
       })
     })
 
@@ -188,79 +188,85 @@ describe('PlanningPokerPage', () => {
     })
   })
 
-  describe('Create session modal', () => {
-    it('should open modal on "Новая сессия" click', async () => {
-      renderPlanningPokerPage()
-
+  describe('Create session (epic picker)', () => {
+    const openPicker = async () => {
       await waitFor(() => {
-        expect(screen.getByText('+ Новая сессия')).toBeInTheDocument()
+        expect(screen.getByText('Новая сессия')).toBeInTheDocument()
       })
+      fireEvent.click(screen.getByText('Новая сессия'))
+    }
 
-      fireEvent.click(screen.getByText('+ Новая сессия'))
+    it('should show inline epic picker on "Новая сессия" click', async () => {
+      renderPlanningPokerPage()
+      await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('Создать сессию Planning Poker')).toBeInTheDocument()
+        expect(screen.getByText('Выберите эпик для оценки')).toBeInTheDocument()
       })
     })
 
-    it('should load eligible epics when modal opens', async () => {
+    it('should load eligible epics when picker opens', async () => {
       renderPlanningPokerPage()
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByText('+ Новая сессия'))
-      })
+      await openPicker()
 
       await waitFor(() => {
         expect(pokerApi.getEligibleEpics).toHaveBeenCalledWith(1)
       })
     })
 
-    it('should show epic options in dropdown', async () => {
+    it('should show epic rows in the list', async () => {
       renderPlanningPokerPage()
+      await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('+ Новая сессия')).toBeInTheDocument()
-      })
-
-      fireEvent.click(screen.getByText('+ Новая сессия'))
-
-      await waitFor(() => {
-        expect(screen.getByText(/EPIC-3/)).toBeInTheDocument()
+        expect(screen.getByText('EPIC-3')).toBeInTheDocument()
+        expect(screen.getByText('New Epic for Poker')).toBeInTheDocument()
       })
     })
 
-    it('should disable epics that already have sessions', async () => {
+    it('should mark epics that already have sessions', async () => {
       renderPlanningPokerPage()
+      await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('+ Новая сессия')).toBeInTheDocument()
+        expect(screen.getByText('Есть сессия')).toBeInTheDocument()
       })
 
-      fireEvent.click(screen.getByText('+ Новая сессия'))
+      // EPIC-4 row is disabled (has a session)
+      const busyRow = screen.getByText('EPIC-4').closest('button')!
+      expect(busyRow).toBeDisabled()
+    })
+
+    it('should filter epics by search query', async () => {
+      renderPlanningPokerPage()
+      await openPicker()
 
       await waitFor(() => {
-        // Check that EPIC-4 (which has a session) is in disabled optgroup
-        const select = screen.getAllByRole('combobox').pop()!
-        const disabledOption = select.querySelector('option[disabled]')
-        expect(disabledOption).toBeInTheDocument()
+        expect(screen.getByText('EPIC-3')).toBeInTheDocument()
+      })
+
+      fireEvent.change(screen.getByPlaceholderText(/Поиск/), { target: { value: 'Another' } })
+
+      await waitFor(() => {
+        expect(screen.queryByText('New Epic for Poker')).not.toBeInTheDocument()
+        expect(screen.getByText('Another Epic')).toBeInTheDocument()
       })
     })
 
-    it('should close modal on "Отмена" click', async () => {
+    it('should return to sessions list on "Отмена" click', async () => {
       renderPlanningPokerPage()
+      await openPicker()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('+ Новая сессия'))
+        expect(screen.getByText('Выберите эпик для оценки')).toBeInTheDocument()
       })
 
-      await waitFor(() => {
-        fireEvent.click(screen.getByText('Отмена'))
-      })
+      fireEvent.click(screen.getByText('Отмена'))
 
-      expect(screen.queryByText('Создать сессию Planning Poker')).not.toBeInTheDocument()
+      expect(screen.queryByText('Выберите эпик для оценки')).not.toBeInTheDocument()
     })
 
-    it('should create session and navigate on submit', async () => {
+    it('should create session and navigate on epic row click', async () => {
       vi.mocked(pokerApi.createSession).mockResolvedValue({
         id: 3,
         roomCode: 'NEW123',
@@ -268,23 +274,13 @@ describe('PlanningPokerPage', () => {
       } as any)
 
       renderPlanningPokerPage()
+      await openPicker()
 
       await waitFor(() => {
-        expect(screen.getByText('+ Новая сессия')).toBeInTheDocument()
+        expect(screen.getByText('EPIC-3')).toBeInTheDocument()
       })
 
-      fireEvent.click(screen.getByText('+ Новая сессия'))
-
-      await waitFor(() => {
-        expect(screen.getByText('Создать сессию Planning Poker')).toBeInTheDocument()
-      })
-
-      // Find the epic select in modal (should be the last combobox)
-      const selects = screen.getAllByRole('combobox')
-      const epicSelect = selects[selects.length - 1]
-      fireEvent.change(epicSelect, { target: { value: 'EPIC-3' } })
-
-      fireEvent.click(screen.getByText('Создать →'))
+      fireEvent.click(screen.getByText('EPIC-3').closest('button')!)
 
       await waitFor(() => {
         expect(pokerApi.createSession).toHaveBeenCalledWith(1, 'EPIC-3')
