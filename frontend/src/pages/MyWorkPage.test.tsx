@@ -9,7 +9,12 @@ import { useAuth } from '../contexts/AuthContext'
 vi.mock('../api/myWork', () => ({ myWorkApi: { getMyWork: vi.fn() } }))
 vi.mock('../api/board', () => ({ getStatusStyles: vi.fn().mockResolvedValue({}) }))
 vi.mock('../contexts/WorkflowConfigContext', () => ({
-  useWorkflowConfig: () => ({ getIssueTypeIconUrl: () => null, getIssueTypeCategory: () => null }),
+  useWorkflowConfig: () => ({
+    getIssueTypeIconUrl: () => null,
+    getIssueTypeCategory: () => null,
+    getRoleColor: () => '#803FA5',
+    getRoleDisplayName: (code: string) => code,
+  }),
 }))
 vi.mock('../contexts/AuthContext', () => ({ useAuth: vi.fn() }))
 
@@ -64,6 +69,11 @@ describe('MyWorkPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/not a member of any team/i)).toBeInTheDocument()
     })
+
+    // Empty state renders nothing else — no task sections.
+    expect(screen.queryByRole('heading', { name: 'In Progress' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Up Next' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Team Queue' })).toBeNull()
   })
 
   it('renders task sections with team badges', async () => {

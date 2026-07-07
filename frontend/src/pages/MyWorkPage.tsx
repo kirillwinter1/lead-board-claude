@@ -125,7 +125,9 @@ function TeamQueueTable({ stories, getIssueTypeIconUrl, getIssueTypeCategory }: 
               <a href={s.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{s.key}</a>
             </td>
             <td className="task-summary-cell">{s.summary}</td>
-            <td className="task-summary-cell">{s.epicSummary}</td>
+            <td className="task-summary-cell">
+              {s.epicSummary ? <span className="task-epic-label">{s.epicSummary}</span> : '—'}
+            </td>
             <td><StatusBadge status={s.status} /></td>
             <td><TeamBadge name={s.teamName} color={s.teamColor} /></td>
             <td>{s.myPhaseSubtasks} subtasks &middot; {formatHours(s.myPhaseEstimateH)}</td>
@@ -151,7 +153,7 @@ function TaskSection({ title, count, children }: { title: string; count: number;
 // ======================== MAIN PAGE ========================
 
 export function MyWorkPage() {
-  const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
 
   const [data, setData] = useState<MyWorkResponse | null>(null)
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
@@ -209,7 +211,12 @@ export function MyWorkPage() {
           <div className="member-info">
             <h2>{member.displayName}</h2>
             <div className="member-info-badges">
-              <span className={`role-badge ${member.role.toLowerCase()}`}>{member.role}</span>
+              <span
+                className="role-badge"
+                style={{ backgroundColor: getRoleColor(member.role) + '20', color: getRoleColor(member.role) }}
+              >
+                {getRoleDisplayName(member.role)}
+              </span>
               <span className={`grade-badge ${member.grade.toLowerCase()}`}>{member.grade}</span>
               {member.teams.map(t => (
                 <TeamBadge key={t.teamId} name={t.teamName} color={t.teamColor} />
