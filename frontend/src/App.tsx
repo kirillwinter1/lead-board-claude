@@ -57,6 +57,7 @@ function App() {
         <Route path="/register" element={<RegistrationPage />} />
         <Route path="/" element={<TenantAwareRoot />}>
           <Route index element={<HomeRedirect />} />
+          <Route path="board" element={<BoardPage />} />
           <Route path="my-work" element={<MyWorkPage />} />
           <Route path="timeline" element={<LegacyTimelineRedirect />} />
           <Route path="metrics" element={<TeamMetricsPage />} />
