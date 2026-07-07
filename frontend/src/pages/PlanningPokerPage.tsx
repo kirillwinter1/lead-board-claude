@@ -4,6 +4,7 @@ import { teamsApi, Team } from '../api/teams'
 import { getConfig } from '../api/config'
 import { Modal } from '../components/Modal'
 import { SearchInput } from '../components/SearchInput'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { getIssueIcon } from '../components/board/helpers'
@@ -197,20 +198,17 @@ export function PlanningPokerPage() {
         <div className="poker-toolbar">
           <div className="poker-toolbar-team">
             <label className="filter-label">Команда</label>
-            <select
-              className="filter-input"
-              style={{ minWidth: 220 }}
-              value={selectedTeamId ?? ''}
-              onChange={e => {
-                setSelectedTeamId(Number(e.target.value))
+            <SingleSelectDropdown
+              label="Команда"
+              placeholder="Выберите команду..."
+              allowClear={false}
+              options={teams.map(t => ({ value: String(t.id), label: t.name, color: t.color ?? undefined }))}
+              selected={selectedTeamId != null ? String(selectedTeamId) : null}
+              onChange={v => {
+                if (v != null) setSelectedTeamId(Number(v))
                 handleClosePicker()
               }}
-            >
-              <option value="" disabled>Выберите команду...</option>
-              {teams.map(team => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
+            />
           </div>
           {sessions.length > 0 && (
             <span className="poker-toolbar-count">
