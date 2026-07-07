@@ -53,6 +53,9 @@
 
 - [ ] N+1 при загрузке capacity по командам в `QuarterlyPlanningService` (`getEpicsForQuarter`, `getSummary`, `getTeamsOverview`, `buildQuarterSnapshot`) — `getTeamCapacity()` зовётся в цикле по командам, каждый вызов = `findByTeamIdAndActiveTrue` + `getTeamAbsenceDates`. Решение: батч-загрузка members/absences для всех активных команд за квартал одним запросом и переиспользование в цикле. Помечено TODO-комментарием в коде (F69 review).
 - [ ] Full epic-table scan в `QuarterlyPlanningService.getProjectCommitment` (F70) — каждое раскрытие проекта на ProjectsPage вызывает `loadAllEpics()` → `findByBoardCategory("EPIC")` (полный скан таблицы) для перебора детей одного проекта. На 1000+ эпиков это болезненно при частом UI-разворачивании. Решение: подменить на `issueRepository.findByParentKeyOrIssueKeyIn(projectKey, childKeySet)` — забирать только релевантные строки (parentKey == projectKey OR issueKey IN childEpicKeys из issue-link `is parent of`). Помечено TODO-комментарием в коде (F70 review, H3).
+- [ ] **Poker: in-memory состояние комнат не масштабируется** (остаток BUG-183, QA 2026-07-07) — `roomSessions`/`sessionParticipants` в `PokerWebSocketHandler` и `roomParticipants` в `PokerSessionService` живут в памяти одного инстанса: рестарт рвёт комнаты, >1 инстанс не работает. Очистка при уходе последнего участника добавлена; для масштабирования нужен Redis pub/sub или sticky sessions.
+- [ ] **Poker: удаление story/сессии не выведено в UI** (остаток BUG-179) — REST `DELETE /api/poker/stories/{id}` есть (facilitator-only), кнопки в комнате нет; `DELETE /api/poker/sessions/{id}` не существует — завершённые/брошенные сессии копятся в лобби.
+- [ ] **Poker: языковой микс и hardcoded бейджи лобби** (BUG-185/188) — страницы покера на русском при английской навигации; статус-бейджи сессий в `PlanningPokerPage.tsx` с ручными цветами. Финальная оценка не предзаполняется медианой голосов (UX).
 
 ## Frontend
 

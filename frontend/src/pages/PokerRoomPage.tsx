@@ -92,10 +92,9 @@ export function PokerRoomPage() {
         setCurrentStoryId(sessionData.currentStoryId)
         setJiraBaseUrl(config.jiraBaseUrl)
 
-        // Determine facilitator (fallback: "system" means legacy session -- treat creator as facilitator)
-        const isFac = sessionData.facilitatorAccountId === authUser.accountId
-          || sessionData.facilitatorAccountId === 'system'
-        setIsFacilitator(isFac)
+        // Facilitator = session creator; the server independently verifies this
+        // from the authenticated account on every WS/REST action
+        setIsFacilitator(sessionData.facilitatorAccountId === authUser.accountId)
 
         // Determine team role
         try {
@@ -553,7 +552,7 @@ export function PokerRoomPage() {
                     <div className="poker-story-estimates">
                       {story.needsRoles.map(role => (
                         <span key={role} className="estimate-badge" style={roleLightStyle(role)}>
-                          {role}: {story.finalEstimates[role] ?? 0}\u0447
+                          {role}: {story.finalEstimates[role] ?? 0}ч
                         </span>
                       ))}
                     </div>
@@ -566,7 +565,13 @@ export function PokerRoomPage() {
           {/* Session controls */}
           {isFacilitator && session.status === 'PREPARING' && stories.length > 0 && (
             <div className="poker-sidebar-footer">
-              <button className="btn btn-primary" style={{ width: '100%' }} onClick={handleStartSession}>
+              <button
+                className="btn btn-primary"
+                style={{ width: '100%' }}
+                onClick={handleStartSession}
+                disabled={!connected}
+                title={connected ? undefined : 'Нет соединения с сервером'}
+              >
                 Начать сессию
               </button>
             </div>
@@ -682,7 +687,12 @@ export function PokerRoomPage() {
                   {/* Facilitator: Reveal button */}
                   {isFacilitator && (
                     <div className="facilitator-controls">
-                      <button className="btn btn-primary" onClick={handleReveal}>
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleReveal}
+                        disabled={!connected}
+                        title={connected ? undefined : 'Нет соединения с сервером'}
+                      >
                         Открыть карты
                       </button>
                     </div>
@@ -727,7 +737,12 @@ export function PokerRoomPage() {
                         ))}
                       </div>
                       <div className="final-actions">
-                        <button className="btn btn-primary" onClick={handleSetFinal}>
+                        <button
+                          className="btn btn-primary"
+                          onClick={handleSetFinal}
+                          disabled={!connected}
+                          title={connected ? undefined : 'Нет соединения с сервером'}
+                        >
                           Сохранить и далее
                         </button>
                       </div>
@@ -739,7 +754,12 @@ export function PokerRoomPage() {
               {/* Story completed - next button */}
               {currentStory.status === 'COMPLETED' && isFacilitator && (
                 <div className="facilitator-controls">
-                  <button className="btn btn-primary" onClick={handleNextStory}>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleNextStory}
+                    disabled={!connected}
+                    title={connected ? undefined : 'Нет соединения с сервером'}
+                  >
                     Следующая стори &#8594;
                   </button>
                 </div>

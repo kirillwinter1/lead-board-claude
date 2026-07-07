@@ -14,12 +14,15 @@ import java.util.List;
 public class PokerWebSocketConfig implements WebSocketConfigurer {
 
     private final PokerWebSocketHandler pokerWebSocketHandler;
+    private final PokerHandshakeInterceptor pokerHandshakeInterceptor;
 
     @Value("${cors.allowed-origins:}")
     private String corsAllowedOrigins;
 
-    public PokerWebSocketConfig(PokerWebSocketHandler pokerWebSocketHandler) {
+    public PokerWebSocketConfig(PokerWebSocketHandler pokerWebSocketHandler,
+                                PokerHandshakeInterceptor pokerHandshakeInterceptor) {
         this.pokerWebSocketHandler = pokerWebSocketHandler;
+        this.pokerHandshakeInterceptor = pokerHandshakeInterceptor;
     }
 
     @Override
@@ -38,6 +41,7 @@ public class PokerWebSocketConfig implements WebSocketConfigurer {
         }
 
         registry.addHandler(pokerWebSocketHandler, "/ws/poker/{roomCode}")
+                .addInterceptors(pokerHandshakeInterceptor)
                 .setAllowedOrigins(origins.toArray(new String[0]));
     }
 }

@@ -1,5 +1,6 @@
 package com.leadboard.poker.service;
 
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.jira.JiraClient;
 import com.leadboard.poker.entity.PokerStoryEntity;
@@ -7,7 +8,6 @@ import com.leadboard.poker.repository.PokerStoryRepository;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,16 +23,16 @@ public class PokerJiraService {
     private final PokerStoryRepository storyRepository;
     private final JiraIssueRepository issueRepository;
     private final WorkflowConfigService workflowConfigService;
-
-    @Value("${jira.project-key:}")
-    private String projectKey;
+    private final JiraConfigResolver jiraConfigResolver;
 
     public PokerJiraService(JiraClient jiraClient, PokerStoryRepository storyRepository,
-                            JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService) {
+                            JiraIssueRepository issueRepository, WorkflowConfigService workflowConfigService,
+                            JiraConfigResolver jiraConfigResolver) {
         this.jiraClient = jiraClient;
         this.storyRepository = storyRepository;
         this.issueRepository = issueRepository;
         this.workflowConfigService = workflowConfigService;
+        this.jiraConfigResolver = jiraConfigResolver;
     }
 
     /**
@@ -40,8 +40,11 @@ public class PokerJiraService {
      * Does NOT save anything to local DB -- Jira is the single source of truth.
      */
     public String createStoryInJira(String epicKey, String title, List<String> needsRoles) {
+        // Tenant-aware project key (JiraConfigResolver), NEVER raw jira.project-key (BUG-177)
+        String projectKey = jiraConfigResolver.getProjectKey();
         String storyTypeName = workflowConfigService.getStoryTypeName();
-        log.info("Creating story in Jira: type='{}', epic={}, title='{}'", storyTypeName, epicKey, title);
+        log.info("Creating story in Jira: project='{}', type='{}', epic={}, title='{}'",
+                projectKey, storyTypeName, epicKey, title);
 
         String storyKey = jiraClient.createIssue(projectKey, storyTypeName, title, epicKey);
         log.info("Created Jira Story: {}", storyKey);
