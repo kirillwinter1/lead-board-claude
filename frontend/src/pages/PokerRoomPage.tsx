@@ -22,6 +22,28 @@ import { usePokerWebSocket } from '../hooks/usePokerWebSocket'
 
 const VOTE_OPTIONS = [2, 4, 8, 12, 16, 24, 32, 40, -1] // -1 = "?"
 
+// Muted line icons for hero/empty states — replaces decorative emoji
+function IconStack({ size = 44 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <rect x="3" y="10" width="18" height="4" rx="1" />
+      <rect x="3" y="16" width="18" height="4" rx="1" />
+    </svg>
+  )
+}
+
+function IconCheckCircle({ size = 44 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 12.5l2.5 2.5 4.5-5" />
+    </svg>
+  )
+}
+
 export function PokerRoomPage() {
   const { roomCode } = useParams<{ roomCode: string }>()
   const navigate = useNavigate()
@@ -517,7 +539,7 @@ export function PokerRoomPage() {
           <div className="poker-stories-list">
             {stories.length === 0 ? (
               <div className="poker-stories-empty">
-                <div className="poker-stories-empty-icon">&#x1F4CB;</div>
+                <div className="poker-stories-empty-icon"><IconStack size={28} /></div>
                 <p>Пока нет сторей</p>
                 {isFacilitator && session.status === 'PREPARING' && (
                   <small>Импортируйте из Jira или создайте вручную</small>
@@ -582,7 +604,7 @@ export function PokerRoomPage() {
         <div className="poker-main">
           {session.status === 'PREPARING' ? (
             <div className="poker-preparing">
-              <div className="poker-preparing-icon">&#x1F0CF;</div>
+              <div className="poker-preparing-icon"><IconStack /></div>
               <h3>Подготовка сессии</h3>
               {isFacilitator ? (
                 <div className="poker-preparing-steps">
@@ -615,7 +637,7 @@ export function PokerRoomPage() {
             </div>
           ) : session.status === 'COMPLETED' ? (
             <div className="poker-completed">
-              <div className="poker-completed-icon">&#x2705;</div>
+              <div className="poker-completed-icon"><IconCheckCircle /></div>
               <h3>Сессия завершена</h3>
               <p>Все стори оценены ({completedCount} из {stories.length})</p>
             </div>
@@ -792,7 +814,7 @@ export function PokerRoomPage() {
                 <div key={p.accountId} className={`participant-item ${p.isOnline ? 'online' : 'offline'}`}>
                   <span className="participant-name">
                     {p.displayName}
-                    {p.isFacilitator && ' \uD83D\uDC51'}
+                    {p.isFacilitator && <span className="participant-facilitator-tag">ведущий</span>}
                   </span>
                   <span className="participant-role" style={roleLightStyle(p.role)}>
                     {p.role}

@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getConfig } from '../api/config'
 import { Modal } from '../components/Modal'
+import { SearchInput } from '../components/SearchInput'
+import { StatusBadge } from '../components/board/StatusBadge'
+import { getIssueIcon } from '../components/board/helpers'
+import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -15,6 +19,7 @@ import { BG_SUBTLE, INFO_BG, SUCCESS_BG } from '../constants/colors'
 
 export function PlanningPokerPage() {
   const navigate = useNavigate()
+  const { getIssueTypeIconUrl, getTypeNameByCategory } = useWorkflowConfig()
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null)
   const [sessions, setSessions] = useState<PokerSession[]>([])
@@ -22,16 +27,19 @@ export function PlanningPokerPage() {
   const [error, setError] = useState<string | null>(null)
   const [jiraBaseUrl, setJiraBaseUrl] = useState('')
 
-  // Create session modal
-  const [showCreateModal, setShowCreateModal] = useState(false)
+  // Inline epic picker (create session)
+  const [pickingEpic, setPickingEpic] = useState(false)
   const [eligibleEpics, setEligibleEpics] = useState<EligibleEpic[]>([])
-  const [selectedEpicKey, setSelectedEpicKey] = useState('')
+  const [epicSearch, setEpicSearch] = useState('')
   const [loadingEpics, setLoadingEpics] = useState(false)
-  const [creating, setCreating] = useState(false)
+  const [creatingEpicKey, setCreatingEpicKey] = useState<string | null>(null)
 
   // Join room modal
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [joinRoomCode, setJoinRoomCode] = useState('')
+
+  const epicTypeName = getTypeNameByCategory('EPIC')
+  const epicIcon = getIssueIcon(epicTypeName || 'Epic', getIssueTypeIconUrl(epicTypeName), 'EPIC')
 
   useEffect(() => {
     Promise.all([
@@ -70,12 +78,13 @@ export function PlanningPokerPage() {
     }
   }
 
-  const handleOpenCreateModal = async () => {
+  const handleOpenEpicPicker = async () => {
     if (!selectedTeamId) return
 
-    setShowCreateModal(true)
+    setPickingEpic(true)
+    setEpicSearch('')
+    setError(null)
     setLoadingEpics(true)
-    setSelectedEpicKey('')
 
     try {
       const epics = await getEligibleEpics(selectedTeamId)
@@ -88,20 +97,22 @@ export function PlanningPokerPage() {
     }
   }
 
-  const handleCreateSession = async () => {
-    if (!selectedTeamId || !selectedEpicKey) return
+  const handleClosePicker = () => {
+    setPickingEpic(false)
+    setEpicSearch('')
+  }
 
-    setCreating(true)
+  const handleSelectEpic = async (epicKey: string) => {
+    if (!selectedTeamId || creatingEpicKey) return
+
+    setCreatingEpicKey(epicKey)
     try {
-      const session = await createSession(selectedTeamId, selectedEpicKey)
-      setShowCreateModal(false)
-      setSelectedEpicKey('')
+      const session = await createSession(selectedTeamId, epicKey)
       navigate(`/poker/room/${session.roomCode}`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError('Failed to create session: ' + message)
-    } finally {
-      setCreating(false)
+      setCreatingEpicKey(null)
     }
   }
 
@@ -142,14 +153,16 @@ export function PlanningPokerPage() {
     <main className="main-content">
       <div className="page-header">
         <h2>Planning Poker</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-secondary" onClick={() => setShowJoinModal(true)}>
-            Войти по коду
-          </button>
-          <button className="btn btn-primary" onClick={handleOpenCreateModal} disabled={!selectedTeamId}>
-            + Новая сессия
-          </button>
-        </div>
+        {!pickingEpic && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={() => setShowJoinModal(true)}>
+              Войти по коду
+            </button>
+            <button className="btn btn-primary" onClick={handleOpenEpicPicker} disabled={!selectedTeamId}>
+              Новая сессия
+            </button>
+          </div>
+        )}
       </div>
 
       {error && <div className="error">{error}</div>}
@@ -161,7 +174,10 @@ export function PlanningPokerPage() {
             className="filter-input"
             style={{ minWidth: 240 }}
             value={selectedTeamId ?? ''}
-            onChange={e => setSelectedTeamId(Number(e.target.value))}
+            onChange={e => {
+              setSelectedTeamId(Number(e.target.value))
+              handleClosePicker()
+            }}
           >
             <option value="" disabled>Выберите команду...</option>
             {teams.map(team => (
@@ -171,7 +187,19 @@ export function PlanningPokerPage() {
         </div>
       </div>
 
-      {/* Sessions List */}
+      {pickingEpic ? (
+        <EpicPicker
+          epics={eligibleEpics}
+          loading={loadingEpics}
+          search={epicSearch}
+          onSearch={setEpicSearch}
+          onSelect={handleSelectEpic}
+          onCancel={handleClosePicker}
+          creatingEpicKey={creatingEpicKey}
+          epicIcon={epicIcon}
+        />
+      ) : (
+      /* Sessions List */
       <div className="poker-sessions-list">
         {sessions.length === 0 ? (
           <div className="chart-empty">
@@ -232,80 +260,7 @@ export function PlanningPokerPage() {
           </table>
         )}
       </div>
-
-      {/* Create Session Modal */}
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Создать сессию Planning Poker">
-        <div style={{ textAlign: 'center' }}>
-          <div className="modal-header-icon">🎯</div>
-          <p className="modal-description">
-            Выберите эпик для оценки задач командой
-          </p>
-        </div>
-
-        <div className="form-group">
-          <label className="filter-label">Эпик</label>
-          {loadingEpics ? (
-            <div className="loading-small">Загрузка эпиков...</div>
-          ) : eligibleEpics.length === 0 ? (
-            <div className="empty-hint">
-              У команды нет незавершённых эпиков для оценки
-            </div>
-          ) : (
-            <select
-              className="filter-input"
-              style={{ width: '100%' }}
-              value={selectedEpicKey}
-              onChange={e => setSelectedEpicKey(e.target.value)}
-              autoFocus
-            >
-              <option value="">Выберите эпик...</option>
-              {eligibleEpics
-                .filter(e => !e.hasPokerSession)
-                .map(epic => (
-                  <option key={epic.epicKey} value={epic.epicKey}>
-                    {epic.epicKey} — {epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}
-                  </option>
-                ))}
-              {eligibleEpics.some(e => e.hasPokerSession) && (
-                <optgroup label="Уже есть сессия">
-                  {eligibleEpics
-                    .filter(e => e.hasPokerSession)
-                    .map(epic => (
-                      <option key={epic.epicKey} value={epic.epicKey} disabled>
-                        {epic.epicKey} — {epic.summary.length > 50 ? epic.summary.substring(0, 50) + '...' : epic.summary}
-                      </option>
-                    ))}
-                </optgroup>
-              )}
-            </select>
-          )}
-          {selectedEpicKey && (
-            <div className="selected-epic-hint">
-              <a
-                href={`${jiraBaseUrl}${selectedEpicKey}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="issue-key"
-              >
-                Открыть в Jira ↗
-              </a>
-            </div>
-          )}
-        </div>
-
-        <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)}>
-            Отмена
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleCreateSession}
-            disabled={creating || !selectedEpicKey}
-          >
-            {creating ? 'Создание...' : 'Создать →'}
-          </button>
-        </div>
-      </Modal>
+      )}
 
       {/* Join Room Modal */}
       <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Войти в комнату">
@@ -336,5 +291,77 @@ export function PlanningPokerPage() {
         </div>
       </Modal>
     </main>
+  )
+}
+
+interface EpicPickerProps {
+  epics: EligibleEpic[]
+  loading: boolean
+  search: string
+  onSearch: (v: string) => void
+  onSelect: (epicKey: string) => void
+  onCancel: () => void
+  creatingEpicKey: string | null
+  epicIcon: string
+}
+
+function EpicPicker({ epics, loading, search, onSearch, onSelect, onCancel, creatingEpicKey, epicIcon }: EpicPickerProps) {
+  const q = search.trim().toLowerCase()
+  const filtered = q
+    ? epics.filter(e => e.epicKey.toLowerCase().includes(q) || e.summary.toLowerCase().includes(q))
+    : epics
+
+  return (
+    <div className="epic-picker">
+      <div className="epic-picker-header">
+        <div>
+          <h3>Выберите эпик для оценки</h3>
+          <span className="epic-picker-subtitle">Команда оценит задачи выбранного эпика</span>
+        </div>
+        <button className="btn btn-secondary" onClick={onCancel}>Отмена</button>
+      </div>
+
+      {!loading && epics.length > 0 && (
+        <div className="epic-picker-search">
+          <SearchInput value={search} onChange={onSearch} placeholder="Поиск по ключу или названию..." />
+        </div>
+      )}
+
+      {loading ? (
+        <div className="loading-small">Загрузка эпиков...</div>
+      ) : epics.length === 0 ? (
+        <div className="chart-empty">
+          У команды нет незавершённых эпиков для оценки
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="chart-empty">Ничего не найдено по запросу «{search}»</div>
+      ) : (
+        <div className="epic-picker-list">
+          {filtered.map(epic => {
+            const busy = creatingEpicKey === epic.epicKey
+            const disabled = epic.hasPokerSession || (creatingEpicKey !== null && !busy)
+            return (
+              <button
+                key={epic.epicKey}
+                className="epic-picker-row"
+                onClick={() => !epic.hasPokerSession && onSelect(epic.epicKey)}
+                disabled={disabled}
+                title={epic.hasPokerSession ? 'Для этого эпика уже есть сессия' : undefined}
+              >
+                <img className="epic-picker-icon" src={epicIcon} alt="" />
+                <span className="epic-picker-key">{epic.epicKey}</span>
+                <span className="epic-picker-summary">{epic.summary}</span>
+                <span className="epic-picker-meta">
+                  {epic.hasPokerSession
+                    ? <span className="epic-picker-tag">Есть сессия</span>
+                    : <StatusBadge status={epic.status} />}
+                </span>
+                {busy && <span className="epic-picker-creating">Создание…</span>}
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
