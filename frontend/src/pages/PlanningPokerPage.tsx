@@ -5,6 +5,7 @@ import { getConfig } from '../api/config'
 import { Modal } from '../components/Modal'
 import { SearchInput } from '../components/SearchInput'
 import { StatusBadge } from '../components/board/StatusBadge'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './PlanningPokerPage.css'
@@ -15,6 +16,7 @@ import {
   getEligibleEpics,
   createSession,
 } from '../api/poker'
+import { getStatusStyles, type StatusStyle } from '../api/board'
 import { BG_SUBTLE, INFO_BG, SUCCESS_BG } from '../constants/colors'
 
 export function PlanningPokerPage() {
@@ -38,18 +40,23 @@ export function PlanningPokerPage() {
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [joinRoomCode, setJoinRoomCode] = useState('')
 
+  // Status colors from workflow config — so StatusBadge renders board colors, not grey
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
+
   const epicTypeName = getTypeNameByCategory('EPIC')
   const epicIcon = getIssueIcon(epicTypeName || 'Epic', getIssueTypeIconUrl(epicTypeName), 'EPIC')
 
   useEffect(() => {
     Promise.all([
       teamsApi.getAll(),
-      getConfig()
+      getConfig(),
+      getStatusStyles().catch(() => ({}))
     ])
-      .then(([teamsData, config]) => {
+      .then(([teamsData, config, styles]) => {
         const activeTeams = teamsData.filter(t => t.active)
         setTeams(activeTeams)
         setJiraBaseUrl(config.jiraBaseUrl)
+        setStatusStyles(styles)
         if (activeTeams.length > 0 && !selectedTeamId) {
           setSelectedTeamId(activeTeams[0].id)
         }
@@ -150,6 +157,7 @@ export function PlanningPokerPage() {
   }
 
   return (
+    <StatusStylesProvider value={statusStyles}>
     <main className="main-content">
       <div className="page-header">
         <h2>Planning Poker</h2>
@@ -291,6 +299,7 @@ export function PlanningPokerPage() {
         </div>
       </Modal>
     </main>
+    </StatusStylesProvider>
   )
 }
 
