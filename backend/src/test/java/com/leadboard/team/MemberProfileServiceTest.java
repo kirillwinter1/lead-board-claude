@@ -9,7 +9,6 @@ import com.leadboard.team.dto.MemberProfileResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -33,7 +32,6 @@ class MemberProfileServiceTest {
     @Mock private WorkflowConfigService workflowConfigService;
     @Mock private WorkCalendarService workCalendarService;
 
-    @InjectMocks
     private MemberProfileService service;
 
     private TeamEntity team;
@@ -43,6 +41,10 @@ class MemberProfileServiceTest {
 
     @BeforeEach
     void setUp() {
+        MemberAnalyticsService analytics = new MemberAnalyticsService(issueRepository, workflowConfigService, workCalendarService);
+        service = new MemberProfileService(teamRepository, memberRepository, issueRepository,
+                workflowConfigService, workCalendarService, analytics);
+
         team = new TeamEntity();
         team.setId(1L);
         team.setName("Platform Team");
