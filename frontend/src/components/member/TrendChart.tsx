@@ -32,11 +32,11 @@ export function TrendChart({ data }: { data: WeeklyTrend[] }) {
       <div className="trend-chart-legend">
         <span className="trend-chart-legend-item">
           <span className="trend-chart-legend-dot" style={{ background: '#0052cc' }} />
-          DSR (оценка / факт)
+          DSR (spent / estimate)
         </span>
         <span className="trend-chart-legend-item">
           <span className="trend-chart-legend-dot" style={{ background: '#c1c7d0', borderRadius: 2 }} />
-          Задач закрыто
+          Tasks closed
         </span>
       </div>
       <svg className="trend-chart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">

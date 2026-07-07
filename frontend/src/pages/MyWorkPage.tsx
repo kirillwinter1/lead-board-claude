@@ -219,7 +219,9 @@ function CompletedTasksTable({ tasks }: { tasks: MyCompletedTask[] }) {
               <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{t.key}</a>
             </td>
             <td className="task-summary-cell">{t.summary}</td>
-            <td className="task-summary-cell">{t.epicKey ? `${t.epicKey} ${t.epicSummary ?? ''}`.trim() : '—'}</td>
+            <td className="task-summary-cell">
+              {t.epicKey ? <span className="task-epic-label">{`${t.epicKey} ${t.epicSummary ?? ''}`.trim()}</span> : '—'}
+            </td>
             <td><TeamBadge name={t.teamName} color={t.teamColor} /></td>
             <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(t.estimateH)}</td>
             <td style={{ textAlign: 'right' }}>
@@ -261,7 +263,7 @@ function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange }:
         <MetricCard title="Closed tasks" value={s.completedCount} />
         <MetricCard
           title="Avg DSR"
-          value={s.avgDsr ?? '—'}
+          value={s.avgDsr != null ? s.avgDsr.toFixed(2) : '—'}
           tooltip="Time spent / original estimate"
         />
         <MetricCard
