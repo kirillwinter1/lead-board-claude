@@ -153,6 +153,17 @@
   color: #6b778c;
 }
 
+/* table-layout: fixed clips overflowing text mid-letter — trim with an ellipsis instead */
+.mywork-task-table td {
+  overflow: hidden;
+}
+
+.mywork-task-table .task-epic-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* =====================================================
    MY PERFORMANCE ANALYTICS (Task 11)
    Reuses .member-summary-cards, .profile-section,
