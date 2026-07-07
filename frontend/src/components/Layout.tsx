@@ -67,7 +67,7 @@ export function Layout() {
               <NavLink to="/my-work" className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 My Work
               </NavLink>
-              <NavLink to={`/${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`} end>
+              <NavLink to={`/board${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>
                 Board
               </NavLink>
               <NavLink to={`/metrics${queryString}`} className={({ isActive }) => `nav-tab ${isActive ? 'active' : ''}`}>

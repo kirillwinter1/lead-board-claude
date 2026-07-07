@@ -260,4 +260,29 @@ describe('MyWorkPage', () => {
       expect(screen.getByText('MYWORK')).toBeInTheDocument()
     })
   })
+
+  it('MEMBER visiting /board sees the board (no redirect)', async () => {
+    // F88: MEMBER lands on /my-work from "/" (HomeRedirect), but the Board tab now
+    // points at the dedicated /board route, which renders BoardPage directly with no
+    // membership-based redirect — so a MEMBER can still open the board on demand.
+    vi.mocked(useAuth).mockReturnValue({
+      loading: false,
+      isMember: () => true,
+    } as unknown as ReturnType<typeof useAuth>)
+
+    render(
+      <MemoryRouter initialEntries={['/board']}>
+        <Routes>
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/board" element={<div>BOARD</div>} />
+          <Route path="/my-work" element={<div>MYWORK</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('BOARD')).toBeInTheDocument()
+    })
+    expect(screen.queryByText('MYWORK')).toBeNull()
+  })
 })

@@ -101,7 +101,7 @@ describe('Layout', () => {
 
       await waitFor(() => {
         const boardLink = screen.getByText('Board').closest('a')
-        expect(boardLink).toHaveAttribute('href', '/?teamId=5')
+        expect(boardLink).toHaveAttribute('href', '/board?teamId=5')
 
         const metricsLink = screen.getByText('Metrics').closest('a')
         expect(metricsLink).toHaveAttribute('href', '/metrics?teamId=5')
