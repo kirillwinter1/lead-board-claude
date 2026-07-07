@@ -190,7 +190,7 @@ public class PokerController {
     @GetMapping("/sessions/{id}")
     public ResponseEntity<SessionResponse> getSession(@PathVariable Long id) {
         return sessionService.getSession(id)
-                .map(SessionResponse::from)
+                .map(this::withEpicDetails)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -198,9 +198,16 @@ public class PokerController {
     @GetMapping("/sessions/room/{roomCode}")
     public ResponseEntity<SessionResponse> getSessionByRoomCode(@PathVariable String roomCode) {
         return sessionService.getSessionByRoomCode(roomCode)
-                .map(SessionResponse::from)
+                .map(this::withEpicDetails)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Builds a SessionResponse enriched with the epic's summary and description. */
+    private SessionResponse withEpicDetails(PokerSessionEntity session) {
+        return issueRepository.findByIssueKey(session.getEpicKey())
+                .map(epic -> SessionResponse.from(session, epic.getSummary(), epic.getDescription()))
+                .orElseGet(() -> SessionResponse.from(session));
     }
 
     @GetMapping("/sessions/team/{teamId}")

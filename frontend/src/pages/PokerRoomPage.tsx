@@ -88,7 +88,7 @@ export function PokerRoomPage() {
   // Show error if not authenticated
   useEffect(() => {
     if (!auth.loading && !auth.authenticated) {
-      setError('Необходимо авторизоваться для участия в сессии')
+      setError('You must be signed in to join the session')
     }
   }, [auth.loading, auth.authenticated])
 
@@ -136,7 +136,7 @@ export function PokerRoomPage() {
         setLoading(false)
       })
       .catch(err => {
-        setError('Не удалось загрузить сессию: ' + err.message)
+        setError('Failed to load session: ' + err.message)
         setLoading(false)
       })
   }, [roomCode, authUser])
@@ -419,7 +419,7 @@ export function PokerRoomPage() {
 
   // Loading states
   if (authLoading || loading) {
-    return <main className="main-content"><div className="loading">Загрузка комнаты...</div></main>
+    return <main className="main-content"><div className="loading">Loading room...</div></main>
   }
 
   if (error && !session) {
@@ -427,14 +427,14 @@ export function PokerRoomPage() {
       <main className="main-content">
         <div className="error">{error}</div>
         <button className="btn btn-secondary" onClick={() => navigate('/poker')}>
-          Назад к списку
+          Back to list
         </button>
       </main>
     )
   }
 
   if (!session) {
-    return <main className="main-content"><div className="error">Сессия не найдена</div></main>
+    return <main className="main-content"><div className="error">Session not found</div></main>
   }
 
   // Role selector modal
@@ -444,9 +444,9 @@ export function PokerRoomPage() {
       <main className="main-content">
         <div className="modal-overlay" style={{ position: 'relative', background: 'transparent' }}>
           <div className="modal-content" style={{ marginTop: 80 }}>
-            <h3>Выберите роль</h3>
+            <h3>Select your role</h3>
             <p style={{ color: '#6b778c', marginBottom: 16 }}>
-              Вы не привязаны к команде. Выберите роль для голосования:
+              You're not on this team — pick a role to vote:
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               {roleCodes.map(code => (
@@ -472,31 +472,33 @@ export function PokerRoomPage() {
       <div className="poker-header">
         <div className="poker-header-left">
           <button className="btn btn-secondary" onClick={() => navigate('/poker')}>
-            &#8592; Назад
+            &#8592; Back
           </button>
-          <h2>
-            <a
-              href={`${jiraBaseUrl}${session.epicKey}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="issue-key"
-            >
-              {session.epicKey}
-            </a>
-            <span className="poker-header-separator">/</span>
-            <span className="poker-header-title">Planning Poker</span>
-          </h2>
+          <div className="poker-epic-heading">
+            <div className="poker-epic-heading-top">
+              <a
+                href={`${jiraBaseUrl}${session.epicKey}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="issue-key"
+              >
+                {session.epicKey}
+              </a>
+              <span className="poker-epic-tag">Planning Poker</span>
+            </div>
+            <h2 className="poker-epic-title">{session.epicSummary || session.epicKey}</h2>
+          </div>
         </div>
         <div className="poker-header-right">
           <button
             className={`poker-copy-code-btn ${copied ? 'copied' : ''}`}
             onClick={handleCopyRoomCode}
-            title="Скопировать код комнаты"
+            title="Copy room code"
           >
             <code>{session.roomCode}</code>
             <span className="copy-icon">{copied ? '\u2713' : '\u2398'}</span>
           </button>
-          <div className={`poker-connection-dot ${connected ? 'connected' : 'disconnected'}`} title={connected ? 'Подключено' : 'Отключено'} />
+          <div className={`poker-connection-dot ${connected ? 'connected' : 'disconnected'}`} title={connected ? 'Connected' : 'Disconnected'} />
           {authUser && (
             <div className="poker-user-badge">
               <span className="poker-user-name">{authUser.displayName}</span>
@@ -508,6 +510,12 @@ export function PokerRoomPage() {
         </div>
       </div>
 
+      {session.epicDescription && session.epicDescription.trim() && (
+        <div className="poker-epic-desc">
+          <p title={session.epicDescription}>{session.epicDescription}</p>
+        </div>
+      )}
+
       {error && <div className="error" style={{ marginBottom: 16, marginLeft: 24, marginRight: 24 }}>{error}</div>}
 
       <div className="poker-layout">
@@ -515,9 +523,9 @@ export function PokerRoomPage() {
         <div className="poker-sidebar">
           <div className="poker-sidebar-header">
             <div>
-              <h3>Стори ({stories.length})</h3>
+              <h3>Stories ({stories.length})</h3>
               {stories.length > 0 && (
-                <span className="poker-stories-progress">{completedCount}/{stories.length} оценено</span>
+                <span className="poker-stories-progress">{completedCount}/{stories.length} estimated</span>
               )}
             </div>
             {isFacilitator && session.status === 'PREPARING' && (
@@ -525,12 +533,12 @@ export function PokerRoomPage() {
                 <button
                   className="btn btn-secondary btn-small"
                   onClick={handleOpenImportStories}
-                  title="Импорт из Jira"
+                  title="Import from Jira"
                 >
-                  &#8595; Импорт
+                  &#8595; Import
                 </button>
-                <button className="btn btn-primary btn-small" onClick={() => setShowAddStory(true)} title="Создать новую">
-                  + Новая
+                <button className="btn btn-primary btn-small" onClick={() => setShowAddStory(true)} title="Create new">
+                  + New
                 </button>
               </div>
             )}
@@ -540,9 +548,9 @@ export function PokerRoomPage() {
             {stories.length === 0 ? (
               <div className="poker-stories-empty">
                 <div className="poker-stories-empty-icon"><IconStack size={28} /></div>
-                <p>Пока нет сторей</p>
+                <p>No stories yet</p>
                 {isFacilitator && session.status === 'PREPARING' && (
-                  <small>Импортируйте из Jira или создайте вручную</small>
+                  <small>Import from Jira or add manually</small>
                 )}
               </div>
             ) : (
@@ -574,7 +582,7 @@ export function PokerRoomPage() {
                     <div className="poker-story-estimates">
                       {story.needsRoles.map(role => (
                         <span key={role} className="estimate-badge" style={roleLightStyle(role)}>
-                          {role}: {story.finalEstimates[role] ?? 0}ч
+                          {role}: {story.finalEstimates[role] ?? 0}h
                         </span>
                       ))}
                     </div>
@@ -592,9 +600,9 @@ export function PokerRoomPage() {
                 style={{ width: '100%' }}
                 onClick={handleStartSession}
                 disabled={!connected}
-                title={connected ? undefined : 'Нет соединения с сервером'}
+                title={connected ? undefined : 'No connection to server'}
               >
-                Начать сессию
+                Start session
               </button>
             </div>
           )}
@@ -605,41 +613,41 @@ export function PokerRoomPage() {
           {session.status === 'PREPARING' ? (
             <div className="poker-preparing">
               <div className="poker-preparing-icon"><IconStack /></div>
-              <h3>Подготовка сессии</h3>
+              <h3>Session setup</h3>
               {isFacilitator ? (
                 <div className="poker-preparing-steps">
                   <div className="poker-step">
                     <span className="poker-step-num">1</span>
-                    <span>Импортируйте стори из Jira или добавьте вручную</span>
+                    <span>Import stories from Jira or add them manually</span>
                   </div>
                   <div className="poker-step">
                     <span className="poker-step-num">2</span>
-                    <span>Дождитесь подключения участников</span>
+                    <span>Wait for participants to join</span>
                   </div>
                   <div className="poker-step">
                     <span className="poker-step-num">3</span>
-                    <span>Нажмите "Начать сессию"</span>
+                    <span>Click "Start session"</span>
                   </div>
                   {stories.length === 0 && (
                     <div className="poker-preparing-actions">
                       <button className="btn btn-secondary" onClick={handleOpenImportStories}>
-                        &#8595; Импорт из Jira
+                        &#8595; Import from Jira
                       </button>
                       <button className="btn btn-primary" onClick={() => setShowAddStory(true)}>
-                        + Новая стори
+                        + New story
                       </button>
                     </div>
                   )}
                 </div>
               ) : (
-                <p>Ведущий готовит стори для оценки. Подождите начала сессии.</p>
+                <p>The facilitator is preparing stories. Please wait for the session to start.</p>
               )}
             </div>
           ) : session.status === 'COMPLETED' ? (
             <div className="poker-completed">
               <div className="poker-completed-icon"><IconCheckCircle /></div>
-              <h3>Сессия завершена</h3>
-              <p>Все стори оценены ({completedCount} из {stories.length})</p>
+              <h3>Session completed</h3>
+              <p>All stories estimated ({completedCount} of {stories.length})</p>
             </div>
           ) : currentStory ? (
             <>
@@ -691,7 +699,7 @@ export function PokerRoomPage() {
                   {/* Voting cards */}
                   {canVote && (
                     <div className="voting-cards">
-                      <p>Ваша оценка ({userRole}):</p>
+                      <p>Your estimate ({userRole}):</p>
                       <div className="cards-row">
                         {VOTE_OPTIONS.map(hours => (
                           <button
@@ -713,9 +721,9 @@ export function PokerRoomPage() {
                         className="btn btn-primary"
                         onClick={handleReveal}
                         disabled={!connected}
-                        title={connected ? undefined : 'Нет соединения с сервером'}
+                        title={connected ? undefined : 'No connection to server'}
                       >
-                        Открыть карты
+                        Reveal cards
                       </button>
                     </div>
                   )}
@@ -725,7 +733,7 @@ export function PokerRoomPage() {
               {/* Revealed votes */}
               {currentStory.status === 'REVEALED' && (
                 <div className="votes-revealed">
-                  <h4>Результаты голосования:</h4>
+                  <h4>Voting results:</h4>
                   <div className="votes-grid">
                     {currentStory.needsRoles.map(role => (
                       <div key={role} className="vote-column">
@@ -743,11 +751,11 @@ export function PokerRoomPage() {
                   {/* Facilitator: Set final estimate */}
                   {isFacilitator && (
                     <div className="final-estimate-form">
-                      <h4>Финальная оценка:</h4>
+                      <h4>Final estimate:</h4>
                       <div className="final-inputs">
                         {currentStory.needsRoles.map(role => (
                           <div key={role} className="final-input-group">
-                            <label>{role} (часы)</label>
+                            <label>{role} (hours)</label>
                             <input
                               type="number"
                               value={finalEstimateInputs[role] || ''}
@@ -763,9 +771,9 @@ export function PokerRoomPage() {
                           className="btn btn-primary"
                           onClick={handleSetFinal}
                           disabled={!connected}
-                          title={connected ? undefined : 'Нет соединения с сервером'}
+                          title={connected ? undefined : 'No connection to server'}
                         >
-                          Сохранить и далее
+                          Save and next
                         </button>
                       </div>
                     </div>
@@ -780,29 +788,29 @@ export function PokerRoomPage() {
                     className="btn btn-primary"
                     onClick={handleNextStory}
                     disabled={!connected}
-                    title={connected ? undefined : 'Нет соединения с сервером'}
+                    title={connected ? undefined : 'No connection to server'}
                   >
-                    Следующая стори &#8594;
+                    Next story &#8594;
                   </button>
                 </div>
               )}
             </>
           ) : (
             <div className="poker-no-story">
-              <p>Нет активной стори для оценки</p>
+              <p>No active story to estimate</p>
             </div>
           )}
         </div>
 
         {/* Right sidebar - Participants */}
         <div className="poker-participants">
-          <h3>Участники ({participants.length})</h3>
+          <h3>Participants ({participants.length})</h3>
           <div className="participants-list">
             {participants.length === 0 ? (
               <div className="poker-participants-empty">
-                <p>Ожидание участников</p>
+                <p>Waiting for participants</p>
                 <div className="poker-participants-share">
-                  <small>Поделитесь кодом комнаты:</small>
+                  <small>Share the room code:</small>
                   <button className="poker-share-code-btn" onClick={handleCopyRoomCode}>
                     <code>{session.roomCode}</code>
                     <span>{copied ? '\u2713' : '\u2398'}</span>
@@ -814,7 +822,7 @@ export function PokerRoomPage() {
                 <div key={p.accountId} className={`participant-item ${p.isOnline ? 'online' : 'offline'}`}>
                   <span className="participant-name">
                     {p.displayName}
-                    {p.isFacilitator && <span className="participant-facilitator-tag">ведущий</span>}
+                    {p.isFacilitator && <span className="participant-facilitator-tag">facilitator</span>}
                   </span>
                   <span className="participant-role" style={roleLightStyle(p.role)}>
                     {p.role}
@@ -827,43 +835,52 @@ export function PokerRoomPage() {
       </div>
 
       {/* Add Story Modal */}
-      <Modal isOpen={showAddStory} onClose={() => setShowAddStory(false)} title="Добавить стори">
-        <div className="form-group">
-          <label className="filter-label">Название</label>
-          <input
-            type="text"
-            className="filter-input"
-            placeholder="Описание стори..."
-            value={newStoryTitle}
-            onChange={e => setNewStoryTitle(e.target.value)}
-            autoFocus
-          />
-        </div>
-        <div className="form-group">
-          <label className="filter-label">Роли</label>
-          <div className="checkbox-group">
-            {getRoleCodes().map(code => (
-              <label key={code}>
-                <input
-                  type="checkbox"
-                  checked={newStoryNeedsRoles.has(code)}
-                  onChange={() => handleToggleNewStoryRole(code)}
-                />
-                {getRoleDisplayName(code)} ({code})
-              </label>
-            ))}
+      <Modal isOpen={showAddStory} onClose={() => setShowAddStory(false)} title="Add story">
+        <div className="poker-add-story">
+          <div className="poker-field">
+            <label className="poker-field-label">Story title</label>
+            <input
+              type="text"
+              className="filter-input"
+              placeholder="e.g. Login-by-code screen"
+              value={newStoryTitle}
+              onChange={e => setNewStoryTitle(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="poker-field">
+            <label className="poker-field-label">Roles to estimate</label>
+            <div className="poker-role-toggles">
+              {getRoleCodes().map(code => {
+                const active = newStoryNeedsRoles.has(code)
+                const color = getRoleColor(code)
+                return (
+                  <button
+                    type="button"
+                    key={code}
+                    className={`poker-role-toggle ${active ? 'active' : ''}`}
+                    style={active ? { borderColor: color, background: color + '14', color } : undefined}
+                    onClick={() => handleToggleNewStoryRole(code)}
+                  >
+                    <span className="poker-role-dot" style={{ background: active ? color : '#c1c7d0' }} />
+                    <span className="poker-role-toggle-name">{getRoleDisplayName(code)}</span>
+                    <span className="poker-role-toggle-code">{code}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         </div>
         <div className="modal-actions">
           <button className="btn btn-secondary" onClick={() => setShowAddStory(false)}>
-            Отмена
+            Cancel
           </button>
           <button
             className="btn btn-primary"
             onClick={handleAddStory}
             disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0}
           >
-            Добавить
+            Add
           </button>
         </div>
       </Modal>
@@ -872,20 +889,20 @@ export function PokerRoomPage() {
       <Modal
         isOpen={showImportStories}
         onClose={() => setShowImportStories(false)}
-        title="Импорт сторей из Jira"
+        title="Import stories from Jira"
         maxWidth={600}
       >
         <p className="modal-description">
-          Выберите существующие стори из эпика {session?.epicKey}
+          Select existing stories from epic {session?.epicKey}
         </p>
 
         {loadingExisting ? (
-          <div className="loading-small">Загрузка сторей...</div>
+          <div className="loading-small">Loading stories...</div>
         ) : existingStories.length === 0 ? (
           <div className="empty-hint">
-            Нет доступных сторей для импорта.
+            No stories available to import.
             <br />
-            <small>Все стори уже добавлены или эпик пустой.</small>
+            <small>All stories are already added or the epic is empty.</small>
           </div>
         ) : (
           <div className="import-stories-list">
@@ -905,7 +922,7 @@ export function PokerRoomPage() {
                   <div className="import-story-subtasks">
                     {story.subtaskRoles.map(role => (
                       <span key={role} className="subtask-badge" style={roleLightStyle(role)}>
-                        {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}\u0447` : '\u2014'}
+                        {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}h` : '\u2014'}
                       </span>
                     ))}
                   </div>
@@ -917,14 +934,14 @@ export function PokerRoomPage() {
 
         <div className="modal-actions">
           <button className="btn btn-secondary" onClick={() => setShowImportStories(false)}>
-            Отмена
+            Cancel
           </button>
           <button
             className="btn btn-primary"
             onClick={handleImportSelected}
             disabled={selectedImportKeys.size === 0}
           >
-            Импортировать ({selectedImportKeys.size})
+            Import ({selectedImportKeys.size})
           </button>
         </div>
       </Modal>

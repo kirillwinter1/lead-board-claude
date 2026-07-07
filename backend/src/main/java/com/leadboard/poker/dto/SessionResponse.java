@@ -10,6 +10,8 @@ public record SessionResponse(
     Long id,
     Long teamId,
     String epicKey,
+    String epicSummary,
+    String epicDescription,
     String facilitatorAccountId,
     String status,
     String roomCode,
@@ -20,6 +22,10 @@ public record SessionResponse(
     Long currentStoryId
 ) {
     public static SessionResponse from(PokerSessionEntity entity) {
+        return from(entity, null, null);
+    }
+
+    public static SessionResponse from(PokerSessionEntity entity, String epicSummary, String epicDescription) {
         Long currentStoryId = entity.getStories().stream()
                 .filter(s -> s.getStatus() == PokerStoryEntity.StoryStatus.VOTING)
                 .findFirst()
@@ -30,6 +36,8 @@ public record SessionResponse(
                 entity.getId(),
                 entity.getTeamId(),
                 entity.getEpicKey(),
+                epicSummary,
+                epicDescription,
                 entity.getFacilitatorAccountId(),
                 entity.getStatus().name(),
                 entity.getRoomCode(),
