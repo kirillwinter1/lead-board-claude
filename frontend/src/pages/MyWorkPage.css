@@ -93,6 +93,67 @@
 }
 
 /* =====================================================
+   COLLAPSIBLE TASK SECTIONS (In Progress / Up Next / Team Queue)
+   ===================================================== */
+
+.mywork-section-toggle {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.mywork-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mywork-section-chevron {
+  display: inline-block;
+  width: 14px;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+  color: #42526e;
+  transition: transform 0.15s ease;
+}
+
+.mywork-section-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+/* =====================================================
+   UNIFIED TASK TABLE COLUMNS
+   Shared by all three task tables so Type/Key/Summary/Story-Epic/
+   Status/Team/right-numeric columns line up at the same positions.
+   ===================================================== */
+
+.mywork-task-table {
+  table-layout: fixed;
+}
+
+.mywork-col-type { width: 5%; }
+.mywork-col-key { width: 9%; }
+.mywork-col-summary { width: 26%; }
+.mywork-col-parent { width: 20%; }
+.mywork-col-status { width: 13%; }
+.mywork-col-team { width: 14%; }
+.mywork-col-right { width: 13%; }
+
+.mywork-task-table th.mywork-col-right-cell,
+.mywork-task-table td.mywork-col-right-cell {
+  text-align: right;
+}
+
+.mywork-hours-sep {
+  color: #6b778c;
+}
+
+/* =====================================================
    MY PERFORMANCE ANALYTICS (Task 11)
    Reuses .member-summary-cards, .profile-section,
    .member-profile-grid, .dsr-badge from MemberProfilePage.css.

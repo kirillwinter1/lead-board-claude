@@ -120,6 +120,57 @@ describe('MyWorkPage', () => {
     expect(screen.getAllByText('Team Alpha').length).toBeGreaterThan(1)
   })
 
+  it('collapses and expands a task section independently of the others', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [{
+        key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
+        parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+      }],
+      upcomingAssigned: [{
+        key: 'LB-2', summary: 'Upcoming task', issueType: 'Bug', status: 'To Do',
+        parentKey: null, parentSummary: null, epicKey: null, epicSummary: null,
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        estimateH: 4, spentH: null, jiraUrl: 'https://jira.example.com/LB-2',
+      }],
+      teamQueue: [{
+        key: 'LB-3', summary: 'Queue story', issueType: 'Story', status: 'Backlog',
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        epicKey: null, epicSummary: null,
+        myPhaseSubtasks: 2, myPhaseEstimateH: 6, jiraUrl: 'https://jira.example.com/LB-3',
+      }],
+      worklogCalendar: [],
+      analytics: null,
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('LB-1')).toBeInTheDocument()
+    })
+
+    const inProgressToggle = screen.getByRole('button', { name: /In Progress/i })
+    expect(inProgressToggle).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.click(inProgressToggle)
+
+    expect(inProgressToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('LB-1')).toBeNull()
+    // The other two sections stay expanded.
+    expect(screen.getByText('LB-2')).toBeInTheDocument()
+    expect(screen.getByText('LB-3')).toBeInTheDocument()
+
+    fireEvent.click(inProgressToggle)
+
+    expect(inProgressToggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('LB-1')).toBeInTheDocument()
+  })
+
   it('team filter chips refetch with teamId', async () => {
     const response: MyWorkResponse = {
       hasMembership: true,
