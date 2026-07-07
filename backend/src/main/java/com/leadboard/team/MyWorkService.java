@@ -11,6 +11,7 @@ import com.leadboard.team.dto.AbsenceDto;
 import com.leadboard.team.dto.MyWorkResponse;
 import com.leadboard.team.dto.MyWorkResponse.MyMemberInfo;
 import com.leadboard.team.dto.MyWorkResponse.MyTask;
+import com.leadboard.team.dto.MyWorkResponse.QueueStory;
 import com.leadboard.team.dto.MyWorkResponse.TeamRef;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -114,8 +116,90 @@ public class MyWorkService {
         activeTasks.sort(byTeamThenKey);
         upcomingAssigned.sort(byTeamThenKey);
 
+        List<QueueStory> teamQueue = buildTeamQueue(taskMembers, issueCache);
+
         return new MyWorkResponse(true, memberInfo, upcomingAbsences, activeTasks, upcomingAssigned,
-                List.of(), List.of(), null);
+                teamQueue, List.of(), null);
+    }
+
+    /**
+     * Team queue — nearest board stories that still have unassigned subtasks of the member's phase.
+     * For every membership we look at unassigned subtasks in that team, keep only those whose phase
+     * (workflowRole, falling back to WorkflowConfigService.getSubtaskRole) matches this membership's
+     * role, group them by parent story, drop done parents, order parents like the board
+     * (manualOrder asc nulls last → autoScore desc nulls last) and cap the merged result at 10.
+     */
+    private List<QueueStory> buildTeamQueue(List<TeamMemberEntity> taskMembers, Map<String, JiraIssueEntity> cache) {
+        Comparator<JiraIssueEntity> boardOrder = Comparator
+                .comparing(JiraIssueEntity::getManualOrder, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(JiraIssueEntity::getAutoScore, Comparator.nullsLast(Comparator.reverseOrder()));
+
+        List<QueueStory> merged = new ArrayList<>();
+
+        for (TeamMemberEntity member : taskMembers) {
+            TeamEntity team = member.getTeam();
+            String myRole = member.getRole();
+
+            List<JiraIssueEntity> unassigned = issueRepository.findUnassignedSubtasksByTeam(team.getId());
+
+            // Keep only subtasks whose phase matches this membership's role, grouped by parent story.
+            Map<String, List<JiraIssueEntity>> byParent = new LinkedHashMap<>();
+            for (JiraIssueEntity sub : unassigned) {
+                if (sub.getParentKey() == null) continue;
+                String phase = sub.getWorkflowRole() != null
+                        ? sub.getWorkflowRole()
+                        : workflowConfigService.getSubtaskRole(sub.getIssueType());
+                if (phase == null || !phase.equals(myRole)) continue;
+                byParent.computeIfAbsent(sub.getParentKey(), k -> new ArrayList<>()).add(sub);
+            }
+
+            if (byParent.isEmpty()) continue;
+
+            // Resolve parents into cache.
+            List<String> missing = byParent.keySet().stream()
+                    .filter(k -> !cache.containsKey(k))
+                    .toList();
+            if (!missing.isEmpty()) {
+                for (JiraIssueEntity parent : issueRepository.findByIssueKeyIn(missing)) {
+                    cache.put(parent.getIssueKey(), parent);
+                }
+            }
+
+            // Collect eligible (non-done, resolved) parents, then order like the board.
+            List<JiraIssueEntity> parents = new ArrayList<>();
+            for (String parentKey : byParent.keySet()) {
+                JiraIssueEntity parent = cache.get(parentKey);
+                if (parent == null) continue;
+                if (workflowConfigService.isDone(parent.getStatus(), parent.getIssueType())) continue;
+                parents.add(parent);
+            }
+            parents.sort(boardOrder);
+
+            for (JiraIssueEntity story : parents) {
+                List<JiraIssueEntity> subs = byParent.get(story.getIssueKey());
+                long estimateSec = subs.stream()
+                        .mapToLong(s -> s.getOriginalEstimateSeconds() != null ? s.getOriginalEstimateSeconds() : 0L)
+                        .sum();
+                String[] epicInfo = analytics.resolveEpicInfo(subs.get(0), cache);
+
+                merged.add(new QueueStory(
+                        story.getIssueKey(),
+                        story.getSummary(),
+                        story.getIssueType(),
+                        story.getStatus(),
+                        team.getId(),
+                        team.getName(),
+                        team.getColor(),
+                        epicInfo[0],
+                        epicInfo[1],
+                        subs.size(),
+                        analytics.secondsToHours(estimateSec),
+                        jiraConfigResolver.getBaseUrl() + "/browse/" + story.getIssueKey()
+                ));
+            }
+        }
+
+        return merged.stream().limit(10).toList();
     }
 
     private MyTask buildMyTask(JiraIssueEntity subtask, TeamMemberEntity member, Map<String, JiraIssueEntity> cache) {

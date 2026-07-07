@@ -19,6 +19,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -135,6 +136,82 @@ class MyWorkServiceTest {
         assertTrue(r.upcomingAssigned().isEmpty());
     }
 
+    @Test
+    void teamQueueFiltersByMyPhaseAndOrdersLikeBoard() {
+        TeamEntity team = createTeam(1L, "Alpha", "#111111");
+        TeamMemberEntity member = createMember(10L, team);
+
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of(member));
+
+        JiraIssueEntity subA = createSubtask("SUB-A", "Subtask A", "TYPE_X", "STATUS_NEW", 3600L, 0L, null);
+        subA.setParentKey("STORY-1");
+        subA.setWorkflowRole("DEV_X");
+
+        JiraIssueEntity subB = createSubtask("SUB-B", "Subtask B", "TYPE_X", "STATUS_NEW", 7200L, 0L, null);
+        subB.setParentKey("STORY-2");
+        subB.setWorkflowRole("DEV_X");
+
+        JiraIssueEntity subC = createSubtask("SUB-C", "Subtask C", "TYPE_X", "STATUS_NEW", 1800L, 0L, null);
+        subC.setParentKey("STORY-1");
+        subC.setWorkflowRole("QA_X"); // different phase — must be filtered out
+
+        when(issueRepository.findUnassignedSubtasksByTeam(1L)).thenReturn(List.of(subA, subB, subC));
+
+        JiraIssueEntity story1 = createStory("STORY-1", "Story One", "STORY_TYPE", "STATUS_OPEN", 1);
+        JiraIssueEntity story2 = createStory("STORY-2", "Story Two", "STORY_TYPE", "STATUS_OPEN", 5);
+
+        when(issueRepository.findByIssueKeyIn(anyList())).thenReturn(List.of(story1, story2));
+        when(workflowConfigService.isDone("STATUS_OPEN", "STORY_TYPE")).thenReturn(false);
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
+
+        MyWorkResponse r = service.getMyWork("acc-1", from, to, null);
+
+        List<MyWorkResponse.QueueStory> queue = r.teamQueue();
+        assertEquals(2, queue.size());
+
+        assertEquals("STORY-1", queue.get(0).key());
+        assertEquals(1, queue.get(0).myPhaseSubtasks());
+        assertEquals(0, new BigDecimal("1.0").compareTo(queue.get(0).myPhaseEstimateH()));
+
+        assertEquals("STORY-2", queue.get(1).key());
+        assertEquals(1, queue.get(1).myPhaseSubtasks());
+        assertEquals(0, new BigDecimal("2.0").compareTo(queue.get(1).myPhaseEstimateH()));
+    }
+
+    @Test
+    void teamQueueExcludesDoneStoriesAndCapsAtTen() {
+        TeamEntity team = createTeam(1L, "Alpha", "#111111");
+        TeamMemberEntity member = createMember(10L, team);
+
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of(member));
+
+        int doneIndex = 6;
+        List<JiraIssueEntity> subtasks = new java.util.ArrayList<>();
+        List<JiraIssueEntity> stories = new java.util.ArrayList<>();
+        for (int i = 1; i <= 12; i++) {
+            String storyKey = "STORY-" + i;
+            JiraIssueEntity sub = createSubtask("SUB-" + i, "Subtask " + i, "TYPE_X", "STATUS_NEW", 3600L, 0L, null);
+            sub.setParentKey(storyKey);
+            sub.setWorkflowRole("DEV_X");
+            subtasks.add(sub);
+
+            String status = (i == doneIndex) ? "STATUS_DONE" : "STATUS_OPEN";
+            stories.add(createStory(storyKey, "Story " + i, "STORY_TYPE", status, i));
+        }
+
+        when(issueRepository.findUnassignedSubtasksByTeam(1L)).thenReturn(subtasks);
+        when(issueRepository.findByIssueKeyIn(anyList())).thenReturn(stories);
+        when(workflowConfigService.isDone("STATUS_OPEN", "STORY_TYPE")).thenReturn(false);
+        when(workflowConfigService.isDone("STATUS_DONE", "STORY_TYPE")).thenReturn(true);
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
+
+        MyWorkResponse r = service.getMyWork("acc-1", from, to, null);
+
+        List<MyWorkResponse.QueueStory> queue = r.teamQueue();
+        assertEquals(10, queue.size());
+        assertTrue(queue.stream().noneMatch(q -> q.key().equals("STORY-" + doneIndex)));
+    }
+
     // ==================== Helpers ====================
 
     private TeamEntity createTeam(Long id, String name, String color) {
@@ -155,6 +232,18 @@ class MyWorkServiceTest {
         member.setGrade(Grade.SENIOR);
         member.setHoursPerDay(new BigDecimal("6.0"));
         return member;
+    }
+
+    private JiraIssueEntity createStory(String key, String summary, String issueType, String status,
+                                         Integer manualOrder) {
+        JiraIssueEntity issue = new JiraIssueEntity();
+        issue.setIssueKey(key);
+        issue.setSummary(summary);
+        issue.setIssueType(issueType);
+        issue.setBoardCategory("STORY");
+        issue.setStatus(status);
+        issue.setManualOrder(manualOrder);
+        return issue;
     }
 
     private JiraIssueEntity createSubtask(String key, String summary, String issueType, String status,
