@@ -31,21 +31,89 @@ function overHoursClass(estimateH: number | null, spentH: number | null): string
 }
 
 // ======================== TASK TABLES ========================
+//
+// The three task lists (In Progress / Up Next / Team Queue) share one column
+// layout — Type | Key | Summary | Story/Epic | Status | Team | a right-aligned
+// numeric column whose content differs per section. Callers adapt their data
+// into TaskRow[] (see taskRows/queueRows below) so the table markup — and
+// therefore the <colgroup> widths — stays identical across all three tables.
 
-interface MyTaskTableProps {
-  tasks: MyTask[]
-  showSpent: boolean
+interface TaskRow {
+  key: string
+  jiraUrl: string
+  issueType: string
+  summary: string
+  status: string
+  teamName: string | null
+  teamColor: string | null
+  parentLabel: string | null
+  epicLabel: string | null
+  right: ReactNode
+}
+
+function taskRows(tasks: MyTask[], showSpent: boolean): TaskRow[] {
+  return tasks.map(t => ({
+    key: t.key,
+    jiraUrl: t.jiraUrl,
+    issueType: t.issueType,
+    summary: t.summary,
+    status: t.status,
+    teamName: t.teamName,
+    teamColor: t.teamColor,
+    parentLabel: t.parentSummary,
+    epicLabel: t.epicSummary,
+    right: showSpent ? (
+      <>
+        <span className="task-hours">{formatHours(t.estimateH)}</span>
+        <span className="mywork-hours-sep"> / </span>
+        <span className={`task-hours ${overHoursClass(t.estimateH, t.spentH)}`}>{formatHours(t.spentH)}</span>
+      </>
+    ) : (
+      <span className="task-hours">{formatHours(t.estimateH)}</span>
+    ),
+  }))
+}
+
+function queueRows(stories: QueueStory[]): TaskRow[] {
+  return stories.map(s => ({
+    key: s.key,
+    jiraUrl: s.jiraUrl,
+    issueType: s.issueType,
+    summary: s.summary,
+    status: s.status,
+    teamName: s.teamName,
+    teamColor: s.teamColor,
+    parentLabel: null,
+    epicLabel: s.epicSummary,
+    right: (
+      <>{s.myPhaseSubtasks} subtask{s.myPhaseSubtasks === 1 ? '' : 's'} &middot; {formatHours(s.myPhaseEstimateH)}</>
+    ),
+  }))
+}
+
+interface TaskTableProps {
+  rows: TaskRow[]
+  rightHeader: string
   emptyLabel: string
   getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
   getIssueTypeCategory: (typeName: string | null | undefined) => string | null
 }
 
-function MyTaskTable({ tasks, showSpent, emptyLabel, getIssueTypeIconUrl, getIssueTypeCategory }: MyTaskTableProps) {
-  if (tasks.length === 0) {
+function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssueTypeCategory }: TaskTableProps) {
+  if (rows.length === 0) {
     return <div className="mywork-section-empty">{emptyLabel}</div>
   }
   return (
-    <table className="profile-tasks-table">
+    <table className="profile-tasks-table mywork-task-table">
+      <colgroup>
+        <col className="mywork-col-type" />
+        <col className="mywork-col-key" />
+        <col className="mywork-col-summary" />
+        <col className="mywork-col-parent" />
+        <col className="mywork-col-status" />
+        <col className="mywork-col-team" />
+        <col className="mywork-col-right" />
+      </colgroup>
       <thead>
         <tr>
           <th>Type</th>
@@ -54,86 +122,31 @@ function MyTaskTable({ tasks, showSpent, emptyLabel, getIssueTypeIconUrl, getIss
           <th>Story/Epic</th>
           <th>Status</th>
           <th>Team</th>
-          <th style={{ textAlign: 'right' }}>Est</th>
-          {showSpent && <th style={{ textAlign: 'right' }}>Spent</th>}
+          <th className="mywork-col-right-cell">{rightHeader}</th>
         </tr>
       </thead>
       <tbody>
-        {tasks.map(t => (
-          <tr key={t.key}>
+        {rows.map(r => (
+          <tr key={r.key}>
             <td>
               <img
-                src={getIssueIcon(t.issueType, getIssueTypeIconUrl(t.issueType), getIssueTypeCategory(t.issueType))}
+                src={getIssueIcon(r.issueType, getIssueTypeIconUrl(r.issueType), getIssueTypeCategory(r.issueType))}
                 className="issue-type-icon"
-                alt={t.issueType}
+                alt={r.issueType}
               />
             </td>
             <td>
-              <a href={t.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{t.key}</a>
+              <a href={r.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{r.key}</a>
             </td>
-            <td className="task-summary-cell">{t.summary}</td>
+            <td className="task-summary-cell">{r.summary}</td>
             <td className="task-summary-cell">
-              {t.parentSummary}
-              {t.epicSummary && <span className="task-epic-label">{t.epicSummary}</span>}
+              {r.parentLabel}
+              {r.epicLabel && <span className="task-epic-label">{r.epicLabel}</span>}
+              {!r.parentLabel && !r.epicLabel && '—'}
             </td>
-            <td><StatusBadge status={t.status} /></td>
-            <td><TeamBadge name={t.teamName} color={t.teamColor} /></td>
-            <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(t.estimateH)}</td>
-            {showSpent && (
-              <td style={{ textAlign: 'right' }}>
-                <span className={`task-hours ${overHoursClass(t.estimateH, t.spentH)}`}>{formatHours(t.spentH)}</span>
-              </td>
-            )}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  )
-}
-
-interface TeamQueueTableProps {
-  stories: QueueStory[]
-  getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
-  getIssueTypeCategory: (typeName: string | null | undefined) => string | null
-}
-
-function TeamQueueTable({ stories, getIssueTypeIconUrl, getIssueTypeCategory }: TeamQueueTableProps) {
-  if (stories.length === 0) {
-    return <div className="mywork-section-empty">No stories in the queue</div>
-  }
-  return (
-    <table className="profile-tasks-table">
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Key</th>
-          <th>Summary</th>
-          <th>Epic</th>
-          <th>Status</th>
-          <th>Team</th>
-          <th>My Phase</th>
-        </tr>
-      </thead>
-      <tbody>
-        {stories.map(s => (
-          <tr key={s.key}>
-            <td>
-              <img
-                src={getIssueIcon(s.issueType, getIssueTypeIconUrl(s.issueType), getIssueTypeCategory(s.issueType))}
-                className="issue-type-icon"
-                alt={s.issueType}
-              />
-            </td>
-            <td>
-              <a href={s.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{s.key}</a>
-            </td>
-            <td className="task-summary-cell">{s.summary}</td>
-            <td className="task-summary-cell">
-              {s.epicSummary ? <span className="task-epic-label">{s.epicSummary}</span> : '—'}
-            </td>
-            <td><StatusBadge status={s.status} /></td>
-            <td><TeamBadge name={s.teamName} color={s.teamColor} /></td>
-            <td>{s.myPhaseSubtasks} subtask{s.myPhaseSubtasks === 1 ? '' : 's'} &middot; {formatHours(s.myPhaseEstimateH)}</td>
+            <td><StatusBadge status={r.status} /></td>
+            <td><TeamBadge name={r.teamName} color={r.teamColor} /></td>
+            <td className="mywork-col-right-cell">{r.right}</td>
           </tr>
         ))}
       </tbody>
@@ -142,13 +155,22 @@ function TeamQueueTable({ stories, getIssueTypeIconUrl, getIssueTypeCategory }: 
 }
 
 function TaskSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+  const [expanded, setExpanded] = useState(true)
   return (
     <div className="profile-section full-width">
-      <div className="profile-section-header">
-        <h3>{title}</h3>
+      <button
+        type="button"
+        className="profile-section-header mywork-section-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(v => !v)}
+      >
+        <span className="mywork-section-title">
+          <span className={`mywork-section-chevron ${expanded ? 'expanded' : ''}`} aria-hidden="true">&#9656;</span>
+          <h3>{title}</h3>
+        </span>
         <span className="section-badge">{count}</span>
-      </div>
-      {children}
+      </button>
+      {expanded && children}
     </div>
   )
 }
@@ -426,9 +448,9 @@ export function MyWorkPage() {
 
         <div className="mywork-sections">
           <TaskSection title="In Progress" count={activeTasks.length}>
-            <MyTaskTable
-              tasks={activeTasks}
-              showSpent
+            <TaskTable
+              rows={taskRows(activeTasks, true)}
+              rightHeader="Est / Spent"
               emptyLabel="No active tasks"
               getIssueTypeIconUrl={getIssueTypeIconUrl}
               getIssueTypeCategory={getIssueTypeCategory}
@@ -436,9 +458,9 @@ export function MyWorkPage() {
           </TaskSection>
 
           <TaskSection title="Up Next" count={upcomingAssigned.length}>
-            <MyTaskTable
-              tasks={upcomingAssigned}
-              showSpent={false}
+            <TaskTable
+              rows={taskRows(upcomingAssigned, false)}
+              rightHeader="Est"
               emptyLabel="No upcoming tasks"
               getIssueTypeIconUrl={getIssueTypeIconUrl}
               getIssueTypeCategory={getIssueTypeCategory}
@@ -446,8 +468,10 @@ export function MyWorkPage() {
           </TaskSection>
 
           <TaskSection title="Team Queue" count={teamQueue.length}>
-            <TeamQueueTable
-              stories={teamQueue}
+            <TaskTable
+              rows={queueRows(teamQueue)}
+              rightHeader="My Phase"
+              emptyLabel="No stories in the queue"
               getIssueTypeIconUrl={getIssueTypeIconUrl}
               getIssueTypeCategory={getIssueTypeCategory}
             />
