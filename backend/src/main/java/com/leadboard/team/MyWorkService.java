@@ -10,9 +10,14 @@ import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.dto.AbsenceDto;
+import com.leadboard.team.dto.MemberProfileResponse.MemberSummary;
+import com.leadboard.team.dto.MemberProfileResponse.WeeklyTrend;
 import com.leadboard.team.dto.MyWorkResponse;
 import com.leadboard.team.dto.MyWorkResponse.CalendarDay;
+import com.leadboard.team.dto.MyWorkResponse.CompletedTaskWithTeam;
 import com.leadboard.team.dto.MyWorkResponse.DayIssue;
+import com.leadboard.team.dto.MyWorkResponse.DsrBreakdown;
+import com.leadboard.team.dto.MyWorkResponse.MyAnalytics;
 import com.leadboard.team.dto.MyWorkResponse.MyMemberInfo;
 import com.leadboard.team.dto.MyWorkResponse.MyTask;
 import com.leadboard.team.dto.MyWorkResponse.QueueStory;
@@ -21,8 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -35,12 +43,14 @@ import java.util.stream.Collectors;
 
 /**
  * Personal work desk — F88 "My Work". Aggregates active/upcoming tasks, team queue,
- * worklog calendar and analytics across every active membership of a Jira account.
- *
- * analytics is filled in by the follow-up Task 5; until then it returns null.
+ * worklog calendar and personal analytics (DSR breakdowns by parent type and epic)
+ * across every active membership of a Jira account.
  */
 @Service
 public class MyWorkService {
+
+    private static final Comparator<DsrBreakdown> DSR_DESC_NULLS_LAST =
+            Comparator.comparing(DsrBreakdown::dsr, Comparator.nullsLast(Comparator.reverseOrder()));
 
     private final TeamMemberRepository memberRepository;
     private final JiraIssueRepository issueRepository;
@@ -128,8 +138,127 @@ public class MyWorkService {
 
         List<CalendarDay> worklogCalendar = buildWorklogCalendar(accountId, members, primary.getHoursPerDay(), today);
 
+        MyAnalytics analytics = buildAnalytics(accountId, members, primary.getHoursPerDay(), from, to, issueCache);
+
         return new MyWorkResponse(true, memberInfo, upcomingAbsences, activeTasks, upcomingAssigned,
-                teamQueue, worklogCalendar, null);
+                teamQueue, worklogCalendar, analytics);
+    }
+
+    /**
+     * Personal analytics (summary, weekly trend, completed tasks, DSR breakdowns) across every
+     * membership of the account — unlike active/upcoming tasks and the team queue, this deliberately
+     * ignores the {@code teamId} request filter so a member always sees their full completed history.
+     */
+    private MyAnalytics buildAnalytics(String accountId, List<TeamMemberEntity> members, BigDecimal hoursPerDay,
+                                        LocalDate from, LocalDate to, Map<String, JiraIssueEntity> cache) {
+        OffsetDateTime fromDt = from.atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+        OffsetDateTime toDt = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toOffsetDateTime();
+
+        Map<Long, TeamMemberEntity> memberByTeamId = new HashMap<>();
+        List<JiraIssueEntity> completed = new ArrayList<>();
+        for (TeamMemberEntity m : members) {
+            Long teamId = m.getTeam().getId();
+            memberByTeamId.put(teamId, m);
+            completed.addAll(issueRepository.findCompletedSubtasksByAssigneeInPeriod(accountId, teamId, fromDt, toDt));
+        }
+        completed.sort(Comparator.comparing(JiraIssueEntity::getDoneAt, Comparator.nullsLast(Comparator.reverseOrder())));
+
+        MemberSummary summary = analytics.buildSummary(completed, hoursPerDay, from, to);
+        List<WeeklyTrend> weeklyTrend = analytics.buildWeeklyTrend(completed, to);
+
+        List<CompletedTaskWithTeam> completedTasks = completed.stream()
+                .map(issue -> buildCompletedTaskWithTeam(issue, cache, memberByTeamId))
+                .toList();
+
+        List<DsrBreakdown> dsrByParentType = buildDsrByParentType(completed, cache);
+        List<DsrBreakdown> dsrByEpic = buildDsrByEpic(completed, cache);
+
+        return new MyAnalytics(summary, weeklyTrend, completedTasks, dsrByParentType, dsrByEpic);
+    }
+
+    private CompletedTaskWithTeam buildCompletedTaskWithTeam(JiraIssueEntity issue, Map<String, JiraIssueEntity> cache,
+                                                               Map<Long, TeamMemberEntity> memberByTeamId) {
+        BigDecimal estimateH = analytics.secondsToHours(issue.getOriginalEstimateSeconds());
+        BigDecimal spentH = analytics.secondsToHours(issue.getTimeSpentSeconds());
+        BigDecimal dsr = analytics.calculateDsr(issue);
+        LocalDate doneDate = issue.getDoneAt() != null ? issue.getDoneAt().toLocalDate() : null;
+        String[] epicInfo = analytics.resolveEpicInfo(issue, cache);
+
+        TeamMemberEntity member = memberByTeamId.get(issue.getTeamId());
+        TeamEntity team = member != null ? member.getTeam() : null;
+
+        return new CompletedTaskWithTeam(
+                issue.getIssueKey(),
+                issue.getSummary(),
+                epicInfo[0],
+                epicInfo[1],
+                team != null ? team.getId() : null,
+                team != null ? team.getName() : null,
+                team != null ? team.getColor() : null,
+                estimateH,
+                spentH,
+                dsr,
+                doneDate,
+                jiraConfigResolver.getBaseUrl() + "/browse/" + issue.getIssueKey()
+        );
+    }
+
+    /**
+     * DSR grouped by the completed subtask's parent issue type (e.g. Story vs Bug), worst DSR first.
+     * A missing/unresolvable parent falls into the "Unknown" bucket.
+     */
+    private List<DsrBreakdown> buildDsrByParentType(List<JiraIssueEntity> completed, Map<String, JiraIssueEntity> cache) {
+        Map<String, List<JiraIssueEntity>> byType = new LinkedHashMap<>();
+        for (JiraIssueEntity sub : completed) {
+            JiraIssueEntity parent = sub.getParentKey() != null
+                    ? cache.computeIfAbsent(sub.getParentKey(), key -> issueRepository.findByIssueKey(key).orElse(null))
+                    : null;
+            String type = parent != null ? parent.getIssueType() : "Unknown";
+            byType.computeIfAbsent(type, k -> new ArrayList<>()).add(sub);
+        }
+
+        return byType.entrySet().stream()
+                .map(e -> buildDsrBreakdown(e.getKey(), e.getKey(), e.getValue()))
+                .sorted(DSR_DESC_NULLS_LAST)
+                .toList();
+    }
+
+    /**
+     * DSR grouped by epic (resolved via the subtask's parent -> grandparent chain), worst DSR first,
+     * capped at the 10 worst epics. Subtasks without a resolvable epic are excluded from this cut.
+     */
+    private List<DsrBreakdown> buildDsrByEpic(List<JiraIssueEntity> completed, Map<String, JiraIssueEntity> cache) {
+        Map<String, List<JiraIssueEntity>> byEpic = new LinkedHashMap<>();
+        Map<String, String> labels = new HashMap<>();
+        for (JiraIssueEntity sub : completed) {
+            String[] epicInfo = analytics.resolveEpicInfo(sub, cache);
+            String epicKey = epicInfo[0];
+            if (epicKey == null) continue;
+            byEpic.computeIfAbsent(epicKey, k -> new ArrayList<>()).add(sub);
+            labels.putIfAbsent(epicKey, epicInfo[1] != null ? epicInfo[1] : epicKey);
+        }
+
+        return byEpic.entrySet().stream()
+                .map(e -> buildDsrBreakdown(e.getKey(), labels.get(e.getKey()), e.getValue()))
+                .sorted(DSR_DESC_NULLS_LAST)
+                .limit(10)
+                .toList();
+    }
+
+    // Sums raw seconds across the group and converts once — summing already-rounded per-task hours
+    // would drift (see the worklog-calendar rounding note in buildWorklogCalendar).
+    private DsrBreakdown buildDsrBreakdown(String key, String label, List<JiraIssueEntity> issues) {
+        long estimateSec = issues.stream()
+                .mapToLong(i -> i.getOriginalEstimateSeconds() != null ? i.getOriginalEstimateSeconds() : 0L)
+                .sum();
+        long spentSec = issues.stream()
+                .mapToLong(i -> i.getTimeSpentSeconds() != null ? i.getTimeSpentSeconds() : 0L)
+                .sum();
+        BigDecimal dsr = estimateSec > 0
+                ? new BigDecimal(spentSec).divide(new BigDecimal(estimateSec), 2, RoundingMode.HALF_UP)
+                : null;
+        return new DsrBreakdown(key, label, issues.size(), analytics.secondsToHours(estimateSec),
+                analytics.secondsToHours(spentSec), dsr);
     }
 
     /**

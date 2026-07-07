@@ -19,12 +19,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -299,6 +302,92 @@ class MyWorkServiceTest {
                 .filter(bi -> bi.issueKey().equals("SUB-4")).findFirst().orElseThrow();
         assertEquals(0, new BigDecimal("0.2").compareTo(sub3.hours()));
         assertEquals(0, new BigDecimal("0.2").compareTo(sub4.hours()));
+    }
+
+    @Test
+    void analyticsBreaksDownDsrByParentTypeAndEpic() {
+        TeamEntity team = createTeam(1L, "Alpha", "#111111");
+        TeamMemberEntity member = createMember(10L, team);
+
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of(member));
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
+
+        JiraIssueEntity epic1 = createStory("EP-1", "Epic One", "EpicType", "STATUS_OPEN", null);
+        JiraIssueEntity epic2 = createStory("EP-2", "Epic Two", "EpicType", "STATUS_OPEN", null);
+        JiraIssueEntity storyA = createStory("STORY-A", "Story A", "TypeA", "STATUS_OPEN", null);
+        storyA.setParentKey("EP-1");
+        JiraIssueEntity storyB = createStory("STORY-B", "Story B", "TypeB", "STATUS_OPEN", null);
+        storyB.setParentKey("EP-2");
+
+        when(issueRepository.findByIssueKey("EP-1")).thenReturn(Optional.of(epic1));
+        when(issueRepository.findByIssueKey("EP-2")).thenReturn(Optional.of(epic2));
+        when(issueRepository.findByIssueKey("STORY-A")).thenReturn(Optional.of(storyA));
+        when(issueRepository.findByIssueKey("STORY-B")).thenReturn(Optional.of(storyB));
+
+        // Two subtasks under a "TypeA" story (parent under EP-1): estimate == spent -> DSR 1.00.
+        JiraIssueEntity sub1 = createSubtask("SUB-1", "Sub 1", "SubtaskType", "STATUS_DONE", 3600L, 3600L,
+                OffsetDateTime.parse("2026-01-20T10:00:00Z"));
+        sub1.setParentKey("STORY-A");
+        JiraIssueEntity sub2 = createSubtask("SUB-2", "Sub 2", "SubtaskType", "STATUS_DONE", 3600L, 3600L,
+                OffsetDateTime.parse("2026-01-21T10:00:00Z"));
+        sub2.setParentKey("STORY-A");
+        // One subtask under a "TypeB" story (parent under EP-2): spent double the estimate -> DSR 2.00.
+        JiraIssueEntity sub3 = createSubtask("SUB-3", "Sub 3", "SubtaskType", "STATUS_DONE", 3600L, 7200L,
+                OffsetDateTime.parse("2026-01-22T10:00:00Z"));
+        sub3.setParentKey("STORY-B");
+
+        when(issueRepository.findCompletedSubtasksByAssigneeInPeriod(eq("acc-1"), eq(1L), any(), any()))
+                .thenReturn(List.of(sub1, sub2, sub3));
+
+        MyWorkResponse r = service.getMyWork("acc-1", from, to, null);
+
+        List<MyWorkResponse.DsrBreakdown> byType = r.analytics().dsrByParentType();
+        assertEquals(2, byType.size());
+        assertEquals("TypeB", byType.get(0).key());
+        assertEquals("TypeB", byType.get(0).label());
+        assertEquals(0, new BigDecimal("2.00").compareTo(byType.get(0).dsr()));
+        assertEquals("TypeA", byType.get(1).key());
+        assertEquals(0, new BigDecimal("1.00").compareTo(byType.get(1).dsr()));
+        assertEquals(2, byType.get(1).taskCount());
+
+        List<MyWorkResponse.DsrBreakdown> byEpic = r.analytics().dsrByEpic();
+        assertEquals(2, byEpic.size());
+        assertTrue(byEpic.stream().anyMatch(d -> d.key().equals("EP-1") && "Epic One".equals(d.label())
+                && new BigDecimal("1.00").compareTo(d.dsr()) == 0));
+        assertTrue(byEpic.stream().anyMatch(d -> d.key().equals("EP-2") && "Epic Two".equals(d.label())
+                && new BigDecimal("2.00").compareTo(d.dsr()) == 0));
+    }
+
+    @Test
+    void analyticsIgnoresTeamIdFilter() {
+        TeamEntity teamAlpha = createTeam(1L, "Alpha", "#111111");
+        TeamEntity teamBeta = createTeam(2L, "Beta", "#222222");
+        TeamMemberEntity memberAlpha = createMember(10L, teamAlpha);
+        TeamMemberEntity memberBeta = createMember(20L, teamBeta);
+
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1"))
+                .thenReturn(List.of(memberAlpha, memberBeta));
+        when(jiraConfigResolver.getBaseUrl()).thenReturn("https://jira.example.com");
+
+        JiraIssueEntity completedAlpha = createSubtask("SUB-A", "Alpha work", "TYPE_X", "STATUS_DONE",
+                3600L, 3600L, OffsetDateTime.parse("2026-01-20T10:00:00Z"));
+        completedAlpha.setTeamId(1L);
+        JiraIssueEntity completedBeta = createSubtask("SUB-B", "Beta work", "TYPE_X", "STATUS_DONE",
+                3600L, 3600L, OffsetDateTime.parse("2026-01-21T10:00:00Z"));
+        completedBeta.setTeamId(2L);
+
+        when(issueRepository.findCompletedSubtasksByAssigneeInPeriod(eq("acc-1"), eq(1L), any(), any()))
+                .thenReturn(List.of(completedAlpha));
+        when(issueRepository.findCompletedSubtasksByAssigneeInPeriod(eq("acc-1"), eq(2L), any(), any()))
+                .thenReturn(List.of(completedBeta));
+
+        // teamId=1L narrows activeTasks/upcomingAssigned/teamQueue, but analytics must still cover both teams.
+        MyWorkResponse r = service.getMyWork("acc-1", from, to, 1L);
+
+        List<MyWorkResponse.CompletedTaskWithTeam> completedTasks = r.analytics().completedTasks();
+        assertEquals(2, completedTasks.size());
+        assertTrue(completedTasks.stream().anyMatch(t -> t.key().equals("SUB-A") && "Alpha".equals(t.teamName())));
+        assertTrue(completedTasks.stream().anyMatch(t -> t.key().equals("SUB-B") && "Beta".equals(t.teamName())));
     }
 
     private MyWorkResponse.CalendarDay findDay(MyWorkResponse r, LocalDate date) {
