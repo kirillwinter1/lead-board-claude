@@ -117,8 +117,9 @@ MyWorkResponse {
 - Общая DSR-логика выносится из `MemberProfileService` в переиспользуемый
   компонент; `MemberProfileService` и `MyWorkService` используют его совместно.
 - Данные: `JiraIssueRepository` (assignee-запросы уже есть),
-  `IssueWorklogRepository.findDailyWorklogsByAuthors` (F57), `AbsenceService`,
-  учёт пауз DSR из F32.
+  `IssueWorklogRepository.findDailyWorklogsByAuthors` (F57), `AbsenceService`.
+  DSR по сабтаскам считается как в F30 (`timeSpent / originalEstimate`);
+  паузы F32 действуют на уровне эпиков и на личный DSR не влияют.
 - Типы/статусы/фазы — только через `WorkflowConfigService`
   (`isStory()`, `isBug()`, `getSubtaskRole()`, `getRolesInPipelineOrder()`).
 - Jira browse-URL — через `JiraConfigResolver`.
