@@ -1,0 +1,93 @@
+/* =====================================================
+   MY WORK PAGE (F88)
+   Reuses .main-content, .page-header, .profile-section,
+   .profile-section-header, .section-badge, .profile-tasks-table,
+   .member-avatar, .member-info, .role-badge, .grade-badge
+   from TeamsPage.css / MemberProfilePage.css.
+   ===================================================== */
+
+.mywork-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
+.mywork-absence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mywork-absence-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.mywork-absence-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.mywork-team-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mywork-team-chips .chip {
+  padding: 6px 14px;
+  border-radius: 16px;
+  border: 1px solid #dfe1e6;
+  background: white;
+  color: #42526e;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mywork-team-chips .chip:hover {
+  background: #f4f5f7;
+}
+
+.mywork-team-chips .chip.active {
+  background: #0052cc;
+  border-color: #0052cc;
+  color: white;
+}
+
+.mywork-empty {
+  padding: 60px;
+  text-align: center;
+  color: #6b778c;
+  background: white;
+  border-radius: 8px;
+}
+
+.mywork-section-empty {
+  padding: 20px;
+  text-align: center;
+  color: #6b778c;
+  font-size: 13px;
+}
+
+.mywork-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.issue-type-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
