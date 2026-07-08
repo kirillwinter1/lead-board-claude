@@ -88,6 +88,7 @@
 | F87 | Timeline: режим отображения факта — worklog сабтасок или интервалы статусов Story (переключатель Logged time / Story statuses) | 2026-07-06 | [features/F87](features/F87_TIMELINE_ACTUALS_MODE.md) |
 | F89 | Planning Poker rework: комната по ключу эпика, публикация оценок в Jira (Original Estimate сабтасков), итоги в человеко-днях + сравнение rough→poker с % ошибки, доска rough→clean, создание стори в Jira с сабтасками+компонентом | 2026-07-08 | [features/F89](features/F89_PLANNING_POKER_REWORK.md) |
 | F88 | My Work — личный рабочий стол участника | 2026-07-07 | [features/F88](features/F88_MY_WORK.md) |
+| F90 | Log time — списание времени со страницы My Work | 2026-07-08 | [features/F90](features/F90_LOG_TIME_MY_WORK.md) |
 
 ## Бэклог (BF)
 
