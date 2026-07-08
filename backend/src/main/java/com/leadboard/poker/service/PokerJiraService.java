@@ -69,7 +69,8 @@ public class PokerJiraService {
             for (String roleCode : needsRoles) {
                 String subtaskTypeName = workflowConfigService.getSubtaskTypeName(roleCode);
                 String subtaskKey = jiraClient.createSubtask(storyKey,
-                        subtaskTypeName != null ? subtaskTypeName : roleCode, projectKey, subtaskTypeName);
+                        subtaskTypeName != null ? subtaskTypeName : roleCode, projectKey, subtaskTypeName,
+                        description, components);
                 log.info("Created {} subtask: {}", roleCode, subtaskKey);
             }
 

@@ -299,6 +299,11 @@ public class JiraClient {
      * @param subtaskTypeName Jira issue type name for subtasks (e.g. "Sub-task", "Подзадача")
      */
     public String createSubtask(String parentKey, String summary, String projectKey, String subtaskTypeName) {
+        return createSubtask(parentKey, summary, projectKey, subtaskTypeName, null, null);
+    }
+
+    public String createSubtask(String parentKey, String summary, String projectKey, String subtaskTypeName,
+                                String description, List<String> componentNames) {
         String accessToken = oauthService.getValidAccessToken();
         String cloudId = oauthService.getCloudIdForCurrentUser();
 
@@ -310,6 +315,16 @@ public class JiraClient {
         fields.put("summary", summary);
         fields.put("issuetype", Map.of("name", typeName));
         fields.put("parent", Map.of("key", parentKey));
+
+        if (description != null && !description.isBlank()) {
+            fields.put("description", toAdf(description));
+        }
+        if (componentNames != null && !componentNames.isEmpty()) {
+            fields.put("components", componentNames.stream()
+                    .filter(n -> n != null && !n.isBlank())
+                    .map(n -> Map.of("name", n))
+                    .toList());
+        }
 
         Map<String, Object> body = Map.of("fields", fields);
 
