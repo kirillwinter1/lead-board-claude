@@ -86,6 +86,7 @@
 | F85 | Board Tooltips (эпик + проект hover-карточки) | 2026-07-02 | [features/F85](features/F85-board-tooltips.md) |
 | F86 | Quarterly Planning: остаток работы по эпикам (needs-planning фильтр + остаток сейчас/на старте квартала) | 2026-07-03 | [features/F86](features/F86_QUARTERLY_REMAINING_WORK.md) |
 | F87 | Timeline: режим отображения факта — worklog сабтасок или интервалы статусов Story (переключатель Logged time / Story statuses) | 2026-07-06 | [features/F87](features/F87_TIMELINE_ACTUALS_MODE.md) |
+| F89 | Planning Poker rework: комната по ключу эпика, публикация оценок в Jira (Original Estimate сабтасков), итоги в человеко-днях + сравнение rough→poker с % ошибки, доска rough→clean, создание стори в Jira с сабтасками+компонентом | 2026-07-08 | [features/F89](features/F89_PLANNING_POKER_REWORK.md) |
 
 ## Бэклог (BF)
 
