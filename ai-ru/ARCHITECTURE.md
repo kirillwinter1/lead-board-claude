@@ -59,7 +59,7 @@ com.leadboard/
 │   └── DTO и entities для логов симуляций
 ├── status/         — StatusCategory enum (TODO/IN_PROGRESS/DONE)
 ├── sync/           — Синхронизация с Jira (SyncService 437 LOC, инкрементальная, ChangelogImportService)
-├── team/           — CRUD команд/участников, MemberProfileService, MyWorkService (F88), TeamSyncService
+├── team/           — CRUD команд/участников, MemberProfileService, MyWorkService (F88), MyWorklogService (F90), TeamSyncService
 └── telegram/       — Интеграция с Telegram (TelegramService)
 ```
 
@@ -86,6 +86,7 @@ com.leadboard/
 | MemberProfileService | ~150 | Профиль участника: задачи, DSR тренд |
 | MemberAnalyticsService | ~180 | Общая DSR-аналитика участника: calculateDsr, weekly trend, summary — используется MemberProfileService и MyWorkService |
 | MyWorkService | ~440 | Личный рабочий стол (F88): активные/предстоящие задачи, фазовая очередь команды, worklog-календарь, аналитика — переиспользует DSR-аналитику MemberAnalyticsService |
+| MyWorklogService | ~100 | Log time из My Work (F90): валидации (свой сабтаск, часы (0,24], дата не в будущем), запись ворклога в Jira персональным OAuth-токеном пользователя через JiraWriteService.logWorkAs (Jira-first), затем локальный апсерт IssueWorklogEntity + инкремент timeSpentSeconds |
 
 ### Entity (23+ сущностей)
 
@@ -142,7 +143,7 @@ com.leadboard/
 | CompetencyController | 5 | /api/competencies/* |
 | SimulationController | 5 | /api/simulation/* |
 | AuditRequestController | 1 | /api/audit-requests |
-| MyWorkController | 1 | /api/me/work |
+| MyWorkController | 2 | /api/me/work, /api/me/worklog (F90, POST — log time) |
 
 ## Frontend (React + Vite + TypeScript)
 
