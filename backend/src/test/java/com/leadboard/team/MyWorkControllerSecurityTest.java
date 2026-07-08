@@ -25,8 +25,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 /**
  * Security tests for {@link MyWorkController} (F88 "My Work").
@@ -52,6 +55,9 @@ class MyWorkControllerSecurityTest {
 
     @MockBean
     private MyWorkService myWorkService;
+
+    @MockBean
+    private MyWorklogService myWorklogService;
 
     @MockBean
     private AuthorizationService authorizationService;
@@ -82,6 +88,17 @@ class MyWorkControllerSecurityTest {
                 .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(myWorkService);
+    }
+
+    @Test
+    void unauthenticatedPostLogTimeGets401() throws Exception {
+        mockMvc.perform(post("/api/me/worklog")
+                        .with(csrf())
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(myWorklogService);
     }
 
     @Test
