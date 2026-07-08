@@ -677,7 +677,7 @@ public class JiraClient {
 
     /**
      * Add a worklog to an issue using explicit OAuth credentials and return the created
-     * worklog's id (F89 — per-user write path for "Log time" from My Work).
+     * worklog's id (F90 — per-user write path for "Log time" from My Work).
      *
      * @param comment optional worklog comment (ADF-wrapped, same structure as {@link #addComment}); may be null/blank
      * @return the created worklog's id, or null if the response didn't contain one

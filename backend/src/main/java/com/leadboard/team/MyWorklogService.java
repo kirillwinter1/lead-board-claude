@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
- * Orchestrates time logging from My Work (F89): validates the request, writes to Jira
+ * Orchestrates time logging from My Work (F90): validates the request, writes to Jira
  * from the acting user's own OAuth identity via {@link JiraWriteService}, then upserts
  * the local worklog cache so the board/analytics reflect the new entry immediately
  * (a full re-sync will later reconcile with Jira, which remains the source of truth).
