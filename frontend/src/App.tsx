@@ -51,7 +51,7 @@ function App() {
           <Route path="metrics" element={<TeamMetricsPage />} />
           <Route path="data-quality" element={<DataQualityPage />} />
           <Route path="poker" element={<PlanningPokerPage />} />
-          <Route path="poker/room/:roomCode" element={<PokerRoomPage />} />
+          <Route path="poker/:epicKey" element={<PokerRoomPage />} />
           <Route path="projects" element={<ProjectsPage />} />
           <Route path="quarterly-planning" element={<QuarterlyPlanningPage />} />
           <Route path="matrix" element={<MatrixPage />} />

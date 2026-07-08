@@ -129,8 +129,8 @@ class PokerIntegrationTest extends IntegrationTestBase {
                 SessionResponse.class).getBody();
 
         // When - add stories
-        var story1 = new AddStoryRequest("User login feature", List.of("SA", "DEV", "QA"), null);
-        var story2 = new AddStoryRequest("Dashboard widget", List.of("DEV", "QA"), null);
+        var story1 = new AddStoryRequest("User login feature", List.of("SA", "DEV", "QA"), null, null, null);
+        var story2 = new AddStoryRequest("Dashboard widget", List.of("DEV", "QA"), null, null, null);
 
         var addResponse1 = restTemplate.postForEntity(
                 "/api/poker/sessions/" + session.id() + "/stories",

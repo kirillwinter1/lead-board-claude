@@ -3,7 +3,7 @@ import { formatCompact } from './helpers'
 import type { EpicRoleChipProps } from './types'
 import { lightenColor } from '../../constants/colors'
 
-export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpdate, roleColor }: EpicRoleChipProps) {
+export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpdate, roleColor, estimateSource }: EpicRoleChipProps) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState<string>('')
   const [saving, setSaving] = useState(false)
@@ -100,13 +100,16 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
   const progress = hasEstimate ? Math.min(100, (loggedDays / estimateDays) * 100) : 0
   const remainingText = `${formatCompact(remainingDays)}d left`
 
-  // If no real estimate but has rough estimate - show rough estimate (read-only)
+  // If no real estimate but has rough estimate - show it read-only.
+  // F23: a 'clean' epic (poker estimates exist) renders filled; a 'rough' one stays
+  // outlined/muted. The tooltip spells out which kind of estimate it is.
   if (!hasEstimate && hasRoughEstimate) {
+    const isClean = estimateSource === 'clean'
     return (
       <div
-        className="epic-role-chip rough-only"
-        style={{ color: roleColor, borderColor }}
-        title={`\u0413\u0440\u044F\u0437\u043D\u0430\u044F \u043E\u0446\u0435\u043D\u043A\u0430: ${roughEstimate}d`}
+        className={`epic-role-chip rough-only ${isClean ? 'clean' : ''}`}
+        style={isClean ? { color: '#fff', background: fillColor, borderColor: fillColor } : { color: roleColor, borderColor }}
+        title={isClean ? `Poker estimate: ${roughEstimate}d` : `Rough estimate (pre-planning): ${roughEstimate}d`}
       >
         <span className="epic-role-label">{label}</span>
         <span className="epic-role-value rough">{roughEstimate}d</span>

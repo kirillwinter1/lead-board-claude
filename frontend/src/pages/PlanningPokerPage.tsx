@@ -18,7 +18,7 @@ import {
   createSession,
 } from '../api/poker'
 import { getStatusStyles, type StatusStyle } from '../api/board'
-import { BG_SUBTLE, INFO_BG, SUCCESS_BG } from '../constants/colors'
+import { INFO_BG, SUCCESS_BG } from '../constants/colors'
 
 // Two overlapping poker cards — line-art empty-state icon (no emoji)
 function PlanningIcon() {
@@ -52,9 +52,9 @@ export function PlanningPokerPage() {
   const [loadingEpics, setLoadingEpics] = useState(false)
   const [creatingEpicKey, setCreatingEpicKey] = useState<string | null>(null)
 
-  // Join room modal
+  // Join room modal — by epic key (rooms are addressed by epic key, F23)
   const [showJoinModal, setShowJoinModal] = useState(false)
-  const [joinRoomCode, setJoinRoomCode] = useState('')
+  const [joinEpicKey, setJoinEpicKey] = useState('')
 
   // Status colors from workflow config — so StatusBadge renders board colors, not grey
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
@@ -131,7 +131,7 @@ export function PlanningPokerPage() {
     setCreatingEpicKey(epicKey)
     try {
       const session = await createSession(selectedTeamId, epicKey)
-      navigate(`/poker/room/${session.roomCode}`)
+      navigate(`/poker/${session.epicKey}`)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError('Failed to create session: ' + message)
@@ -140,8 +140,8 @@ export function PlanningPokerPage() {
   }
 
   const handleJoinRoom = () => {
-    if (joinRoomCode.trim()) {
-      navigate(`/poker/room/${joinRoomCode.trim().toUpperCase()}`)
+    if (joinEpicKey.trim()) {
+      navigate(`/poker/${joinEpicKey.trim().toUpperCase()}`)
     }
   }
 
@@ -180,7 +180,7 @@ export function PlanningPokerPage() {
         {!pickingEpic && (
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={() => setShowJoinModal(true)}>
-              Join by code
+              Join by key
             </button>
             <button className="btn btn-primary" onClick={handleOpenEpicPicker} disabled={!selectedTeamId}>
               New session
@@ -233,7 +233,7 @@ export function PlanningPokerPage() {
           <p>Create a Planning Poker session for your team to estimate an epic's stories together.</p>
           <div className="poker-empty-actions">
             <button className="btn btn-secondary" onClick={() => setShowJoinModal(true)}>
-              Join by code
+              Join by key
             </button>
             <button className="btn btn-primary" onClick={handleOpenEpicPicker} disabled={!selectedTeamId}>
               New session
@@ -247,7 +247,6 @@ export function PlanningPokerPage() {
             <thead>
               <tr>
                 <th>Epic</th>
-                <th>Room code</th>
                 <th>Status</th>
                 <th>Stories</th>
                 <th>Created</th>
@@ -258,25 +257,20 @@ export function PlanningPokerPage() {
               {sessions.map(session => (
                 <tr key={session.id}>
                   <td>
-                    <a
-                      href={`${jiraBaseUrl}${session.epicKey}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="issue-key"
-                    >
-                      {session.epicKey}
-                    </a>
-                  </td>
-                  <td>
-                    <code style={{
-                      background: BG_SUBTLE,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      fontWeight: 600,
-                      letterSpacing: '0.1em'
-                    }}>
-                      {session.roomCode}
-                    </code>
+                    <span className="poker-epic-cell">
+                      <img className="poker-epic-cell-icon" src={epicIcon} alt="" />
+                      <a
+                        href={`${jiraBaseUrl}${session.epicKey}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="issue-key"
+                      >
+                        {session.epicKey}
+                      </a>
+                      {session.epicSummary && (
+                        <span className="poker-epic-cell-summary">· {session.epicSummary}</span>
+                      )}
+                    </span>
                   </td>
                   <td>{getStatusBadge(session.status)}</td>
                   <td>{session.stories.length}</td>
@@ -284,9 +278,9 @@ export function PlanningPokerPage() {
                   <td>
                     <button
                       className="btn btn-secondary"
-                      onClick={() => navigate(`/poker/room/${session.roomCode}`)}
+                      onClick={() => navigate(`/poker/${session.epicKey}`)}
                     >
-                      {session.status === 'COMPLETED' ? 'View' : 'Join'}
+                      Open
                     </button>
                   </td>
                 </tr>
@@ -296,19 +290,19 @@ export function PlanningPokerPage() {
       </div>
       )}
 
-      {/* Join Room Modal */}
-      <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join room">
+      {/* Join Room Modal — by epic key */}
+      <Modal isOpen={showJoinModal} onClose={() => setShowJoinModal(false)} title="Join by epic key">
         <div className="form-group">
-          <label className="filter-label">Room code</label>
+          <label className="filter-label">Epic key</label>
           <input
             type="text"
             className="filter-input"
-            placeholder="e.g. ABC123"
-            value={joinRoomCode}
-            onChange={e => setJoinRoomCode(e.target.value.toUpperCase())}
+            placeholder="e.g. LB-203"
+            value={joinEpicKey}
+            onChange={e => setJoinEpicKey(e.target.value.toUpperCase())}
+            onKeyDown={e => { if (e.key === 'Enter' && joinEpicKey.trim()) handleJoinRoom() }}
             autoFocus
-            maxLength={6}
-            style={{ letterSpacing: '0.2em', textAlign: 'center', fontSize: 18 }}
+            style={{ letterSpacing: '0.14em', textAlign: 'center', fontSize: 18 }}
           />
         </div>
         <div className="modal-actions">
@@ -318,9 +312,9 @@ export function PlanningPokerPage() {
           <button
             className="btn btn-primary"
             onClick={handleJoinRoom}
-            disabled={joinRoomCode.trim().length !== 6}
+            disabled={!joinEpicKey.trim()}
           >
-            Join
+            Open room
           </button>
         </div>
       </Modal>

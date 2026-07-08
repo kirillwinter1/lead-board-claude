@@ -47,7 +47,7 @@ class PokerE2ETest extends IntegrationTestBase {
         String roomCode = session.roomCode();
 
         // ===== Step 3: Add stories to estimate =====
-        var story1 = new AddStoryRequest("User authentication", List.of("SA", "DEV", "QA"), null);
+        var story1 = new AddStoryRequest("User authentication", List.of("SA", "DEV", "QA"), null, null, null);
         var story1Response = restTemplate.postForEntity(
                 "/api/poker/sessions/" + sessionId + "/stories",
                 story1,
@@ -58,7 +58,7 @@ class PokerE2ETest extends IntegrationTestBase {
         assertTrue(story1Response.getBody().needsRoles().contains("DEV"));
         assertTrue(story1Response.getBody().needsRoles().contains("QA"));
 
-        var story2 = new AddStoryRequest("Dashboard widget", List.of("DEV", "QA"), null);
+        var story2 = new AddStoryRequest("Dashboard widget", List.of("DEV", "QA"), null, null, null);
         var story2Response = restTemplate.postForEntity(
                 "/api/poker/sessions/" + sessionId + "/stories",
                 story2,
@@ -67,7 +67,7 @@ class PokerE2ETest extends IntegrationTestBase {
         assertEquals(HttpStatus.OK, story2Response.getStatusCode());
         assertFalse(story2Response.getBody().needsRoles().contains("SA"));
 
-        var story3 = new AddStoryRequest("API endpoint", List.of("DEV"), null);
+        var story3 = new AddStoryRequest("API endpoint", List.of("DEV"), null, null, null);
         restTemplate.postForEntity(
                 "/api/poker/sessions/" + sessionId + "/stories",
                 story3,
@@ -189,6 +189,8 @@ class PokerE2ETest extends IntegrationTestBase {
         var linkedStory = new AddStoryRequest(
                 "Existing Story",
                 List.of("SA", "DEV", "QA"),
+                null, // description
+                null, // component
                 "LINKSTORY-1" // Link to existing Jira story
         );
 

@@ -1,6 +1,8 @@
 package com.leadboard.poker.controller;
 
+import com.leadboard.config.JiraConfigResolver;
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.jira.JiraClient;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
@@ -8,6 +10,7 @@ import com.leadboard.poker.entity.PokerStoryEntity;
 import com.leadboard.poker.repository.PokerSessionRepository;
 import com.leadboard.poker.service.PokerJiraService;
 import com.leadboard.poker.service.PokerSessionService;
+import com.leadboard.poker.service.PokerSummaryService;
 import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.auth.LeadBoardAuthentication;
@@ -31,21 +34,30 @@ public class PokerController {
 
     private final PokerSessionService sessionService;
     private final PokerJiraService jiraService;
+    private final PokerSummaryService summaryService;
     private final JiraIssueRepository issueRepository;
     private final PokerSessionRepository pokerSessionRepository;
     private final WorkflowConfigService workflowConfigService;
+    private final JiraClient jiraClient;
+    private final JiraConfigResolver jiraConfigResolver;
 
     public PokerController(
             PokerSessionService sessionService,
             PokerJiraService jiraService,
+            PokerSummaryService summaryService,
             JiraIssueRepository issueRepository,
             PokerSessionRepository pokerSessionRepository,
-            WorkflowConfigService workflowConfigService) {
+            WorkflowConfigService workflowConfigService,
+            JiraClient jiraClient,
+            JiraConfigResolver jiraConfigResolver) {
         this.sessionService = sessionService;
         this.jiraService = jiraService;
+        this.summaryService = summaryService;
         this.issueRepository = issueRepository;
         this.pokerSessionRepository = pokerSessionRepository;
         this.workflowConfigService = workflowConfigService;
+        this.jiraClient = jiraClient;
+        this.jiraConfigResolver = jiraConfigResolver;
     }
 
     // ===== Eligible Epics =====
@@ -203,6 +215,51 @@ public class PokerController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * F23 rework: rooms are addressed by epic key, not room code. Returns the active
+     * (PREPARING or ACTIVE) session for the epic; if none is active, falls back to the
+     * most recent session (e.g. a COMPLETED one, so its results stay viewable).
+     * Enriched with epicSummary/epicDescription. 404 when the epic has no session at all.
+     */
+    @GetMapping("/sessions/epic/{epicKey}")
+    public ResponseEntity<SessionResponse> getActiveSessionByEpic(@PathVariable String epicKey) {
+        Optional<PokerSessionEntity> active = pokerSessionRepository.findByEpicKeyAndStatusInWithStories(
+                epicKey,
+                List.of(PokerSessionEntity.SessionStatus.PREPARING, PokerSessionEntity.SessionStatus.ACTIVE))
+                .stream().findFirst();
+
+        // Fall back to the most recent session of any status (view completed results).
+        Optional<PokerSessionEntity> session = active.or(() ->
+                pokerSessionRepository.findByEpicKeyOrderByCreatedAtDesc(epicKey).stream()
+                        .findFirst()
+                        .flatMap(s -> sessionService.getSession(s.getId())));
+
+        return session
+                .map(this::withEpicDetails)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // ===== Jira Project Components (for the "Add story" form) =====
+
+    /** Components for the default project (JiraConfigResolver.getProjectKey()). */
+    @GetMapping("/projects/components")
+    public ResponseEntity<List<ComponentResponse>> getDefaultProjectComponents() {
+        return ResponseEntity.ok(fetchComponents(jiraConfigResolver.getProjectKey()));
+    }
+
+    /** Components for a specific Jira project. */
+    @GetMapping("/projects/{projectKey}/components")
+    public ResponseEntity<List<ComponentResponse>> getProjectComponents(@PathVariable String projectKey) {
+        return ResponseEntity.ok(fetchComponents(projectKey));
+    }
+
+    private List<ComponentResponse> fetchComponents(String projectKey) {
+        return jiraClient.getComponents(projectKey).stream()
+                .map(c -> new ComponentResponse(c.get("id"), c.get("name")))
+                .toList();
+    }
+
     /** Builds a SessionResponse enriched with the epic's summary and description. */
     private SessionResponse withEpicDetails(PokerSessionEntity session) {
         return issueRepository.findByIssueKey(session.getEpicKey())
@@ -232,6 +289,26 @@ public class PokerController {
         return ResponseEntity.ok(SessionResponse.from(session));
     }
 
+    /**
+     * F23 rework: publish final estimates to Jira. Facilitator-only. For each COMPLETED
+     * story with final estimates, ensures a subtask per role and writes the role's
+     * Original Estimate. Idempotent — safe to re-run. Returns per-story status.
+     */
+    @PostMapping("/sessions/{id}/publish")
+    public ResponseEntity<PublishResultResponse> publishSession(@PathVariable Long id) {
+        requireFacilitator(getSessionOrThrow(id));
+        return ResponseEntity.ok(jiraService.publishSession(id));
+    }
+
+    /**
+     * F23 rework: session summary — stories with final estimates plus a rough-vs-poker
+     * comparison by role and the resulting planning error.
+     */
+    @GetMapping("/sessions/{id}/summary")
+    public ResponseEntity<SessionSummaryResponse> getSummary(@PathVariable Long id) {
+        return ResponseEntity.ok(summaryService.buildSummary(id));
+    }
+
     // ===== Story Endpoints =====
 
     @PostMapping("/sessions/{sessionId}/stories")
@@ -245,9 +322,13 @@ public class PokerController {
 
         if (createInJira) {
             // Create in Jira FIRST -- Jira is the single source of truth
-            String storyKey = jiraService.createStoryInJira(session.getEpicKey(), request.title(), request.needsRoles());
+            String storyKey = jiraService.createStoryInJira(
+                    session.getEpicKey(), request.title(), request.description(),
+                    request.component(), request.needsRoles());
             // Only save to poker session after Jira succeeds
-            AddStoryRequest enriched = new AddStoryRequest(request.title(), request.needsRoles(), storyKey);
+            AddStoryRequest enriched = new AddStoryRequest(
+                    request.title(), request.needsRoles(), request.description(),
+                    request.component(), storyKey);
             PokerStoryEntity story = sessionService.addStory(sessionId, enriched);
             return ResponseEntity.ok(StoryResponse.from(story));
         }

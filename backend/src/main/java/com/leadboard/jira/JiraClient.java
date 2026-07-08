@@ -202,6 +202,17 @@ public class JiraClient {
      * Create a new issue in Jira (Story, Epic, etc.)
      */
     public String createIssue(String projectKey, String issueType, String summary, String parentKey) {
+        return createIssue(projectKey, issueType, summary, parentKey, null, null);
+    }
+
+    /**
+     * Create a new issue in Jira with an optional description and component list.
+     * F23 rework: Planning Poker creates a Story with a description and the
+     * component selected in the "Add story" form. {@code componentNames} are sent
+     * as {@code components:[{name}]}; {@code description} is wrapped in ADF.
+     */
+    public String createIssue(String projectKey, String issueType, String summary, String parentKey,
+                              String description, List<String> componentNames) {
         String accessToken = oauthService.getValidAccessToken();
         String cloudId = oauthService.getCloudIdForCurrentUser();
 
@@ -215,12 +226,38 @@ public class JiraClient {
             fields.put("parent", Map.of("key", parentKey));
         }
 
+        if (description != null && !description.isBlank()) {
+            fields.put("description", toAdf(description));
+        }
+
+        if (componentNames != null && !componentNames.isEmpty()) {
+            fields.put("components", componentNames.stream()
+                    .filter(n -> n != null && !n.isBlank())
+                    .map(n -> Map.of("name", n))
+                    .toList());
+        }
+
         Map<String, Object> body = Map.of("fields", fields);
 
         if (accessToken != null && cloudId != null) {
             return createIssueWithOAuth(body, accessToken, cloudId);
         }
         return createIssueWithBasicAuth(body);
+    }
+
+    /**
+     * Wrap plain text in a minimal Atlassian Document Format (ADF) document,
+     * as required by the {@code description} field on Jira Cloud REST API v3.
+     */
+    private static Map<String, Object> toAdf(String text) {
+        return Map.of(
+                "type", "doc",
+                "version", 1,
+                "content", List.of(Map.of(
+                        "type", "paragraph",
+                        "content", List.of(Map.of("type", "text", "text", text))
+                ))
+        );
     }
 
     private String createIssueWithOAuth(Map<String, Object> body, String accessToken, String cloudId) {
@@ -803,6 +840,50 @@ public class JiraClient {
         return components.stream()
                 .map(c -> (String) c.get("name"))
                 .filter(name -> name != null && !name.isEmpty())
+                .toList();
+    }
+
+    /**
+     * Get project components as {id, name} pairs (F23 rework — the "Add story" form
+     * needs both the id for selection and the name for display / Jira create).
+     */
+    @SuppressWarnings("unchecked")
+    public List<Map<String, String>> getComponents(String projectKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        List<Map<String, Object>> components;
+        if (accessToken != null && cloudId != null) {
+            String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+            components = webClient.get()
+                    .uri(baseUrl + "/rest/api/3/project/" + projectKey + "/components")
+                    .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
+                    .retrieve()
+                    .bodyToMono(List.class)
+                    .block();
+        } else {
+            if (configResolver.getBaseUrl() == null || configResolver.getBaseUrl().isEmpty()) {
+                throw new IllegalStateException("Jira base URL is not configured and OAuth is not available");
+            }
+            components = webClient.get()
+                    .uri(configResolver.getBaseUrl() + "/rest/api/3/project/" + projectKey + "/components")
+                    .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
+                    .retrieve()
+                    .bodyToMono(List.class)
+                    .block();
+        }
+
+        if (components == null) return List.of();
+        return components.stream()
+                .map(c -> {
+                    Object id = c.get("id");
+                    Object name = c.get("name");
+                    Map<String, String> m = new java.util.HashMap<>();
+                    m.put("id", id != null ? String.valueOf(id) : null);
+                    m.put("name", name != null ? String.valueOf(name) : null);
+                    return m;
+                })
+                .filter(m -> m.get("name") != null && !m.get("name").isEmpty())
                 .toList();
     }
 

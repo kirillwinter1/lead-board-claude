@@ -29,6 +29,7 @@ public class BoardNode {
     private boolean epicDone; // true if Epic is in Done status
     private OffsetDateTime doneAt; // timestamp when epic transitioned to Done (Epic only)
     private Map<String, BigDecimal> roughEstimates; // dynamic rough estimates by role code
+    private String estimateSource; // F23: "rough" (pre-poker) or "clean" (poker/actuals), Epic only
     private BigDecimal autoScore; // AutoScore for prioritization (Epic and Story)
     private Integer manualOrder; // Manual order position (1 = first)
     private Boolean flagged; // Impediment flag (Story only)
@@ -193,6 +194,14 @@ public class BoardNode {
 
     public void setRoughEstimates(Map<String, BigDecimal> roughEstimates) {
         this.roughEstimates = roughEstimates;
+    }
+
+    public String getEstimateSource() {
+        return estimateSource;
+    }
+
+    public void setEstimateSource(String estimateSource) {
+        this.estimateSource = estimateSource;
     }
 
     public BigDecimal getAutoScore() {
