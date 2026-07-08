@@ -28,6 +28,7 @@ import {
   formatDays,
   formatDayValue,
   formatDeltaDayValue,
+  apiError,
 } from '../api/poker'
 import { usePokerWebSocket } from '../hooks/usePokerWebSocket'
 
@@ -470,7 +471,7 @@ export function PokerRoomPage() {
       setNewStoryDescription('')
       setNewStoryComponent(null)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      const message = apiError(err)
       setError('Failed to add story: ' + message)
     } finally {
       setAddingStory(false)
@@ -490,7 +491,7 @@ export function PokerRoomPage() {
       const availableStories = epicStories.filter(s => !existingKeys.has(s.storyKey))
       setExistingStories(availableStories)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      const message = apiError(err)
       setError('Failed to load existing stories: ' + message)
     } finally {
       setLoadingExisting(false)
@@ -528,7 +529,7 @@ export function PokerRoomPage() {
       setShowImportStories(false)
       setSelectedImportKeys(new Set())
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      const message = apiError(err)
       setError('Failed to import stories: ' + message)
     }
   }
@@ -545,7 +546,7 @@ export function PokerRoomPage() {
         setPublishDone(true)
       }
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
+      const message = apiError(err)
       setError('Failed to publish: ' + message)
     } finally {
       setPublishing(false)

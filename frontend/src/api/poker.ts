@@ -215,6 +215,14 @@ export async function publishSession(sessionId: number): Promise<PublishResult> 
   return response.data
 }
 
+// Extract the backend's error message from an axios error, falling back to the
+// generic message. The API returns { error: "..." } with a human-readable reason
+// (e.g. the exact Jira validation failure) — show that, not "status code 400".
+export function apiError(err: unknown): string {
+  const anyErr = err as { response?: { data?: { error?: string } }; message?: string }
+  return anyErr?.response?.data?.error || anyErr?.message || 'Unknown error'
+}
+
 // ===== Day helpers (1 d = 8 h) =====
 
 export const HOURS_PER_DAY = 8
