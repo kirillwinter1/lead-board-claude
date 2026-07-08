@@ -11,6 +11,7 @@ import { MetricCard } from '../components/metrics/MetricCard'
 import { TrendChart } from '../components/member/TrendChart'
 import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
 import { MyWorklogCalendar } from '../components/member/MyWorklogCalendar'
+import { LogTimeModal, type LogTimeTarget } from '../components/member/LogTimeModal'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 import './MyWorkPage.css'
@@ -49,9 +50,10 @@ interface TaskRow {
   parentLabel: string | null
   epicLabel: string | null
   right: ReactNode
+  onLog?: () => void
 }
 
-function taskRows(tasks: MyTask[], showSpent: boolean): TaskRow[] {
+function taskRows(tasks: MyTask[], showSpent: boolean, onLog?: (target: LogTimeTarget) => void): TaskRow[] {
   return tasks.map(t => ({
     key: t.key,
     jiraUrl: t.jiraUrl,
@@ -71,9 +73,12 @@ function taskRows(tasks: MyTask[], showSpent: boolean): TaskRow[] {
     ) : (
       <span className="task-hours">{formatHours(t.estimateH)}</span>
     ),
+    onLog: onLog ? () => onLog({ key: t.key, summary: t.summary }) : undefined,
   }))
 }
 
+// Team Queue rows never get a log button — those stories aren't assigned to the
+// viewer, so there's nothing of theirs to log time against.
 function queueRows(stories: QueueStory[]): TaskRow[] {
   return stories.map(s => ({
     key: s.key,
@@ -113,6 +118,7 @@ function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssu
         <col className="mywork-col-status" />
         <col className="mywork-col-team" />
         <col className="mywork-col-right" />
+        <col className="mywork-col-log" />
       </colgroup>
       <thead>
         <tr>
@@ -123,6 +129,7 @@ function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssu
           <th>Status</th>
           <th>Team</th>
           <th className="mywork-col-right-cell">{rightHeader}</th>
+          <th aria-label="Log time" />
         </tr>
       </thead>
       <tbody>
@@ -147,6 +154,7 @@ function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssu
             <td><StatusBadge status={r.status} /></td>
             <td><TeamBadge name={r.teamName} color={r.teamColor} /></td>
             <td className="mywork-col-right-cell">{r.right}</td>
+            <td>{r.onLog && <button type="button" className="mywork-log-btn" title="Log time" onClick={r.onLog}>+</button>}</td>
           </tr>
         ))}
       </tbody>
@@ -216,7 +224,7 @@ function DsrBreakdownTable({ title, rows }: { title: string; rows: DsrBreakdown[
   )
 }
 
-function CompletedTasksTable({ tasks }: { tasks: MyCompletedTask[] }) {
+function CompletedTasksTable({ tasks, onLog }: { tasks: MyCompletedTask[]; onLog: (target: LogTimeTarget) => void }) {
   if (tasks.length === 0) {
     return <div className="mywork-section-empty">No completed tasks in this period</div>
   }
@@ -232,6 +240,7 @@ function CompletedTasksTable({ tasks }: { tasks: MyCompletedTask[] }) {
           <th style={{ textAlign: 'right' }}>Spent</th>
           <th style={{ textAlign: 'center' }}>DSR</th>
           <th>Done</th>
+          <th aria-label="Log time" />
         </tr>
       </thead>
       <tbody>
@@ -253,6 +262,16 @@ function CompletedTasksTable({ tasks }: { tasks: MyCompletedTask[] }) {
               <span className={`dsr-badge ${getDsrClass(t.dsr)}`}>{t.dsr?.toFixed(2) ?? '—'}</span>
             </td>
             <td>{formatDate(t.doneDate)}</td>
+            <td>
+              <button
+                type="button"
+                className="mywork-log-btn"
+                title="Log time"
+                onClick={() => onLog({ key: t.key, summary: t.summary })}
+              >
+                +
+              </button>
+            </td>
           </tr>
         ))}
       </tbody>
@@ -266,9 +285,10 @@ interface MyPerformanceSectionProps {
   to: string
   onFromChange: (value: string) => void
   onToChange: (value: string) => void
+  onLog: (target: LogTimeTarget) => void
 }
 
-function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange }: MyPerformanceSectionProps) {
+function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange, onLog }: MyPerformanceSectionProps) {
   const s = analytics.summary
   return (
     <div className="mywork-analytics">
@@ -315,7 +335,7 @@ function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange }:
           <h3>Completed</h3>
           <span className="section-badge">{analytics.completedTasks.length}</span>
         </div>
-        <CompletedTasksTable tasks={analytics.completedTasks} />
+        <CompletedTasksTable tasks={analytics.completedTasks} onLog={onLog} />
       </div>
 
       <div className="member-profile-grid">
@@ -338,6 +358,7 @@ export function MyWorkPage() {
   const [to, setTo] = useState(defaultTo)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [logTarget, setLogTarget] = useState<LogTimeTarget | null>(null)
 
   // Status colors are shared across the tenant and don't depend on the
   // selected period/team — load once.
@@ -449,7 +470,7 @@ export function MyWorkPage() {
         <div className="mywork-sections">
           <TaskSection title="In Progress" count={activeTasks.length}>
             <TaskTable
-              rows={taskRows(activeTasks, true)}
+              rows={taskRows(activeTasks, true, setLogTarget)}
               rightHeader="Est / Spent"
               emptyLabel="No active tasks"
               getIssueTypeIconUrl={getIssueTypeIconUrl}
@@ -459,7 +480,7 @@ export function MyWorkPage() {
 
           <TaskSection title="Up Next" count={upcomingAssigned.length}>
             <TaskTable
-              rows={taskRows(upcomingAssigned, false)}
+              rows={taskRows(upcomingAssigned, false, setLogTarget)}
               rightHeader="Est"
               emptyLabel="No upcoming tasks"
               getIssueTypeIconUrl={getIssueTypeIconUrl}
@@ -492,6 +513,7 @@ export function MyWorkPage() {
             to={to}
             onFromChange={setFrom}
             onToChange={setTo}
+            onLog={setLogTarget}
           />
         )}
       </>
@@ -503,6 +525,7 @@ export function MyWorkPage() {
       <StatusStylesProvider value={statusStyles}>
         {content}
       </StatusStylesProvider>
+      <LogTimeModal target={logTarget} onClose={() => setLogTarget(null)} onLogged={loadMyWork} />
     </main>
   )
 }

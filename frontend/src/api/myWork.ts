@@ -46,9 +46,12 @@ export interface MyWorkResponse {
   activeTasks: MyTask[]; upcomingAssigned: MyTask[]; teamQueue: QueueStory[]
   worklogCalendar: CalendarDay[]; analytics: MyAnalytics | null
 }
+export interface LogTimePayload { issueKey: string; date: string; hours: number; comment?: string }
 
 export const myWorkApi = {
   getMyWork: (from: string, to: string, teamId?: number) =>
     axios.get<MyWorkResponse>('/api/me/work', { params: { from, to, ...(teamId ? { teamId } : {}) } })
       .then(r => r.data),
+  logTime: (payload: LogTimePayload) =>
+    axios.post<{ worklogId: string }>('/api/me/worklog', payload).then(r => r.data),
 }
