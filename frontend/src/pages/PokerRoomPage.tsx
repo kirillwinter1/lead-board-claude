@@ -461,18 +461,30 @@ export function PokerRoomPage() {
     }
 
     setAddingStory(true)
-    try {
-      // A new story is created in Jira together with its subtasks (F23), so it
-      // gets a key immediately. Final estimates are written on publish.
-      const story = await addStory(session.id, request, true)
+    setError(null)
+    const closeAndReset = (story: PokerStory) => {
       setStories(prev => [...prev, story])
       setShowAddStory(false)
       setNewStoryTitle('')
       setNewStoryDescription('')
       setNewStoryComponent(null)
-    } catch (err: unknown) {
-      const message = apiError(err)
-      setError('Failed to add story: ' + message)
+    }
+    try {
+      // A new story is created in Jira together with its subtasks (F23), so it
+      // gets a key immediately. Final estimates are written on publish.
+      const story = await addStory(session.id, request, true)
+      closeAndReset(story)
+    } catch (jiraErr: unknown) {
+      // Some Jira projects mandate fields the create screen doesn't expose (e.g.
+      // Time Tracking / Labels), which blocks API creation. Fall back to a local
+      // session story so estimation isn't blocked — it just won't have a Jira key.
+      try {
+        const story = await addStory(session.id, request, false)
+        closeAndReset(story)
+        setError('Added as a local story — could not create it in Jira: ' + apiError(jiraErr))
+      } catch (localErr: unknown) {
+        setError('Failed to add story: ' + apiError(localErr))
+      }
     } finally {
       setAddingStory(false)
     }
