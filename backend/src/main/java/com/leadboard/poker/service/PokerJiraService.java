@@ -10,6 +10,7 @@ import com.leadboard.poker.entity.PokerStoryEntity;
 import com.leadboard.poker.entity.PokerStoryEntity.StoryStatus;
 import com.leadboard.poker.repository.PokerSessionRepository;
 import com.leadboard.poker.repository.PokerStoryRepository;
+import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,14 +142,24 @@ public class PokerJiraService {
     private Map<String, String> publishStory(PokerStoryEntity story, String projectKey,
                                              Map<String, Integer> finals) {
         // Map existing subtasks by role so we don't create duplicates (idempotency).
+        // Prefer the locally-synced subtasks (reliable) and only fall back to a live
+        // Jira search when the DB has none (e.g. a just-created story not yet synced).
         Map<String, String> roleToSubtaskKey = new LinkedHashMap<>();
-        for (Map<String, Object> subtask : jiraClient.getSubtasks(story.getStoryKey())) {
-            String subtaskKey = (String) subtask.get("key");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> fields = (Map<String, Object>) subtask.get("fields");
-            String role = roleOfSubtask(fields);
+        for (JiraIssueEntity subtask : issueRepository.findByParentKey(story.getStoryKey())) {
+            String role = workflowConfigService.getSubtaskRole(subtask.getIssueType());
             if (role != null) {
-                roleToSubtaskKey.putIfAbsent(role, subtaskKey);
+                roleToSubtaskKey.putIfAbsent(role, subtask.getIssueKey());
+            }
+        }
+        if (roleToSubtaskKey.isEmpty()) {
+            for (Map<String, Object> subtask : jiraClient.getSubtasks(story.getStoryKey())) {
+                String subtaskKey = (String) subtask.get("key");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> fields = (Map<String, Object>) subtask.get("fields");
+                String role = roleOfSubtask(fields);
+                if (role != null) {
+                    roleToSubtaskKey.putIfAbsent(role, subtaskKey);
+                }
             }
         }
 

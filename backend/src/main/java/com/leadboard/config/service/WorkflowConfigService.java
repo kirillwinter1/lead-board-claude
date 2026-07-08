@@ -391,6 +391,7 @@ public class WorkflowConfigService {
     }
 
     public String getSubtaskRole(String jiraTypeName, String projectKey) {
+        ensureLoaded();
         if (jiraTypeName == null) return getDefaultRoleCode();
         String typeKey = jiraTypeName.toLowerCase();
         if (projectKey != null) {
