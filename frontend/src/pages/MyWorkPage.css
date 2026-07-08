@@ -138,11 +138,12 @@
 
 .mywork-col-type { width: 5%; }
 .mywork-col-key { width: 9%; }
-.mywork-col-summary { width: 26%; }
-.mywork-col-parent { width: 20%; }
+.mywork-col-summary { width: 24%; }
+.mywork-col-parent { width: 18%; }
 .mywork-col-status { width: 13%; }
 .mywork-col-team { width: 14%; }
 .mywork-col-right { width: 13%; }
+.mywork-col-log { width: 4%; }
 
 .mywork-task-table th.mywork-col-right-cell,
 .mywork-task-table td.mywork-col-right-cell {
@@ -151,6 +152,26 @@
 
 .mywork-hours-sep {
   color: #6b778c;
+}
+
+.mywork-log-btn {
+  width: 22px;
+  height: 22px;
+  border: 1px solid #dfe1e6;
+  border-radius: 4px;
+  background: white;
+  color: #42526e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+.mywork-log-btn:hover {
+  background: #f4f5f7;
 }
 
 /* table-layout: fixed clips overflowing text mid-letter — trim with an ellipsis instead */
