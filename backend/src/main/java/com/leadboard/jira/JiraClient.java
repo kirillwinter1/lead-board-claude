@@ -676,6 +676,44 @@ public class JiraClient {
     }
 
     /**
+     * Add a worklog to an issue using explicit OAuth credentials and return the created
+     * worklog's id (F89 — per-user write path for "Log time" from My Work).
+     *
+     * @param comment optional worklog comment (ADF-wrapped, same structure as {@link #addComment}); may be null/blank
+     * @return the created worklog's id, or null if the response didn't contain one
+     */
+    public String addWorklogReturningId(String issueKey, int timeSpentSeconds, LocalDate date,
+                                        String comment, String accessToken, String cloudId) {
+        String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
+
+        String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
+
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("timeSpentSeconds", timeSpentSeconds);
+        body.put("started", started);
+        if (comment != null && !comment.isBlank()) {
+            Map<String, Object> adf = Map.of(
+                    "type", "doc",
+                    "version", 1,
+                    "content", List.of(Map.of(
+                            "type", "paragraph",
+                            "content", List.of(Map.of("type", "text", "text", comment))
+                    ))
+            );
+            body.put("comment", adf);
+        }
+
+        Map<String, Object> resp = webClient.post()
+                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
+                .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
+                .bodyValue(body)
+                .retrieve()
+                .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                .block();
+        return resp != null && resp.get("id") != null ? String.valueOf(resp.get("id")) : null;
+    }
+
+    /**
      * Add a comment to an issue using explicit OAuth credentials (F80 write).
      * Body is wrapped in Atlassian Document Format (ADF).
      */

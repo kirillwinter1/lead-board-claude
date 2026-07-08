@@ -40,6 +40,13 @@ public class JiraWriteService {
     /** Учётные данные OAuth текущего пользователя для записи в Jira. */
     private record Creds(String accessToken, String cloudId) {}
 
+    /** Бросается {@link #logWorkAs}, когда у указанного пользователя нет валидного OAuth-токена Jira. */
+    public static class NoUserTokenException extends RuntimeException {
+        public NoUserTokenException(String m) {
+            super(m);
+        }
+    }
+
     private Creds requireCreds() {
         String token = oauthService.getValidAccessToken();
         String cloudId = oauthService.getCloudIdForCurrentUser();
@@ -123,6 +130,29 @@ public class JiraWriteService {
         LocalDate when = date != null ? date : LocalDate.now();
         jiraClient.addWorklog(issueKey, timeSpentSeconds, when, c.accessToken(), c.cloudId());
         log.info("Jira worklog: {} +{}s on {}", issueKey, timeSpentSeconds, when);
+    }
+
+    /**
+     * Залогировать время на задачу от имени КОНКРЕТНОГО пользователя (F89 — My Work),
+     * используя его личный OAuth-токен, а не {@link #requireCreds()} (последний токен
+     * тенанта, которым пользуется AI-чат). Так worklog атрибутируется реальному автору.
+     *
+     * @param atlassianAccountId Atlassian account id пользователя, от чьего имени пишем
+     * @return id созданного worklog'а
+     * @throws NoUserTokenException если у пользователя нет валидного OAuth-токена
+     */
+    public String logWorkAs(String atlassianAccountId, String issueKey, int timeSpentSeconds,
+                            LocalDate date, String comment) {
+        OAuthService.TokenInfo token = oauthService.getValidAccessTokenForUser(atlassianAccountId);
+        if (token == null || token.accessToken() == null || token.cloudId() == null) {
+            throw new NoUserTokenException(
+                    "Нет валидного OAuth-токена Jira у пользователя " + atlassianAccountId + ".");
+        }
+        LocalDate when = date != null ? date : LocalDate.now();
+        String worklogId = jiraClient.addWorklogReturningId(
+                issueKey, timeSpentSeconds, when, comment, token.accessToken(), token.cloudId());
+        log.info("Jira worklog (as {}): {} +{}s on {}", atlassianAccountId, issueKey, timeSpentSeconds, when);
+        return worklogId;
     }
 
     /** Добавить комментарий к задаче. */
