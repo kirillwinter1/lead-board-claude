@@ -1,9 +1,8 @@
-# F23 Planning Poker — Rework (poker→Jira publishing, days, comparison, epic-key rooms)
+# F89 Planning Poker — Rework (poker→Jira publishing, days, comparison, epic-key rooms)
 
-> Крупный рефактор F23 после дизайн-ревью. Утверждённый макет всех экранов:
-> https://claude.ai/code/artifact/c0ceee71-99d2-4b7c-b94a-c5c787d265b0
-> Ветка: `fix/f23-poker-qa` (worktree `.claude/worktrees/f23-poker`). Версия бампится
-> при финализации (координировать с F88 параллельного агента; вероятно 0.88.0/0.89.0).
+> Крупный рефактор F23 после дизайн-ревью, оформлен как F89 (v0.89.0). Утверждённый
+> макет всех экранов: https://claude.ai/code/artifact/c0ceee71-99d2-4b7c-b94a-c5c787d265b0
+> Ветка: `fix/f23-poker-qa` (worktree `.claude/worktrees/f23-poker`).
 
 ## Решения (утверждены пользователем)
 
