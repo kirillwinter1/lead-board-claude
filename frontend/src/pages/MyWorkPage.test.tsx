@@ -6,7 +6,7 @@ import { HomeRedirect } from '../App'
 import { myWorkApi, type MyWorkResponse } from '../api/myWork'
 import { useAuth } from '../contexts/AuthContext'
 
-vi.mock('../api/myWork', () => ({ myWorkApi: { getMyWork: vi.fn() } }))
+vi.mock('../api/myWork', () => ({ myWorkApi: { getMyWork: vi.fn(), logTime: vi.fn() } }))
 vi.mock('../api/board', () => ({ getStatusStyles: vi.fn().mockResolvedValue({}) }))
 vi.mock('../contexts/WorkflowConfigContext', () => ({
   useWorkflowConfig: () => ({
@@ -289,6 +289,85 @@ describe('MyWorkPage', () => {
     await waitFor(() => {
       const lastCall = vi.mocked(myWorkApi.getMyWork).mock.calls.at(-1)
       expect(lastCall?.[0]).toBe('2026-01-01')
+    })
+  })
+
+  it('log button on In Progress row opens modal; team queue rows have no log button', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [{
+        key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
+        parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+      }],
+      upcomingAssigned: [],
+      teamQueue: [{
+        key: 'LB-3', summary: 'Queue story', issueType: 'Story', status: 'Backlog',
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        epicKey: null, epicSummary: null,
+        myPhaseSubtasks: 2, myPhaseEstimateH: 6, jiraUrl: 'https://jira.example.com/LB-3',
+      }],
+      worklogCalendar: [],
+      analytics: null,
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('LB-1')).toBeInTheDocument()
+    })
+
+    // Only the In Progress row has a log-time button — Team Queue tasks aren't mine to log.
+    const logButtons = screen.getAllByTitle('Log time')
+    expect(logButtons).toHaveLength(1)
+
+    fireEvent.click(logButtons[0])
+
+    await waitFor(() => {
+      expect(screen.getByText('Log time — LB-1')).toBeInTheDocument()
+    })
+  })
+
+  it('successful log refetches my work', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [{
+        key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
+        parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+      }],
+      upcomingAssigned: [],
+      teamQueue: [],
+      worklogCalendar: [],
+      analytics: null,
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+    vi.mocked(myWorkApi.logTime).mockResolvedValue({ worklogId: 'wl-1' })
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('LB-1')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByTitle('Log time'))
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Hours')).toBeInTheDocument()
+    })
+
+    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Log time' }))
+
+    await waitFor(() => {
+      expect(myWorkApi.getMyWork).toHaveBeenCalledTimes(2)
     })
   })
 
