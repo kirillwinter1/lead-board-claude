@@ -42,7 +42,7 @@ class AddStoryRequestTest {
     @DisplayName("rejects a classic JQL injection payload in existingStoryKey")
     void rejectsJqlInjectionPayload() {
         AddStoryRequest request = new AddStoryRequest(
-                "Some title", List.of("DEV"), "X OR project = SECRET");
+                "Some title", List.of("DEV"), null, null, "X OR project = SECRET");
 
         Set<ConstraintViolation<AddStoryRequest>> violations = validator.validate(request);
 
@@ -67,7 +67,7 @@ class AddStoryRequestTest {
     })
     @DisplayName("rejects malformed / injected existingStoryKey values")
     void rejectsMalformedKeys(String malicious) {
-        AddStoryRequest request = new AddStoryRequest("Some title", List.of("DEV"), malicious);
+        AddStoryRequest request = new AddStoryRequest("Some title", List.of("DEV"), null, null, malicious);
 
         Set<ConstraintViolation<AddStoryRequest>> violations = validator.validate(request);
 
@@ -77,7 +77,7 @@ class AddStoryRequestTest {
     @Test
     @DisplayName("allows a null existingStoryKey (creating a brand-new Jira story)")
     void allowsNullStoryKey() {
-        AddStoryRequest request = new AddStoryRequest("Some title", List.of("DEV"), null);
+        AddStoryRequest request = new AddStoryRequest("Some title", List.of("DEV"), null, null, null);
 
         Set<ConstraintViolation<AddStoryRequest>> violations = validator.validate(request);
 
@@ -88,7 +88,7 @@ class AddStoryRequestTest {
     @ValueSource(strings = {"ABC-123", "LEAD-1", "AB2C-9999"})
     @DisplayName("allows well-formed Jira issue keys")
     void allowsValidStoryKeys(String validKey) {
-        AddStoryRequest request = new AddStoryRequest("Some title", List.of("DEV"), validKey);
+        AddStoryRequest request = new AddStoryRequest("Some title", List.of("DEV"), null, null, validKey);
 
         Set<ConstraintViolation<AddStoryRequest>> violations = validator.validate(request);
 

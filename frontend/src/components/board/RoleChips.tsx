@@ -51,6 +51,7 @@ export function RoleChips({ node, config, onRoughEstimateUpdate }: RoleChipsProp
               config={config}
               onUpdate={onRoughEstimateUpdate}
               roleColor={getRoleColor(code)}
+              estimateSource={node.estimateSource}
             />
           )
         })}

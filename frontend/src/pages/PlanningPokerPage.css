@@ -1151,3 +1151,592 @@
   letter-spacing: 0.03em;
   opacity: 0.7;
 }
+
+/* ==================== F23 rework — design-pass additions ==================== */
+
+/* ----- Lobby: epic cell with icon ----- */
+.poker-epic-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.poker-epic-cell-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.poker-epic-cell-summary {
+  color: #6b778c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ----- Room header: epic icon + Copy link ----- */
+.poker-epic-heading-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.poker-copy-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #42526e;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.poker-copy-link-btn:hover {
+  background: #f4f5f7;
+  border-color: #c1c7d0;
+}
+.poker-copy-link-btn.copied {
+  background: #e3fcef;
+  border-color: #abf5d1;
+  color: #006644;
+}
+
+/* ----- Stories list: icon + description ----- */
+.poker-story-key {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.poker-story-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+.poker-story-sub {
+  font-size: 11.5px;
+  color: #6b778c;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ----- Current story head + description ----- */
+.cur-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  justify-content: center;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+.cur-story-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.cur-story-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #172b4d;
+}
+.cur-desc {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: #42526e;
+  max-width: 60ch;
+  margin: 6px auto 14px;
+  background: #fafbfc;
+  border: 1px solid #ebecf0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: left;
+}
+.cur-desc-k {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #97a0af;
+  margin-bottom: 5px;
+}
+
+/* ----- Voting status chips ----- */
+.voted-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 8px 0 6px;
+}
+.vchip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #42526e;
+  border: 1px solid #dfe1e6;
+  border-radius: 999px;
+  padding: 5px 12px;
+  background: #fff;
+}
+.vchip.wait {
+  color: #97a0af;
+}
+.vchip-tick {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  background: #dfe1e6;
+  color: #6b778c;
+}
+.vcount {
+  font-variant-numeric: tabular-nums;
+  color: #6b778c;
+  font-weight: 500;
+}
+
+.cards-label {
+  font-size: 13px;
+  color: #42526e;
+  text-align: center;
+  margin: 12px 0 6px;
+}
+
+/* ----- Revealed: results head + consensus ----- */
+.results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4px 0 16px;
+}
+.results-head h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #172b4d;
+  margin: 0;
+}
+.consensus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 11px;
+  border-radius: 999px;
+}
+.consensus.ok {
+  color: #1f9a6d;
+  background: #e3f7ef;
+}
+.consensus.spread {
+  color: #d9730d;
+  background: #fcf0e3;
+}
+
+/* ----- Role columns ----- */
+.role-cols {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.role-col {
+  border: 1px solid #dfe1e6;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.rc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #ebecf0;
+}
+.rc-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.rc-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.rc-median {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #42526e;
+}
+.rc-body {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rc-empty {
+  font-size: 12px;
+  color: #97a0af;
+  text-align: center;
+}
+.vote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.voter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #42526e;
+}
+.vinit {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #f4f5f7;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #42526e;
+  flex-shrink: 0;
+}
+.vval {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-weight: 700;
+  font-size: 14px;
+  color: #172b4d;
+  min-width: 34px;
+  height: 30px;
+  padding: 0 8px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: #f4f5f7;
+}
+.rc-stats {
+  display: flex;
+  gap: 14px;
+  padding: 10px 14px;
+  border-top: 1px solid #ebecf0;
+  background: #fafbfc;
+}
+.stat {
+  display: flex;
+  flex-direction: column;
+}
+.stat-k {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #97a0af;
+}
+.stat-v {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 14px;
+  font-weight: 700;
+  color: #172b4d;
+}
+
+/* ----- Final estimate form ----- */
+.final {
+  margin-top: 24px;
+  border-top: 1px dashed #dfe1e6;
+  padding-top: 20px;
+}
+.final h4 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+.final-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  max-width: 520px;
+}
+.fin-field label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #42526e;
+  margin-bottom: 6px;
+}
+.fin-input {
+  width: 100%;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  color: #172b4d;
+  background: #fff;
+  box-sizing: border-box;
+}
+.fin-hint {
+  font-size: 11px;
+  color: #97a0af;
+  margin-top: 5px;
+}
+.final-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* The Revealed block spans the stage width */
+.votes-revealed {
+  width: 100%;
+  max-width: 720px;
+  align-self: stretch;
+  text-align: left;
+}
+
+/* ----- Completed panel ----- */
+.poker-completed-panel {
+  width: 100%;
+  align-self: stretch;
+}
+.done-hero {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #e3f7ef;
+  color: #1f9a6d;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 12px;
+}
+.done-title {
+  text-align: center;
+  margin: 0 0 4px;
+  font-size: 18px;
+  color: #172b4d;
+}
+.done-sub {
+  text-align: center;
+  color: #6b778c;
+  margin: 0;
+  font-size: 14px;
+}
+.poker-summary-panel {
+  max-width: 760px;
+  margin: 0 auto;
+}
+.panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b778c;
+  margin: 26px 0 10px;
+}
+.panel-title-note {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #97a0af;
+}
+.poker-summary-card {
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.sum-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.sum-table th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b778c;
+  font-weight: 600;
+  padding: 10px 14px;
+  background: #fafbfc;
+  border-bottom: 1px solid #ebecf0;
+}
+.sum-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #ebecf0;
+  color: #42526e;
+}
+.sum-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.sum-table .num-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.sum-total {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-weight: 700;
+  color: #172b4d;
+}
+.story-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.story-cell-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.role-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.delta {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.delta.over { color: #d9730d; }
+.delta.under { color: #1f9a6d; }
+.delta.eq { color: #97a0af; }
+.sum-table tfoot td {
+  background: #f1f4f9;
+  border-top: 2px solid #dfe1e6;
+  border-bottom: none;
+  font-weight: 700;
+  color: #172b4d;
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+.sum-table tfoot td:first-child {
+  font-family: inherit;
+  color: #42526e;
+  font-weight: 600;
+}
+
+/* ----- Accuracy metrics ----- */
+.accuracy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20px;
+  padding: 18px 22px;
+  border: 1px solid #dfe1e6;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #fafbfc);
+}
+.acc-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 40px;
+  border-right: 1px solid #ebecf0;
+}
+.acc-metric.last {
+  border-right: none;
+}
+.acc-v {
+  font-family: 'SFMono-Regular', Consolas, monospace;
+  font-size: 36px;
+  font-weight: 800;
+  color: #d9730d;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.acc-v.acc-ink {
+  color: #172b4d;
+}
+.acc-pct {
+  font-size: 20px;
+  margin-left: 2px;
+}
+.acc-k {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #6b778c;
+  margin-top: 6px;
+}
+
+/* ----- Publish ----- */
+.publish-foot {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+.poker-publish-btn {
+  padding: 12px 28px !important;
+  font-size: 15px !important;
+}
+
+/* ----- Add-story textarea ----- */
+.poker-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 76px;
+  font-family: inherit;
+  line-height: 1.5;
+  border-radius: 8px;
+}
+
+/* ----- Role selector screen ----- */
+.poker-role-select-card {
+  max-width: 460px;
+  margin: 48px auto 0;
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 12px;
+  padding: 26px;
+  text-align: center;
+}
+.poker-role-select-card h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #172b4d;
+}
+.poker-role-select-card p {
+  color: #6b778c;
+  font-size: 13px;
+  margin: 0 0 18px;
+}
+.poker-role-select-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.poker-role-select-btn {
+  padding: 12px 22px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .role-cols,
+  .final-grid {
+    grid-template-columns: 1fr;
+  }
+}

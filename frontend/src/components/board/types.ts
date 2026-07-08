@@ -36,6 +36,10 @@ export interface BoardNode {
   epicDone: boolean
   doneAt?: string  // ISO-8601 timestamp when epic transitioned to Done
   roughEstimates: Record<string, number> | null
+  // F23: once an epic has poker (final) estimates its badge shows a CLEAN estimate
+  // (filled); before poker it's a ROUGH pre-estimate (outlined/muted). Optional so
+  // older board payloads default to rough behaviour.
+  estimateSource?: 'rough' | 'clean'
   alerts: DataQualityViolation[]
   autoScore: number | null
   manualOrder: number | null
@@ -92,6 +96,8 @@ export interface EpicRoleChipProps {
   config: RoughEstimateConfig | null
   onUpdate: RoughEstimateUpdateFn
   roleColor: string
+  // F23: 'clean' once poker estimates exist for the epic, else 'rough'.
+  estimateSource?: 'rough' | 'clean'
 }
 
 export interface RoleChipsProps {

@@ -10,6 +10,14 @@ public record AddStoryRequest(
     @NotBlank String title,
     @NotEmpty List<String> needsRoles,
 
+    // F23 rework: free-text description. Pushed to Jira on create (createInJira=true)
+    // and shown in the room. Optional.
+    String description,
+
+    // F23 rework: Jira component name selected in the form. Sent to Jira as
+    // components:[{name}] on create. Optional (some projects have no components).
+    String component,
+
     // If linking to an existing Jira story (createInJira=false); null when a new
     // story is being created in Jira (the controller fills this in afterwards
     // with the key Jira itself returned).

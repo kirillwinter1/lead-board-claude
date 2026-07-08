@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getConfig } from '../api/config'
 import { teamsApi, TeamMember } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { useAuth, type AuthUser } from '../contexts/AuthContext'
 import { Modal } from '../components/Modal'
+import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { getIssueIcon } from '../components/board/helpers'
+import { hexToRgba } from '../constants/colors'
 import './PlanningPokerPage.css'
 import {
   PokerSession,
@@ -13,10 +16,18 @@ import {
   ParticipantInfo,
   SessionState,
   EpicStory,
-  getSessionByRoomCode,
+  JiraComponent,
+  SessionSummary,
+  getSessionByEpicKey,
   getEpicStories,
+  getProjectComponents,
+  getSessionSummary,
+  publishSession,
   addStory,
   AddStoryRequest,
+  formatDays,
+  formatDayValue,
+  formatDeltaDayValue,
 } from '../api/poker'
 import { usePokerWebSocket } from '../hooks/usePokerWebSocket'
 
@@ -44,10 +55,62 @@ function IconCheckCircle({ size = 44 }: { size?: number }) {
   )
 }
 
+function IconLink({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.5 13.5a4 4 0 0 0 5.7 0l2.3-2.3a4 4 0 0 0-5.7-5.7l-1.2 1.2" />
+      <path d="M14.5 10.5a4 4 0 0 0-5.7 0L6.5 12.8a4 4 0 0 0 5.7 5.7l1.2-1.2" />
+    </svg>
+  )
+}
+
+// ---- stats helpers ----
+
+interface VoteStats {
+  avg: number
+  median: number
+  min: number
+  max: number
+  count: number
+}
+
+function computeStats(hours: number[]): VoteStats | null {
+  const valid = hours.filter(h => h !== null && h >= 0) // drop null and "?" (-1)
+  if (valid.length === 0) return null
+  const sorted = [...valid].sort((a, b) => a - b)
+  const sum = sorted.reduce((a, b) => a + b, 0)
+  const avg = sum / sorted.length
+  const mid = Math.floor(sorted.length / 2)
+  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+  return { avg, median, min: sorted[0], max: sorted[sorted.length - 1], count: sorted.length }
+}
+
+function fmtNum(n: number): string {
+  const r = Math.round(n * 10) / 10
+  return String(r)
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function shortName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return name
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`
+}
+
 export function PokerRoomPage() {
-  const { roomCode } = useParams<{ roomCode: string }>()
+  const { epicKey } = useParams<{ epicKey: string }>()
   const navigate = useNavigate()
-  const { getRoleCodes, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
+  const {
+    getRoleCodes, getRoleColor, getRoleDisplayName,
+    getTypeNameByCategory, getIssueTypeIconUrl,
+  } = useWorkflowConfig()
   const auth = useAuth()
 
   const [session, setSession] = useState<PokerSession | null>(null)
@@ -68,13 +131,17 @@ export function PokerRoomPage() {
   const [stories, setStories] = useState<PokerStory[]>([])
   const [myVote, setMyVote] = useState<number | null>(null)
 
-  // Copy room code
+  // Copy link
   const [copied, setCopied] = useState(false)
 
   // Add story modal
   const [showAddStory, setShowAddStory] = useState(false)
   const [newStoryTitle, setNewStoryTitle] = useState('')
+  const [newStoryDescription, setNewStoryDescription] = useState('')
+  const [newStoryComponent, setNewStoryComponent] = useState<string | null>(null)
   const [newStoryNeedsRoles, setNewStoryNeedsRoles] = useState<Set<string>>(new Set(getRoleCodes()))
+  const [components, setComponents] = useState<JiraComponent[]>([])
+  const [addingStory, setAddingStory] = useState(false)
 
   // Import existing stories modal
   const [showImportStories, setShowImportStories] = useState(false)
@@ -84,6 +151,19 @@ export function PokerRoomPage() {
 
   // Final estimate inputs - dynamic map
   const [finalEstimateInputs, setFinalEstimateInputs] = useState<Record<string, string>>({})
+
+  // Completed-screen summary (rough → poker → Δ)
+  const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [publishing, setPublishing] = useState(false)
+  const [publishDone, setPublishDone] = useState(false)
+
+  // Issue-type icons (from workflow config)
+  const epicTypeName = getTypeNameByCategory('EPIC')
+  const storyTypeName = getTypeNameByCategory('STORY')
+  const epicIcon = getIssueIcon(epicTypeName || 'Epic', getIssueTypeIconUrl(epicTypeName), 'EPIC')
+  const storyIcon = getIssueIcon(storyTypeName || 'Story', getIssueTypeIconUrl(storyTypeName), 'STORY')
+
+  const projectKey = useMemo(() => (epicKey ? epicKey.split('-')[0] : ''), [epicKey])
 
   // Show error if not authenticated
   useEffect(() => {
@@ -100,12 +180,12 @@ export function PokerRoomPage() {
     }
   }, [getRoleCodes])
 
-  // Load session + determine role once auth is ready
+  // Load session by epic key + determine role once auth is ready
   useEffect(() => {
-    if (!roomCode || !authUser) return
+    if (!epicKey || !authUser) return
 
     Promise.all([
-      getSessionByRoomCode(roomCode),
+      getSessionByEpicKey(epicKey),
       getConfig()
     ])
       .then(async ([sessionData, config]) => {
@@ -125,11 +205,9 @@ export function PokerRoomPage() {
           if (me) {
             setUserRole(me.role)
           } else {
-            // User not in team - show role selector
             setShowRoleSelector(true)
           }
         } catch {
-          // Fallback: show role selector
           setShowRoleSelector(true)
         }
 
@@ -139,7 +217,7 @@ export function PokerRoomPage() {
         setError('Failed to load session: ' + err.message)
         setLoading(false)
       })
-  }, [roomCode, authUser])
+  }, [epicKey, authUser])
 
   // WebSocket callbacks
   const handleStateUpdate = useCallback((state: SessionState) => {
@@ -216,6 +294,7 @@ export function PokerRoomPage() {
   const handleCurrentStoryChanged = useCallback((storyId: number) => {
     setCurrentStoryId(storyId)
     setMyVote(null)
+    setFinalEstimateInputs({})
     setStories(prev => prev.map(story =>
       story.id === storyId
         ? { ...story, status: 'VOTING' as const }
@@ -231,8 +310,10 @@ export function PokerRoomPage() {
     setError(message)
   }, [])
 
-  // WebSocket connection -- only connect when we have auth + role
-  const wsReady = !!authUser && !!userRole
+  // WebSocket connection -- only connect when we have auth + role.
+  // Rooms are addressed by epic key in the URL, but the WS channel still uses the
+  // server-issued room code carried on the session object.
+  const wsReady = !!authUser && !!userRole && !!session
   const {
     connected,
     sendVote,
@@ -241,7 +322,7 @@ export function PokerRoomPage() {
     sendNextStory,
     sendStartSession,
   } = usePokerWebSocket({
-    roomCode: wsReady ? (roomCode || '') : '',
+    roomCode: wsReady ? (session?.roomCode || '') : '',
     accountId: authUser?.accountId || '',
     displayName: authUser?.displayName || '',
     role: userRole || 'DEV',
@@ -256,6 +337,48 @@ export function PokerRoomPage() {
     onSessionCompleted: handleSessionCompleted,
     onError: handleError,
   })
+
+  // Current story
+  const currentStory = stories.find(s => s.id === currentStoryId)
+
+  // Per-role vote stats for the current story (used by Revealed columns + median prefill)
+  const roleStats = useMemo(() => {
+    const map: Record<string, VoteStats | null> = {}
+    if (currentStory) {
+      for (const role of currentStory.needsRoles) {
+        const hours = currentStory.votes
+          .filter(v => v.voterRole === role && v.voteHours !== null)
+          .map(v => v.voteHours as number)
+        map[role] = computeStats(hours)
+      }
+    }
+    return map
+  }, [currentStory])
+
+  // Prefill final-estimate inputs with the median when votes are revealed
+  useEffect(() => {
+    if (currentStory && currentStory.status === 'REVEALED') {
+      setFinalEstimateInputs(prev => {
+        // don't clobber values the facilitator already edited
+        if (Object.keys(prev).length > 0) return prev
+        const next: Record<string, string> = {}
+        for (const role of currentStory.needsRoles) {
+          const st = roleStats[role]
+          next[role] = st ? fmtNum(st.median) : ''
+        }
+        return next
+      })
+    }
+  }, [currentStory, roleStats])
+
+  // Load the rough → poker comparison once the session is completed
+  useEffect(() => {
+    if (session && session.status === 'COMPLETED') {
+      getSessionSummary(session.id)
+        .then(setSummary)
+        .catch(() => setSummary(null)) // endpoint may not be wired yet — degrade gracefully
+    }
+  }, [session?.status, session?.id])
 
   // Handlers
   const handleVote = (hours: number) => {
@@ -286,9 +409,8 @@ export function PokerRoomPage() {
     sendStartSession()
   }
 
-  const handleCopyRoomCode = () => {
-    if (!session) return
-    navigator.clipboard.writeText(session.roomCode).then(() => {
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
@@ -311,26 +433,47 @@ export function PokerRoomPage() {
     })
   }
 
+  const handleOpenAddStory = async () => {
+    setShowAddStory(true)
+    setNewStoryTitle('')
+    setNewStoryDescription('')
+    setNewStoryComponent(null)
+    if (projectKey && components.length === 0) {
+      try {
+        const comps = await getProjectComponents(projectKey)
+        setComponents(comps)
+      } catch {
+        // Components are optional — the selector just stays empty if unavailable
+        setComponents([])
+      }
+    }
+  }
+
   const handleAddStory = async () => {
     if (!session || !newStoryTitle.trim()) return
 
     const request: AddStoryRequest = {
       title: newStoryTitle.trim(),
       needsRoles: Array.from(newStoryNeedsRoles),
+      description: newStoryDescription.trim() || undefined,
+      component: newStoryComponent || undefined,
     }
 
+    setAddingStory(true)
     try {
-      // Add as a local session story (createInJira=false). Creating the issue in
-      // Jira is unreliable — many projects require mandatory fields (description,
-      // components, ...) we don't collect here. Estimates for existing Jira
-      // stories still sync back via the Import flow.
-      const story = await addStory(session.id, request, false)
+      // A new story is created in Jira together with its subtasks (F23), so it
+      // gets a key immediately. Final estimates are written on publish.
+      const story = await addStory(session.id, request, true)
       setStories(prev => [...prev, story])
       setShowAddStory(false)
       setNewStoryTitle('')
+      setNewStoryDescription('')
+      setNewStoryComponent(null)
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Unknown error'
       setError('Failed to add story: ' + message)
+    } finally {
+      setAddingStory(false)
     }
   }
 
@@ -343,7 +486,6 @@ export function PokerRoomPage() {
 
     try {
       const epicStories = await getEpicStories(session.epicKey)
-      // Filter out stories already in poker session
       const existingKeys = new Set(stories.map(s => s.storyKey))
       const availableStories = epicStories.filter(s => !existingKeys.has(s.storyKey))
       setExistingStories(availableStories)
@@ -391,6 +533,25 @@ export function PokerRoomPage() {
     }
   }
 
+  const handlePublish = async () => {
+    if (!session) return
+    setPublishing(true)
+    try {
+      const result = await publishSession(session.id)
+      const failed = result.stories.filter(r => r.status === 'error')
+      if (failed.length > 0) {
+        setError(`Published with issues: ${failed.map(f => f.storyKey || f.title || 'story').join(', ')}`)
+      } else {
+        setPublishDone(true)
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError('Failed to publish: ' + message)
+    } finally {
+      setPublishing(false)
+    }
+  }
+
   // Helpers
   const roleBadgeStyle = (roleCode: string) => ({
     background: getRoleColor(roleCode),
@@ -400,13 +561,10 @@ export function PokerRoomPage() {
   const roleLightStyle = (roleCode: string) => {
     const color = getRoleColor(roleCode)
     return {
-      background: color + '18',
+      background: hexToRgba(color, 0.12),
       color: color,
     }
   }
-
-  // Current story
-  const currentStory = stories.find(s => s.id === currentStoryId)
 
   // Progress stats
   const completedCount = stories.filter(s => s.status === 'COMPLETED').length
@@ -417,9 +575,50 @@ export function PokerRoomPage() {
     userRole &&
     currentStory.needsRoles.includes(userRole)
 
-  // Get vote counts per role (for voting status display)
+  // Vote counts per role (for the voting-status chips)
   const getVoteCountByRole = (story: PokerStory, role: string) =>
     story.votes.filter(v => v.voterRole === role && v.hasVoted).length
+  const getRoleParticipantCount = (role: string) =>
+    Math.max(1, participants.filter(p => p.role === role).length)
+
+  // Consensus indicator for the current story
+  const spreadRoles = currentStory
+    ? currentStory.needsRoles.filter(role => {
+        const st = roleStats[role]
+        return st && st.max > st.min
+      })
+    : []
+
+  // ---- Completed screen data (client-side, from stories) ----
+  const completedRoleCodes = useMemo(() => {
+    const present = new Set<string>()
+    stories.forEach(s => s.needsRoles.forEach(r => present.add(r)))
+    return getRoleCodes().filter(r => present.has(r))
+  }, [stories, getRoleCodes])
+
+  const storyRows = useMemo(() => {
+    return stories.map(s => {
+      const roleHours: Record<string, number> = {}
+      let total = 0
+      for (const role of completedRoleCodes) {
+        const h = s.finalEstimates[role] ?? 0
+        roleHours[role] = h
+        total += h
+      }
+      return { key: s.storyKey, title: s.title, roleHours, total }
+    })
+  }, [stories, completedRoleCodes])
+
+  const roleTotals = useMemo(() => {
+    const totals: Record<string, number> = {}
+    let grand = 0
+    for (const role of completedRoleCodes) {
+      const sum = storyRows.reduce((a, r) => a + (r.roleHours[role] ?? 0), 0)
+      totals[role] = sum
+      grand += sum
+    }
+    return { totals, grand }
+  }, [storyRows, completedRoleCodes])
 
   // Loading states
   if (authLoading || loading) {
@@ -441,29 +640,25 @@ export function PokerRoomPage() {
     return <main className="main-content"><div className="error">Session not found</div></main>
   }
 
-  // Role selector modal
+  // Role selector screen
   if (showRoleSelector && !userRole) {
     const roleCodes = getRoleCodes()
     return (
       <main className="main-content">
-        <div className="modal-overlay" style={{ position: 'relative', background: 'transparent' }}>
-          <div className="modal-content" style={{ marginTop: 80 }}>
-            <h3>Select your role</h3>
-            <p style={{ color: '#6b778c', marginBottom: 16 }}>
-              You're not on this team — pick a role to vote:
-            </p>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              {roleCodes.map(code => (
-                <button
-                  key={code}
-                  className="btn btn-primary poker-role-select-btn"
-                  style={{ background: getRoleColor(code), borderColor: getRoleColor(code) }}
-                  onClick={() => handleSelectRole(code)}
-                >
-                  {getRoleDisplayName(code)}
-                </button>
-              ))}
-            </div>
+        <div className="poker-role-select-card">
+          <h3>Select your role</h3>
+          <p>You're not on this team — pick a role to vote</p>
+          <div className="poker-role-select-row">
+            {roleCodes.map(code => (
+              <button
+                key={code}
+                className="poker-role-select-btn"
+                style={{ background: getRoleColor(code), borderColor: getRoleColor(code) }}
+                onClick={() => handleSelectRole(code)}
+              >
+                {getRoleDisplayName(code)}
+              </button>
+            ))}
           </div>
         </div>
       </main>
@@ -480,6 +675,7 @@ export function PokerRoomPage() {
           </button>
           <div className="poker-epic-heading">
             <div className="poker-epic-heading-top">
+              <img className="poker-epic-heading-icon" src={epicIcon} alt="" />
               <a
                 href={`${jiraBaseUrl}${session.epicKey}`}
                 target="_blank"
@@ -495,12 +691,12 @@ export function PokerRoomPage() {
         </div>
         <div className="poker-header-right">
           <button
-            className={`poker-copy-code-btn ${copied ? 'copied' : ''}`}
-            onClick={handleCopyRoomCode}
-            title="Copy room code"
+            className={`poker-copy-link-btn ${copied ? 'copied' : ''}`}
+            onClick={handleCopyLink}
+            title="Copy room link"
           >
-            <code>{session.roomCode}</code>
-            <span className="copy-icon">{copied ? '\u2713' : '\u2398'}</span>
+            <IconLink />
+            <span>{copied ? 'Copied' : 'Copy link'}</span>
           </button>
           <div className={`poker-connection-dot ${connected ? 'connected' : 'disconnected'}`} title={connected ? 'Connected' : 'Disconnected'} />
           {authUser && (
@@ -532,7 +728,7 @@ export function PokerRoomPage() {
                 <span className="poker-stories-progress">{completedCount}/{stories.length} estimated</span>
               )}
             </div>
-            {isFacilitator && session.status === 'PREPARING' && (
+            {isFacilitator && session.status !== 'COMPLETED' && (
               <div style={{ display: 'flex', gap: 4 }}>
                 <button
                   className="btn btn-secondary btn-small"
@@ -541,7 +737,7 @@ export function PokerRoomPage() {
                 >
                   &#8595; Import
                 </button>
-                <button className="btn btn-primary btn-small" onClick={() => setShowAddStory(true)} title="Create new">
+                <button className="btn btn-primary btn-small" onClick={handleOpenAddStory} title="Create new">
                   + New
                 </button>
               </div>
@@ -564,29 +760,35 @@ export function PokerRoomPage() {
                   className={`poker-story-item ${story.id === currentStoryId ? 'active' : ''} ${story.status.toLowerCase()}`}
                 >
                   <div className="poker-story-header">
-                    {story.storyKey && (
-                      <a
-                        href={`${jiraBaseUrl}${story.storyKey}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="issue-key"
-                      >
-                        {story.storyKey}
-                      </a>
-                    )}
+                    <span className="poker-story-key">
+                      <img className="poker-story-icon" src={storyIcon} alt="" />
+                      {story.storyKey && (
+                        <a
+                          href={`${jiraBaseUrl}${story.storyKey}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="issue-key"
+                        >
+                          {story.storyKey}
+                        </a>
+                      )}
+                    </span>
                     <span className={`story-status story-status-${story.status.toLowerCase()}`}>
-                      {story.status === 'PENDING' && '\u25CB'}
-                      {story.status === 'VOTING' && '\u25CF'}
-                      {story.status === 'REVEALED' && '\u25D0'}
-                      {story.status === 'COMPLETED' && '\u2713'}
+                      {story.status === 'PENDING' && '○'}
+                      {story.status === 'VOTING' && '◐'}
+                      {story.status === 'REVEALED' && '◑'}
+                      {story.status === 'COMPLETED' && '✓'}
                     </span>
                   </div>
                   <div className="poker-story-title">{story.title}</div>
+                  {story.description && story.description.trim() && (
+                    <div className="poker-story-sub">{story.description}</div>
+                  )}
                   {story.status === 'COMPLETED' && (
                     <div className="poker-story-estimates">
                       {story.needsRoles.map(role => (
                         <span key={role} className="estimate-badge" style={roleLightStyle(role)}>
-                          {role}: {story.finalEstimates[role] ?? 0}h
+                          {role}: {formatDays(story.finalEstimates[role] ?? 0)}
                         </span>
                       ))}
                     </div>
@@ -630,14 +832,14 @@ export function PokerRoomPage() {
                   </div>
                   <div className="poker-step">
                     <span className="poker-step-num">3</span>
-                    <span>Click "Start session"</span>
+                    <span>Start the session when everyone's ready</span>
                   </div>
                   {stories.length === 0 && (
                     <div className="poker-preparing-actions">
                       <button className="btn btn-secondary" onClick={handleOpenImportStories}>
                         &#8595; Import from Jira
                       </button>
-                      <button className="btn btn-primary" onClick={() => setShowAddStory(true)}>
+                      <button className="btn btn-primary" onClick={handleOpenAddStory}>
                         + New story
                       </button>
                     </div>
@@ -648,31 +850,47 @@ export function PokerRoomPage() {
               )}
             </div>
           ) : session.status === 'COMPLETED' ? (
-            <div className="poker-completed">
-              <div className="poker-completed-icon"><IconCheckCircle /></div>
-              <h3>Session completed</h3>
-              <p>All stories estimated ({completedCount} of {stories.length})</p>
-            </div>
+            <CompletedPanel
+              storyRows={storyRows}
+              roleCodes={completedRoleCodes}
+              roleTotals={roleTotals}
+              storyCount={stories.length}
+              summary={summary}
+              getRoleColor={getRoleColor}
+              getRoleDisplayName={getRoleDisplayName}
+              storyIcon={storyIcon}
+              isFacilitator={isFacilitator}
+              publishing={publishing}
+              publishDone={publishDone}
+              onPublish={handlePublish}
+            />
           ) : currentStory ? (
             <>
               {/* Current story */}
               <div className="poker-current-story">
-                <div className="current-story-header">
+                <div className="cur-head">
+                  <img className="cur-story-icon" src={storyIcon} alt="" />
                   {currentStory.storyKey && (
                     <a
                       href={`${jiraBaseUrl}${currentStory.storyKey}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="issue-key"
-                      style={{ fontSize: 18 }}
                     >
                       {currentStory.storyKey}
                     </a>
                   )}
-                  <h3>{currentStory.title}</h3>
+                  <h3 className="cur-story-title">{currentStory.title}</h3>
                 </div>
 
-                <div className="needed-roles">
+                {currentStory.description && currentStory.description.trim() && (
+                  <div className="cur-desc">
+                    <span className="cur-desc-k">Description</span>
+                    {currentStory.description}
+                  </div>
+                )}
+
+                <div className="need-roles">
                   {currentStory.needsRoles.map(role => (
                     <span key={role} className="role-badge" style={roleBadgeStyle(role)}>{role}</span>
                   ))}
@@ -682,28 +900,32 @@ export function PokerRoomPage() {
               {/* Voting area */}
               {currentStory.status === 'VOTING' && (
                 <>
-                  {/* Show who has voted */}
-                  <div className="votes-status">
-                    <div className="votes-pending">
-                      {currentStory.needsRoles.map(role => {
-                        const voted = getVoteCountByRole(currentStory, role)
-                        return (
-                          <span
-                            key={role}
-                            className={`vote-indicator ${voted > 0 ? 'voted' : ''}`}
-                            style={voted > 0 ? roleLightStyle(role) : undefined}
-                          >
-                            {role} {voted > 0 ? '\u2713' : '...'}
+                  {/* Who has voted */}
+                  <div className="voted-row">
+                    {currentStory.needsRoles.map(role => {
+                      const voted = getVoteCountByRole(currentStory, role)
+                      const total = getRoleParticipantCount(role)
+                      const color = getRoleColor(role)
+                      const done = voted > 0
+                      return (
+                        <span
+                          key={role}
+                          className={`vchip ${done ? '' : 'wait'}`}
+                          style={done ? { borderColor: color, color } : undefined}
+                        >
+                          <span className="vchip-tick" style={done ? { background: color, color: '#fff' } : undefined}>
+                            {done ? '✓' : '···'}
                           </span>
-                        )
-                      })}
-                    </div>
+                          {role} <span className="vcount">{voted}/{total}</span>
+                        </span>
+                      )
+                    })}
                   </div>
 
                   {/* Voting cards */}
                   {canVote && (
                     <div className="voting-cards">
-                      <p>Your estimate ({userRole}):</p>
+                      <p className="cards-label">Your estimate ({userRole})</p>
                       <div className="cards-row">
                         {VOTE_OPTIONS.map(hours => (
                           <button
@@ -737,47 +959,98 @@ export function PokerRoomPage() {
               {/* Revealed votes */}
               {currentStory.status === 'REVEALED' && (
                 <div className="votes-revealed">
-                  <h4>Voting results:</h4>
-                  <div className="votes-grid">
-                    {currentStory.needsRoles.map(role => (
-                      <div key={role} className="vote-column">
-                        <h5>{role}</h5>
-                        {currentStory.votes.filter(v => v.voterRole === role).map(vote => (
-                          <div key={vote.id} className="vote-result">
-                            <span>{vote.voterDisplayName || vote.voterAccountId}</span>
-                            <span className="vote-value">{vote.voteHours === -1 ? '?' : vote.voteHours}</span>
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                  <div className="results-head">
+                    <h4>Voting results</h4>
+                    {spreadRoles.length > 0 ? (
+                      <span className="consensus spread">Spread in {spreadRoles.join(', ')}</span>
+                    ) : (
+                      <span className="consensus ok">Consensus</span>
+                    )}
                   </div>
 
-                  {/* Facilitator: Set final estimate */}
-                  {isFacilitator && (
-                    <div className="final-estimate-form">
-                      <h4>Final estimate:</h4>
-                      <div className="final-inputs">
-                        {currentStory.needsRoles.map(role => (
-                          <div key={role} className="final-input-group">
-                            <label>{role} (hours)</label>
-                            <input
-                              type="number"
-                              value={finalEstimateInputs[role] || ''}
-                              onChange={e => setFinalEstimateInputs(prev => ({ ...prev, [role]: e.target.value }))}
-                              min="0"
-                              max="100"
-                            />
+                  <div className="role-cols">
+                    {currentStory.needsRoles.map(role => {
+                      const color = getRoleColor(role)
+                      const st = roleStats[role]
+                      const votes = currentStory.votes.filter(v => v.voterRole === role)
+                      return (
+                        <div key={role} className="role-col">
+                          <div className="rc-head" style={{ background: hexToRgba(color, 0.12) }}>
+                            <span className="rc-name" style={{ color }}>
+                              <span className="rc-dot" style={{ background: color }} />
+                              {getRoleDisplayName(role)}
+                            </span>
+                            {st && <span className="rc-median">med {fmtNum(st.median)}h</span>}
                           </div>
-                        ))}
+                          <div className="rc-body">
+                            {votes.length === 0 ? (
+                              <div className="rc-empty">No votes</div>
+                            ) : votes.map(vote => (
+                              <div key={`${vote.voterAccountId}-${vote.id}`} className="vote">
+                                <span className="voter">
+                                  <span className="vinit">{initials(vote.voterDisplayName || vote.voterAccountId)}</span>
+                                  {shortName(vote.voterDisplayName || vote.voterAccountId)}
+                                </span>
+                                <span className="vval">{vote.voteHours === -1 ? '?' : vote.voteHours ?? '—'}</span>
+                              </div>
+                            ))}
+                          </div>
+                          {st && (
+                            <div className="rc-stats">
+                              <div className="stat"><span className="stat-k">Avg</span><span className="stat-v">{fmtNum(st.avg)}</span></div>
+                              <div className="stat"><span className="stat-k">Median</span><span className="stat-v">{fmtNum(st.median)}</span></div>
+                              <div className="stat"><span className="stat-k">Range</span><span className="stat-v">{st.min}{'–'}{st.max}</span></div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {/* Facilitator: Final estimate (prefilled with medians) */}
+                  {isFacilitator && (
+                    <div className="final">
+                      <h4>Final estimate</h4>
+                      <div className="final-grid">
+                        {currentStory.needsRoles.map(role => {
+                          const color = getRoleColor(role)
+                          const st = roleStats[role]
+                          const spread = st && st.max > st.min
+                          return (
+                            <div key={role} className="fin-field">
+                              <label>{role} · hours</label>
+                              <input
+                                className="fin-input"
+                                style={{ borderLeft: `3px solid ${color}` }}
+                                type="number"
+                                value={finalEstimateInputs[role] || ''}
+                                onChange={e => setFinalEstimateInputs(prev => ({ ...prev, [role]: e.target.value }))}
+                                min="0"
+                                max="1000"
+                              />
+                              {st && (
+                                <div className="fin-hint">median {fmtNum(st.median)}h{spread ? ' · spread' : ''}</div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                       <div className="final-actions">
+                        <button
+                          className="btn btn-secondary"
+                          onClick={handleReveal}
+                          disabled={!connected}
+                          title="Re-open voting"
+                        >
+                          Re-vote
+                        </button>
                         <button
                           className="btn btn-primary"
                           onClick={handleSetFinal}
                           disabled={!connected}
                           title={connected ? undefined : 'No connection to server'}
                         >
-                          Save and next
+                          Save &amp; next story &#8594;
                         </button>
                       </div>
                     </div>
@@ -814,10 +1087,10 @@ export function PokerRoomPage() {
               <div className="poker-participants-empty">
                 <p>Waiting for participants</p>
                 <div className="poker-participants-share">
-                  <small>Share the room code:</small>
-                  <button className="poker-share-code-btn" onClick={handleCopyRoomCode}>
-                    <code>{session.roomCode}</code>
-                    <span>{copied ? '\u2713' : '\u2398'}</span>
+                  <small>Share the room link:</small>
+                  <button className="poker-share-code-btn" onClick={handleCopyLink}>
+                    <IconLink />
+                    <span>{copied ? 'Copied' : 'Copy link'}</span>
                   </button>
                 </div>
               </div>
@@ -853,6 +1126,27 @@ export function PokerRoomPage() {
             />
           </div>
           <div className="poker-field">
+            <label className="poker-field-label">Description</label>
+            <textarea
+              className="filter-input poker-textarea"
+              placeholder="What needs to be done…"
+              value={newStoryDescription}
+              onChange={e => setNewStoryDescription(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <div className="poker-field">
+            <label className="poker-field-label">Component</label>
+            <SingleSelectDropdown
+              label="Component"
+              placeholder={components.length ? 'Select component…' : 'No components available'}
+              allowClear
+              options={components.map(c => ({ value: c.name, label: c.name }))}
+              selected={newStoryComponent}
+              onChange={v => setNewStoryComponent(v)}
+            />
+          </div>
+          <div className="poker-field">
             <label className="poker-field-label">Roles to estimate</label>
             <div className="poker-role-toggles">
               {getRoleCodes().map(code => {
@@ -863,7 +1157,7 @@ export function PokerRoomPage() {
                     type="button"
                     key={code}
                     className={`poker-role-toggle ${active ? 'active' : ''}`}
-                    style={active ? { borderColor: color, background: color + '14', color } : undefined}
+                    style={active ? { borderColor: color, background: hexToRgba(color, 0.08), color } : undefined}
                     onClick={() => handleToggleNewStoryRole(code)}
                   >
                     <span className="poker-role-dot" style={{ background: active ? color : '#c1c7d0' }} />
@@ -882,9 +1176,9 @@ export function PokerRoomPage() {
           <button
             className="btn btn-primary"
             onClick={handleAddStory}
-            disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0}
+            disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0 || addingStory}
           >
-            Add
+            {addingStory ? 'Adding…' : 'Add story'}
           </button>
         </div>
       </Modal>
@@ -919,6 +1213,7 @@ export function PokerRoomPage() {
                 />
                 <div className="import-story-info">
                   <div className="import-story-header">
+                    <img className="poker-story-icon" src={storyIcon} alt="" />
                     <span className="issue-key">{story.storyKey}</span>
                     <span className="import-story-status">{story.status}</span>
                   </div>
@@ -926,7 +1221,7 @@ export function PokerRoomPage() {
                   <div className="import-story-subtasks">
                     {story.subtaskRoles.map(role => (
                       <span key={role} className="subtask-badge" style={roleLightStyle(role)}>
-                        {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}h` : '\u2014'}
+                        {role} {story.roleEstimates[role] ? `${story.roleEstimates[role]}h` : '—'}
                       </span>
                     ))}
                   </div>
@@ -950,5 +1245,165 @@ export function PokerRoomPage() {
         </div>
       </Modal>
     </main>
+  )
+}
+
+// ============ Completed panel ============
+
+interface CompletedStoryRow {
+  key: string | null
+  title: string
+  roleHours: Record<string, number>
+  total: number
+}
+
+interface CompletedPanelProps {
+  storyRows: CompletedStoryRow[]
+  roleCodes: string[]
+  roleTotals: { totals: Record<string, number>; grand: number }
+  storyCount: number
+  summary: SessionSummary | null
+  getRoleColor: (code: string) => string
+  getRoleDisplayName: (code: string) => string
+  storyIcon: string
+  isFacilitator: boolean
+  publishing: boolean
+  publishDone: boolean
+  onPublish: () => void
+}
+
+function CompletedPanel({
+  storyRows, roleCodes, roleTotals, storyCount, summary,
+  getRoleColor, getRoleDisplayName, storyIcon,
+  isFacilitator, publishing, publishDone, onPublish,
+}: CompletedPanelProps) {
+  return (
+    <div className="poker-completed-panel">
+      <div className="done-hero"><IconCheckCircle size={28} /></div>
+      <h3 className="done-title">Session completed</h3>
+      <p className="done-sub">
+        All {storyCount} stories estimated · {publishDone ? 'published to Jira' : 'not published yet'}
+      </p>
+
+      <div className="poker-summary-panel">
+        {/* Stories & final estimates (person-days) */}
+        <div className="panel-title">
+          Stories &amp; final estimates <span className="panel-title-note">· person-days, 1 d = 8 h</span>
+        </div>
+        <div className="poker-summary-card">
+          <table className="sum-table">
+            <thead>
+              <tr>
+                <th>Story</th>
+                {roleCodes.map(r => <th key={r} className="num-cell">{r}</th>)}
+                <th className="num-cell">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {storyRows.map((row, i) => (
+                <tr key={row.key || i}>
+                  <td>
+                    <span className="story-cell">
+                      <img className="poker-story-icon" src={storyIcon} alt="" />
+                      {row.key && <span className="issue-key">{row.key}</span>}
+                      <span className="story-cell-title">{row.key ? '· ' : ''}{row.title}</span>
+                    </span>
+                  </td>
+                  {roleCodes.map(r => (
+                    <td key={r} className="num-cell">{formatDays(row.roleHours[r] ?? 0)}</td>
+                  ))}
+                  <td className="num-cell sum-total">{formatDays(row.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td>Total · {storyCount} stories</td>
+                {roleCodes.map(r => (
+                  <td key={r} className="num-cell">{formatDays(roleTotals.totals[r] ?? 0)}</td>
+                ))}
+                <td className="num-cell">{formatDays(roleTotals.grand)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        {/* Rough → Poker comparison */}
+        {summary && summary.comparison.length > 0 && (
+          <>
+            <div className="panel-title">
+              Rough estimate (pre-planning) → Poker result <span className="panel-title-note">· person-days</span>
+            </div>
+            <div className="poker-summary-card">
+              <table className="sum-table">
+                <thead>
+                  <tr>
+                    <th>Role</th>
+                    <th className="num-cell">Rough</th>
+                    <th className="num-cell">Poker</th>
+                    <th className="num-cell">{'Δ'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {summary.comparison.map(row => {
+                    const cls = row.deltaDays > 0 ? 'over' : row.deltaDays < 0 ? 'under' : 'eq'
+                    return (
+                      <tr key={row.role}>
+                        <td>
+                          <span className="story-cell">
+                            <span className="role-dot" style={{ background: getRoleColor(row.role) }} />
+                            {getRoleDisplayName(row.role)}
+                          </span>
+                        </td>
+                        <td className="num-cell">{formatDayValue(row.roughDays)}</td>
+                        <td className="num-cell sum-total">{formatDayValue(row.pokerDays)}</td>
+                        <td className="num-cell"><span className={`delta ${cls}`}>{formatDeltaDayValue(row.deltaDays)}</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td>Total</td>
+                    <td className="num-cell">{formatDayValue(summary.roughTotalDays)}</td>
+                    <td className="num-cell">{formatDayValue(summary.pokerTotalDays)}</td>
+                    <td className="num-cell">
+                      <span className="delta over">{formatDayValue(summary.errorDays)}</span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        )}
+
+        {/* Metrics */}
+        <div className="accuracy">
+          <div className="acc-metric">
+            <div className="acc-v acc-ink">{formatDays(roleTotals.grand).replace('d', '')}<span className="acc-pct">d</span></div>
+            <div className="acc-k">Total · person-days</div>
+          </div>
+          {summary && (
+            <div className="acc-metric last">
+              <div className="acc-v">{fmtNum(summary.errorPercent)}<span className="acc-pct">%</span></div>
+              <div className="acc-k">Planning error</div>
+            </div>
+          )}
+        </div>
+
+        {/* Publish */}
+        {isFacilitator && (
+          <div className="publish-foot">
+            <button
+              className="btn btn-primary poker-publish-btn"
+              onClick={onPublish}
+              disabled={publishing || publishDone}
+            >
+              {publishDone ? 'Published ✓' : publishing ? 'Publishing…' : 'Publish to Jira →'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

@@ -134,6 +134,8 @@ public class PokerSessionService {
         PokerStoryEntity story = new PokerStoryEntity();
         story.setSession(session);
         story.setTitle(request.title());
+        story.setDescription(request.description());
+        story.setJiraComponent(request.component());
         story.setStoryKey(request.existingStoryKey());
         story.setNeedsRoles(request.needsRoles());
         story.setOrderIndex(maxOrder + 1);

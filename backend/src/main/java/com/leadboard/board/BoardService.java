@@ -468,6 +468,8 @@ public class BoardService {
                 node.setEstimateSeconds(0L);
                 node.setLoggedSeconds(0L);
                 node.setProgress(0);
+                // No stories yet -> the badge still reflects the rough (pre-poker) estimate.
+                node.setEstimateSource("rough");
                 return;
             }
             Long estimate = node.getEstimateSeconds();
@@ -524,6 +526,8 @@ public class BoardService {
 
                 Map<String, BoardNode.RoleMetrics> roleProgressMap = buildDynamicRoleProgressMap(roleMetrics, null);
                 node.setRoleProgress(roleProgressMap);
+                // F23: at least one story estimated (subtask Original Estimates exist) -> clean.
+                node.setEstimateSource("clean");
             } else if (node.getRoleProgress() != null && !node.getRoleProgress().isEmpty()) {
                 // Rough estimates already set on the node, just update logged
                 node.setLoggedSeconds(totalLogged);
@@ -533,6 +537,10 @@ public class BoardService {
                 } else {
                     node.setProgress(0);
                 }
+                // F23: no story estimates yet -> the badge shows the rough (pre-poker) estimate.
+                node.setEstimateSource("rough");
+            } else {
+                node.setEstimateSource("rough");
             }
         } else {
             node.setEstimateSeconds(totalEstimate);
@@ -542,6 +550,10 @@ public class BoardService {
             Map<String, BigDecimal> roughEstimates = isEpic ? node.getRoughEstimates() : null;
             Map<String, BoardNode.RoleMetrics> roleProgressMap = buildDynamicRoleProgressMap(roleMetrics, roughEstimates);
             node.setRoleProgress(roleProgressMap);
+            if (isEpic) {
+                // Epic past the planning phase -> the estimate is the clean/actual subtask total.
+                node.setEstimateSource("clean");
+            }
         }
     }
 

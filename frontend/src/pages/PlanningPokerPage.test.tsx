@@ -123,38 +123,39 @@ describe('PlanningPokerPage', () => {
       })
     })
 
-    it('should render "Join by code" button', async () => {
+    it('should render "Join by key" button', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Join by code')).toBeInTheDocument()
+        expect(screen.getByText('Join by key')).toBeInTheDocument()
       })
     })
   })
 
   describe('Sessions table', () => {
-    it('should render sessions table headers', async () => {
+    it('should render sessions table headers (no room code)', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
         expect(screen.getByText('Epic')).toBeInTheDocument()
-        expect(screen.getByText('Room code')).toBeInTheDocument()
         expect(screen.getByText('Status')).toBeInTheDocument()
         expect(screen.getByText('Stories')).toBeInTheDocument()
         expect(screen.getByText('Created')).toBeInTheDocument()
         expect(screen.getByText('Actions')).toBeInTheDocument()
       })
+      // Room code column has been removed from the UI entirely
+      expect(screen.queryByText('Room code')).not.toBeInTheDocument()
     })
 
-    it('should render session rows', async () => {
+    it('should render epic rows without room codes', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
         expect(screen.getByText('EPIC-1')).toBeInTheDocument()
         expect(screen.getByText('EPIC-2')).toBeInTheDocument()
-        expect(screen.getByText('ABC123')).toBeInTheDocument()
-        expect(screen.getByText('XYZ789')).toBeInTheDocument()
       })
+      expect(screen.queryByText('ABC123')).not.toBeInTheDocument()
+      expect(screen.queryByText('XYZ789')).not.toBeInTheDocument()
     })
 
     it('should show story count', async () => {
@@ -175,19 +176,11 @@ describe('PlanningPokerPage', () => {
       })
     })
 
-    it('should show "Join" for active sessions', async () => {
+    it('should show "Open" action for every session', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Join')).toBeInTheDocument()
-      })
-    })
-
-    it('should show "View" for completed sessions', async () => {
-      renderPlanningPokerPage()
-
-      await waitFor(() => {
-        expect(screen.getByText('View')).toBeInTheDocument()
+        expect(screen.getAllByText('Open').length).toBe(2)
       })
     })
   })
@@ -270,9 +263,10 @@ describe('PlanningPokerPage', () => {
       expect(screen.queryByText('Select an epic to estimate')).not.toBeInTheDocument()
     })
 
-    it('should create session and navigate on epic row click', async () => {
+    it('should create session and navigate by epic key on epic row click', async () => {
       vi.mocked(pokerApi.createSession).mockResolvedValue({
         id: 3,
+        epicKey: 'EPIC-3',
         roomCode: 'NEW123',
         status: 'PREPARING',
       } as any)
@@ -288,82 +282,76 @@ describe('PlanningPokerPage', () => {
 
       await waitFor(() => {
         expect(pokerApi.createSession).toHaveBeenCalledWith(1, 'EPIC-3')
-        expect(mockNavigate).toHaveBeenCalledWith('/poker/room/NEW123')
+        expect(mockNavigate).toHaveBeenCalledWith('/poker/EPIC-3')
       })
     })
   })
 
-  describe('Join room modal', () => {
-    it('should open modal on "Join by code" click', async () => {
+  describe('Join by epic key modal', () => {
+    it('should open modal on "Join by key" click', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Join by code'))
+        fireEvent.click(screen.getByText('Join by key'))
       })
 
-      expect(screen.getByText('Join room')).toBeInTheDocument()
+      expect(screen.getByText('Join by epic key')).toBeInTheDocument()
     })
 
-    it('should have room code input', async () => {
+    it('should have epic key input', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Join by code'))
+        fireEvent.click(screen.getByText('Join by key'))
       })
 
-      expect(screen.getByPlaceholderText('e.g. ABC123')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('e.g. LB-203')).toBeInTheDocument()
     })
 
-    it('should navigate to room on submit', async () => {
+    it('should navigate to room by epic key on submit', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Join by code')).toBeInTheDocument()
+        expect(screen.getByText('Join by key')).toBeInTheDocument()
       })
 
-      fireEvent.click(screen.getByText('Join by code'))
+      fireEvent.click(screen.getByText('Join by key'))
 
       await waitFor(() => {
-        expect(screen.getByText('Join room')).toBeInTheDocument()
+        expect(screen.getByText('Join by epic key')).toBeInTheDocument()
       })
 
-      const input = screen.getByPlaceholderText('e.g. ABC123')
-      fireEvent.change(input, { target: { value: 'ABC123' } })
+      const input = screen.getByPlaceholderText('e.g. LB-203')
+      fireEvent.change(input, { target: { value: 'LB-203' } })
 
-      // Find submit button in modal (the one in modal-actions)
       const modalActions = screen.getByText('Cancel').parentElement!
       const submitButton = modalActions.querySelector('button.btn-primary')!
       fireEvent.click(submitButton)
 
-      expect(mockNavigate).toHaveBeenCalledWith('/poker/room/ABC123')
+      expect(mockNavigate).toHaveBeenCalledWith('/poker/LB-203')
     })
 
-    it('should convert room code to uppercase', async () => {
+    it('should convert epic key to uppercase', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Join by code'))
+        fireEvent.click(screen.getByText('Join by key'))
       })
 
-      const input = screen.getByPlaceholderText('e.g. ABC123')
-      fireEvent.change(input, { target: { value: 'abc123' } })
+      const input = screen.getByPlaceholderText('e.g. LB-203')
+      fireEvent.change(input, { target: { value: 'lb-203' } })
 
-      expect(input).toHaveValue('ABC123')
+      expect(input).toHaveValue('LB-203')
     })
 
-    it('should disable submit for short codes', async () => {
+    it('should disable submit for empty key', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Join by code'))
+        fireEvent.click(screen.getByText('Join by key'))
       })
 
-      const input = screen.getByPlaceholderText('e.g. ABC123')
-      fireEvent.change(input, { target: { value: 'ABC' } })
-
-      const submitButton = screen.getAllByText('Join').find(
-        el => el.tagName === 'BUTTON' && el.closest('.modal-content')
-      )
+      const submitButton = screen.getByText('Open room')
       expect(submitButton).toBeDisabled()
     })
   })
@@ -383,14 +371,15 @@ describe('PlanningPokerPage', () => {
   })
 
   describe('Navigation', () => {
-    it('should navigate to room on row action click', async () => {
+    it('should navigate to room by epic key on row action click', async () => {
       renderPlanningPokerPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Join'))
+        expect(screen.getAllByText('Open').length).toBe(2)
       })
+      fireEvent.click(screen.getAllByText('Open')[0])
 
-      expect(mockNavigate).toHaveBeenCalledWith('/poker/room/ABC123')
+      expect(mockNavigate).toHaveBeenCalledWith('/poker/EPIC-1')
     })
   })
 

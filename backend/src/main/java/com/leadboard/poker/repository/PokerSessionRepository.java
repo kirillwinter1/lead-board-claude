@@ -31,4 +31,15 @@ public interface PokerSessionRepository extends JpaRepository<PokerSessionEntity
 
     @Query("SELECT s FROM PokerSessionEntity s WHERE s.status IN :statuses ORDER BY s.createdAt DESC")
     List<PokerSessionEntity> findByStatusIn(@Param("statuses") List<SessionStatus> statuses);
+
+    /**
+     * F23 rework: active poker session for an epic (rooms are addressed by epic key,
+     * not room code). Active = PREPARING or ACTIVE. Newest first so the controller can
+     * take the first result. Stories are fetched to enrich the SessionResponse.
+     */
+    @Query("SELECT s FROM PokerSessionEntity s LEFT JOIN FETCH s.stories "
+            + "WHERE s.epicKey = :epicKey AND s.status IN :statuses ORDER BY s.createdAt DESC")
+    List<PokerSessionEntity> findByEpicKeyAndStatusInWithStories(
+            @Param("epicKey") String epicKey,
+            @Param("statuses") List<SessionStatus> statuses);
 }

@@ -6,9 +6,15 @@ import {
   createSession,
   getSession,
   getSessionByRoomCode,
+  getSessionByEpicKey,
   getSessionsByTeam,
+  getProjectComponents,
+  getSessionSummary,
+  publishSession,
   addStory,
   getVotes,
+  formatDays,
+  formatDeltaDays,
 } from './poker'
 
 vi.mock('axios')
@@ -225,6 +231,77 @@ describe('Poker API', () => {
       expect(result).toHaveLength(2)
       expect(result[0].hasVoted).toBe(true)
       expect(result[1].hasVoted).toBe(false)
+    })
+  })
+
+  describe('getSessionByEpicKey', () => {
+    it('should fetch the active session for an epic key', async () => {
+      const mockSession = { id: 1, epicKey: 'LB-203', status: 'ACTIVE', roomCode: 'ABC123' }
+      mockedAxios.get.mockResolvedValueOnce({ data: mockSession })
+
+      const result = await getSessionByEpicKey('LB-203')
+
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/poker/sessions/epic/LB-203')
+      expect(result.epicKey).toBe('LB-203')
+    })
+  })
+
+  describe('getProjectComponents', () => {
+    it('should fetch Jira project components', async () => {
+      const mockComponents = [{ id: '1', name: 'Backend' }, { id: '2', name: 'Frontend' }]
+      mockedAxios.get.mockResolvedValueOnce({ data: mockComponents })
+
+      const result = await getProjectComponents('LB')
+
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/poker/projects/LB/components')
+      expect(result).toHaveLength(2)
+      expect(result[1].name).toBe('Frontend')
+    })
+  })
+
+  describe('getSessionSummary', () => {
+    it('should fetch the rough → poker summary', async () => {
+      const mockSummary = {
+        stories: [],
+        roles: [{ role: 'DEV', roughHours: 32, pokerHours: 36 }],
+        roughTotalHours: 68,
+        pokerTotalHours: 68,
+        errorHours: 8,
+        errorPct: 11.8,
+      }
+      mockedAxios.get.mockResolvedValueOnce({ data: mockSummary })
+
+      const result = await getSessionSummary(1)
+
+      expect(mockedAxios.get).toHaveBeenCalledWith('/api/poker/sessions/1/summary')
+      expect(result.errorPct).toBe(11.8)
+    })
+  })
+
+  describe('publishSession', () => {
+    it('should POST to the publish endpoint', async () => {
+      mockedAxios.post.mockResolvedValueOnce({ data: { results: [{ storyKey: 'LB-311', ok: true, message: null, subtaskKeys: ['LB-401'] }] } })
+
+      const result = await publishSession(1)
+
+      expect(mockedAxios.post).toHaveBeenCalledWith('/api/poker/sessions/1/publish')
+      expect(result.results[0].ok).toBe(true)
+    })
+  })
+
+  describe('day helpers', () => {
+    it('formatDays converts hours to person-days (1 d = 8 h)', () => {
+      expect(formatDays(0)).toBe('0d')
+      expect(formatDays(4)).toBe('0.5d')
+      expect(formatDays(8)).toBe('1d')
+      expect(formatDays(12)).toBe('1.5d')
+      expect(formatDays(24)).toBe('3d')
+    })
+
+    it('formatDeltaDays shows a signed delta with a proper minus sign', () => {
+      expect(formatDeltaDays(0)).toBe('0')
+      expect(formatDeltaDays(4)).toBe('+0.5d')
+      expect(formatDeltaDays(-4)).toBe('−0.5d')
     })
   })
 

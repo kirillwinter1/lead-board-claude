@@ -641,6 +641,16 @@
   opacity: 0.8;
 }
 
+/* F23: clean (post-poker) epic estimate — filled, solid, no dashed hatch */
+.epic-role-chip.rough-only.clean {
+  background: var(--clean-fill, currentColor);
+  border-style: solid !important;
+}
+
+.epic-role-chip.rough-only.clean .epic-role-value.rough {
+  opacity: 1;
+}
+
 
 .epic-role-times.warning {
   justify-content: center;

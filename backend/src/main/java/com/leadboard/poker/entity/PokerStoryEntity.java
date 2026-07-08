@@ -28,6 +28,14 @@ public class PokerStoryEntity {
     @Column(nullable = false)
     private String title;
 
+    // F23 rework: story description (pushed to Jira on create, shown in the room).
+    @Column(name = "description")
+    private String description;
+
+    // F23 rework: Jira component selected in the "Add story" form (used for Jira create).
+    @Column(name = "jira_component")
+    private String jiraComponent;
+
     @Column(name = "needs_roles", columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
     private List<String> needsRoles = new ArrayList<>();
@@ -91,6 +99,22 @@ public class PokerStoryEntity {
 
     public void setTitle(String title) {
         this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getJiraComponent() {
+        return jiraComponent;
+    }
+
+    public void setJiraComponent(String jiraComponent) {
+        this.jiraComponent = jiraComponent;
     }
 
     public List<String> getNeedsRoles() {
