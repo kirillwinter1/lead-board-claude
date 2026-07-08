@@ -292,7 +292,7 @@ describe('MyWorkPage', () => {
     })
   })
 
-  it('log button on In Progress row opens modal; team queue rows have no log button', async () => {
+  it('log buttons on In Progress and Up Next rows open modal; team queue rows have none', async () => {
     const response: MyWorkResponse = {
       hasMembership: true,
       member: oneTeamMember,
@@ -303,7 +303,12 @@ describe('MyWorkPage', () => {
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
         estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
       }],
-      upcomingAssigned: [],
+      upcomingAssigned: [{
+        key: 'LB-2', summary: 'Upcoming task', issueType: 'Bug', status: 'To Do',
+        parentKey: null, parentSummary: null, epicKey: null, epicSummary: null,
+        teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+        estimateH: 4, spentH: null, jiraUrl: 'https://jira.example.com/LB-2',
+      }],
       teamQueue: [{
         key: 'LB-3', summary: 'Queue story', issueType: 'Story', status: 'Backlog',
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
@@ -321,14 +326,67 @@ describe('MyWorkPage', () => {
       expect(screen.getByText('LB-1')).toBeInTheDocument()
     })
 
-    // Only the In Progress row has a log-time button — Team Queue tasks aren't mine to log.
+    // In Progress (LB-1) + Up Next (LB-2) each get a button; Team Queue (LB-3) gets none.
+    const logButtons = screen.getAllByTitle('Log time')
+    expect(logButtons).toHaveLength(2)
+
+    // First button belongs to the In Progress row.
+    fireEvent.click(logButtons[0])
+    await waitFor(() => {
+      expect(screen.getByText('Log time — LB-1')).toBeInTheDocument()
+    })
+
+    // Second button belongs to the Up Next row.
+    fireEvent.click(logButtons[1])
+    await waitFor(() => {
+      expect(screen.getByText('Log time — LB-2')).toBeInTheDocument()
+    })
+  })
+
+  it('log button on a Completed row opens modal with that task', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [],
+      upcomingAssigned: [],
+      teamQueue: [],
+      worklogCalendar: [],
+      analytics: {
+        summary: {
+          completedCount: 1,
+          avgDsr: 0.88,
+          avgCycleTimeDays: 3,
+          utilization: 80,
+          totalSpentH: 7,
+          totalEstimateH: 8,
+        },
+        weeklyTrend: [],
+        completedTasks: [{
+          key: 'LB-10', summary: 'Completed task', epicKey: 'LB-200', epicSummary: 'Epic X',
+          teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
+          estimateH: 8, spentH: 7, dsr: 0.88, doneDate: '2026-06-10', jiraUrl: 'https://jira.example.com/LB-10',
+        }],
+        dsrByParentType: [],
+        dsrByEpic: [],
+      },
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('Completed task')).toBeInTheDocument()
+    })
+
+    // No active/upcoming rows, so the only log button on the page is the Completed row's.
     const logButtons = screen.getAllByTitle('Log time')
     expect(logButtons).toHaveLength(1)
 
     fireEvent.click(logButtons[0])
 
     await waitFor(() => {
-      expect(screen.getByText('Log time — LB-1')).toBeInTheDocument()
+      expect(screen.getByText('Log time — LB-10')).toBeInTheDocument()
     })
   })
 
