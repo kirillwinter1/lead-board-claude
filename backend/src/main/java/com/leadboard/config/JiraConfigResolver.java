@@ -107,6 +107,25 @@ public class JiraConfigResolver {
         return getAllProjectKeys();
     }
 
+    /**
+     * F90 review fix: the active tenant's configured Jira cloudId. Used by per-user write
+     * paths (e.g. {@link com.leadboard.jira.JiraWriteService#logWorkAs}) that must write to
+     * THIS tenant's Jira site rather than whichever site an OAuth token happens to record —
+     * a user who is a member of two tenants on different Jira sites would otherwise leak a
+     * worklog to the wrong site. Same tenant-config-first resolution as
+     * {@code TenantAccessReconciler.reconcile}.
+     *
+     * <p>Returns null when there's no tenant context or no cloudId configured yet — callers
+     * should fall back to a token-derived cloudId (single-tenant/.env mode has no cloudId
+     * concept here, so there is nothing to fall back to on this side).</p>
+     */
+    public String getJiraCloudId() {
+        return getTenantConfig()
+                .map(TenantJiraConfigEntity::getJiraCloudId)
+                .filter(s -> s != null && !s.isBlank())
+                .orElse(null);
+    }
+
     public String getTeamFieldId() {
         return getTenantConfig()
                 .map(TenantJiraConfigEntity::getTeamFieldId)

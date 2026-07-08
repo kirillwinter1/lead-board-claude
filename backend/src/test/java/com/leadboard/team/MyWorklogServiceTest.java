@@ -129,8 +129,10 @@ class MyWorklogServiceTest {
 
     @Test
     void rejectsFutureDateAndBadHours() {
+        // The +1 day tz-tolerance (see acceptsDateOneDayAheadForTimezoneTolerance below) means
+        // tomorrow alone no longer trips this — the day after tomorrow still must.
         assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(1), BigDecimal.ONE, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(2), BigDecimal.ONE, "comment"));
 
         assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
                 service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ZERO, "comment"));
@@ -140,6 +142,39 @@ class MyWorklogServiceTest {
 
         verifyNoInteractions(issueRepository);
         verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    void acceptsDateOneDayAheadForTimezoneTolerance() {
+        // A server clock running behind the user's local timezone (e.g. UTC server, MSK user
+        // just after midnight) can see "today" from the user as "tomorrow" server-side.
+        JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 0L);
+        when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), any(), any())).thenReturn("wl-tz");
+
+        String worklogId = service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(1), BigDecimal.ONE, "comment");
+
+        assertEquals("wl-tz", worklogId);
+    }
+
+    @Test
+    void rejectsHoursThatRoundToZeroSeconds() {
+        assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), new BigDecimal("0.0001"), "comment"));
+
+        verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    void throwsJiraNoIdExceptionWhenJiraReturnsNoWorklogId() {
+        JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 0L);
+        when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), any(), any())).thenReturn(null);
+
+        assertThrows(MyWorklogService.JiraNoIdException.class, () ->
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment"));
+
+        verifyNoInteractions(worklogRepository);
     }
 
     @Test

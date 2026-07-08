@@ -35,6 +35,18 @@ public class MyWorklogService {
         }
     }
 
+    /**
+     * Jira accepted the write call (no HTTP error) but didn't hand back a worklog id — we
+     * can't tell whether the worklog actually landed. Kept distinct from a generic
+     * IllegalStateException so the controller can map it to a specific message that warns
+     * against a blind retry (which could create a duplicate worklog on Jira's side).
+     */
+    public static class JiraNoIdException extends RuntimeException {
+        public JiraNoIdException(String m) {
+            super(m);
+        }
+    }
+
     private final JiraIssueRepository issueRepository;
     private final IssueWorklogRepository worklogRepository;
     private final WorkflowConfigService workflowConfigService;
@@ -58,14 +70,19 @@ public class MyWorklogService {
      * @throws LogTimeValidationException hours/date/issue invalid (400)
      * @throws LogTimeForbiddenException the task is not assigned to {@code accountId} (403)
      * @throws JiraWriteService.NoUserTokenException no valid Jira OAuth token for the user (409)
-     * @throws org.springframework.web.reactive.function.client.WebClientResponseException Jira call failed (502)
+     * @throws JiraNoIdException Jira accepted the write but returned no worklog id (502)
+     * @throws org.springframework.web.reactive.function.client.WebClientException Jira call failed (502)
      */
+    // Jira runs inside this transaction, holding the DB connection for the HTTP round-trip —
+    // deliberate: this endpoint is human-frequency (one submit per click), not a hot path.
     @Transactional
     public String logTime(String accountId, String issueKey, LocalDate date, BigDecimal hours, String comment) {
         if (hours == null || hours.signum() <= 0 || hours.compareTo(BigDecimal.valueOf(24)) > 0) {
             throw new LogTimeValidationException("Hours must be between 0 and 24");
         }
-        if (date == null || date.isAfter(LocalDate.now())) {
+        // +1 day tolerance: the server's clock/timezone may lag the user's local "today"
+        // (e.g. UTC server, MSK user near midnight) — reject only dates clearly in the future.
+        if (date == null || date.isAfter(LocalDate.now().plusDays(1))) {
             throw new LogTimeValidationException("Date must not be in the future");
         }
         JiraIssueEntity issue = issueRepository.findByIssueKey(issueKey)
@@ -78,10 +95,14 @@ public class MyWorklogService {
         }
 
         int seconds = hours.multiply(BigDecimal.valueOf(3600)).intValue();
+        if (seconds <= 0) {
+            // e.g. 0.0001h truncates to 0 seconds — Jira would reject it with an opaque error.
+            throw new LogTimeValidationException("Hours too small");
+        }
 
         String worklogId = jiraWriteService.logWorkAs(accountId, issueKey, seconds, date, comment);
         if (worklogId == null) {
-            throw new IllegalStateException("Jira did not return worklog id");
+            throw new JiraNoIdException("Jira did not confirm the worklog — check Jira before retrying");
         }
 
         IssueWorklogEntity entity = new IssueWorklogEntity();
