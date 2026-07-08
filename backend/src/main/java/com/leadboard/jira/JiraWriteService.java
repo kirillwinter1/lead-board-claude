@@ -139,20 +139,44 @@ public class JiraWriteService {
      *
      * @param atlassianAccountId Atlassian account id пользователя, от чьего имени пишем
      * @return id созданного worklog'а
-     * @throws NoUserTokenException если у пользователя нет валидного OAuth-токена
+     * @throws NoUserTokenException если у пользователя нет валидного OAuth-токена или не
+     *         удалось определить Jira cloudId для записи
      */
     public String logWorkAs(String atlassianAccountId, String issueKey, int timeSpentSeconds,
                             LocalDate date, String comment) {
         OAuthService.TokenInfo token = oauthService.getValidAccessTokenForUser(atlassianAccountId);
-        if (token == null || token.accessToken() == null || token.cloudId() == null) {
+        if (token == null || token.accessToken() == null) {
             throw new NoUserTokenException(
                     "Нет валидного OAuth-токена Jira у пользователя " + atlassianAccountId + ".");
         }
+        String cloudId = resolveWriteCloudId(token);
+        if (cloudId == null || cloudId.isBlank()) {
+            throw new NoUserTokenException(
+                    "Не удалось определить Jira cloudId для пользователя " + atlassianAccountId + ".");
+        }
         LocalDate when = date != null ? date : LocalDate.now();
         String worklogId = jiraClient.addWorklogReturningId(
-                issueKey, timeSpentSeconds, when, comment, token.accessToken(), token.cloudId());
+                issueKey, timeSpentSeconds, when, comment, token.accessToken(), cloudId);
         log.info("Jira worklog (as {}): {} +{}s on {}", atlassianAccountId, issueKey, timeSpentSeconds, when);
         return worklogId;
+    }
+
+    /**
+     * Resolves the Jira cloudId to write to for {@link #logWorkAs}: prefers the ACTIVE
+     * TENANT's configured site ({@link JiraConfigResolver#getJiraCloudId()}) over the
+     * cloudId stored on the user's OAuth token (the site they first logged into) — a member
+     * of two tenants on different Jira sites must write to the CURRENT tenant's site, not
+     * whichever one their token happens to remember. The 3LO access token itself is
+     * site-agnostic; only the {@code /ex/jira/{cloudId}} path segment picks the site. Falls
+     * back to the token's cloudId when there's no tenant config (single-tenant/.env mode).
+     * Same precedence as {@link com.leadboard.tenant.TenantAccessReconciler}.
+     */
+    private String resolveWriteCloudId(OAuthService.TokenInfo token) {
+        String tenantCloudId = configResolver.getJiraCloudId();
+        if (tenantCloudId != null && !tenantCloudId.isBlank()) {
+            return tenantCloudId;
+        }
+        return token.cloudId();
     }
 
     /** Добавить комментарий к задаче. */
