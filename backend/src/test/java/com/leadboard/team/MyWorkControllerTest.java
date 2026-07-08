@@ -14,10 +14,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -180,5 +183,40 @@ class MyWorkControllerTest {
                         .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Jira API error"));
+    }
+
+    @Test
+    void logTimeReturns502OnWebClientRequestException() throws Exception {
+        // Network-level failure (DNS/timeout) — WebClientRequestException, a sibling of
+        // WebClientResponseException under the common WebClientException parent the
+        // controller now catches (F90 review fix).
+        LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
+        when(auth.getAtlassianAccountId()).thenReturn("acc-1");
+        when(authorizationService.getCurrentAuth()).thenReturn(auth);
+        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+                .thenThrow(new WebClientRequestException(
+                        new java.io.IOException("boom"), HttpMethod.POST, URI.create("https://api.atlassian.com/x"), HttpHeaders.EMPTY));
+
+        mockMvc.perform(post("/api/me/worklog")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("Jira API error"));
+    }
+
+    @Test
+    void logTimeReturns502WithNoRetryWarningOnJiraNoIdException() throws Exception {
+        LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
+        when(auth.getAtlassianAccountId()).thenReturn("acc-1");
+        when(authorizationService.getCurrentAuth()).thenReturn(auth);
+        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+                .thenThrow(new MyWorklogService.JiraNoIdException(
+                        "Jira did not confirm the worklog — check Jira before retrying"));
+
+        mockMvc.perform(post("/api/me/worklog")
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("Jira did not confirm the worklog — check Jira before retrying"));
     }
 }

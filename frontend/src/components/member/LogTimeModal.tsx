@@ -73,6 +73,7 @@ export function LogTimeModal({ target, onClose, onLogged }: LogTimeModalProps): 
               id="logtime-hours"
               type="number"
               min="0.5"
+              max="24"
               step="0.5"
               value={hours}
               onChange={e => setHours(e.target.value)}
@@ -87,6 +88,7 @@ export function LogTimeModal({ target, onClose, onLogged }: LogTimeModalProps): 
               max={todayLocal()}
               value={date}
               onChange={e => setDate(e.target.value)}
+              required
             />
           </div>
           <div className="form-group">

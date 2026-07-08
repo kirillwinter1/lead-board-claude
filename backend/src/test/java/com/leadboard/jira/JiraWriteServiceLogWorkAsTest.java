@@ -68,4 +68,47 @@ class JiraWriteServiceLogWorkAsTest {
 
         verifyNoInteractions(jiraClient);
     }
+
+    /**
+     * F90 review fix: a user who belongs to two tenants on different Jira sites must have
+     * their worklog written to the CURRENT tenant's site — not whichever site their OAuth
+     * token happens to remember from wherever they first logged in.
+     */
+    @Test
+    void logWorkAsPrefersActiveTenantCloudIdOverTokenCloudId() {
+        when(oauthService.getValidAccessTokenForUser("acc-1"))
+                .thenReturn(new OAuthService.TokenInfo("tok", "token-cloud"));
+        when(configResolver.getJiraCloudId()).thenReturn("tenant-cloud");
+        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "tenant-cloud"))
+                .thenReturn("42");
+
+        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.of(2026, 7, 8), "note"));
+
+        verify(jiraClient).addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "tenant-cloud");
+    }
+
+    @Test
+    void logWorkAsFallsBackToTokenCloudIdWhenNoTenantConfig() {
+        when(oauthService.getValidAccessTokenForUser("acc-1"))
+                .thenReturn(new OAuthService.TokenInfo("tok", "token-cloud"));
+        when(configResolver.getJiraCloudId()).thenReturn(null);
+        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "token-cloud"))
+                .thenReturn("42");
+
+        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.of(2026, 7, 8), "note"));
+
+        verify(jiraClient).addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "token-cloud");
+    }
+
+    @Test
+    void logWorkAsThrowsWhenNeitherTenantNorTokenHasCloudId() {
+        when(oauthService.getValidAccessTokenForUser("acc-1"))
+                .thenReturn(new OAuthService.TokenInfo("tok", null));
+        when(configResolver.getJiraCloudId()).thenReturn(null);
+
+        assertThrows(JiraWriteService.NoUserTokenException.class,
+                () -> service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.now(), null));
+
+        verifyNoInteractions(jiraClient);
+    }
 }

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.reactive.function.client.WebClientException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -71,7 +71,14 @@ public class MyWorkController {
         } catch (JiraWriteService.NoUserTokenException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(Map.of("error", "Jira session expired — re-login via Atlassian"));
-        } catch (WebClientResponseException | IllegalStateException e) {
+        } catch (MyWorklogService.JiraNoIdException e) {
+            // Distinct from the generic Jira-error branch below: warns the client not to
+            // blindly retry, since the write may have already landed on Jira's side.
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", e.getMessage()));
+        } catch (WebClientException e) {
+            // Parent of WebClientResponseException (Jira 4xx/5xx) AND WebClientRequestException
+            // (DNS failure, connect/read timeout) — both are "Jira unreachable/erroring" from
+            // the caller's perspective.
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", "Jira API error"));
         }
     }
