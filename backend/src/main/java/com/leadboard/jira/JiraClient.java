@@ -237,12 +237,65 @@ public class JiraClient {
                     .toList());
         }
 
-        Map<String, Object> body = Map.of("fields", fields);
+        return createWithRequiredRetry(fields, accessToken, cloudId);
+    }
 
+    /**
+     * POST the issue to Jira and, if the create fails with a 400 because the project
+     * marks some fields required on the create screen (e.g. LB requires {@code timetracking}
+     * and {@code labels} on Story/Subtask), fill placeholder values for exactly the fields
+     * Jira named and retry once. Jira's own error body is the source of truth, so this
+     * adapts per-project without hardcoding a screen config and without touching projects
+     * that don't require these fields. Placeholders are neutral (0m estimate, a marker
+     * label); the real per-role estimates are written to subtasks later via publish.
+     */
+    private String createWithRequiredRetry(Map<String, Object> fields, String accessToken, String cloudId) {
+        try {
+            return postCreate(fields, accessToken, cloudId);
+        } catch (org.springframework.web.reactive.function.client.WebClientResponseException e) {
+            if (e.getStatusCode().value() == 400) {
+                Map<String, Object> extra = requiredFieldPlaceholders(e.getResponseBodyAsString(), fields);
+                if (!extra.isEmpty()) {
+                    fields.putAll(extra);
+                    log.info("Jira create 400 — retrying with placeholders for required field(s): {}",
+                            extra.keySet());
+                    return postCreate(fields, accessToken, cloudId);
+                }
+            }
+            throw e;
+        }
+    }
+
+    private String postCreate(Map<String, Object> fields, String accessToken, String cloudId) {
+        Map<String, Object> body = Map.of("fields", fields);
         if (accessToken != null && cloudId != null) {
             return createIssueWithOAuth(body, accessToken, cloudId);
         }
         return createIssueWithBasicAuth(body);
+    }
+
+    /**
+     * Inspect a Jira create 400 body and return placeholder values for the required
+     * system fields we know how to satisfy. Only fields whose error text says they are
+     * <em>required</em> ("обязательно"/"required") are filled — a "cannot be set, not on
+     * screen" error is left alone so we don't loop. Fields the caller already set are
+     * never overridden.
+     */
+    private Map<String, Object> requiredFieldPlaceholders(String errorBody, Map<String, Object> current) {
+        Map<String, Object> out = new java.util.HashMap<>();
+        if (errorBody == null) return out;
+        boolean requiredMarker = errorBody.contains("обязательно")
+                || errorBody.toLowerCase().contains("is required")
+                || errorBody.toLowerCase().contains("required");
+        if (!requiredMarker) return out;
+
+        if (errorBody.contains("timetracking") && !current.containsKey("timetracking")) {
+            out.put("timetracking", Map.of("originalEstimate", "0m", "remainingEstimate", "0m"));
+        }
+        if (errorBody.contains("\"labels\"") && !current.containsKey("labels")) {
+            out.put("labels", List.of("planning-poker"));
+        }
+        return out;
     }
 
     /**
@@ -326,12 +379,9 @@ public class JiraClient {
                     .toList());
         }
 
-        Map<String, Object> body = Map.of("fields", fields);
-
-        if (accessToken != null && cloudId != null) {
-            return createIssueWithOAuth(body, accessToken, cloudId);
-        }
-        return createIssueWithBasicAuth(body);
+        // Same required-field retry as createIssue (subtask create screen may also
+        // require timetracking / labels).
+        return createWithRequiredRetry(fields, accessToken, cloudId);
     }
 
     /**
