@@ -2,8 +2,9 @@
    MY WORK PAGE (F88)
    Reuses .main-content, .page-header, .profile-section,
    .profile-section-header, .section-badge, .profile-tasks-table,
-   .member-avatar, .member-info, .role-badge, .grade-badge
+   .member-avatar, .member-info
    from TeamsPage.css / MemberProfilePage.css.
+   Role/grade pills render via the shared RoleBadge / GradeBadge components.
    ===================================================== */
 
 .mywork-header {

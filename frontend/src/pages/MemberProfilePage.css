@@ -214,30 +214,7 @@
   color: #bf2600;
 }
 
-/* Status badges */
-.status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.status-badge.done {
-  background: #e3fcef;
-  color: #006644;
-}
-
-.status-badge.in-progress {
-  background: #deebff;
-  color: #0747a6;
-}
-
-.status-badge.todo {
-  background: #f4f5f7;
-  color: #42526e;
-}
+/* Status badges are rendered via the shared StatusBadge component (true DB colours). */
 
 /* Trend Chart (SVG) */
 .trend-chart-container {

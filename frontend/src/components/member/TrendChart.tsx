@@ -1,4 +1,5 @@
 import { WeeklyTrend } from '../../api/teams'
+import { CHART_GRID, LINK_COLOR, TEXT_SUBTLE } from '../../constants/colors'
 
 // Extracted from MemberProfilePage — CSS classes (trend-chart-*) live in MemberProfilePage.css.
 // Consuming pages must import that stylesheet (or a copy of the relevant rules).
@@ -31,18 +32,18 @@ export function TrendChart({ data }: { data: WeeklyTrend[] }) {
     <div className="trend-chart-container">
       <div className="trend-chart-legend">
         <span className="trend-chart-legend-item">
-          <span className="trend-chart-legend-dot" style={{ background: '#0052cc' }} />
+          <span className="trend-chart-legend-dot" style={{ background: LINK_COLOR }} />
           DSR (spent / estimate)
         </span>
         <span className="trend-chart-legend-item">
-          <span className="trend-chart-legend-dot" style={{ background: '#c1c7d0', borderRadius: 2 }} />
+          <span className="trend-chart-legend-dot" style={{ background: CHART_GRID, borderRadius: 2 }} />
           Tasks closed
         </span>
       </div>
       <svg className="trend-chart-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet">
         {/* Reference line DSR=1.0 */}
-        <line x1={PX} y1={refY} x2={W - PX} y2={refY} stroke="#ebecf0" strokeWidth="1" strokeDasharray="4 3" />
-        <text x={PX - 4} y={refY + 4} textAnchor="end" fontSize="10" fill="#97a0af">1.0</text>
+        <line x1={PX} y1={refY} x2={W - PX} y2={refY} stroke={CHART_GRID} strokeWidth="1" strokeDasharray="4 3" />
+        <text x={PX - 4} y={refY + 4} textAnchor="end" fontSize="10" fill={TEXT_SUBTLE}>1.0</text>
 
         {/* Task bars */}
         {data.map((d, i) => {
@@ -50,7 +51,7 @@ export function TrendChart({ data }: { data: WeeklyTrend[] }) {
           const barH = (d.tasksCompleted / maxTasks) * chartH * 0.6
           const y = PY + chartH - barH
           return (
-            <rect key={`bar-${i}`} x={x} y={y} width={barW} height={barH} rx="3" fill="#ebecf0" />
+            <rect key={`bar-${i}`} x={x} y={y} width={barW} height={barH} rx="3" fill={CHART_GRID} />
           )
         })}
 
@@ -58,7 +59,7 @@ export function TrendChart({ data }: { data: WeeklyTrend[] }) {
         <polyline
           points={dsrPoints.join(' ')}
           fill="none"
-          stroke="#0052cc"
+          stroke={LINK_COLOR}
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -70,7 +71,7 @@ export function TrendChart({ data }: { data: WeeklyTrend[] }) {
           const x = PX + (i / (data.length - 1)) * chartW
           const y = PY + (1 - (d.dsr - minDsr) / range) * chartH
           return (
-            <circle key={`dot-${i}`} cx={x} cy={y} r="4" fill="#0052cc" stroke="white" strokeWidth="2" />
+            <circle key={`dot-${i}`} cx={x} cy={y} r="4" fill={LINK_COLOR} stroke="white" strokeWidth="2" />
           )
         })}
 
@@ -78,7 +79,7 @@ export function TrendChart({ data }: { data: WeeklyTrend[] }) {
         {data.map((d, i) => {
           const x = PX + (i / (data.length - 1)) * chartW
           return (
-            <text key={`label-${i}`} x={x} y={H - 2} textAnchor="middle" fontSize="10" fill="#97a0af">
+            <text key={`label-${i}`} x={x} y={H - 2} textAnchor="middle" fontSize="10" fill={TEXT_SUBTLE}>
               {d.week}
             </text>
           )

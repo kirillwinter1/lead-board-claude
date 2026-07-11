@@ -7,6 +7,9 @@ import { competencyApi, CompetencyLevel } from '../api/competency'
 import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
 import { ERROR_TEXT } from '../constants/colors'
 import { TrendChart } from '../components/member/TrendChart'
+import { StatusBadge } from '../components/board/StatusBadge'
+import { RoleBadge } from '../components/RoleBadge'
+import { GradeBadge } from '../components/GradeBadge'
 import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
@@ -144,8 +147,8 @@ export function MemberProfilePage() {
         <div className="member-info">
           <h2>{member.displayName}</h2>
           <div className="member-info-badges">
-            <span className={`role-badge ${member.role.toLowerCase()}`}>{member.role}</span>
-            <span className={`grade-badge ${member.grade.toLowerCase()}`}>{member.grade}</span>
+            <RoleBadge role={member.role} />
+            <GradeBadge grade={member.grade} />
             <span className="member-info-team">{member.teamName} &middot; {member.hoursPerDay}h/день</span>
           </div>
         </div>
@@ -394,7 +397,7 @@ export function MemberProfilePage() {
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className="status-badge in-progress">{task.status}</span>
+                      <StatusBadge status={task.status} />
                     </td>
                     <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(task.estimateH)}</td>
                     <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(task.spentH)}</td>
@@ -410,7 +413,7 @@ export function MemberProfilePage() {
                       )}
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <span className="status-badge todo">{task.status}</span>
+                      <StatusBadge status={task.status} />
                     </td>
                     <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(task.estimateH)}</td>
                     <td className="task-hours" style={{ textAlign: 'right' }}>—</td>

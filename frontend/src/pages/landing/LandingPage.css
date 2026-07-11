@@ -1084,7 +1084,7 @@
 }
 
 /* Modal */
-.modal-overlay {
+.landing-modal-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -1095,7 +1095,7 @@
   z-index: 1000;
 }
 
-.modal-content {
+.landing-modal-content {
   background: var(--landing-bg-alt);
   border-radius: var(--landing-radius);
   padding: 40px;
@@ -1106,7 +1106,7 @@
   overflow-y: auto;
 }
 
-.modal-close {
+.landing-modal-close {
   position: absolute;
   top: 16px;
   right: 16px;
@@ -1119,23 +1119,23 @@
   line-height: 1;
 }
 
-.modal-close:hover {
+.landing-modal-close:hover {
   color: var(--landing-text);
 }
 
-.modal-title {
+.landing-modal-title {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 8px;
 }
 
-.modal-subtitle {
+.landing-modal-subtitle {
   color: var(--landing-text-secondary);
   margin-bottom: 32px;
   font-size: 0.9375rem;
 }
 
-.modal-form {
+.landing-modal-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -1184,24 +1184,24 @@
   color: var(--landing-muted);
 }
 
-.modal-submit {
+.landing-modal-submit {
   margin-top: 8px;
   width: 100%;
 }
 
-.modal-response-note {
+.landing-modal-response-note {
   margin-top: 12px;
   font-size: 0.8125rem;
   color: var(--landing-muted);
   text-align: center;
 }
 
-.modal-success {
+.landing-modal-success {
   text-align: center;
   padding: 20px 0;
 }
 
-.modal-success-icon {
+.landing-modal-success-icon {
   width: 64px;
   height: 64px;
   background: #f0fdf4;
@@ -1214,12 +1214,12 @@
   margin: 0 auto 20px;
 }
 
-.modal-success h3 {
+.landing-modal-success h3 {
   font-size: 1.25rem;
   margin-bottom: 8px;
 }
 
-.modal-success p {
+.landing-modal-success p {
   color: var(--landing-text-secondary);
   margin-bottom: 24px;
 }
@@ -1877,7 +1877,7 @@
     font-size: 0.75rem;
   }
 
-  .modal-content {
+  .landing-modal-content {
     padding: 24px;
   }
 }
@@ -2989,19 +2989,19 @@
   }
 
   /* Modal */
-  .modal-overlay {
+  .landing-modal-overlay {
     padding: 16px;
   }
 
-  .modal-content {
+  .landing-modal-content {
     padding: 20px;
   }
 
-  .modal-title {
+  .landing-modal-title {
     font-size: 1.25rem;
   }
 
-  .modal-subtitle {
+  .landing-modal-subtitle {
     font-size: 0.875rem;
     margin-bottom: 24px;
   }

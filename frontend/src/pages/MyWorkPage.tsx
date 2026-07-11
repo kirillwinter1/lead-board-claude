@@ -4,6 +4,8 @@ import { getStatusStyles, type StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { TeamBadge } from '../components/TeamBadge'
+import { RoleBadge } from '../components/RoleBadge'
+import { GradeBadge } from '../components/GradeBadge'
 import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
@@ -351,7 +353,7 @@ function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange, o
 // ======================== MAIN PAGE ========================
 
 export function MyWorkPage() {
-  const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
+  const { getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
 
   const [data, setData] = useState<MyWorkResponse | null>(null)
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
@@ -414,13 +416,8 @@ export function MyWorkPage() {
           <div className="member-info">
             <h2>{member.displayName}</h2>
             <div className="member-info-badges">
-              <span
-                className="role-badge"
-                style={{ backgroundColor: getRoleColor(member.role) + '20', color: getRoleColor(member.role) }}
-              >
-                {getRoleDisplayName(member.role)}
-              </span>
-              <span className={`grade-badge ${member.grade.toLowerCase()}`}>{member.grade}</span>
+              <RoleBadge role={member.role} />
+              <GradeBadge grade={member.grade} />
               {member.teams.map(t => (
                 <TeamBadge key={t.teamId} name={t.teamName} color={t.teamColor} />
               ))}

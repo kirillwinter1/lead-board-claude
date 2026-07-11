@@ -22,6 +22,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
   })
   const [errors, setErrors] = useState<Partial<FormData>>({})
   const [submitted, setSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const validate = (): boolean => {
@@ -45,6 +46,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
     if (!validate()) return
 
     setLoading(true)
+    setSubmitError(null)
 
     try {
       const response = await fetch('/api/audit-requests', {
@@ -66,8 +68,10 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
 
       setSubmitted(true)
     } catch (error) {
+      // Never fake success on failure — the lead would be silently lost.
+      // Show an error and let the user retry.
       console.error('Error submitting audit request:', error)
-      setSubmitted(true)
+      setSubmitError('Не удалось отправить заявку. Проверьте соединение и попробуйте ещё раз.')
     } finally {
       setLoading(false)
     }
@@ -77,6 +81,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
     setFormData({ name: '', company: '', role: '', contact: '' })
     setErrors({})
     setSubmitted(false)
+    setSubmitError(null)
     onClose()
   }
 
@@ -93,26 +98,26 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="modal-overlay"
+          className="landing-modal-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={handleClose}
         >
           <motion.div
-            className="modal-content"
+            className="landing-modal-content"
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             onClick={e => e.stopPropagation()}
           >
-            <button className="modal-close" onClick={handleClose}>
+            <button className="landing-modal-close" onClick={handleClose}>
               &times;
             </button>
 
             {submitted ? (
-              <div className="modal-success">
-                <div className="modal-success-icon">✓</div>
+              <div className="landing-modal-success">
+                <div className="landing-modal-success-icon">✓</div>
                 <h3>Заявка отправлена</h3>
                 <p>Свяжемся с вами в течение 24 часов для согласования времени разбора.</p>
                 <button
@@ -124,12 +129,12 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
               </div>
             ) : (
               <>
-                <h2 className="modal-title">Оставить заявку</h2>
-                <p className="modal-subtitle">
+                <h2 className="landing-modal-title">Оставить заявку</h2>
+                <p className="landing-modal-subtitle">
                   30 минут — разберём вашу ситуацию и покажем, как сделать сроки предсказуемыми
                 </p>
 
-                <form className="modal-form" onSubmit={handleSubmit}>
+                <form className="landing-modal-form" onSubmit={handleSubmit}>
                   <div className="form-group">
                     <label className="form-label">
                       Имя <span className="required">*</span>
@@ -180,14 +185,17 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
                     {errors.contact && <span className="form-error">{errors.contact}</span>}
                   </div>
 
+                  {submitError && (
+                    <span className="form-error" role="alert">{submitError}</span>
+                  )}
                   <button
                     type="submit"
-                    className="landing-btn landing-btn-primary landing-btn-large modal-submit"
+                    className="landing-btn landing-btn-primary landing-btn-large landing-modal-submit"
                     disabled={loading}
                   >
                     {loading ? 'Отправка...' : 'Отправить заявку'}
                   </button>
-                  <p className="modal-response-note">
+                  <p className="landing-modal-response-note">
                     Ответим в течение 1 рабочего дня
                   </p>
                 </form>
