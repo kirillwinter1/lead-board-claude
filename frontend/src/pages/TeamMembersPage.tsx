@@ -373,18 +373,18 @@ export function TeamMembersPage() {
           onClick={() => setShowPlanningConfig(!showPlanningConfig)}
         >
           <span className={`chevron ${showPlanningConfig ? 'expanded' : ''}`}>›</span>
-          <h3>Настройки планирования</h3>
+          <h3>Planning settings</h3>
         </div>
 
         {showPlanningConfig && (
           <div className="planning-config-content">
             <div className="config-group">
               <div className="config-title-row">
-                <h4>Коэффициенты грейдов</h4>
-                <span className="config-info" title="Влияют на расчёт скорости выполнения задач. Чем меньше коэффициент — тем быстрее работает специалист.">?</span>
+                <h4>Grade coefficients</h4>
+                <span className="config-info" title="Affect how task delivery speed is estimated. A lower coefficient means the person works faster.">?</span>
               </div>
               <p className="config-hint">
-                Senior (0.8) выполняет 1 чел-день за 0.8 дня, Junior (1.5) — за 1.5 дня
+                Senior (0.8) does 1 person-day in 0.8 days, Junior (1.5) in 1.5 days
               </p>
               <div className="config-row">
                 <div className="config-field">
@@ -425,15 +425,15 @@ export function TeamMembersPage() {
 
             <div className="config-group">
               <div className="config-title-row">
-                <h4>Буфер рисков</h4>
-                <span className="config-info" title="Запас времени на непредвиденные обстоятельства: болезни, блокеры, техдолг. Добавляется к прогнозным датам.">?</span>
+                <h4>Risk buffer</h4>
+                <span className="config-info" title="Time reserve for the unexpected: sick days, blockers, tech debt. Added to forecast dates.">?</span>
               </div>
               <p className="config-hint">
-                Рекомендуется 15-25% для большинства команд
+                Recommended 15-25% for most teams
               </p>
               <div className="config-row">
                 <div className="config-field config-field-percent">
-                  <label>Буфер</label>
+                  <label>Buffer</label>
                   <div className="input-with-suffix">
                     <input
                       type="number"
@@ -454,16 +454,16 @@ export function TeamMembersPage() {
 
             <div className="config-group">
               <div className="config-title-row">
-                <h4>Длительность стори по ролям</h4>
-                <span className="config-info" title="Среднее время работы над одной сторёй для каждой роли. Используется для расчёта параллельной работы: следующая роль начинает после завершения первой стори предыдущей.">?</span>
+                <h4>Story duration by role</h4>
+                <span className="config-info" title="Average time to work on one story per role. Used to model parallel work: the next role starts after the previous role finishes its first story.">?</span>
               </div>
               <p className="config-hint">
-                Влияет на перекрытие фаз в timeline. Меньше значение — больше параллелизм.
+                Affects phase overlap in the timeline. A smaller value means more parallelism.
               </p>
               <div className="config-row">
                 {storyDurationEntries.map(({ role, duration }) => (
                   <div className="config-field" key={role}>
-                    <label>{getRoleDisplayName(role)} (дней)</label>
+                    <label>{getRoleDisplayName(role)} (days)</label>
                     <input
                       type="number"
                       min="0.5"
@@ -479,18 +479,18 @@ export function TeamMembersPage() {
 
             <div className="config-group">
               <div className="config-title-row">
-                <h4>WIP лимиты (рекомендательные)</h4>
-                <span className="config-info" title="Рекомендуемые ограничения количества эпиков в работе. НЕ влияют на автопланирование — используются только для визуализации и метрик.">?</span>
+                <h4>WIP limits (advisory)</h4>
+                <span className="config-info" title="Advisory limits on the number of epics in progress. They do NOT affect auto-planning — used only for visualization and metrics.">?</span>
               </div>
               <p className="config-hint wip-notice">
-                Эти значения НЕ ограничивают планирование. Алгоритм планирует все эпики на основе реальной capacity команды.
+                These values do NOT constrain planning. The algorithm plans all epics based on the team's real capacity.
               </p>
               <p className="config-hint">
-                Рекомендация: команда = участники / кол-во ролей, на роль = участников x 1.5
+                Recommendation: team = members / number of roles, per role = members x 1.5
               </p>
               <div className="config-row wip-row">
                 <div className={`config-field wip-field ${getWipStatus(planningConfig.wipLimits.team, recommendedWip.team)}`}>
-                  <label>Команда</label>
+                  <label>Team</label>
                   <input
                     type="number"
                     min="1"
@@ -500,7 +500,7 @@ export function TeamMembersPage() {
                     onChange={e => updateTeamWipLimit(parseInt(e.target.value) || 1)}
                   />
                   <span className="wip-recommendation">
-                    рек. {recommendedWip.team || 1}
+                    rec. {recommendedWip.team || 1}
                   </span>
                 </div>
                 {roleWipEntries.map(({ role, limit }) => {
@@ -521,16 +521,16 @@ export function TeamMembersPage() {
                         onChange={e => updateRoleWipLimit(role, parseInt(e.target.value) || 1)}
                       />
                       <span className="wip-recommendation">
-                        рек. {recommended || 1}
+                        rec. {recommended || 1}
                       </span>
                     </div>
                   )
                 })}
               </div>
               <div className="wip-legend">
-                <span className="wip-legend-item good">● Оптимально</span>
-                <span className="wip-legend-item warning">● Допустимо</span>
-                <span className="wip-legend-item danger">● Перегрузка</span>
+                <span className="wip-legend-item good">● Optimal</span>
+                <span className="wip-legend-item warning">● Acceptable</span>
+                <span className="wip-legend-item danger">● Overload</span>
               </div>
             </div>
 
@@ -540,7 +540,7 @@ export function TeamMembersPage() {
                 onClick={handleSavePlanningConfig}
                 disabled={savingConfig}
               >
-                {savingConfig ? 'Сохранение...' : 'Сохранить настройки'}
+                {savingConfig ? 'Saving...' : 'Save settings'}
               </button>
             </div>
           </div>
@@ -554,7 +554,7 @@ export function TeamMembersPage() {
           onClick={() => setShowAbsences(!showAbsences)}
         >
           <span className={`chevron ${showAbsences ? 'expanded' : ''}`}>›</span>
-          <h3>Отпуска и отсутствия</h3>
+          <h3>Time off and absences</h3>
         </div>
 
         {showAbsences && teamId && (

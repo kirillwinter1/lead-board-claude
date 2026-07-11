@@ -24,8 +24,8 @@ export function MatrixUnassigned({ cards, jiraBaseUrl }: MatrixUnassignedProps) 
     >
       <div className="matrix-zone-header" style={{ borderLeftColor: color.accent }}>
         <div className="matrix-zone-titles">
-          <span className="matrix-zone-title">Нераспределённые</span>
-          <span className="matrix-zone-subtitle">Перетащите карточку в квадрант</span>
+          <span className="matrix-zone-title">Unassigned</span>
+          <span className="matrix-zone-subtitle">Drag a card into a quadrant</span>
         </div>
         <span className="matrix-zone-count">{cards.length}</span>
       </div>

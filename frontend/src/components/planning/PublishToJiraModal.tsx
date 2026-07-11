@@ -123,7 +123,7 @@ export function PublishToJiraModal({
   const visibleChanges: PendingChange[] = hasFailures ? failedChanges : pendingChanges
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Опубликовать → Jira" maxWidth={640}>
+    <Modal isOpen={isOpen} onClose={handleClose} title="Publish → Jira" maxWidth={640}>
       {pendingChanges.length === 0 && !results && (
         <div style={{ color: TEXT_MUTED, fontSize: 13 }}>No pending changes.</div>
       )}

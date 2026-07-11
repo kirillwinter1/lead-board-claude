@@ -201,8 +201,8 @@ export function EpicCard({
   }, [remaining, getRoleCodes])
 
   const moveAction = mode === 'backlog'
-    ? { label: 'В квартал →', handler: () => onMove(epic.epicKey, targetQuarter) }
-    : { label: '← Вернуть', handler: () => onMove(epic.epicKey, null) }
+    ? { label: 'To quarter →', handler: () => onMove(epic.epicKey, targetQuarter) }
+    : { label: '← Return', handler: () => onMove(epic.epicKey, null) }
 
   // Role-chips row for remaining work — same chip styling as the demand row,
   // colored via getRoleColor (never hardcode role colors).
@@ -385,12 +385,12 @@ export function EpicCard({
       {showRemainingWork && remaining && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            <WarningBadge tone="warn">Осталась работа</WarningBadge>
+            <WarningBadge tone="warn">Work remaining</WarningBadge>
           </div>
           {!remainingEqualsEstimate &&
-            renderRemainingLine('Осталось сейчас:', remaining.remainingNowByRole)}
+            renderRemainingLine('Remaining now:', remaining.remainingNowByRole)}
           {!atStartEqualsNow &&
-            renderRemainingLine(`На старте ${currentQuarter}:`, remaining.remainingAtQuarterStartByRole)}
+            renderRemainingLine(`At ${currentQuarter} start:`, remaining.remainingAtQuarterStartByRole)}
         </div>
       )}
 
@@ -405,16 +405,16 @@ export function EpicCard({
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {/* Pencil chips already scream "no estimate" on editable epics */}
           {!epic.hasEstimate && !showRemainingWork && !estimateEditable && (
-            <WarningBadge tone="warn">нет оценки</WarningBadge>
+            <WarningBadge tone="warn">no estimate</WarningBadge>
           )}
           {!epic.hasTeamMapping && (
-            <WarningBadge tone="warn">нет команды</WarningBadge>
+            <WarningBadge tone="warn">no team</WarningBadge>
           )}
           {inOtherQuarter && epic.quarterLabel && (
-            <WarningBadge tone="info">в {epic.quarterLabel}</WarningBadge>
+            <WarningBadge tone="info">in {epic.quarterLabel}</WarningBadge>
           )}
           {pmDesiresDifferentQuarter && (
-            <WarningBadge tone="info">PM желает {epic.projectDesiredQuarter}</WarningBadge>
+            <WarningBadge tone="info">PM wants {epic.projectDesiredQuarter}</WarningBadge>
           )}
         </div>
       )}

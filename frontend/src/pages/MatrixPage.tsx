@@ -141,7 +141,7 @@ export function MatrixPage() {
       // Revert optimistic move on failure.
       setView(previousView)
       setTriageError(
-        `Не удалось переместить ${issueKey}: ` + (err instanceof Error ? err.message : 'Unknown error'),
+        `Failed to move ${issueKey}: ` + (err instanceof Error ? err.message : 'Unknown error'),
       )
     })
   }, [view])
@@ -180,29 +180,25 @@ export function MatrixPage() {
             <div className="matrix-grid">
               <MatrixQuadrant
                 quadrant="P1"
-                title="Важно и срочно"
-                subtitle="Important & Urgent"
+                title="Important & urgent"
                 cards={view.p1}
                 jiraBaseUrl={jiraBaseUrl}
               />
               <MatrixQuadrant
                 quadrant="P2"
-                title="Важно, не срочно"
-                subtitle="Important / Not urgent"
+                title="Important, not urgent"
                 cards={view.p2}
                 jiraBaseUrl={jiraBaseUrl}
               />
               <MatrixQuadrant
                 quadrant="P3"
-                title="Не важно, срочно"
-                subtitle="Not important / Urgent"
+                title="Not important, urgent"
                 cards={view.p3}
                 jiraBaseUrl={jiraBaseUrl}
               />
               <MatrixQuadrant
                 quadrant="P4"
-                title="Не важно, не срочно"
-                subtitle="Not important / Not urgent"
+                title="Not important, not urgent"
                 cards={view.p4}
                 jiraBaseUrl={jiraBaseUrl}
               />

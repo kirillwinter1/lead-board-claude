@@ -92,10 +92,10 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
             pointerEvents: 'none',
           }}
         >
-          <div style={{ fontWeight: 600, color: '#172b4d', marginBottom: 8 }}>Путь по статусам</div>
+          <div style={{ fontWeight: 600, color: '#172b4d', marginBottom: 8 }}>Status path</div>
 
-          {loading && <div style={{ color: '#6b778c' }}>Загрузка…</div>}
-          {error && <div style={{ color: ERROR_TEXT }}>Не удалось загрузить</div>}
+          {loading && <div style={{ color: '#6b778c' }}>Loading…</div>}
+          {error && <div style={{ color: ERROR_TEXT }}>Failed to load</div>}
 
           {history && !loading && (
             <>
@@ -115,7 +115,7 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
                       <StatusBadge status={seg.status} />
                       {seg.current && (
                         <span style={{ fontSize: 10, color: '#0052cc', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                          сейчас
+                          now
                         </span>
                       )}
                     </span>
@@ -143,12 +143,12 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Всего</span>
+                  <span>Total</span>
                   <span style={{ fontWeight: 600, color: '#172b4d' }}>{formatDuration(history.totalSeconds)}</span>
                 </div>
                 {history.segments.length > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Без «{history.segments[0].status}»</span>
+                    <span>Excl. “{history.segments[0].status}”</span>
                     <span style={{ fontWeight: 600, color: '#172b4d' }}>
                       {formatDuration(history.totalSeconds - history.segments[0].durationSeconds)}
                     </span>

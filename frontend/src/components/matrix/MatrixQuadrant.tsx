@@ -6,7 +6,7 @@ import type { MatrixCard as MatrixCardData, Quadrant } from '../../api/matrixApi
 interface MatrixQuadrantProps {
   quadrant: Quadrant
   title: string
-  subtitle: string
+  subtitle?: string
   cards: MatrixCardData[]
   jiraBaseUrl: string
 }
@@ -29,7 +29,7 @@ export function MatrixQuadrant({ quadrant, title, subtitle, cards, jiraBaseUrl }
         <span className="matrix-zone-badge" style={{ background: color.accent }}>{quadrant}</span>
         <div className="matrix-zone-titles">
           <span className="matrix-zone-title">{title}</span>
-          <span className="matrix-zone-subtitle">{subtitle}</span>
+          {subtitle && <span className="matrix-zone-subtitle">{subtitle}</span>}
         </div>
         <span className="matrix-zone-count">{cards.length}</span>
       </div>

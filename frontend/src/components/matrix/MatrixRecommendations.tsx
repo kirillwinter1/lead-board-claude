@@ -25,9 +25,9 @@ export function MatrixRecommendations({ data, jiraBaseUrl }: Props) {
       <ZeroBugSection bugs={zeroBugPolicy.bugs} count={zeroBugPolicy.openBugCount} jiraBaseUrl={jiraBaseUrl} />
 
       <div className="rec-block">
-        <div className="rec-block-head">Рекомендуем взять из техдолга</div>
+        <div className="rec-block-head">Recommended from tech debt</div>
         {recommended.length === 0 ? (
-          <div className="rec-empty-line">Нет распределённых задач — разложите техдолг по квадрантам матрицы.</div>
+          <div className="rec-empty-line">No assigned tasks — sort tech debt into the matrix quadrants.</div>
         ) : (
           <div className="rec-cards">
             {recommended.map(s => <StoryCard key={s.issueKey} story={s} jiraBaseUrl={jiraBaseUrl} />)}
@@ -36,7 +36,7 @@ export function MatrixRecommendations({ data, jiraBaseUrl }: Props) {
 
         {needsEstimation.length > 0 && (
           <>
-            <div className="rec-subhead rec-subhead-warn">Требует нарезки / оценки</div>
+            <div className="rec-subhead rec-subhead-warn">Needs breakdown / estimation</div>
             <div className="rec-cards">
               {needsEstimation.map(c => <WarnCard key={c.issueKey} card={c} jiraBaseUrl={jiraBaseUrl} />)}
             </div>
@@ -51,13 +51,13 @@ function ZeroBugSection({ bugs, count, jiraBaseUrl }: { bugs: RecCard[]; count: 
   if (count === 0) {
     return (
       <div className="rec-block rec-zerobug rec-zerobug-clean" role="status">
-        <div className="rec-block-head">🐞 Zero Bug Policy — 0 багов, политика соблюдается</div>
+        <div className="rec-block-head">🐞 Zero Bug Policy — 0 bugs, policy upheld</div>
       </div>
     )
   }
   return (
     <div className="rec-block rec-zerobug" role="alert">
-      <div className="rec-block-head">🐞 Zero Bug Policy — {count} открытых багов</div>
+      <div className="rec-block-head">🐞 Zero Bug Policy — {count} open bugs</div>
       <div className="rec-cards">
         {bugs.map(b => <WarnCard key={b.issueKey} card={b} jiraBaseUrl={jiraBaseUrl} bug />)}
       </div>
@@ -91,18 +91,18 @@ function StoryCard({ story, jiraBaseUrl }: { story: StoryRec; jiraBaseUrl: strin
       <div className="rec-card-roles">
         {story.roles.map(r => (
           <span key={r.roleCode} className="rec-role-chip" style={{ background: getRoleColor(r.roleCode) }}>
-            {r.roleCode} {fmtHours(r.hours)}ч
+            {r.roleCode} {fmtHours(r.hours)}h
           </span>
         ))}
       </div>
-      <div className="rec-card-total">Всего {fmtHours(story.totalHours)}ч</div>
+      <div className="rec-card-total">Total {fmtHours(story.totalHours)}h</div>
     </div>
   )
 }
 
 function WarnCard({ card, jiraBaseUrl, bug }: { card: RecCard; jiraBaseUrl: string; bug?: boolean }) {
   const { getIssueTypeIconUrl, getIssueTypeCategory, getRoleColor } = useWorkflowConfig()
-  const estimateLabel = card.estimateHours != null ? `${fmtHours(card.estimateHours)}ч` : 'не оценён'
+  const estimateLabel = card.estimateHours != null ? `${fmtHours(card.estimateHours)}h` : 'not estimated'
 
   return (
     <div className={`rec-card ${bug ? '' : 'rec-card-warn'}`}>

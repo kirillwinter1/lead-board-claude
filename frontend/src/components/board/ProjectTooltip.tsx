@@ -23,17 +23,17 @@ export function ProjectTooltip({ projectKey, children }: { projectKey: string; c
                 {p.description}
               </div>
             ) : (
-              <div style={{ color: '#97a0af', fontStyle: 'italic' }}>Без описания</div>
+              <div style={{ color: '#97a0af', fontStyle: 'italic' }}>No description</div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#42526e' }}>
-              <span>Прогресс</span>
+              <span>Progress</span>
               <span style={{ fontWeight: 600, color: '#172b4d' }}>
-                {p.progressPercent}% · {p.completedEpicCount}/{p.epics.length} эпиков
+                {p.progressPercent}% · {p.completedEpicCount}/{p.epics.length} epics
               </span>
             </div>
             {p.expectedDone && (
               <div style={{ display: 'flex', justifyContent: 'space-between', color: '#42526e' }}>
-                <span>Дедлайн</span>
+                <span>Deadline</span>
                 <span style={{ fontWeight: 600, color: '#172b4d' }}>{p.expectedDone}</span>
               </div>
             )}

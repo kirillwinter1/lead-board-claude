@@ -22,8 +22,8 @@ export async function getStatusHistory(issueKey: string, signal?: AbortSignal): 
 // Compact duration: >= 1 day -> "Nд", >= 1 hour -> "Nч", else "<1ч".
 export function formatDuration(seconds: number): string {
   const days = Math.floor(seconds / 86400)
-  if (days >= 1) return `${days}д`
+  if (days >= 1) return `${days}d`
   const hours = Math.floor(seconds / 3600)
-  if (hours >= 1) return `${hours}ч`
-  return '<1ч'
+  if (hours >= 1) return `${hours}h`
+  return '<1h'
 }

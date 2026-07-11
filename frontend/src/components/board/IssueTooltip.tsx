@@ -18,7 +18,7 @@ export function IssueTooltip({ issueKey, children }: { issueKey: string; childre
               {d.description}
             </div>
           ) : (
-            <div style={{ color: '#97a0af', fontStyle: 'italic' }}>Без описания</div>
+            <div style={{ color: '#97a0af', fontStyle: 'italic' }}>No description</div>
           )}
         </div>
       )}

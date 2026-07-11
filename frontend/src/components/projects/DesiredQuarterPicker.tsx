@@ -64,7 +64,7 @@ export function DesiredQuarterPicker({
   // Augment options with a "no desired quarter" option representing null. We
   // synthesize a sentinel value because SingleSelectDropdown surfaces clear
   // via `allowClear` but we want the picker to expose the meaning explicitly.
-  const optionsWithNone = [{ value: NULL_VALUE, label: 'Не запланирован' }, ...options]
+  const optionsWithNone = [{ value: NULL_VALUE, label: 'Not planned' }, ...options]
 
   const selected = currentDesiredQuarter ?? NULL_VALUE
 
@@ -84,7 +84,7 @@ export function DesiredQuarterPicker({
           fontWeight: 600,
         }}
       >
-        {currentDesiredQuarter ?? 'Не запланирован'}
+        {currentDesiredQuarter ?? 'Not planned'}
       </span>
     )
   }
@@ -108,7 +108,7 @@ export function DesiredQuarterPicker({
     } catch (err) {
       if (cancelledRef.current) return
       if (latestTargetRef.current !== target) return
-      setError(err instanceof Error ? err.message : 'Не удалось сохранить квартал')
+      setError(err instanceof Error ? err.message : 'Failed to save quarter')
     } finally {
       // Only the most recent request should clear the saving indicator;
       // older overlapping requests would otherwise hide the spinner while
@@ -130,7 +130,7 @@ export function DesiredQuarterPicker({
           options={optionsWithNone}
           selected={selected}
           onChange={handleChange}
-          placeholder="Не запланирован"
+          placeholder="Not planned"
           allowClear={false}
         />
       </div>
@@ -139,7 +139,7 @@ export function DesiredQuarterPicker({
       )}
       {saving && (
         <span role="status" aria-live="polite" style={{ fontSize: 11, color: TEXT_PRIMARY }}>
-          Сохраняем…
+          Saving…
         </span>
       )}
     </div>
