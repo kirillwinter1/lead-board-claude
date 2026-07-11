@@ -108,7 +108,6 @@ public class PokerSummaryService {
                 sessionId,
                 session.getEpicKey(),
                 storyEstimates,
-                pokerTotal,
                 comparison,
                 roughTotal,
                 pokerTotal,

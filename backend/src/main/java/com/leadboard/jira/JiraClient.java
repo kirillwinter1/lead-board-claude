@@ -276,26 +276,52 @@ public class JiraClient {
 
     /**
      * Inspect a Jira create 400 body and return placeholder values for the required
-     * system fields we know how to satisfy. Only fields whose error text says they are
-     * <em>required</em> ("обязательно"/"required") are filled — a "cannot be set, not on
-     * screen" error is left alone so we don't loop. Fields the caller already set are
-     * never overridden.
+     * system fields we know how to satisfy. Parses the structured {@code errors} object
+     * ({@code {"errors":{"timetracking":"...","labels":"..."}}}) and only fills a field
+     * when Jira reported an error keyed to THAT field whose message marks it required —
+     * so an unrelated field's message mentioning "labels"/"timetracking" can't trigger a
+     * spurious injection. Fields the caller already set are never overridden.
      */
     private Map<String, Object> requiredFieldPlaceholders(String errorBody, Map<String, Object> current) {
         Map<String, Object> out = new java.util.HashMap<>();
         if (errorBody == null) return out;
-        boolean requiredMarker = errorBody.contains("обязательно")
-                || errorBody.toLowerCase().contains("is required")
-                || errorBody.toLowerCase().contains("required");
-        if (!requiredMarker) return out;
 
-        if (errorBody.contains("timetracking") && !current.containsKey("timetracking")) {
+        Map<String, String> errors = parseJiraFieldErrors(errorBody);
+        if (errors.isEmpty()) return out;
+
+        boolean timetrackingRequired = errors.entrySet().stream()
+                .anyMatch(en -> en.getKey().startsWith("timetracking") && isRequiredMessage(en.getValue()));
+        boolean labelsRequired = errors.entrySet().stream()
+                .anyMatch(en -> en.getKey().equals("labels") && isRequiredMessage(en.getValue()));
+
+        if (timetrackingRequired && !current.containsKey("timetracking")) {
             out.put("timetracking", Map.of("originalEstimate", "0m", "remainingEstimate", "0m"));
         }
-        if (errorBody.contains("\"labels\"") && !current.containsKey("labels")) {
+        if (labelsRequired && !current.containsKey("labels")) {
             out.put("labels", List.of("planning-poker"));
         }
         return out;
+    }
+
+    /** Parse the {@code errors} object (fieldId -> message) from a Jira 400 body; empty on any problem. */
+    private Map<String, String> parseJiraFieldErrors(String errorBody) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode errorsNode = mapper.readTree(errorBody).path("errors");
+            if (!errorsNode.isObject()) return Map.of();
+            Map<String, String> errors = new java.util.HashMap<>();
+            errorsNode.fields().forEachRemaining(en -> errors.put(en.getKey(), en.getValue().asText("")));
+            return errors;
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    /** True if a Jira field-error message marks the field as required (RU/EN). */
+    private boolean isRequiredMessage(String message) {
+        if (message == null) return false;
+        String m = message.toLowerCase();
+        return m.contains("обязательно") || m.contains("is required") || m.contains("required");
     }
 
     /**
@@ -531,6 +557,31 @@ public class JiraClient {
                 .uri(configResolver.getBaseUrl() + "/rest/api/3/issue/" + issueKey)
                 .header(HttpHeaders.AUTHORIZATION, basicAuthHeaderValue())
                 .bodyValue(body)
+                .retrieve()
+                .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
+                .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))
+                .toBodilessEntity()
+                .block();
+    }
+
+    /**
+     * Delete an issue (and its subtasks) from Jira. Used to roll back a partially-created
+     * poker Story when a following subtask create fails, so no orphaned Story is left in
+     * Jira. Best-effort: callers treat failure here as non-fatal.
+     */
+    public void deleteIssue(String issueKey) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+        String base = (accessToken != null && cloudId != null)
+                ? ATLASSIAN_API_BASE + "/ex/jira/" + cloudId
+                : configResolver.getBaseUrl();
+        String auth = (accessToken != null && cloudId != null)
+                ? bearerAuthHeaderValue(accessToken)
+                : basicAuthHeaderValue();
+
+        webClient.delete()
+                .uri(base + "/rest/api/3/issue/" + issueKey + "?deleteSubtasks=true")
+                .header(HttpHeaders.AUTHORIZATION, auth)
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, resp -> jiraErrorMono(resp, issueKey, "4xx"))
                 .onStatus(HttpStatusCode::is5xxServerError, resp -> jiraErrorMono(resp, issueKey, "5xx"))

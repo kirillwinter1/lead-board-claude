@@ -6,7 +6,9 @@ import com.leadboard.jira.JiraClient;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
+import com.leadboard.poker.PokerStateException;
 import com.leadboard.poker.entity.PokerStoryEntity;
+import com.leadboard.poker.entity.PokerStoryEntity.StoryStatus;
 import com.leadboard.poker.repository.PokerSessionRepository;
 import com.leadboard.poker.service.PokerJiraService;
 import com.leadboard.poker.service.PokerSessionService;
@@ -174,8 +176,15 @@ public class PokerController {
     }
 
     /** Mutating session operations are facilitator-only (BUG-176). */
+    // Legacy sessions (pre-F89) stored the facilitator as the sentinel "system"; treat any
+    // authenticated user as facilitator for those so they aren't permanently locked out.
+    private static final String LEGACY_SYSTEM_FACILITATOR = "system";
+
     private void requireFacilitator(PokerSessionEntity session) {
-        if (!currentAccountId().equals(session.getFacilitatorAccountId())) {
+        String facilitator = session.getFacilitatorAccountId();
+        boolean allowed = LEGACY_SYSTEM_FACILITATOR.equals(facilitator)
+                || currentAccountId().equals(facilitator);
+        if (!allowed) {
             throw new org.springframework.security.access.AccessDeniedException(
                     "Only the session facilitator can perform this action");
         }
@@ -345,7 +354,15 @@ public class PokerController {
         PokerStoryEntity existing = sessionService.getStoryWithSession(storyId);
         requireFacilitator(existing.getSession());
 
-        // Keep Jira in sync first (single source of truth) when the story is already there.
+        // Validate editability BEFORE touching Jira: only a not-yet-estimated story may be
+        // edited. Writing to Jira first and letting the local update throw afterwards would
+        // leave Jira and the DB diverging (BUG: non-PENDING edit). Same guard as
+        // PokerSessionService.updateStory, checked here so no Jira write happens on reject.
+        if (existing.getStatus() != StoryStatus.PENDING) {
+            throw new PokerStateException("Only a not-yet-estimated story can be edited");
+        }
+
+        // Keep Jira in sync (single source of truth) when the story is already there.
         if (existing.getStoryKey() != null && !existing.getStoryKey().isBlank()) {
             jiraService.updateStoryInJira(existing.getStoryKey(), request.title(), request.description());
         }

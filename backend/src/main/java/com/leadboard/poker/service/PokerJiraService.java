@@ -62,8 +62,9 @@ public class PokerJiraService {
         log.info("Creating story in Jira: project='{}', type='{}', epic={}, title='{}', component='{}'",
                 projectKey, storyTypeName, epicKey, title, component);
 
+        String storyKey = null;
         try {
-            String storyKey = jiraClient.createIssue(projectKey, storyTypeName, title, epicKey,
+            storyKey = jiraClient.createIssue(projectKey, storyTypeName, title, epicKey,
                     description, components);
             log.info("Created Jira Story: {}", storyKey);
 
@@ -77,7 +78,22 @@ public class PokerJiraService {
 
             return storyKey;
         } catch (WebClientResponseException e) {
+            // Roll back the already-created Story so a subtask failure doesn't leave an
+            // orphaned Story in Jira (which the poker session would never reference and
+            // which would fail publish with "Story is not in Jira yet"). Best-effort.
+            rollbackOrphanStory(storyKey);
             throw mapJiraError(e, "create story in Jira");
+        }
+    }
+
+    /** Best-effort delete of a Story created before a later subtask create failed. */
+    private void rollbackOrphanStory(String storyKey) {
+        if (storyKey == null) return;
+        try {
+            jiraClient.deleteIssue(storyKey);
+            log.info("Rolled back orphaned Jira Story {} after subtask create failure", storyKey);
+        } catch (Exception cleanup) {
+            log.warn("Could not roll back orphaned Jira Story {}: {}", storyKey, cleanup.getMessage());
         }
     }
 

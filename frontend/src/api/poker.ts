@@ -119,8 +119,8 @@ export interface JiraComponent {
   name: string
 }
 
-// TODO(F23 backend): GET /api/poker/projects/{projectKey}/components — pulls Jira
-// project components via JiraClient + JiraConfigResolver. Returns [] until wired.
+// GET /api/poker/projects/{projectKey}/components — Jira project components via
+// JiraClient + JiraConfigResolver (used by the Add-story component selector).
 export async function getProjectComponents(projectKey: string): Promise<JiraComponent[]> {
   const response = await axios.get(`/api/poker/projects/${projectKey}/components`)
   return response.data
@@ -191,7 +191,6 @@ export interface SessionSummary {
   sessionId: number
   epicKey: string
   stories: SummaryStoryRow[]
-  totalPokerDays: number
   comparison: SummaryRoleComparison[]
   roughTotalDays: number
   pokerTotalDays: number
@@ -246,16 +245,7 @@ export const HOURS_PER_DAY = 8
 export function formatDays(hours: number): string {
   const days = hours / HOURS_PER_DAY
   const rounded = Math.round(days * 100) / 100
-  const text = Number.isInteger(rounded) ? String(rounded) : String(rounded)
-  return `${text}d`
-}
-
-// Signed delta in days for the rough → poker comparison: "+0.5d", "−0.5d", "0".
-export function formatDeltaDays(deltaHours: number): string {
-  const days = Math.round((deltaHours / HOURS_PER_DAY) * 100) / 100
-  if (days === 0) return '0'
-  const sign = days > 0 ? '+' : '−' // minus sign
-  return `${sign}${Math.abs(days)}d`
+  return `${rounded}d`
 }
 
 // Format a value ALREADY in days (server comparison block): 1.5 -> "1.5d".

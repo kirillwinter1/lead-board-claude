@@ -16,7 +16,6 @@ public record SessionSummaryResponse(
         Long sessionId,
         String epicKey,
         List<StoryEstimate> stories,
-        double totalPokerDays,
         List<RoleComparison> comparison,
         double roughTotalDays,
         double pokerTotalDays,

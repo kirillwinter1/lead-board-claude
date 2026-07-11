@@ -1,6 +1,7 @@
 package com.leadboard.poker.service;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.poker.PokerStateException;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
 import com.leadboard.poker.entity.PokerSessionEntity.SessionStatus;
@@ -27,6 +28,9 @@ public class PokerSessionService {
     private static final String ROOM_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int ROOM_CODE_LENGTH = 6;
     private static final int MAX_VOTE_HOURS = 160;
+    // Final per-role estimate cap — kept in sync with the room's Final input (max=1000).
+    // A final can legitimately exceed a single card's vote range, so it is capped higher.
+    private static final int MAX_FINAL_HOURS = 1000;
     private static final int UNSURE_VOTE = -1;
     private static final SecureRandom random = new SecureRandom();
 
@@ -91,7 +95,7 @@ public class PokerSessionService {
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
         if (session.getStatus() != SessionStatus.PREPARING) {
-            throw new IllegalStateException("Session is not in PREPARING state");
+            throw new PokerStateException("Session is not in PREPARING state");
         }
 
         session.setStatus(SessionStatus.ACTIVE);
@@ -126,7 +130,7 @@ public class PokerSessionService {
                 .orElseThrow(() -> new IllegalArgumentException("Session not found"));
 
         if (session.getStatus() == SessionStatus.COMPLETED) {
-            throw new IllegalStateException("Cannot add stories to a completed session");
+            throw new PokerStateException("Cannot add stories to a completed session");
         }
 
         Integer maxOrder = storyRepository.findMaxOrderIndexBySessionId(sessionId).orElse(-1);
@@ -155,7 +159,7 @@ public class PokerSessionService {
         PokerStoryEntity story = storyRepository.findByIdWithSession(storyId)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
         if (story.getStatus() != StoryStatus.PENDING) {
-            throw new IllegalStateException("Only a not-yet-estimated story can be edited");
+            throw new PokerStateException("Only a not-yet-estimated story can be edited");
         }
         story.setTitle(request.title());
         story.setDescription(request.description());
@@ -196,7 +200,7 @@ public class PokerSessionService {
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
 
         if (story.getStatus() != StoryStatus.VOTING) {
-            throw new IllegalStateException("Voting is not active for this story");
+            throw new PokerStateException("Voting is not active for this story");
         }
 
         // Check if role is needed for this story
@@ -232,7 +236,7 @@ public class PokerSessionService {
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
 
         if (story.getStatus() != StoryStatus.VOTING) {
-            throw new IllegalStateException("Story is not in VOTING state");
+            throw new PokerStateException("Story is not in VOTING state");
         }
 
         story.setStatus(StoryStatus.REVEALED);
@@ -244,16 +248,19 @@ public class PokerSessionService {
         PokerStoryEntity story = storyRepository.findById(storyId)
                 .orElseThrow(() -> new IllegalArgumentException("Story not found"));
 
-        if (story.getStatus() != StoryStatus.REVEALED) {
-            throw new IllegalStateException("Final estimate can only be set after votes are revealed");
+        // Allow setting the final after reveal, and re-setting it on an already COMPLETED
+        // story so a wrong number can be corrected (it would otherwise be permanent, then
+        // published to Jira). Any other status (PENDING/VOTING) is still rejected.
+        if (story.getStatus() != StoryStatus.REVEALED && story.getStatus() != StoryStatus.COMPLETED) {
+            throw new PokerStateException("Final estimate can only be set after votes are revealed");
         }
 
         if (finalEstimates != null) {
             for (Map.Entry<String, Integer> entry : finalEstimates.entrySet()) {
                 Integer hours = entry.getValue();
-                if (hours != null && (hours < 0 || hours > MAX_VOTE_HOURS)) {
+                if (hours != null && (hours < 0 || hours > MAX_FINAL_HOURS)) {
                     throw new IllegalArgumentException(
-                            "Final estimate for " + entry.getKey() + " must be between 0 and " + MAX_VOTE_HOURS + " hours");
+                            "Final estimate for " + entry.getKey() + " must be between 0 and " + MAX_FINAL_HOURS + " hours");
                 }
             }
         }

@@ -25,8 +25,12 @@ vi.mock('../api/poker', () => ({
   getSessionSummary: vi.fn().mockResolvedValue(null),
   publishSession: vi.fn().mockResolvedValue({ results: [] }),
   addStory: vi.fn(),
+  updateStory: vi.fn(),
+  deleteStory: vi.fn(),
+  apiError: (e: unknown) => (e as Error)?.message ?? 'Unknown error',
   formatDays: (h: number) => `${h / 8}d`,
-  formatDeltaDays: (h: number) => `${h / 8}d`,
+  formatDayValue: (d: number) => `${d}d`,
+  formatDeltaDayValue: (d: number) => `${d}d`,
 }))
 
 vi.mock('../api/config', () => ({
