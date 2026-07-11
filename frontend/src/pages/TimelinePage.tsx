@@ -673,7 +673,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
                 <DarkTooltip.Label style={{ fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</DarkTooltip.Label>
               )}
               {hoveredStory.flagged && (
-                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: DSR_RED, backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>
               )}
             </div>
             <StatusBadge status={hoveredStory.status} maxWidth={130} />

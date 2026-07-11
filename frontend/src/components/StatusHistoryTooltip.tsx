@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { getStatusHistory, formatDuration, type StatusHistory } from '../api/statusHistory'
 import { StatusBadge } from './board/StatusBadge'
-import { ERROR_TEXT } from '../constants/colors'
+import { ERROR_TEXT, TEXT_PRIMARY, TEXT_MUTED, LINK_COLOR, SEPARATOR } from '../constants/colors'
 
 interface StatusHistoryTooltipProps {
   issueKey: string
@@ -92,9 +92,9 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
             pointerEvents: 'none',
           }}
         >
-          <div style={{ fontWeight: 600, color: '#172b4d', marginBottom: 8 }}>Status path</div>
+          <div style={{ fontWeight: 600, color: TEXT_PRIMARY, marginBottom: 8 }}>Status path</div>
 
-          {loading && <div style={{ color: '#6b778c' }}>Loading…</div>}
+          {loading && <div style={{ color: TEXT_MUTED }}>Loading…</div>}
           {error && <div style={{ color: ERROR_TEXT }}>Failed to load</div>}
 
           {history && !loading && (
@@ -114,14 +114,14 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
                     <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                       <StatusBadge status={seg.status} />
                       {seg.current && (
-                        <span style={{ fontSize: 10, color: '#0052cc', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: 10, color: LINK_COLOR, fontWeight: 600, whiteSpace: 'nowrap' }}>
                           now
                         </span>
                       )}
                     </span>
                     <span
                       style={{
-                        color: '#172b4d',
+                        color: TEXT_PRIMARY,
                         fontWeight: seg.current ? 700 : 500,
                         whiteSpace: 'nowrap',
                       }}
@@ -133,23 +133,23 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
               </div>
               <div
                 style={{
-                  borderTop: '1px solid #ebecf0',
+                  borderTop: `1px solid ${SEPARATOR}`,
                   marginTop: 8,
                   paddingTop: 6,
                   display: 'flex',
                   flexDirection: 'column',
                   gap: 4,
-                  color: '#6b778c',
+                  color: TEXT_MUTED,
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>Total</span>
-                  <span style={{ fontWeight: 600, color: '#172b4d' }}>{formatDuration(history.totalSeconds)}</span>
+                  <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>{formatDuration(history.totalSeconds)}</span>
                 </div>
                 {history.segments.length > 1 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span>Excl. “{history.segments[0].status}”</span>
-                    <span style={{ fontWeight: 600, color: '#172b4d' }}>
+                    <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>
                       {formatDuration(history.totalSeconds - history.segments[0].durationSeconds)}
                     </span>
                   </div>

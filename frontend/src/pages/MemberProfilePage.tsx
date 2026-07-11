@@ -5,7 +5,7 @@ import { CompetencyRating } from '../components/competency/CompetencyRating'
 import { teamsApi, MemberProfileResponse, Absence } from '../api/teams'
 import { competencyApi, CompetencyLevel } from '../api/competency'
 import { ABSENCE_TYPE_LABELS } from '../components/AbsenceModal'
-import { ERROR_TEXT, ABSENCE_COLORS, hexToRgba } from '../constants/colors'
+import { ERROR_TEXT, ABSENCE_COLORS, hexToRgba, TEXT_MUTED } from '../constants/colors'
 import { TrendChart } from '../components/member/TrendChart'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
@@ -99,7 +99,7 @@ export function MemberProfilePage() {
             <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b778c' }}>Loading profile...</div>
+        <div style={{ padding: 40, textAlign: 'center', color: TEXT_MUTED }}>Loading profile...</div>
       </main>
     )
   }
@@ -255,7 +255,7 @@ export function MemberProfilePage() {
                 <span style={{ fontWeight: 600, color: ABSENCE_COLORS[a.absenceType] }}>
                   {ABSENCE_TYPE_LABELS[a.absenceType]}
                 </span>
-                <span style={{ color: '#6b778c' }}>
+                <span style={{ color: TEXT_MUTED }}>
                   {formatDate(a.startDate)} — {formatDate(a.endDate)}
                 </span>
                 {a.comment && (
@@ -276,7 +276,7 @@ export function MemberProfilePage() {
             <span className="section-badge">{completedTasks.length}</span>
           </div>
           {completedTasks.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: '#6b778c', fontSize: 13 }}>
+            <div style={{ padding: 20, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
               No completed tasks for the selected period
             </div>
           ) : (
@@ -314,7 +314,7 @@ export function MemberProfilePage() {
                         </span>
                       ) : '—'}
                     </td>
-                    <td style={{ color: '#6b778c', fontSize: 13 }}>{formatDate(task.doneDate)}</td>
+                    <td style={{ color: TEXT_MUTED, fontSize: 13 }}>{formatDate(task.doneDate)}</td>
                   </tr>
                 ))}
                 {/* Totals row */}
@@ -367,7 +367,7 @@ export function MemberProfilePage() {
               </div>
             </>
           ) : (
-            <div style={{ padding: 20, textAlign: 'center', color: '#6b778c', fontSize: 13 }}>
+            <div style={{ padding: 20, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
               No data to show the trend
             </div>
           )}
@@ -380,7 +380,7 @@ export function MemberProfilePage() {
             <span className="section-badge">{activeTasks.length + upcomingTasks.length}</span>
           </div>
           {activeTasks.length === 0 && upcomingTasks.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: '#6b778c', fontSize: 13 }}>
+            <div style={{ padding: 20, textAlign: 'center', color: TEXT_MUTED, fontSize: 13 }}>
               No current or upcoming tasks
             </div>
           ) : (
