@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay, StatusInterval } from '../api/forecast'
@@ -24,7 +23,10 @@ import {
   TIMELINE_PHASE_TINT, TIMELINE_PHASE_TINT_ROUGH, TIMELINE_ROLE_BORDER_TINT,
   TIMELINE_BAR_TRACK, TIMELINE_FLAGGED_BORDER, TIMELINE_BLOCKED_BORDER,
   TIMELINE_ROUGH_BG, TIMELINE_ROUGH_BADGE_BG, TIMELINE_ROUGH_BADGE_TEXT,
+  TOOLTIP_HIGHLIGHT, TOOLTIP_TEXT, TOOLTIP_LABEL, TOOLTIP_VALUE,
+  TOOLTIP_PROGRESS_TRACK, TOOLTIP_SUCCESS, TOOLTIP_DANGER, TOOLTIP_DIVIDER,
 } from '../constants/colors'
+import { DarkTooltip } from '../components/DarkTooltip'
 import {
   ZoomLevel, DateRange,
   daysBetween,
@@ -222,51 +224,37 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
         </span>
       </div>
 
-      {showTooltip && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            zIndex: 10000,
-            pointerEvents: 'none',
-            background: 'rgba(23, 43, 77, 0.98)',
-            borderRadius: 8,
-            padding: 14,
-            minWidth: 300,
-            maxWidth: 400,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-            color: 'white',
-            fontSize: 13
-          }}
-        >
+      {showTooltip && (
+        <DarkTooltip top={tooltipPos.y} left={tooltipPos.x} minWidth={300} maxWidth={400}>
           {/* Header */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <img src={epicIconUrl} alt="Epic" style={{ width: 16, height: 16 }} />
-              <span style={{ fontWeight: 600, color: '#B3D4FF' }}>{epic.epicKey}</span>
-              <span style={{ color: '#8993A4', fontSize: 11 }}>({epic.autoScore?.toFixed(0)})</span>
+              <DarkTooltip.Title>{epic.epicKey}</DarkTooltip.Title>
+              <DarkTooltip.Label style={{ fontSize: 11 }}>({epic.autoScore?.toFixed(0)})</DarkTooltip.Label>
             </div>
             <StatusBadge status={epic.status || 'Unknown'} />
           </div>
 
           {/* Summary */}
-          <div style={{ color: '#B3BAC5', marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>
+          <div style={{ color: TOOLTIP_TEXT, marginBottom: 12, fontSize: 12, lineHeight: 1.4 }}>
             {epic.summary}
           </div>
 
           {/* Progress section */}
           <div style={{ marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ color: '#8993A4', fontSize: 11 }}>Progress</span>
-              <span style={{ color: '#B3BAC5', fontSize: 11 }}>
+              <DarkTooltip.Label style={{ fontSize: 11 }}>Progress</DarkTooltip.Label>
+              <span style={{ color: TOOLTIP_TEXT, fontSize: 11 }}>
                 {formatHours(epic.totalLoggedSeconds)} / {formatHours(epic.totalEstimateSeconds)}
               </span>
             </div>
+            {/* Epic progress keeps its blue in-progress / green complete semantics
+                (deliberately different from the story bar's green/red-over scale) */}
             <div style={{
               width: '100%',
               height: 8,
-              backgroundColor: '#42526e',
+              backgroundColor: TOOLTIP_PROGRESS_TRACK,
               borderRadius: 4,
               overflow: 'hidden'
             }}>
@@ -277,7 +265,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
                 borderRadius: 4
               }} />
             </div>
-            <div style={{ textAlign: 'right', color: '#B3BAC5', fontSize: 12, marginTop: 2 }}>
+            <div style={{ textAlign: 'right', color: TOOLTIP_TEXT, fontSize: 12, marginTop: 2 }}>
               {progress}%
             </div>
           </div>
@@ -285,8 +273,8 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
           {/* Dates section */}
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12 }}>
             <div>
-              <span style={{ color: '#8993A4' }}>📅 </span>
-              <span style={{ color: '#B3BAC5' }}>
+              <DarkTooltip.Label>📅 </DarkTooltip.Label>
+              <span style={{ color: TOOLTIP_TEXT }}>
                 {epic.startDate ? formatDateShort(new Date(epic.startDate)) : '—'}
                 {' → '}
                 {epic.endDate ? formatDateShort(new Date(epic.endDate)) : '—'}
@@ -294,7 +282,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
             </div>
             {epic.dueDate && (
               <div>
-                <span style={{ color: '#8993A4' }}>⏰ Due: </span>
+                <DarkTooltip.Label>⏰ Due: </DarkTooltip.Label>
                 <span style={{ color: dueDateDelta && dueDateDelta > 0 ? DSR_RED : DSR_GREEN }}>
                   {formatDateShort(new Date(epic.dueDate))}
                   {dueDateDelta !== null && dueDateDelta > 0 && ` (+${dueDateDelta}d)`}
@@ -305,7 +293,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
 
           {/* Role progress */}
           {epic.roleProgress && (
-            <div style={{ borderTop: '1px solid #42526e', paddingTop: 10, marginBottom: 10 }}>
+            <div style={{ borderTop: `1px solid ${TOOLTIP_DIVIDER}`, paddingTop: 10, marginBottom: 10 }}>
               <table style={{ width: '100%', fontSize: 12 }}>
                 <tbody>
                   {getRoleCodes()
@@ -316,10 +304,10 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
                         {progress.completed && <span style={{ marginLeft: 4 }}>✓</span>}
                       </td>
-                      <td style={{ color: '#B3BAC5', textAlign: 'right' }}>
+                      <td style={{ color: TOOLTIP_TEXT, textAlign: 'right' }}>
                         {formatHours(progress.loggedSeconds)} / {formatHours(progress.estimateSeconds)}
                       </td>
-                      <td style={{ color: '#8993A4', textAlign: 'right', width: 45 }}>
+                      <td style={{ color: TOOLTIP_LABEL, textAlign: 'right', width: 45 }}>
                         {progress.estimateSeconds
                           ? Math.min(100, Math.round((progress.loggedSeconds || 0) * 100 / progress.estimateSeconds))
                           : 0}%
@@ -332,12 +320,11 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
           )}
 
           {/* Footer stats */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#8993A4', fontSize: 11 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: TOOLTIP_LABEL, fontSize: 11 }}>
             <span>📊 AutoScore: {epic.autoScore?.toFixed(0) || '—'}</span>
             <span>📋 Stories: {epic.storiesActive} active / {epic.storiesTotal} total</span>
           </div>
-        </div>,
-        document.body
+        </DarkTooltip>
       )}
     </>
   )
@@ -664,25 +651,8 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
         ))}
       </div>
 
-      {hoveredStory && createPortal(
-        <div
-          className="timeline-tooltip"
-          style={{
-            position: 'fixed',
-            left: tooltipPos.x + 12,
-            top: tooltipPos.y + 12,
-            zIndex: 10000,
-            pointerEvents: 'none',
-            background: 'rgba(0,0,0,0.92)',
-            borderRadius: '8px',
-            padding: '12px 14px',
-            minWidth: '300px',
-            maxWidth: '420px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            color: 'white',
-            fontSize: '13px'
-          }}
-        >
+      {hoveredStory && (
+        <DarkTooltip top={tooltipPos.y + 12} left={tooltipPos.x + 12} minWidth={300} maxWidth={420} interactive>
           {/* Header: Type icon + Key + AutoScore + Status */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -695,12 +665,12 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
                 href={`${jiraBaseUrl}${hoveredStory.storyKey}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ pointerEvents: 'auto', color: '#60a5fa', textDecoration: 'none', fontWeight: 600 }}
+                style={{ color: TOOLTIP_HIGHLIGHT, textDecoration: 'none', fontWeight: 600 }}
               >
                 {hoveredStory.storyKey}
               </a>
               {hoveredStory.autoScore !== null && (
-                <span style={{ color: '#9ca3af', fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</span>
+                <DarkTooltip.Label style={{ fontSize: '12px' }}>({hoveredStory.autoScore?.toFixed(0)})</DarkTooltip.Label>
               )}
               {hoveredStory.flagged && (
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>
@@ -710,7 +680,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
           </div>
 
           {/* Summary */}
-          <div style={{ color: '#d1d5db', marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
+          <div style={{ color: TOOLTIP_TEXT, marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
             {hoveredStory.summary || 'No summary'}
           </div>
 
@@ -718,32 +688,22 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
           {hoveredStory.totalEstimateSeconds && hoveredStory.totalEstimateSeconds > 0 && (
             <div style={{ marginBottom: '10px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
-                <span style={{ color: '#9ca3af' }}>Progress</span>
-                <span style={{ color: '#e5e7eb' }}>
+                <DarkTooltip.Label>Progress</DarkTooltip.Label>
+                <DarkTooltip.Value>
                   {formatHours(hoveredStory.totalLoggedSeconds)} / {formatHours(hoveredStory.totalEstimateSeconds)}
-                  <span style={{ color: '#9ca3af', marginLeft: '6px' }}>
+                  <DarkTooltip.Label style={{ marginLeft: '6px' }}>
                     ({hoveredStory.progressPercent ?? 0}%)
-                  </span>
-                </span>
+                  </DarkTooltip.Label>
+                </DarkTooltip.Value>
               </div>
-              <div style={{ height: '6px', background: '#374151', borderRadius: '3px', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${hoveredStory.progressPercent ?? 0}%`,
-                    background: (hoveredStory.progressPercent ?? 0) > 100 ? '#ef4444' : '#22c55e',
-                    borderRadius: '3px',
-                    transition: 'width 0.2s'
-                  }}
-                />
-              </div>
+              <DarkTooltip.Progress value={hoveredStory.progressPercent ?? 0} max={100} />
             </div>
           )}
 
           {/* Dates */}
           {hoveredStory.startDate && hoveredStory.endDate && (
-            <div style={{ marginBottom: '10px', color: '#9ca3af', fontSize: '12px' }}>
-              📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))}
+            <div style={{ marginBottom: '10px', fontSize: '12px' }}>
+              <DarkTooltip.Label>📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))}</DarkTooltip.Label>
             </div>
           )}
 
@@ -768,11 +728,11 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
                       <td style={{ padding: '3px 4px' }}>
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
                         {progress?.completed && (
-                          <span style={{ color: '#22c55e', marginLeft: '4px' }}>✓</span>
+                          <span style={{ color: TOOLTIP_SUCCESS, marginLeft: '4px' }}>✓</span>
                         )}
                       </td>
-                      <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{phase?.assigneeDisplayName || '-'}</td>
-                      <td style={{ padding: '3px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                      <td style={{ padding: '3px 4px', color: TOOLTIP_TEXT }}>{phase?.assigneeDisplayName || '-'}</td>
+                      <td style={{ padding: '3px 4px', textAlign: 'right', color: TOOLTIP_VALUE }}>
                         {progress ? (
                           <span>
                             {formatHours(progress.loggedSeconds)}/{formatHours(progress.estimateSeconds)}
@@ -790,12 +750,11 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
 
           {/* Blocked by */}
           {hoveredStory.blockedBy && hoveredStory.blockedBy.length > 0 && (
-            <div style={{ color: '#f87171', marginTop: '10px', fontSize: '12px', borderTop: '1px solid #374151', paddingTop: '8px' }}>
+            <div style={{ color: TOOLTIP_DANGER, marginTop: '10px', fontSize: '12px', borderTop: `1px solid ${TOOLTIP_DIVIDER}`, paddingTop: '8px' }}>
               🚫 Blocked by: {hoveredStory.blockedBy.join(', ')}
             </div>
           )}
-        </div>,
-        document.body
+        </DarkTooltip>
       )}
     </>
   )
@@ -948,30 +907,13 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
         />
       </div>
 
-      {hoveredEpic && createPortal(
-        <div
-          className="timeline-tooltip"
-          style={{
-            position: 'fixed',
-            left: tooltipPos.x + 12,
-            top: tooltipPos.y + 12,
-            zIndex: 10000,
-            pointerEvents: 'none',
-            background: 'rgba(0,0,0,0.92)',
-            borderRadius: '8px',
-            padding: '12px 14px',
-            minWidth: '280px',
-            maxWidth: '380px',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            color: 'white',
-            fontSize: '13px'
-          }}
-        >
+      {hoveredEpic && (
+        <DarkTooltip top={tooltipPos.y + 12} left={tooltipPos.x + 12} minWidth={280} maxWidth={380}>
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <img src={epicIconUrl} alt="Epic" style={{ width: '16px', height: '16px' }} />
-              <span style={{ fontWeight: 600, color: '#60a5fa' }}>{hoveredEpic.epicKey}</span>
+              <DarkTooltip.Title>{hoveredEpic.epicKey}</DarkTooltip.Title>
             </div>
             <span
               style={{
@@ -988,16 +930,16 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
           </div>
 
           {/* Summary */}
-          <div style={{ color: '#d1d5db', marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
+          <div style={{ color: TOOLTIP_TEXT, marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
             {hoveredEpic.summary}
           </div>
 
           {/* Rough estimates breakdown */}
           {hoveredEpic.roughEstimates && Object.keys(hoveredEpic.roughEstimates).length > 0 && (
-            <div style={{ marginBottom: '10px', borderTop: '1px solid #374151', paddingTop: '10px' }}>
-              <div style={{ color: '#9ca3af', fontSize: '11px', marginBottom: '6px' }}>
+            <div style={{ marginBottom: '10px', borderTop: `1px solid ${TOOLTIP_DIVIDER}`, paddingTop: '10px' }}>
+              <DarkTooltip.Label style={{ display: 'block', fontSize: '11px', marginBottom: '6px' }}>
                 Estimates (days):
-              </div>
+              </DarkTooltip.Label>
               <table style={{ width: '100%', fontSize: '12px' }}>
                 <tbody>
                   {getRoleCodes()
@@ -1007,7 +949,7 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
                       <td style={{ padding: '2px 4px' }}>
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
                       </td>
-                      <td style={{ padding: '2px 4px', textAlign: 'right', color: '#e5e7eb' }}>
+                      <td style={{ padding: '2px 4px', textAlign: 'right', color: TOOLTIP_VALUE }}>
                         {hoveredEpic.roughEstimates?.[role]} days
                       </td>
                     </tr>
@@ -1019,17 +961,16 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
 
           {/* Dates */}
           {hoveredEpic.startDate && hoveredEpic.endDate && (
-            <div style={{ color: '#9ca3af', fontSize: '12px' }}>
-              📅 {formatDateShort(new Date(hoveredEpic.startDate))} → {formatDateShort(new Date(hoveredEpic.endDate))}
+            <div style={{ fontSize: '12px' }}>
+              <DarkTooltip.Label>📅 {formatDateShort(new Date(hoveredEpic.startDate))} → {formatDateShort(new Date(hoveredEpic.endDate))}</DarkTooltip.Label>
             </div>
           )}
 
           {/* Note */}
-          <div style={{ marginTop: '8px', color: '#6b7280', fontSize: '11px', fontStyle: 'italic' }}>
+          <div style={{ marginTop: '8px', color: TOOLTIP_LABEL, fontSize: '11px', fontStyle: 'italic' }}>
             Epic without stories, planned by rough estimates
           </div>
-        </div>,
-        document.body
+        </DarkTooltip>
       )}
     </>
   )
