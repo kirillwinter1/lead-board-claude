@@ -11,7 +11,7 @@ export interface MyTask {
   parentKey: string | null; parentSummary: string | null
   epicKey: string | null; epicSummary: string | null
   teamId: number; teamName: string; teamColor: string | null
-  estimateH: number | null; spentH: number | null; jiraUrl: string
+  estimateH: number | null; spentH: number | null; remainingH: number | null; jiraUrl: string
 }
 export interface QueueStory {
   key: string; summary: string; issueType: string; status: string
@@ -32,7 +32,7 @@ export interface MyWeeklyTrend { week: string; weekStart: string; dsr: number | 
 export interface MyCompletedTask {
   key: string; summary: string; epicKey: string | null; epicSummary: string | null
   teamId: number; teamName: string; teamColor: string | null
-  estimateH: number | null; spentH: number | null; dsr: number | null
+  estimateH: number | null; spentH: number | null; remainingH: number | null; dsr: number | null
   doneDate: string; jiraUrl: string
 }
 export interface DsrBreakdown { key: string; label: string; taskCount: number; estimateH: number | null; spentH: number | null; dsr: number | null }
@@ -46,7 +46,11 @@ export interface MyWorkResponse {
   activeTasks: MyTask[]; upcomingAssigned: MyTask[]; teamQueue: QueueStory[]
   worklogCalendar: CalendarDay[]; analytics: MyAnalytics | null
 }
-export interface LogTimePayload { issueKey: string; date: string; hours: number; comment?: string }
+export interface LogTimePayload {
+  issueKey: string; date: string
+  timeSpentSeconds: number; remainingEstimateSeconds: number
+  comment?: string
+}
 
 export const myWorkApi = {
   getMyWork: (from: string, to: string, teamId?: number) =>
@@ -54,4 +58,8 @@ export const myWorkApi = {
       .then(r => r.data),
   logTime: (payload: LogTimePayload) =>
     axios.post<{ worklogId: string }>('/api/me/worklog', payload).then(r => r.data),
+  // month: 'YYYY-MM'. Returns full Mon–Sun weeks covering that month, including
+  // spill-over days from the adjacent months.
+  worklogCalendar: (month: string) =>
+    axios.get<CalendarDay[]>('/api/me/worklog-calendar', { params: { month } }).then(r => r.data),
 }

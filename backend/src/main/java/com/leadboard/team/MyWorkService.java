@@ -30,7 +30,9 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -136,12 +138,29 @@ public class MyWorkService {
 
         List<QueueStory> teamQueue = buildTeamQueue(taskMembers, issueCache);
 
-        List<CalendarDay> worklogCalendar = buildWorklogCalendar(accountId, members, primary.getHoursPerDay(), today);
+        List<CalendarDay> worklogCalendar = buildWorklogCalendarForMonth(
+                accountId, members, primary.getHoursPerDay(), YearMonth.from(today));
 
         MyAnalytics myAnalytics = buildAnalytics(accountId, members, primary.getHoursPerDay(), from, to, issueCache);
 
         return new MyWorkResponse(true, memberInfo, upcomingAbsences, activeTasks, upcomingAssigned,
                 teamQueue, worklogCalendar, myAnalytics);
+    }
+
+    /**
+     * Worklog-календарь за произвольный месяц — для навигации по месяцам с фронта (стрелки
+     * «предыдущий / следующий месяц»). Резолвит активные членства аккаунта так же, как
+     * {@link #getMyWork}: если пользователь не состоит ни в одной команде — возвращает пустой список.
+     * Норму дня берём из первого (primary) членства, как и первый рендер.
+     */
+    @Transactional(readOnly = true)
+    public List<CalendarDay> getWorklogCalendar(String accountId, YearMonth month) {
+        List<TeamMemberEntity> members = memberRepository.findAllByJiraAccountIdAndActiveTrue(accountId);
+        if (members.isEmpty()) {
+            return List.of();
+        }
+        TeamMemberEntity primary = members.get(0);
+        return buildWorklogCalendarForMonth(accountId, members, primary.getHoursPerDay(), month);
     }
 
     /**
@@ -180,6 +199,7 @@ public class MyWorkService {
                                                                Map<Long, TeamMemberEntity> memberByTeamId) {
         BigDecimal estimateH = analytics.secondsToHours(issue.getOriginalEstimateSeconds());
         BigDecimal spentH = analytics.secondsToHours(issue.getTimeSpentSeconds());
+        BigDecimal remainingH = analytics.secondsToHours(issue.getRemainingEstimateSeconds());
         BigDecimal dsr = analytics.calculateDsr(issue);
         LocalDate doneDate = issue.getDoneAt() != null ? issue.getDoneAt().toLocalDate() : null;
         String[] epicInfo = analytics.resolveEpicInfo(issue, cache);
@@ -197,6 +217,7 @@ public class MyWorkService {
                 team != null ? team.getColor() : null,
                 estimateH,
                 spentH,
+                remainingH,
                 dsr,
                 doneDate,
                 jiraConfigResolver.getBaseUrl() + "/browse/" + issue.getIssueKey()
@@ -262,15 +283,26 @@ public class MyWorkService {
     }
 
     /**
-     * Full 4-week worklog calendar (Mon-Sun x 4, ending with the current ISO week), independent of
-     * the from/to request range. Shows logged hours per day (broken down by issue), the calendar
-     * day type (WORKDAY/WEEKEND/HOLIDAY) and any absence covering that day across all memberships.
+     * Worklog-календарь за один календарный месяц, выровненный по полным ISO-неделям Mon–Sun.
+     * Сетка начинается с понедельника ≤ 1-го числа месяца и кончается воскресеньем ≥ последнего числа,
+     * поэтому в неё попадают «хвостовые» дни соседних месяцев (фронт их приглушает). Независимо от
+     * from/to запроса. Показывает залогированные часы по дням (с разбивкой по задачам), тип дня
+     * (WORKDAY/WEEKEND/HOLIDAY) и любое отсутствие, покрывающее день, по всем членствам аккаунта.
      */
-    private List<CalendarDay> buildWorklogCalendar(String accountId, List<TeamMemberEntity> allMembers,
-                                                     BigDecimal hoursPerDay, LocalDate today) {
-        LocalDate calFrom = today.with(DayOfWeek.MONDAY).minusWeeks(3);
-        LocalDate calTo = today.with(DayOfWeek.SUNDAY);
+    List<CalendarDay> buildWorklogCalendarForMonth(String accountId, List<TeamMemberEntity> allMembers,
+                                                     BigDecimal hoursPerDay, YearMonth month) {
+        LocalDate calFrom = month.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate calTo = month.atEndOfMonth().with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        return buildWorklogCalendarForRange(accountId, allMembers, hoursPerDay, calFrom, calTo);
+    }
 
+    /**
+     * Общая логика построения worklog-календаря за явный диапазон [calFrom, calTo]. Для каждого дня:
+     * залогированные часы (с разбивкой по задачам), тип дня (WORKDAY/WEEKEND/HOLIDAY), норма дня
+     * (hoursPerDay для рабочего дня без отсутствия, иначе 0) и тип отсутствия по всем членствам.
+     */
+    private List<CalendarDay> buildWorklogCalendarForRange(String accountId, List<TeamMemberEntity> allMembers,
+                                                             BigDecimal hoursPerDay, LocalDate calFrom, LocalDate calTo) {
         WorkdaysResponseDto calendarInfo = workCalendarService.getWorkdaysInfo(calFrom, calTo);
         Set<LocalDate> holidayDates = calendarInfo.holidayList().stream()
                 .map(HolidayDto::date)
@@ -434,6 +466,7 @@ public class MyWorkService {
                 team.getColor(),
                 analytics.secondsToHours(subtask.getOriginalEstimateSeconds()),
                 analytics.secondsToHours(subtask.getTimeSpentSeconds()),
+                analytics.secondsToHours(subtask.getRemainingEstimateSeconds()),
                 jiraConfigResolver.getBaseUrl() + "/browse/" + subtask.getIssueKey()
         );
     }

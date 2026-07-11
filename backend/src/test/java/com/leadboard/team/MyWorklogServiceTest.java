@@ -15,7 +15,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -23,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -36,6 +36,8 @@ class MyWorklogServiceTest {
 
     private static final String ACCOUNT_ID = "acc-1";
     private static final String ISSUE_KEY = "LB-101";
+    private static final int ONE_HOUR = 3600;
+    private static final int TWO_HOURS = 7200;
 
     @Mock private JiraIssueRepository issueRepository;
     @Mock private IssueWorklogRepository worklogRepository;
@@ -65,15 +67,18 @@ class MyWorklogServiceTest {
     void logsTimeJiraFirstThenUpsertsLocally() {
         JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 1800L);
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
-        when(jiraWriteService.logWorkAs(eq(ACCOUNT_ID), eq(ISSUE_KEY), eq(3600), eq(LocalDate.of(2026, 7, 1)), eq("comment")))
+        when(jiraWriteService.logWorkAs(eq(ACCOUNT_ID), eq(ISSUE_KEY), eq(ONE_HOUR), eq((long) TWO_HOURS),
+                eq(LocalDate.of(2026, 7, 1)), eq("comment")))
                 .thenReturn("wl-777");
 
-        String worklogId = service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment");
+        String worklogId = service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1),
+                ONE_HOUR, TWO_HOURS, "comment");
 
         assertEquals("wl-777", worklogId);
 
         InOrder inOrder = inOrder(jiraWriteService, worklogRepository, issueRepository);
-        inOrder.verify(jiraWriteService).logWorkAs(ACCOUNT_ID, ISSUE_KEY, 3600, LocalDate.of(2026, 7, 1), "comment");
+        inOrder.verify(jiraWriteService).logWorkAs(ACCOUNT_ID, ISSUE_KEY, ONE_HOUR, (long) TWO_HOURS,
+                LocalDate.of(2026, 7, 1), "comment");
         inOrder.verify(worklogRepository).save(any(IssueWorklogEntity.class));
         inOrder.verify(issueRepository).save(issue);
 
@@ -83,11 +88,13 @@ class MyWorklogServiceTest {
         assertEquals(ISSUE_KEY, saved.getIssueKey());
         assertEquals("wl-777", saved.getWorklogId());
         assertEquals(ACCOUNT_ID, saved.getAuthorAccountId());
-        assertEquals(3600, saved.getTimeSpentSeconds());
+        assertEquals(ONE_HOUR, saved.getTimeSpentSeconds());
         assertEquals(LocalDate.of(2026, 7, 1), saved.getStartedDate());
         assertEquals("ROLE_X", saved.getRoleCode());
 
-        assertEquals(3600L + 1800L, issue.getTimeSpentSeconds());
+        // spent is incremented; remaining is set outright to the user-chosen value.
+        assertEquals(ONE_HOUR + 1800L, issue.getTimeSpentSeconds());
+        assertEquals((long) TWO_HOURS, issue.getRemainingEstimateSeconds());
     }
 
     @Test
@@ -95,10 +102,10 @@ class MyWorklogServiceTest {
         JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 0L);
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
         WebClientResponseException jiraError = WebClientResponseException.create(500, "Internal Server Error", null, null, null);
-        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), any(), any())).thenThrow(jiraError);
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), anyLong(), any(), any())).thenThrow(jiraError);
 
         assertThrows(WebClientResponseException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, TWO_HOURS, "comment"));
 
         verifyNoInteractions(worklogRepository);
         verify(issueRepository, never()).save(any());
@@ -110,7 +117,7 @@ class MyWorklogServiceTest {
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
 
         assertThrows(MyWorklogService.LogTimeForbiddenException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, TWO_HOURS, "comment"));
 
         verifyNoInteractions(jiraWriteService);
     }
@@ -122,26 +129,50 @@ class MyWorklogServiceTest {
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
 
         assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, TWO_HOURS, "comment"));
 
         verifyNoInteractions(jiraWriteService);
     }
 
     @Test
-    void rejectsFutureDateAndBadHours() {
+    void rejectsFutureDateAndBadTimeSpent() {
         // The +1 day tz-tolerance (see acceptsDateOneDayAheadForTimezoneTolerance below) means
         // tomorrow alone no longer trips this — the day after tomorrow still must.
         assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(2), BigDecimal.ONE, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(2), ONE_HOUR, TWO_HOURS, "comment"));
 
+        // Non-positive time spent.
         assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ZERO, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), 0, TWO_HOURS, "comment"));
 
+        // Above the 30-working-day cap (30 * 8h).
         assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), new BigDecimal("24.5"), "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), 30 * 8 * 3600 + 1, TWO_HOURS, "comment"));
 
         verifyNoInteractions(issueRepository);
         verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    void rejectsNegativeRemainingEstimate() {
+        assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, -1, "comment"));
+
+        verifyNoInteractions(issueRepository);
+        verifyNoInteractions(jiraWriteService);
+    }
+
+    @Test
+    void acceptsZeroRemainingEstimate() {
+        // remaining=0 is valid — it clears the estimate (adjustEstimate=new, newEstimate=0m).
+        JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 0L);
+        when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), anyLong(), any(), any())).thenReturn("wl-0");
+
+        service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, 0, "comment");
+
+        verify(jiraWriteService).logWorkAs(ACCOUNT_ID, ISSUE_KEY, ONE_HOUR, 0L, LocalDate.of(2026, 7, 1), "comment");
+        assertEquals(0L, issue.getRemainingEstimateSeconds());
     }
 
     @Test
@@ -150,29 +181,22 @@ class MyWorklogServiceTest {
         // just after midnight) can see "today" from the user as "tomorrow" server-side.
         JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 0L);
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
-        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), any(), any())).thenReturn("wl-tz");
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), anyLong(), any(), any())).thenReturn("wl-tz");
 
-        String worklogId = service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(1), BigDecimal.ONE, "comment");
+        String worklogId = service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.now().plusDays(1),
+                ONE_HOUR, TWO_HOURS, "comment");
 
         assertEquals("wl-tz", worklogId);
-    }
-
-    @Test
-    void rejectsHoursThatRoundToZeroSeconds() {
-        assertThrows(MyWorklogService.LogTimeValidationException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), new BigDecimal("0.0001"), "comment"));
-
-        verifyNoInteractions(jiraWriteService);
     }
 
     @Test
     void throwsJiraNoIdExceptionWhenJiraReturnsNoWorklogId() {
         JiraIssueEntity issue = createSubtask(ACCOUNT_ID, "ROLE_X", "TypeX", 0L);
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
-        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), any(), any())).thenReturn(null);
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), anyLong(), any(), any())).thenReturn(null);
 
         assertThrows(MyWorklogService.JiraNoIdException.class, () ->
-                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment"));
+                service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, TWO_HOURS, "comment"));
 
         verifyNoInteractions(worklogRepository);
     }
@@ -181,10 +205,10 @@ class MyWorklogServiceTest {
     void roleCodeFallsBackToSubtaskRole() {
         JiraIssueEntity issue = createSubtask(ACCOUNT_ID, null, "TypeX", 0L);
         when(issueRepository.findByIssueKey(ISSUE_KEY)).thenReturn(Optional.of(issue));
-        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), any(), any())).thenReturn("wl-1");
+        when(jiraWriteService.logWorkAs(anyString(), anyString(), anyInt(), anyLong(), any(), any())).thenReturn("wl-1");
         when(workflowConfigService.getSubtaskRole("TypeX")).thenReturn("ROLE_FALLBACK");
 
-        service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), BigDecimal.ONE, "comment");
+        service.logTime(ACCOUNT_ID, ISSUE_KEY, LocalDate.of(2026, 7, 1), ONE_HOUR, TWO_HOURS, "comment");
 
         ArgumentCaptor<IssueWorklogEntity> captor = ArgumentCaptor.forClass(IssueWorklogEntity.class);
         verify(worklogRepository).save(captor.capture());

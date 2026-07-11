@@ -51,10 +51,11 @@ class JiraWriteServiceLogWorkAsTest {
     void logWorkAsUsesPersonalTokenAndReturnsWorklogId() {
         when(oauthService.getValidAccessTokenForUser("acc-1"))
                 .thenReturn(new OAuthService.TokenInfo("tok", "cloud"));
-        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "cloud"))
+        // remaining 3600s -> Jira "1h" (see JiraDuration): logWorkAs must format & forward it.
+        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "cloud", "1h"))
                 .thenReturn("42");
 
-        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.of(2026, 7, 8), "note"));
+        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, 3600, LocalDate.of(2026, 7, 8), "note"));
 
         verify(oauthService, never()).getValidAccessToken();
     }
@@ -64,7 +65,7 @@ class JiraWriteServiceLogWorkAsTest {
         when(oauthService.getValidAccessTokenForUser("acc-1")).thenReturn(null);
 
         assertThrows(JiraWriteService.NoUserTokenException.class,
-                () -> service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.now(), null));
+                () -> service.logWorkAs("acc-1", "SUB-1", 1800, 3600, LocalDate.now(), null));
 
         verifyNoInteractions(jiraClient);
     }
@@ -79,12 +80,12 @@ class JiraWriteServiceLogWorkAsTest {
         when(oauthService.getValidAccessTokenForUser("acc-1"))
                 .thenReturn(new OAuthService.TokenInfo("tok", "token-cloud"));
         when(configResolver.getJiraCloudId()).thenReturn("tenant-cloud");
-        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "tenant-cloud"))
+        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "tenant-cloud", "1h"))
                 .thenReturn("42");
 
-        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.of(2026, 7, 8), "note"));
+        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, 3600, LocalDate.of(2026, 7, 8), "note"));
 
-        verify(jiraClient).addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "tenant-cloud");
+        verify(jiraClient).addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "tenant-cloud", "1h");
     }
 
     @Test
@@ -92,12 +93,12 @@ class JiraWriteServiceLogWorkAsTest {
         when(oauthService.getValidAccessTokenForUser("acc-1"))
                 .thenReturn(new OAuthService.TokenInfo("tok", "token-cloud"));
         when(configResolver.getJiraCloudId()).thenReturn(null);
-        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "token-cloud"))
+        when(jiraClient.addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "token-cloud", "1h"))
                 .thenReturn("42");
 
-        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.of(2026, 7, 8), "note"));
+        assertEquals("42", service.logWorkAs("acc-1", "SUB-1", 1800, 3600, LocalDate.of(2026, 7, 8), "note"));
 
-        verify(jiraClient).addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "token-cloud");
+        verify(jiraClient).addWorklogReturningId("SUB-1", 1800, LocalDate.of(2026, 7, 8), "note", "tok", "token-cloud", "1h");
     }
 
     @Test
@@ -107,7 +108,7 @@ class JiraWriteServiceLogWorkAsTest {
         when(configResolver.getJiraCloudId()).thenReturn(null);
 
         assertThrows(JiraWriteService.NoUserTokenException.class,
-                () -> service.logWorkAs("acc-1", "SUB-1", 1800, LocalDate.now(), null));
+                () -> service.logWorkAs("acc-1", "SUB-1", 1800, 3600, LocalDate.now(), null));
 
         verifyNoInteractions(jiraClient);
     }

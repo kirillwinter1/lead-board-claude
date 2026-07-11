@@ -27,7 +27,7 @@ public record MyWorkResponse(
     public record MyTask(String key, String summary, String issueType, String status,
                          String parentKey, String parentSummary, String epicKey, String epicSummary,
                          Long teamId, String teamName, String teamColor,
-                         BigDecimal estimateH, BigDecimal spentH, String jiraUrl) {}
+                         BigDecimal estimateH, BigDecimal spentH, BigDecimal remainingH, String jiraUrl) {}
 
     public record QueueStory(String key, String summary, String issueType, String status,
                              Long teamId, String teamName, String teamColor,
@@ -48,8 +48,8 @@ public record MyWorkResponse(
 
     public record CompletedTaskWithTeam(String key, String summary, String epicKey, String epicSummary,
                                         Long teamId, String teamName, String teamColor,
-                                        BigDecimal estimateH, BigDecimal spentH, BigDecimal dsr,
-                                        LocalDate doneDate, String jiraUrl) {}
+                                        BigDecimal estimateH, BigDecimal spentH, BigDecimal remainingH,
+                                        BigDecimal dsr, LocalDate doneDate, String jiraUrl) {}
 
     public record DsrBreakdown(String key, String label, int taskCount,
                                BigDecimal estimateH, BigDecimal spentH, BigDecimal dsr) {}
