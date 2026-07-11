@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { TimeInStatusResponse } from '../../api/metrics'
 import { StatusBadge } from '../board/StatusBadge'
+import { EmptyState } from '../EmptyState'
 import { lightenColor, DSR_RED } from '../../constants/colors'
 import './TimeInStatusTable.css'
 
@@ -44,7 +45,7 @@ export function TimeInStatusTable({ data }: TimeInStatusTableProps) {
     return (
       <div className="chart-section">
         <h3>Time in Status</h3>
-        <div className="chart-empty">No status transition data available</div>
+        <EmptyState variant="inline" message="No status transition data available" />
       </div>
     )
   }

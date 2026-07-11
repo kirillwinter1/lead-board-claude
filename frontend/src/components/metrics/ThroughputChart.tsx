@@ -9,6 +9,7 @@ import {
   ResponsiveContainer
 } from 'recharts'
 import { SingleSelectDropdown } from '../SingleSelectDropdown'
+import { EmptyState } from '../EmptyState'
 import { THROUGHPUT_MA, CHART_GRID, CHART_TICK, CHART_AXIS, CHART_TOOLTIP_BG } from '../../constants/colors'
 import './ThroughputChart.css'
 
@@ -76,7 +77,7 @@ export function ThroughputChart({
       </div>
 
       {!hasData ? (
-        <div className="chart-empty">No data available for this period</div>
+        <EmptyState variant="inline" message="No data available for this period" />
       ) : (
         <div className="throughput-chart-container" style={{ opacity: loading ? 0.5 : 1 }}>
           <ResponsiveContainer width="100%" height={280}>

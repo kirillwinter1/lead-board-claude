@@ -1,4 +1,5 @@
 import { ForecastAccuracyResponse, EpicAccuracy } from '../../api/metrics'
+import { EmptyState } from '../EmptyState'
 import { getAccuracyColor, DSR_GREEN, DSR_YELLOW, DSR_RED, PROGRESS_IN_PROGRESS, TEXT_MUTED } from '../../constants/colors'
 import './ForecastAccuracyChart.css'
 
@@ -12,13 +13,11 @@ export function ForecastAccuracyChart({ data, jiraBaseUrl = '' }: ForecastAccura
     return (
       <div className="chart-section">
         <h3>Forecast Accuracy</h3>
-        <div className="chart-empty">
-          No completed epics for the selected period.
-          <br />
-          <small style={{ color: TEXT_MUTED }}>
-            Forecast accuracy requires epics with completion date (done_at) and forecast snapshots.
-          </small>
-        </div>
+        <EmptyState
+          variant="inline"
+          message="No completed epics for the selected period."
+          hint="Forecast accuracy requires epics with completion date (done_at) and forecast snapshots."
+        />
       </div>
     )
   }

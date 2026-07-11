@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { getIssueIcon } from '../components/board/helpers'
+import { EmptyState } from '../components/EmptyState'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
@@ -457,11 +458,11 @@ export function DataQualityPage() {
             </div>
 
             {filteredViolations.length === 0 ? (
-              <div className="empty">
-                {data.violations.length === 0
+              <EmptyState
+                message={data.violations.length === 0
                   ? 'No data quality issues found!'
                   : 'No issues matching filters'}
-              </div>
+              />
             ) : (
               <div className="violations-table-container">
                 <table className="violations-table">

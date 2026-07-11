@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { teamsApi, TeamMember, WorklogTimelineResponse, WorklogMember, WorklogDayInfo } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { AbsenceType } from '../api/teams'
+import { EmptyState } from './EmptyState'
 import { ERROR_TEXT, ABSENCE_COLORS, hexToRgba } from '../constants/colors'
 import './WorklogTimeline.css'
 
@@ -134,7 +135,7 @@ export function WorklogTimeline({ teamId, from: propFrom, to: propTo }: WorklogT
   }
 
   if (!data || data.members.length === 0) {
-    return <div className="worklog-empty">No worklog data available for this period.</div>
+    return <EmptyState variant="inline" message="No worklog data available for this period." />
   }
 
   const days = data.days

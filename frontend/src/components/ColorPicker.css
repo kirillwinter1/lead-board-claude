@@ -1,0 +1,71 @@
+/* F91 — shared colour picker. Migrated from the WorkflowConfigPage
+   .color-picker rules and the TeamsPage inline popup. */
+
+.ds-color-picker {
+  position: relative;
+  display: inline-block;
+}
+
+.ds-color-picker-trigger-wrap {
+  display: inline-flex;
+  cursor: pointer;
+  outline: none;
+}
+
+.ds-color-picker-trigger-wrap:focus-visible {
+  outline: 2px solid #4c9aff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.ds-color-picker-trigger {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #8993a4;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ds-color-picker-trigger-wrap:hover .ds-color-picker-trigger {
+  border-color: #b3bac5;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
+}
+
+.ds-color-picker-dropdown {
+  position: fixed;
+  z-index: 200;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.ds-color-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.1s, border-color 0.15s;
+  outline: none;
+}
+
+.ds-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.ds-color-swatch:focus-visible {
+  outline: 2px solid #4c9aff;
+  outline-offset: 2px;
+}
+
+.ds-color-swatch.selected {
+  border-color: #172b4d;
+  box-shadow: 0 0 0 2px #fff inset;
+}

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest, PlanningConfig } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { Modal } from '../components/Modal'
+import { EmptyState } from '../components/EmptyState'
 import { RoleBadge } from '../components/RoleBadge'
 import { GradeBadge } from '../components/GradeBadge'
 import { AbsenceTimeline } from '../components/AbsenceTimeline'
@@ -288,7 +289,7 @@ export function TeamMembersPage() {
       </div>
 
       {members.length === 0 ? (
-        <div className="empty">No members in this team yet. Add your first member!</div>
+        <EmptyState message="No members in this team yet. Add your first member!" />
       ) : (
         <div className="members-table-container">
           <table className="members-table">

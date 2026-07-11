@@ -1,0 +1,53 @@
+/* F91 — shared empty-state primitive. Colours mirror constants/colors.ts
+   (TEXT_MUTED #6b778c, BORDER_DEFAULT #dfe1e6, BG_PAGE white). */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  color: #6b778c;
+}
+
+/* page: large centred block, mirrors the legacy .empty rule (App.css). */
+.empty-state--page {
+  padding: 60px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #dfe1e6;
+}
+
+/* inline: compact placeholder for cards / charts / table sections. */
+.empty-state--inline {
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+.empty-state-icon {
+  margin-bottom: 12px;
+  opacity: 0.7;
+  line-height: 0;
+}
+
+.empty-state--inline .empty-state-icon {
+  margin-bottom: 8px;
+}
+
+.empty-state-message {
+  font-size: 14px;
+}
+
+.empty-state--page .empty-state-message {
+  font-weight: 500;
+  color: #42526e;
+}
+
+.empty-state-hint {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #97a0af;
+}
+
+.empty-state-action {
+  margin-top: 16px;
+}

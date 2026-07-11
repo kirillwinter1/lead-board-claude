@@ -6,6 +6,7 @@ import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, Unifie
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider, useStatusStyles } from '../components/board/StatusStylesContext'
+import { EmptyState } from '../components/EmptyState'
 import { resolveStatusBgColor } from '../components/board/StatusBadge'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
@@ -1816,11 +1817,11 @@ export function TimelineContent({
       {error && <div className="error">{error}</div>}
 
       {!loading && !error && needsTeamSelection && (
-        <div className="empty">Select exactly one team in filters to see the timeline</div>
+        <EmptyState message="Select exactly one team in filters to see the timeline" />
       )}
 
       {!loading && !error && !needsTeamSelection && epics.length === 0 && (
-        <div className="empty">No epics with planning data</div>
+        <EmptyState message="No epics with planning data" />
       )}
 
       {!loading && !error && !needsTeamSelection && epics.length > 0 && canExpandHistory && (

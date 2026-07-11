@@ -141,9 +141,4 @@
   color: #de350b;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 48px;
-  color: #6b778c;
-  font-size: 14px;
-}
+/* F91 — .empty-state moved to the shared EmptyState component. */

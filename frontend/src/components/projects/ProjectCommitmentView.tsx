@@ -1,4 +1,5 @@
 import { TeamBadge } from '../TeamBadge'
+import { ProgressBar } from '../ProgressBar'
 import { ProjectQuarterCommitmentDto, TeamCommitmentDto } from '../../api/quarterlyPlanning'
 import {
   TEXT_PRIMARY,
@@ -6,7 +7,6 @@ import {
   TEXT_SECONDARY,
   BG_SUBTLE,
   BORDER_DEFAULT,
-  PROGRESS_TRACK,
   DSR_GREEN,
   DSR_YELLOW,
   DSR_RED,
@@ -104,9 +104,6 @@ export function ProjectCommitmentView({ commitment }: ProjectCommitmentViewProps
         const status = classify(team)
         const color = STATUS_COLOR[status]
         const icon = STATUS_ICON[status]
-        const percent = team.totalEpics > 0
-          ? Math.round((team.committedEpics / team.totalEpics) * 100)
-          : 0
         return (
           <div
             key={team.teamId}
@@ -121,30 +118,12 @@ export function ProjectCommitmentView({ commitment }: ProjectCommitmentViewProps
               <TeamBadge name={team.teamName} color={team.teamColor} />
             </div>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={team.totalEpics}
-                aria-valuenow={team.committedEpics}
-                aria-label={`${team.teamName}: ${team.committedEpics} of ${team.totalEpics} epics committed`}
-                style={{
-                  width: '100%',
-                  height: 6,
-                  background: PROGRESS_TRACK,
-                  borderRadius: 3,
-                  overflow: 'hidden',
-                }}
-              >
-                <div
-                  style={{
-                    width: `${percent}%`,
-                    minWidth: percent > 0 ? 2 : 0,
-                    height: '100%',
-                    background: color,
-                    transition: 'width 0.15s ease',
-                  }}
-                />
-              </div>
+              <ProgressBar
+                value={team.committedEpics}
+                max={team.totalEpics}
+                color={color}
+                ariaLabel={`${team.teamName}: ${team.committedEpics} of ${team.totalEpics} epics committed`}
+              />
               <div style={{ fontSize: 12, color: TEXT_SECONDARY, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 <strong style={{ color: TEXT_PRIMARY }}>
                   {team.committedEpics}/{team.totalEpics} {pluralEpics(team.totalEpics)}

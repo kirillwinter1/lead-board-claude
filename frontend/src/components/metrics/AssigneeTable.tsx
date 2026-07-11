@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { AssigneeMetrics } from '../../api/metrics'
+import { EmptyState } from '../EmptyState'
 import { getDsrColor, DSR_GREEN, DSR_YELLOW, DSR_RED } from '../../constants/colors'
 import './AssigneeTable.css'
 
@@ -50,7 +51,7 @@ export function AssigneeTable({ data }: AssigneeTableProps) {
     return (
       <div className="chart-section">
         <h3>By Team Member</h3>
-        <div className="chart-empty">No assignee data available</div>
+        <EmptyState variant="inline" message="No assignee data available" />
       </div>
     )
   }

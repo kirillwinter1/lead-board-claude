@@ -140,63 +140,7 @@
   box-shadow: 0 0 0 2px rgba(76, 154, 255, 0.2);
 }
 
-.color-picker {
-  position: relative;
-  display: inline-block;
-}
-
-.color-picker-trigger {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid #8993A4;
-  cursor: pointer;
-  padding: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.color-picker-trigger:hover {
-  border-color: #B3BAC5;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08);
-}
-
-.color-picker-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 99;
-}
-
-.color-picker-dropdown {
-  position: fixed;
-  z-index: 100;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 6px;
-  padding: 10px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.04);
-}
-
-.color-swatch {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.1s, border-color 0.15s;
-}
-
-.color-swatch:hover {
-  transform: scale(1.15);
-}
-
-.color-swatch.selected {
-  border-color: #172B4D;
-  box-shadow: 0 0 0 2px #fff inset;
-}
+/* F91 — .color-picker / .color-swatch rules moved to the shared ColorPicker.css. */
 
 .workflow-actions {
   display: flex;

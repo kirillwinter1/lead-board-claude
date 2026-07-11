@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { ForecastAccuracyResponse, EpicAccuracy } from '../../api/metrics'
+import { EmptyState } from '../EmptyState'
 import './ForecastScatterPlot.css'
 
 interface ForecastScatterPlotProps {
@@ -46,9 +47,7 @@ export function ForecastScatterPlot({ data, jiraBaseUrl = '' }: ForecastScatterP
     return (
       <div className="scatter-plot-section">
         <h3>Plan vs Fact (Scatter)</h3>
-        <div className="scatter-empty">
-          No data for scatter plot. Need completed epics with both planned and actual days.
-        </div>
+        <EmptyState variant="inline" message="No data for scatter plot. Need completed epics with both planned and actual days." />
       </div>
     )
   }

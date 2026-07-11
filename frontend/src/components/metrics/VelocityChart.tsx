@@ -11,6 +11,7 @@ import {
   Cell
 } from 'recharts'
 import { getVelocity, VelocityResponse } from '../../api/metrics'
+import { EmptyState } from '../EmptyState'
 import { getUtilizationColor, CHART_GRID, CHART_AXIS, CHART_TICK, CHART_TOOLTIP_BG } from '../../constants/colors'
 import './VelocityChart.css'
 
@@ -47,7 +48,7 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
     return (
       <div className="velocity-section">
         <h3>Team Velocity</h3>
-        <div className="velocity-empty">Failed to load: {error}</div>
+        <EmptyState variant="inline" message={`Failed to load: ${error}`} />
       </div>
     )
   }
@@ -56,7 +57,7 @@ export function VelocityChart({ teamId, from, to }: VelocityChartProps) {
     return (
       <div className="velocity-section">
         <h3>Team Velocity</h3>
-        <div className="velocity-empty">No velocity data for this period.</div>
+        <EmptyState variant="inline" message="No velocity data for this period." />
       </div>
     )
   }

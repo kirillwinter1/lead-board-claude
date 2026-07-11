@@ -102,6 +102,8 @@ export function CapacityBars({ teams }: CapacityBarsProps) {
                 {status.glyph}
               </span>
             </div>
+            {/* intentionally custom: overlaid >100% striped-overflow layer + per-role stacked
+                mini-bars below don't fit the single-segment shared ProgressBar API. See F91. */}
             <div
               style={{
                 position: 'relative',
