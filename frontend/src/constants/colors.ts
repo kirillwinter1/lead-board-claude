@@ -28,6 +28,14 @@ export function getUtilizationColor(percent: number): string {
   return DSR_RED
 }
 
+// Grade badge colors — member seniority pill (junior/middle/senior), used by GradeBadge.
+// Migrated verbatim from the .grade-badge.* rules in TeamsPage.css.
+export const GRADE_COLORS: Record<string, { bg: string; text: string }> = {
+  junior: { bg: '#fce4ec', text: '#880e4f' },
+  middle: { bg: '#e8eaf6', text: '#283593' },
+  senior: { bg: '#e0f2f1', text: '#00695c' },
+}
+
 // Severity colors — used in DataQualityPage
 export const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   ERROR: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },

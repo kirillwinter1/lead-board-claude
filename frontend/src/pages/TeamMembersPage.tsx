@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom'
 import { teamsApi, Team, TeamMember, CreateTeamMemberRequest, UpdateTeamMemberRequest, PlanningConfig } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { Modal } from '../components/Modal'
+import { RoleBadge } from '../components/RoleBadge'
+import { GradeBadge } from '../components/GradeBadge'
 import { AbsenceTimeline } from '../components/AbsenceTimeline'
 import { WorklogTimeline } from '../components/WorklogTimeline'
 import './TeamsPage.css'
@@ -28,7 +30,7 @@ function buildDefaultPlanningConfig(roles: string[]): PlanningConfig {
 
 export function TeamMembersPage() {
   const { teamId } = useParams<{ teamId: string }>()
-  const { getRoleCodes, getRoleColor, getRoleDisplayName } = useWorkflowConfig()
+  const { getRoleCodes, getRoleDisplayName } = useWorkflowConfig()
   const roles = getRoleCodes()
 
   const [team, setTeam] = useState<Team | null>(null)
@@ -144,28 +146,6 @@ export function TeamMembersPage() {
       .catch(err => {
         setError(err.response?.data?.error || 'Failed to deactivate member')
       })
-  }
-
-  const getRoleBadgeStyle = (role: string): React.CSSProperties => {
-    const color = getRoleColor(role)
-    return {
-      backgroundColor: color + '20',
-      color: color,
-      padding: '2px 8px',
-      borderRadius: '4px',
-      fontSize: '12px',
-      fontWeight: 600,
-      display: 'inline-block',
-    }
-  }
-
-  const getGradeBadgeClass = (grade: string) => {
-    switch (grade) {
-      case 'JUNIOR': return 'grade-badge junior'
-      case 'MIDDLE': return 'grade-badge middle'
-      case 'SENIOR': return 'grade-badge senior'
-      default: return 'grade-badge'
-    }
   }
 
   const handleSavePlanningConfig = () => {
@@ -363,12 +343,10 @@ export function TeamMembersPage() {
                   </td>
                   <td className="cell-account-id">{member.jiraAccountId}</td>
                   <td>
-                    <span style={getRoleBadgeStyle(member.role)}>
-                      {getRoleDisplayName(member.role)}
-                    </span>
+                    <RoleBadge role={member.role} />
                   </td>
                   <td>
-                    <span className={getGradeBadgeClass(member.grade)}>{member.grade}</span>
+                    <GradeBadge grade={member.grade} />
                   </td>
                   <td className="cell-hours">{member.hoursPerDay}h</td>
                   <td>
