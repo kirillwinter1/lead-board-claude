@@ -173,15 +173,25 @@ com.leadboard/
 frontend/src/
 ├── api/            — 9 API клиентов (board, forecast, teams, metrics, poker, stories, epics, config, competency)
 ├── constants/
-│   └── colors.ts            — Centralized color constants (DSR, severity, chart theme, text hierarchy)
+│   └── colors.ts            — Centralized color constants (DSR, severity, chart theme, text hierarchy,
+│                              GRADE_COLORS, ABSENCE_COLORS, WARNING_ORANGE, TOOLTIP_*, TIMELINE_* —
+│                              muted Gantt palette, intentionally dimmer than Board, F91)
 ├── components/
 │   ├── Layout.tsx           — Навигация + табы
 │   ├── Modal.tsx            — Модальные окна
 │   ├── MultiSelectDropdown.tsx
-│   ├── SeverityBadge.tsx     — Shared severity badge (ERROR/WARNING/INFO)
+│   ├── SeverityBadge.tsx     — Shared severity badge (ERROR/WARNING/INFO), реэкспортирует SEVERITY_COLORS
+│   ├── RoleBadge.tsx        — Бейдж роли участника (F91), цвет из getRoleColor()
+│   ├── GradeBadge.tsx       — Бейдж грейда junior/middle/senior (F91), GRADE_COLORS
+│   ├── ProgressBar.tsx      — Единая полоса прогресса с ARIA progressbar (F91); stacked-бары
+│   │                          (CapacityBars, ProjectGanttView) остаются кастомными
+│   ├── EmptyState.tsx       — Единый empty state, variant page|inline (F91)
+│   ├── ColorPicker.tsx      — Единый color picker popup (F91), заменил 3 копии
+│   ├── DarkTooltip.tsx      — Портальный тёмный тултип для Timeline + Title/Label/Value/Divider/Progress (F91);
+│   │                          НЕ для светлых hover-карточек Board (HoverInfoCard/IssueTooltip/ProjectTooltip)
 │   ├── board/               — FilterPanel, BoardTable, BoardRow, SortableEpicRow, SortableStoryRow,
-│   │                          StatusBadge, RoleChips, EpicRoleChip, ProgressCell, PriorityCell,
-│   │                          ExpectedDoneCell, StoryExpectedDoneCell, AlertIcon, StatusStylesContext
+│   │                          StatusBadge (проп maxWidth — F91), RoleChips, EpicRoleChip, ProgressCell,
+│   │                          PriorityCell, ExpectedDoneCell, StoryExpectedDoneCell, AlertIcon, StatusStylesContext
 │   ├── competency/          — CompetencyRating
 │   ├── metrics/             — DsrGauge, ThroughputChart, ForecastAccuracyChart, ForecastScatterPlot,
 │   │                          VelocityChart, EpicBurndownChart, TimeInStatusChart, AssigneeTable, RoleLoadBlock
