@@ -214,8 +214,71 @@
 }
 
 /* =====================================================
-   MINI WORKLOG CALENDAR (Task 10)
+   MONTHLY WORKLOG CALENDAR (Task 10 / F90)
    ===================================================== */
+
+/* Breathing room between the task columns above and the calendar. */
+.mywork-cal-section {
+  margin-top: 30px;
+}
+
+.mywork-cal-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.mywork-cal-nav-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #172b4d;
+  min-width: 140px;
+  text-align: center;
+}
+
+.mywork-cal-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: #42526e;
+  background: white;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mywork-cal-nav-btn:hover:not(:disabled) {
+  background: #f4f5f7;
+  border-color: #c1c7d0;
+}
+
+.mywork-cal-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mywork-cal-grid.loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.mywork-cal-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 16px;
+  color: #6b778c;
+  font-size: 13px;
+}
 
 .mywork-cal-weekdays {
   display: grid;
@@ -239,6 +302,7 @@
 }
 
 .mywork-cal-cell {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -259,6 +323,12 @@
   background: #fff3e6;
 }
 
+/* Green = a workday with logged time that meets the bar. */
+.mywork-cal-cell.logged {
+  background: #e3fcef;
+  border-color: #57d9a3;
+}
+
 .mywork-cal-cell.low-hours {
   background: #ffebe6;
   border-color: #ff5630;
@@ -270,6 +340,18 @@
 
 .mywork-cal-cell.future {
   opacity: 0.5;
+}
+
+/* Spill-over days from the neighbouring months — muted, hours hidden. */
+.mywork-cal-cell.other-month {
+  background: #fafbfc;
+  border-color: #ebecf0;
+  opacity: 0.55;
+}
+
+.mywork-cal-cell.other-month .mywork-cal-daynum {
+  color: #97a0af;
+  font-weight: 500;
 }
 
 .mywork-cal-cell.absence {
@@ -289,6 +371,69 @@
 .mywork-cal-hours {
   font-size: 11px;
   color: #6b778c;
+}
+
+/* Hover popover — scoped to the calendar, positioned over the hovered cell. */
+.mywork-cal-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  min-width: 130px;
+  max-width: 220px;
+  padding: 8px 10px;
+  background: #172b4d;
+  color: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(9, 30, 66, 0.35);
+  font-size: 12px;
+  text-align: left;
+  pointer-events: none;
+}
+
+.mywork-cal-tip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #172b4d;
+}
+
+.mywork-cal-tip-date {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: #b3d4ff;
+}
+
+.mywork-cal-tip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mywork-cal-tip-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mywork-cal-tip-key {
+  font-weight: 500;
+}
+
+.mywork-cal-tip-hours {
+  color: #79f2c0;
+  white-space: nowrap;
+}
+
+.mywork-cal-tip-empty {
+  color: #c1c7d0;
 }
 
 .mywork-cal-legend {
@@ -315,7 +460,8 @@
 }
 
 .mywork-cal-legend-logged {
-  background: white;
+  background: #e3fcef;
+  border-color: #57d9a3;
 }
 
 .mywork-cal-legend-low-hours {

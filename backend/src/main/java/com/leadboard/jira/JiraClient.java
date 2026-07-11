@@ -680,13 +680,23 @@ public class JiraClient {
      * worklog's id (F90 — per-user write path for "Log time" from My Work).
      *
      * @param comment optional worklog comment (ADF-wrapped, same structure as {@link #addComment}); may be null/blank
+     * @param newRemainingEstimate optional Jira-formatted remaining estimate (e.g. {@code "2h 30m"}); when
+     *        non-null/blank the call sets the remaining estimate explicitly via {@code adjustEstimate=new}
+     *        instead of Jira's default {@code auto} (which just subtracts the logged time). May be null/blank.
      * @return the created worklog's id, or null if the response didn't contain one
      */
     public String addWorklogReturningId(String issueKey, int timeSpentSeconds, LocalDate date,
-                                        String comment, String accessToken, String cloudId) {
+                                        String comment, String accessToken, String cloudId,
+                                        String newRemainingEstimate) {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
 
         String started = date.atTime(9, 0, 0).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'+0000'"));
+
+        String uri = baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false";
+        if (newRemainingEstimate != null && !newRemainingEstimate.isBlank()) {
+            uri += "&adjustEstimate=new&newEstimate="
+                    + java.net.URLEncoder.encode(newRemainingEstimate, StandardCharsets.UTF_8);
+        }
 
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("timeSpentSeconds", timeSpentSeconds);
@@ -704,7 +714,7 @@ public class JiraClient {
         }
 
         Map<String, Object> resp = webClient.post()
-                .uri(baseUrl + "/rest/api/3/issue/" + issueKey + "/worklog?notifyUsers=false")
+                .uri(uri)
                 .header(HttpHeaders.AUTHORIZATION, bearerAuthHeaderValue(accessToken))
                 .bodyValue(body)
                 .retrieve()

@@ -9,7 +9,6 @@ import com.leadboard.sync.JiraIssueRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -66,8 +65,11 @@ public class MyWorklogService {
      * <p>All validations run before any Jira call; once Jira is written, the local
      * upsert follows. If Jira fails, no local rows are written.</p>
      *
+     * @param timeSpentSeconds time to log, in seconds (> 0, capped at 30 working days)
+     * @param remainingEstimateSeconds new remaining estimate to set on the issue, in seconds (>= 0;
+     *        0 clears the estimate) — written to Jira via {@code adjustEstimate=new}
      * @return the Jira worklog id
-     * @throws LogTimeValidationException hours/date/issue invalid (400)
+     * @throws LogTimeValidationException time/remaining/date/issue invalid (400)
      * @throws LogTimeForbiddenException the task is not assigned to {@code accountId} (403)
      * @throws JiraWriteService.NoUserTokenException no valid Jira OAuth token for the user (409)
      * @throws JiraNoIdException Jira accepted the write but returned no worklog id (502)
@@ -76,9 +78,15 @@ public class MyWorklogService {
     // Jira runs inside this transaction, holding the DB connection for the HTTP round-trip —
     // deliberate: this endpoint is human-frequency (one submit per click), not a hot path.
     @Transactional
-    public String logTime(String accountId, String issueKey, LocalDate date, BigDecimal hours, String comment) {
-        if (hours == null || hours.signum() <= 0 || hours.compareTo(BigDecimal.valueOf(24)) > 0) {
-            throw new LogTimeValidationException("Hours must be between 0 and 24");
+    public String logTime(String accountId, String issueKey, LocalDate date, int timeSpentSeconds,
+                          int remainingEstimateSeconds, String comment) {
+        // Cap at 30 working days (8h each) — guards against a fat-fingered "30w" that would
+        // otherwise log a nonsense worklog; anything larger is almost certainly a mistake.
+        if (timeSpentSeconds <= 0 || timeSpentSeconds > 30 * 8 * 3600) {
+            throw new LogTimeValidationException("Time spent must be between 0 and 30 working days");
+        }
+        if (remainingEstimateSeconds < 0) {
+            throw new LogTimeValidationException("Remaining estimate must not be negative");
         }
         // +1 day tolerance: the server's clock/timezone may lag the user's local "today"
         // (e.g. UTC server, MSK user near midnight) — reject only dates clearly in the future.
@@ -94,13 +102,8 @@ public class MyWorklogService {
             throw new LogTimeForbiddenException("You can log time only on your own tasks");
         }
 
-        int seconds = hours.multiply(BigDecimal.valueOf(3600)).intValue();
-        if (seconds <= 0) {
-            // e.g. 0.0001h truncates to 0 seconds — Jira would reject it with an opaque error.
-            throw new LogTimeValidationException("Hours too small");
-        }
-
-        String worklogId = jiraWriteService.logWorkAs(accountId, issueKey, seconds, date, comment);
+        String worklogId = jiraWriteService.logWorkAs(
+                accountId, issueKey, timeSpentSeconds, remainingEstimateSeconds, date, comment);
         if (worklogId == null) {
             throw new JiraNoIdException("Jira did not confirm the worklog — check Jira before retrying");
         }
@@ -109,7 +112,7 @@ public class MyWorklogService {
         entity.setIssueKey(issueKey);
         entity.setWorklogId(worklogId);
         entity.setAuthorAccountId(accountId);
-        entity.setTimeSpentSeconds(seconds);
+        entity.setTimeSpentSeconds(timeSpentSeconds);
         entity.setStartedDate(date);
         entity.setRoleCode(issue.getWorkflowRole() != null
                 ? issue.getWorkflowRole()
@@ -117,7 +120,9 @@ public class MyWorklogService {
         worklogRepository.save(entity);
 
         long cur = issue.getTimeSpentSeconds() != null ? issue.getTimeSpentSeconds() : 0L;
-        issue.setTimeSpentSeconds(cur + seconds);
+        issue.setTimeSpentSeconds(cur + timeSpentSeconds);
+        // The user explicitly chose the new remaining (auto/manual), matching what we told Jira.
+        issue.setRemainingEstimateSeconds((long) remainingEstimateSeconds);
         issueRepository.save(issue);
 
         return worklogId;

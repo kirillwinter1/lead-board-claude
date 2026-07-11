@@ -4,6 +4,7 @@ import com.leadboard.auth.AuthorizationService;
 import com.leadboard.auth.LeadBoardAuthentication;
 import com.leadboard.jira.JiraWriteService;
 import com.leadboard.team.dto.MyWorkResponse;
+import com.leadboard.team.dto.MyWorkResponse.CalendarDay;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,8 +17,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClientException;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -52,7 +55,27 @@ public class MyWorkController {
         return ResponseEntity.ok(myWorkService.getMyWork(auth.getAtlassianAccountId(), from, to, teamId));
     }
 
-    public record LogTimeRequest(String issueKey, LocalDate date, BigDecimal hours, String comment) {}
+    /**
+     * Worklog-календарь за конкретный месяц — для навигации по месяцам с фронта.
+     * Параметр {@code month} в формате YYYY-MM (например 2026-07). Кривой формат -> 400.
+     */
+    @GetMapping("/worklog-calendar")
+    public ResponseEntity<List<CalendarDay>> getWorklogCalendar(@RequestParam String month) {
+        LeadBoardAuthentication auth = authorizationService.getCurrentAuth();
+        if (auth == null || auth.getAtlassianAccountId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        YearMonth ym;
+        try {
+            ym = YearMonth.parse(month);
+        } catch (DateTimeParseException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        return ResponseEntity.ok(myWorkService.getWorklogCalendar(auth.getAtlassianAccountId(), ym));
+    }
+
+    public record LogTimeRequest(String issueKey, LocalDate date, int timeSpentSeconds,
+                                 int remainingEstimateSeconds, String comment) {}
 
     @PostMapping("/worklog")
     public ResponseEntity<Map<String, String>> logTime(@RequestBody LogTimeRequest req) {
@@ -62,7 +85,8 @@ public class MyWorkController {
         }
         try {
             String worklogId = myWorklogService.logTime(
-                    auth.getAtlassianAccountId(), req.issueKey(), req.date(), req.hours(), req.comment());
+                    auth.getAtlassianAccountId(), req.issueKey(), req.date(),
+                    req.timeSpentSeconds(), req.remainingEstimateSeconds(), req.comment());
             return ResponseEntity.ok(Map.of("worklogId", worklogId));
         } catch (MyWorklogService.LogTimeValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

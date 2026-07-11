@@ -137,13 +137,19 @@ public class JiraWriteService {
      * используя его личный OAuth-токен, а не {@link #requireCreds()} (последний токен
      * тенанта, которым пользуется AI-чат). Так worklog атрибутируется реальному автору.
      *
+     * <p>Одновременно с worklog'ом явно выставляет остаток (Remaining Estimate) через
+     * {@code adjustEstimate=new} — пользователь управляет остатком вручную, как в нативном
+     * Jira «Log work», вместо дефолтного {@code auto} (которое просто вычитает списанное).</p>
+     *
      * @param atlassianAccountId Atlassian account id пользователя, от чьего имени пишем
+     * @param remainingEstimateSeconds новый остаток в секундах (форматируется в Jira-строку
+     *        через {@link JiraDuration#format(long)}); {@code 0} корректно обнуляет остаток
      * @return id созданного worklog'а
      * @throws NoUserTokenException если у пользователя нет валидного OAuth-токена или не
      *         удалось определить Jira cloudId для записи
      */
     public String logWorkAs(String atlassianAccountId, String issueKey, int timeSpentSeconds,
-                            LocalDate date, String comment) {
+                            long remainingEstimateSeconds, LocalDate date, String comment) {
         OAuthService.TokenInfo token = oauthService.getValidAccessTokenForUser(atlassianAccountId);
         if (token == null || token.accessToken() == null) {
             throw new NoUserTokenException(
@@ -155,9 +161,11 @@ public class JiraWriteService {
                     "Не удалось определить Jira cloudId для пользователя " + atlassianAccountId + ".");
         }
         LocalDate when = date != null ? date : LocalDate.now();
+        String newRemaining = JiraDuration.format(remainingEstimateSeconds);
         String worklogId = jiraClient.addWorklogReturningId(
-                issueKey, timeSpentSeconds, when, comment, token.accessToken(), cloudId);
-        log.info("Jira worklog (as {}): {} +{}s on {}", atlassianAccountId, issueKey, timeSpentSeconds, when);
+                issueKey, timeSpentSeconds, when, comment, token.accessToken(), cloudId, newRemaining);
+        log.info("Jira worklog (as {}): {} +{}s on {}, remaining={}",
+                atlassianAccountId, issueKey, timeSpentSeconds, when, newRemaining);
         return worklogId;
     }
 
