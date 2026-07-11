@@ -141,7 +141,7 @@ export function BugSlaSettingsPage() {
   const configuredPriorities = new Set(configs.map(c => c.priority))
   const missingPriorities = availablePriorities.filter(p => !configuredPriorities.has(p))
 
-  if (loading) return <div className="page-loading">Loading SLA configuration...</div>
+  if (loading) return <div className="loading">Loading SLA configuration...</div>
 
   return (
     <div style={{ padding: '24px', maxWidth: 700 }}>

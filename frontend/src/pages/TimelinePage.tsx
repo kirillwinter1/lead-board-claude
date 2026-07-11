@@ -199,7 +199,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span title={epic.status || ''}>
-              <StatusBadge status={epic.status || 'Unknown'} />
+              <StatusBadge status={epic.status || 'Unknown'} maxWidth={130} />
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               <div style={{
@@ -233,7 +233,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               <DarkTooltip.Title>{epic.epicKey}</DarkTooltip.Title>
               <DarkTooltip.Label style={{ fontSize: 11 }}>({epic.autoScore?.toFixed(0)})</DarkTooltip.Label>
             </div>
-            <StatusBadge status={epic.status || 'Unknown'} />
+            <StatusBadge status={epic.status || 'Unknown'} maxWidth={130} />
           </div>
 
           {/* Summary */}
@@ -676,7 +676,7 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>
               )}
             </div>
-            <StatusBadge status={hoveredStory.status} />
+            <StatusBadge status={hoveredStory.status} maxWidth={130} />
           </div>
 
           {/* Summary */}
