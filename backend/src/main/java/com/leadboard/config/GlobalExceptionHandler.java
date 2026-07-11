@@ -2,6 +2,7 @@ package com.leadboard.config;
 
 import com.leadboard.jira.JiraClientException;
 import com.leadboard.matrix.MatrixIssueNotFoundException;
+import com.leadboard.poker.PokerStateException;
 import com.leadboard.planning.EpicNotFoundException;
 import com.leadboard.planning.ProjectNotFoundException;
 import com.leadboard.simulation.SimulationNotFoundException;
@@ -114,9 +115,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", ex.getMessage()));
     }
 
-    // State-machine violations (e.g. reveal on a non-VOTING poker story) -> 409, not 500 (BUG-180)
-    @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, String>> handleIllegalState(IllegalStateException ex) {
+    // Poker state-machine violations (e.g. reveal on a non-VOTING story) -> 409, not 500
+    // (BUG-180). Scoped to PokerStateException on purpose: a blanket IllegalStateException
+    // handler would echo internal messages and flip status codes for unrelated subsystems
+    // (config/simulation guards), so those keep falling through to the sanitised 500 below.
+    @ExceptionHandler(PokerStateException.class)
+    public ResponseEntity<Map<String, String>> handlePokerState(PokerStateException ex) {
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
                 .body(Map.of("error", ex.getMessage()));

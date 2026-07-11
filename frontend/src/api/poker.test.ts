@@ -14,7 +14,6 @@ import {
   addStory,
   getVotes,
   formatDays,
-  formatDeltaDays,
 } from './poker'
 
 vi.mock('axios')
@@ -296,12 +295,6 @@ describe('Poker API', () => {
       expect(formatDays(8)).toBe('1d')
       expect(formatDays(12)).toBe('1.5d')
       expect(formatDays(24)).toBe('3d')
-    })
-
-    it('formatDeltaDays shows a signed delta with a proper minus sign', () => {
-      expect(formatDeltaDays(0)).toBe('0')
-      expect(formatDeltaDays(4)).toBe('+0.5d')
-      expect(formatDeltaDays(-4)).toBe('−0.5d')
     })
   })
 

@@ -203,8 +203,13 @@ export function PokerRoomPage() {
         setJiraBaseUrl(config.jiraBaseUrl)
 
         // Facilitator = session creator; the server independently verifies this
-        // from the authenticated account on every WS/REST action
-        setIsFacilitator(sessionData.facilitatorAccountId === authUser.accountId)
+        // from the authenticated account on every WS/REST action. Legacy pre-F89
+        // sessions stored the facilitator as "system" — treat the current user as
+        // facilitator for those so the room isn't permanently locked.
+        setIsFacilitator(
+          sessionData.facilitatorAccountId === authUser.accountId ||
+          sessionData.facilitatorAccountId === 'system'
+        )
 
         // Determine team role
         try {
