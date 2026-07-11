@@ -82,6 +82,20 @@ public class PokerJiraService {
     }
 
     /**
+     * Sync an edited poker story's title/description to its existing Jira issue so the
+     * local copy never contradicts Jira. Client/upstream failures are mapped to 400/502
+     * (never a raw 500), matching {@link #createStoryInJira}.
+     */
+    public void updateStoryInJira(String storyKey, String title, String description) {
+        try {
+            jiraClient.updateStoryFields(storyKey, title, description);
+            log.info("Updated Jira story {} (title/description)", storyKey);
+        } catch (WebClientResponseException e) {
+            throw mapJiraError(e, "update story " + storyKey + " in Jira");
+        }
+    }
+
+    /**
      * Publish a completed session's final estimates to Jira (F23 rework). For every
      * COMPLETED story that carries final estimates, ensure a subtask exists for each
      * estimated role and write the role's estimate as the subtask's Original Estimate

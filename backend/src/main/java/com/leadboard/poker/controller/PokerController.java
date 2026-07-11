@@ -270,7 +270,7 @@ public class PokerController {
     @GetMapping("/sessions/team/{teamId}")
     public ResponseEntity<List<SessionResponse>> getSessionsByTeam(@PathVariable Long teamId) {
         List<SessionResponse> sessions = sessionService.getSessionsByTeam(teamId).stream()
-                .map(SessionResponse::from)
+                .map(this::withEpicDetails)
                 .toList();
         return ResponseEntity.ok(sessions);
     }
@@ -335,6 +335,21 @@ public class PokerController {
 
         // Import existing story (already in Jira)
         PokerStoryEntity story = sessionService.addStory(sessionId, request);
+        return ResponseEntity.ok(StoryResponse.from(story));
+    }
+
+    @PutMapping("/stories/{storyId}")
+    public ResponseEntity<StoryResponse> updateStory(
+            @PathVariable Long storyId,
+            @Valid @RequestBody AddStoryRequest request) {
+        PokerStoryEntity existing = sessionService.getStoryWithSession(storyId);
+        requireFacilitator(existing.getSession());
+
+        // Keep Jira in sync first (single source of truth) when the story is already there.
+        if (existing.getStoryKey() != null && !existing.getStoryKey().isBlank()) {
+            jiraService.updateStoryInJira(existing.getStoryKey(), request.title(), request.description());
+        }
+        PokerStoryEntity story = sessionService.updateStory(storyId, request);
         return ResponseEntity.ok(StoryResponse.from(story));
     }
 
