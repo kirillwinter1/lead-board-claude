@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { competencyApi, TeamCompetencyMatrix, BusFactorAlert, CompetencyLevel } from '../api/competency'
 import { CompetencyRating, LEVEL_COLORS } from '../components/competency/CompetencyRating'
-import { BG_SUBTLE, ERROR_BG, ERROR_DARK_TEXT, ERROR_TEXT, SUCCESS_BG, SUCCESS_TEXT, WARNING_BG, WARNING_BORDER } from '../constants/colors'
+import { BG_SUBTLE, ERROR_BG, ERROR_DARK_TEXT, ERROR_TEXT, SUCCESS_BG, SUCCESS_TEXT, WARNING_BG, WARNING_BORDER, WARNING_ORANGE } from '../constants/colors'
 import './TeamsPage.css'
 
 export function TeamCompetencyPage() {
@@ -48,7 +48,7 @@ export function TeamCompetencyPage() {
   const severityStyle = (severity: string) => {
     switch (severity) {
       case 'CRITICAL': return { background: ERROR_BG, color: ERROR_DARK_TEXT, border: '1px solid #ff8f73' }
-      case 'WARNING': return { background: WARNING_BG, color: '#ff8b00', border: `1px solid ${WARNING_BORDER}` }
+      case 'WARNING': return { background: WARNING_BG, color: WARNING_ORANGE, border: `1px solid ${WARNING_BORDER}` }
       default: return { background: SUCCESS_BG, color: SUCCESS_TEXT, border: '1px solid #79f2c0' }
     }
   }

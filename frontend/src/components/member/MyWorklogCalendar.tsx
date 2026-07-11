@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { myWorkApi, type CalendarDay } from '../../api/myWork'
-import { ABSENCE_COLORS } from '../AbsenceModal'
+import { ABSENCE_COLORS } from '../../constants/colors'
 import type { AbsenceType } from '../../api/teams'
 
 // CSS classes (mywork-cal-*) live in MyWorkPage.css — consuming pages must

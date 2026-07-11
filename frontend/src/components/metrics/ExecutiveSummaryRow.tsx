@@ -7,7 +7,7 @@ import {
   SparklineData,
   SparklinePoint,
 } from '../../api/metrics'
-import { DSR_GREEN, DSR_RED, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_SUBTLE } from '../../constants/colors'
+import { DSR_GREEN, DSR_RED, DSR_YELLOW, TEXT_MUTED, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_SUBTLE, BORDER_DEFAULT } from '../../constants/colors'
 import './ExecutiveSummaryRow.css'
 
 interface ExecutiveSummaryRowProps {
@@ -113,7 +113,7 @@ function KpiCardComponent({
 
   // Target border
   const hasTarget = card.target !== null && card.target !== undefined
-  let borderColor = '#DFE1E6'
+  let borderColor = BORDER_DEFAULT
   if (hasTarget && card.rawValue !== null && card.target !== null) {
     if (isInverse) {
       borderColor = card.rawValue <= card.target ? DSR_GREEN : DSR_RED
@@ -137,7 +137,7 @@ function KpiCardComponent({
         </div>
       )}
       {!hasDelta && card.trend === 'WARNING' && (
-        <div className="kpi-card-delta" style={{ color: '#FFAB00' }}>at risk</div>
+        <div className="kpi-card-delta" style={{ color: DSR_YELLOW }}>at risk</div>
       )}
       <div className="kpi-card-sample" style={{ color: TEXT_MUTED }}>
         n={card.sampleSize}

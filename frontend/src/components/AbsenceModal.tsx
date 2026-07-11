@@ -10,13 +10,6 @@ const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
   OTHER: 'Other',
 }
 
-const ABSENCE_COLORS: Record<AbsenceType, string> = {
-  VACATION: '#4C9AFF',
-  SICK_LEAVE: '#FF5630',
-  DAY_OFF: '#FF991F',
-  OTHER: '#97A0AF',
-}
-
 const ABSENCE_TYPES: AbsenceType[] = ['VACATION', 'SICK_LEAVE', 'DAY_OFF', 'OTHER']
 
 interface AbsenceModalProps {
@@ -163,4 +156,4 @@ export function AbsenceModal({ isOpen, onClose, onSave, onDelete, absence }: Abs
   )
 }
 
-export { ABSENCE_TYPE_LABELS, ABSENCE_COLORS }
+export { ABSENCE_TYPE_LABELS }

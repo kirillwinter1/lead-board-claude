@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import { setTenantSlug } from '../utils/tenant';
+import { LINK_COLOR, ERROR_TEXT, SUCCESS_TEXT, TEXT_MUTED, TEXT_SUBTLE, BORDER_DEFAULT } from '../constants/colors';
 
 export default function RegistrationPage() {
     const [name, setName] = useState('');
@@ -76,7 +77,7 @@ export default function RegistrationPage() {
     return (
         <div style={{ maxWidth: 480, margin: '80px auto', padding: 24 }}>
             <h1 style={{ marginBottom: 8 }}>Create your workspace</h1>
-            <p style={{ color: '#666', marginBottom: 32 }}>
+            <p style={{ color: TEXT_MUTED, marginBottom: 32 }}>
                 Get started with LeadBoard. Free 14-day trial.
             </p>
 
@@ -93,7 +94,7 @@ export default function RegistrationPage() {
                         required
                         style={{
                             width: '100%', padding: '8px 12px', borderRadius: 6,
-                            border: '1px solid #ddd', fontSize: 14
+                            border: `1px solid ${BORDER_DEFAULT}`, fontSize: 14
                         }}
                     />
                 </div>
@@ -119,22 +120,22 @@ export default function RegistrationPage() {
                             pattern="[a-z][a-z0-9-]{1,61}[a-z0-9]"
                             style={{
                                 flex: 1, padding: '8px 12px', borderRadius: 6,
-                                border: `1px solid ${slugAvailable === false ? '#e74c3c' : slugAvailable === true ? '#27ae60' : '#ddd'}`,
+                                border: `1px solid ${slugAvailable === false ? ERROR_TEXT : slugAvailable === true ? SUCCESS_TEXT : BORDER_DEFAULT}`,
                                 fontSize: 14
                             }}
                         />
-                        <span style={{ color: '#888', fontSize: 14 }}>.leadboard.app</span>
+                        <span style={{ color: TEXT_SUBTLE, fontSize: 14 }}>.leadboard.app</span>
                     </div>
                     {slugAvailable === false && (
-                        <span style={{ color: '#e74c3c', fontSize: 12 }}>This URL is taken</span>
+                        <span style={{ color: ERROR_TEXT, fontSize: 12 }}>This URL is taken</span>
                     )}
                     {slugAvailable === true && (
-                        <span style={{ color: '#27ae60', fontSize: 12 }}>Available</span>
+                        <span style={{ color: SUCCESS_TEXT, fontSize: 12 }}>Available</span>
                     )}
                 </div>
 
                 {error && (
-                    <div style={{ color: '#e74c3c', marginBottom: 16, fontSize: 14 }}>
+                    <div style={{ color: ERROR_TEXT, marginBottom: 16, fontSize: 14 }}>
                         {error}
                     </div>
                 )}
@@ -144,7 +145,7 @@ export default function RegistrationPage() {
                     disabled={loading || !name || !slug || slug.length < 3 || slugAvailable === false}
                     style={{
                         width: '100%', padding: '10px 16px', borderRadius: 6,
-                        background: '#2563eb', color: '#fff', border: 'none',
+                        background: LINK_COLOR, color: '#fff', border: 'none',
                         fontSize: 14, fontWeight: 500, cursor: 'pointer',
                         opacity: loading ? 0.6 : 1
                     }}

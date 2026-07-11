@@ -2090,18 +2090,18 @@
 }
 
 .demo-role-chip.sa {
-  background: #E9F2FE;
-  color: #0052cc;
+  background: #E9F2FF;
+  color: #1558BC;
 }
 
 .demo-role-chip.dev {
-  background: #F3E8FF;
-  color: #8B5CF6;
+  background: #F8EEFE;
+  color: #803FA5;
 }
 
 .demo-role-chip.qa {
-  background: #E0F7FA;
-  color: #0891B2;
+  background: #E7F9FF;
+  color: #206A83;
 }
 
 .demo-role-label {
@@ -2218,18 +2218,18 @@
 }
 
 .demo-role-badge.sa {
-  background: #E9F2FE;
-  color: #0052cc;
+  background: #E9F2FF;
+  color: #1558BC;
 }
 
 .demo-role-badge.dev {
-  background: #F3E8FF;
-  color: #8B5CF6;
+  background: #F8EEFE;
+  color: #803FA5;
 }
 
 .demo-role-badge.qa {
-  background: #E0F7FA;
-  color: #0891B2;
+  background: #E7F9FF;
+  color: #206A83;
 }
 
 /* Story Status */

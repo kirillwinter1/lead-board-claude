@@ -9,7 +9,7 @@ import {
   ResponsiveContainer
 } from 'recharts'
 import { SingleSelectDropdown } from '../SingleSelectDropdown'
-import { THROUGHPUT_MA } from '../../constants/colors'
+import { THROUGHPUT_MA, CHART_GRID, CHART_TICK, CHART_AXIS, CHART_TOOLTIP_BG } from '../../constants/colors'
 import './ThroughputChart.css'
 
 /** One throughput line: a labelled, coloured series of per-period values. */
@@ -81,22 +81,22 @@ export function ThroughputChart({
         <div className="throughput-chart-container" style={{ opacity: loading ? 0.5 : 1 }}>
           <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#ebecf0" />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: '#6b778c' }}
+                tick={{ fontSize: 11, fill: CHART_TICK }}
                 tickLine={false}
-                axisLine={{ stroke: '#dfe1e6' }}
+                axisLine={{ stroke: CHART_AXIS }}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: '#6b778c' }}
+                tick={{ fontSize: 11, fill: CHART_TICK }}
                 tickLine={false}
-                axisLine={{ stroke: '#dfe1e6' }}
+                axisLine={{ stroke: CHART_AXIS }}
                 allowDecimals={false}
               />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: '#172b4d',
+                  backgroundColor: CHART_TOOLTIP_BG,
                   border: 'none',
                   borderRadius: 4,
                   color: 'white',

@@ -8,7 +8,8 @@ import { RoleBadge } from '../components/RoleBadge'
 import { GradeBadge } from '../components/GradeBadge'
 import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
-import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
+import { ABSENCE_TYPE_LABELS } from '../components/AbsenceModal'
+import { ABSENCE_COLORS, hexToRgba, TEXT_MUTED } from '../constants/colors'
 import { MetricCard } from '../components/metrics/MetricCard'
 import { TrendChart } from '../components/member/TrendChart'
 import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
@@ -430,15 +431,15 @@ export function MyWorkPage() {
                     key={a.id}
                     className="mywork-absence-chip"
                     style={{
-                      background: ABSENCE_COLORS[a.absenceType] + '15',
-                      border: `1px solid ${ABSENCE_COLORS[a.absenceType]}30`,
+                      background: hexToRgba(ABSENCE_COLORS[a.absenceType], 0.08),
+                      border: `1px solid ${hexToRgba(ABSENCE_COLORS[a.absenceType], 0.19)}`,
                     }}
                   >
                     <span className="mywork-absence-dot" style={{ backgroundColor: ABSENCE_COLORS[a.absenceType] }} />
                     <span style={{ fontWeight: 600, color: ABSENCE_COLORS[a.absenceType] }}>
                       {ABSENCE_TYPE_LABELS[a.absenceType]}
                     </span>
-                    <span style={{ color: '#6b778c' }}>
+                    <span style={{ color: TEXT_MUTED }}>
                       {formatDate(a.startDate)} &mdash; {formatDate(a.endDate)}
                     </span>
                   </div>

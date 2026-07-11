@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
 import { getPriorityColor } from '../helpers/priorityColors'
-import { BG_SUBTLE, ERROR_BG, ERROR_TEXT } from '../constants/colors'
+import { BG_SUBTLE, ERROR_BG, ERROR_TEXT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, LINK_COLOR, SEPARATOR, BORDER_DEFAULT, WARNING_BG } from '../constants/colors'
 
 interface BugSlaConfig {
   id: number
@@ -146,7 +146,7 @@ export function BugSlaSettingsPage() {
   return (
     <div style={{ padding: '24px', maxWidth: 700 }}>
       <h2 style={{ margin: '0 0 8px 0' }}>Bug SLA Settings</h2>
-      <p style={{ color: '#6b778c', margin: '0 0 24px 0' }}>
+      <p style={{ color: TEXT_MUTED, margin: '0 0 24px 0' }}>
         Maximum resolution time by priority. Bugs exceeding SLA will trigger a Data Quality error.
       </p>
 
@@ -159,16 +159,16 @@ export function BugSlaSettingsPage() {
 
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
-          <tr style={{ borderBottom: '2px solid #dfe1e6' }}>
-            <th style={{ textAlign: 'left', padding: '8px 12px', color: '#6b778c', fontWeight: 500 }}>Priority</th>
-            <th style={{ textAlign: 'left', padding: '8px 12px', color: '#6b778c', fontWeight: 500 }}>Max Resolution Time</th>
-            <th style={{ textAlign: 'left', padding: '8px 12px', color: '#6b778c', fontWeight: 500 }}>Hours</th>
+          <tr style={{ borderBottom: `2px solid ${BORDER_DEFAULT}` }}>
+            <th style={{ textAlign: 'left', padding: '8px 12px', color: TEXT_MUTED, fontWeight: 500 }}>Priority</th>
+            <th style={{ textAlign: 'left', padding: '8px 12px', color: TEXT_MUTED, fontWeight: 500 }}>Max Resolution Time</th>
+            <th style={{ textAlign: 'left', padding: '8px 12px', color: TEXT_MUTED, fontWeight: 500 }}>Hours</th>
             <th style={{ width: 140, padding: '8px 12px' }}></th>
           </tr>
         </thead>
         <tbody>
           {configs.map(config => (
-            <tr key={config.priority} style={{ borderBottom: '1px solid #ebecf0' }}>
+            <tr key={config.priority} style={{ borderBottom: `1px solid ${SEPARATOR}` }}>
               <td style={{ padding: '10px 12px' }}>
                 <span style={{
                   display: 'inline-flex',
@@ -180,7 +180,7 @@ export function BugSlaSettingsPage() {
                   {config.priority}
                 </span>
               </td>
-              <td style={{ padding: '10px 12px', color: '#172b4d' }}>
+              <td style={{ padding: '10px 12px', color: TEXT_PRIMARY }}>
                 {formatHours(config.maxResolutionHours)}
               </td>
               <td style={{ padding: '10px 12px' }}>
@@ -197,14 +197,14 @@ export function BugSlaSettingsPage() {
                     style={{
                       width: 80,
                       padding: '4px 8px',
-                      border: '1px solid #0052cc',
+                      border: `1px solid ${LINK_COLOR}`,
                       borderRadius: 4,
                       outline: 'none',
                     }}
                     autoFocus
                   />
                 ) : (
-                  <span style={{ color: '#6b778c' }}>{config.maxResolutionHours}h</span>
+                  <span style={{ color: TEXT_MUTED }}>{config.maxResolutionHours}h</span>
                 )}
               </td>
               <td style={{ padding: '10px 12px', textAlign: 'right' }}>
@@ -215,7 +215,7 @@ export function BugSlaSettingsPage() {
                       disabled={saving}
                       style={{
                         padding: '4px 12px',
-                        background: '#0052cc',
+                        background: LINK_COLOR,
                         color: '#fff',
                         border: 'none',
                         borderRadius: 4,
@@ -230,7 +230,7 @@ export function BugSlaSettingsPage() {
                       style={{
                         padding: '4px 12px',
                         background: BG_SUBTLE,
-                        color: '#42526e',
+                        color: TEXT_SECONDARY,
                         border: 'none',
                         borderRadius: 4,
                         cursor: 'pointer',
@@ -247,7 +247,7 @@ export function BugSlaSettingsPage() {
                       style={{
                         padding: '4px 12px',
                         background: BG_SUBTLE,
-                        color: '#42526e',
+                        color: TEXT_SECONDARY,
                         border: 'none',
                         borderRadius: 4,
                         cursor: 'pointer',
@@ -279,7 +279,7 @@ export function BugSlaSettingsPage() {
       </table>
 
       {missingPriorities.length > 0 && (
-        <div style={{ marginTop: 16, padding: '12px 16px', background: '#fffae6', borderRadius: 6, color: '#7a6200', fontSize: 13 }}>
+        <div style={{ marginTop: 16, padding: '12px 16px', background: WARNING_BG, borderRadius: 6, color: '#7a6200', fontSize: 13 }}>
           Priorities found in issues without SLA config: <strong>{missingPriorities.join(', ')}</strong>
         </div>
       )}
@@ -291,7 +291,7 @@ export function BugSlaSettingsPage() {
               <select
                 value={newPriority}
                 onChange={e => setNewPriority(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #dfe1e6', fontSize: 13 }}
+                style={{ padding: '6px 10px', borderRadius: 4, border: `1px solid ${BORDER_DEFAULT}`, fontSize: 13 }}
               >
                 <option value="">Select priority...</option>
                 {missingPriorities.map(p => (
@@ -305,7 +305,7 @@ export function BugSlaSettingsPage() {
                 placeholder="Priority name"
                 value={newPriority}
                 onChange={e => setNewPriority(e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #dfe1e6', fontSize: 13, width: 140 }}
+                style={{ padding: '6px 10px', borderRadius: 4, border: `1px solid ${BORDER_DEFAULT}`, fontSize: 13, width: 140 }}
               />
             )}
             {newPriority === '__custom' && (
@@ -313,7 +313,7 @@ export function BugSlaSettingsPage() {
                 type="text"
                 placeholder="Priority name"
                 onChange={e => setNewPriority(e.target.value === '' ? '__custom' : e.target.value)}
-                style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #dfe1e6', fontSize: 13, width: 140 }}
+                style={{ padding: '6px 10px', borderRadius: 4, border: `1px solid ${BORDER_DEFAULT}`, fontSize: 13, width: 140 }}
                 autoFocus
               />
             )}
@@ -323,15 +323,15 @@ export function BugSlaSettingsPage() {
               value={newHours}
               onChange={e => setNewHours(e.target.value)}
               placeholder="Hours"
-              style={{ padding: '6px 10px', borderRadius: 4, border: '1px solid #dfe1e6', fontSize: 13, width: 80 }}
+              style={{ padding: '6px 10px', borderRadius: 4, border: `1px solid ${BORDER_DEFAULT}`, fontSize: 13, width: 80 }}
             />
-            <span style={{ color: '#6b778c', fontSize: 13 }}>hours</span>
+            <span style={{ color: TEXT_MUTED, fontSize: 13 }}>hours</span>
             <button
               onClick={addSla}
               disabled={saving || !newPriority || newPriority === '__custom'}
               style={{
                 padding: '6px 14px',
-                background: '#0052cc',
+                background: LINK_COLOR,
                 color: '#fff',
                 border: 'none',
                 borderRadius: 4,
@@ -346,7 +346,7 @@ export function BugSlaSettingsPage() {
               style={{
                 padding: '6px 14px',
                 background: BG_SUBTLE,
-                color: '#42526e',
+                color: TEXT_SECONDARY,
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',
@@ -362,7 +362,7 @@ export function BugSlaSettingsPage() {
             style={{
               padding: '8px 16px',
               background: BG_SUBTLE,
-              color: '#172b4d',
+              color: TEXT_PRIMARY,
               border: 'none',
               borderRadius: 4,
               cursor: 'pointer',

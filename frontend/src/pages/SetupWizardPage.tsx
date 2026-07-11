@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import axios from 'axios'
 import { WorkflowConfigPage } from './WorkflowConfigPage'
-import { BG_SUBTLE } from '../constants/colors'
+import { BG_SUBTLE, LINK_COLOR, PRIMARY_LIGHT_BG, TEXT_PRIMARY } from '../constants/colors'
 import './SetupWizardPage.css'
 
 interface SetupWizardPageProps {
@@ -283,7 +283,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
             placeholder="Your Jira API token"
           />
           <p style={{ fontSize: 11, color: '#97a0af', margin: '4px 0 0' }}>
-            Generate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noreferrer" style={{ color: '#2563eb' }}>id.atlassian.com</a>
+            Generate at <a href="https://id.atlassian.com/manage-profile/security/api-tokens" target="_blank" rel="noreferrer" style={{ color: LINK_COLOR }}>id.atlassian.com</a>
           </p>
         </div>
         <div>
@@ -457,7 +457,7 @@ export function SetupWizardPage({ onComplete }: SetupWizardPageProps) {
       <div className="wizard-done-icon">{'\u2705'}</div>
       <h2>Setup Complete!</h2>
       <p>Your board is ready. You can start managing your project.</p>
-      <div style={{ margin: '16px 0', padding: '12px 16px', background: '#E9F2FE', borderRadius: 8, fontSize: 14, color: '#172B4D' }}>
+      <div style={{ margin: '16px 0', padding: '12px 16px', background: PRIMARY_LIGHT_BG, borderRadius: 8, fontSize: 14, color: TEXT_PRIMARY }}>
         <strong>Next step:</strong> Go to the <strong>Teams</strong> tab to set up team members — assign roles, grades, and capacity for accurate planning and forecasting.
       </div>
 

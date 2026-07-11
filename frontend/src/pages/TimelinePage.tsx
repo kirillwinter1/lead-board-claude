@@ -17,7 +17,13 @@ import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import './TimelinePage.css'
 
 import { getIssueIcon } from '../components/board/helpers'
-import { ERROR_BG, lightenColor } from '../constants/colors'
+import {
+  ERROR_BG, lightenColor,
+  DSR_GREEN, DSR_YELLOW, DSR_RED, PROGRESS_IN_PROGRESS, TEXT_MUTED, WARNING_ORANGE, WARNING_BG,
+  TIMELINE_PHASE_TINT, TIMELINE_PHASE_TINT_ROUGH, TIMELINE_ROLE_BORDER_TINT,
+  TIMELINE_BAR_TRACK, TIMELINE_FLAGGED_BORDER, TIMELINE_BLOCKED_BORDER,
+  TIMELINE_ROUGH_BG, TIMELINE_ROUGH_BADGE_BG, TIMELINE_ROUGH_BADGE_TEXT,
+} from '../constants/colors'
 import {
   ZoomLevel, DateRange,
   daysBetween,
@@ -155,11 +161,11 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
   let dueDateIndicator = null
   if (epic.dueDate) {
     if (dueDateDelta === null || dueDateDelta <= 0) {
-      dueDateIndicator = <span style={{ color: '#36B37E', fontSize: 10 }}>●</span>
+      dueDateIndicator = <span style={{ color: DSR_GREEN, fontSize: 10 }}>●</span>
     } else if (dueDateDelta <= 5) {
-      dueDateIndicator = <span style={{ color: '#FFAB00', fontSize: 10 }}>●</span>
+      dueDateIndicator = <span style={{ color: DSR_YELLOW, fontSize: 10 }}>●</span>
     } else {
-      dueDateIndicator = <span style={{ color: '#FF5630', fontSize: 10 }}>●</span>
+      dueDateIndicator = <span style={{ color: DSR_RED, fontSize: 10 }}>●</span>
     }
   }
 
@@ -186,7 +192,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               {epic.epicKey}
             </a>
             {dueDateIndicator}
-            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>}
+            {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: DSR_RED, backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span title={epic.status || ''}>
@@ -203,10 +209,10 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
                 <div style={{
                   width: `${progress}%`,
                   height: '100%',
-                  backgroundColor: progress >= 100 ? '#36B37E' : '#0065FF',
+                  backgroundColor: progress >= 100 ? DSR_GREEN : PROGRESS_IN_PROGRESS,
                 }} />
               </div>
-              <span style={{ fontSize: 9, color: '#6b778c', minWidth: 22 }}>{progress}%</span>
+              <span style={{ fontSize: 9, color: TEXT_MUTED, minWidth: 22 }}>{progress}%</span>
             </div>
           </div>
         </div>
@@ -266,7 +272,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
               <div style={{
                 width: `${progress}%`,
                 height: '100%',
-                backgroundColor: progress >= 100 ? '#36B37E' : '#0065FF',
+                backgroundColor: progress >= 100 ? DSR_GREEN : PROGRESS_IN_PROGRESS,
                 borderRadius: 4
               }} />
             </div>
@@ -288,7 +294,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
             {epic.dueDate && (
               <div>
                 <span style={{ color: '#8993A4' }}>⏰ Due: </span>
-                <span style={{ color: dueDateDelta && dueDateDelta > 0 ? '#FF5630' : '#36B37E' }}>
+                <span style={{ color: dueDateDelta && dueDateDelta > 0 ? DSR_RED : DSR_GREEN }}>
                   {formatDateShort(new Date(epic.dueDate))}
                   {dueDateDelta !== null && dueDateDelta > 0 && ` (+${dueDateDelta}d)`}
                 </span>
@@ -386,7 +392,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const isBlocked = story.blockedBy && story.blockedBy.length > 0
   const hasWarning = story.warnings?.length > 0 || globalWarnings?.some(w => w.issueKey === story.storyKey)
 
-  const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), 0.65)
+  const getPhaseColor = (role: string) => lightenColor(getRoleColor(role), TIMELINE_PHASE_TINT)
 
   // Render per-day worklog segments when worklog data is available
   const renderWorklogSegments = () => {
@@ -561,9 +567,9 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         top: `${lane * (BAR_HEIGHT + LANE_GAP)}px`,
         height: `${BAR_HEIGHT}px`,
         borderRadius: '4px',
-        border: story.flagged ? '2px solid #f97316' : isBlocked ? '2px solid #ef4444' : '1px solid rgba(0,0,0,0.15)',
+        border: story.flagged ? `2px solid ${TIMELINE_FLAGGED_BORDER}` : isBlocked ? `2px solid ${TIMELINE_BLOCKED_BORDER}` : '1px solid rgba(0,0,0,0.15)',
         overflow: 'hidden',
-        background: '#e5e7eb',
+        background: TIMELINE_BAR_TRACK,
         boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
       }}
       onMouseEnter={handleMouseEnter}
@@ -600,8 +606,8 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
         }}
       >
         {storyNumber}
-        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff5630', backgroundColor: ERROR_BG }}>FLG</span>}
-        {hasWarning && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: '#ff8b00', backgroundColor: '#fffae6' }}>!</span>}
+        {story.flagged && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: DSR_RED, backgroundColor: ERROR_BG }}>FLG</span>}
+        {hasWarning && <span style={{ marginLeft: 3, fontSize: 9, fontWeight: 700, padding: '0 3px', borderRadius: 3, color: WARNING_ORANGE, backgroundColor: WARNING_BG }}>!</span>}
       </span>
     </div>
   )
@@ -817,7 +823,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
   const leftPercent = (daysFromStart / totalDays) * 100
   const widthPercent = (duration / totalDays) * 100
 
-  const getPhaseColorDimmed = (role: string) => lightenColor(getRoleColor(role), 0.8)
+  const getPhaseColorDimmed = (role: string) => lightenColor(getRoleColor(role), TIMELINE_PHASE_TINT_ROUGH)
 
   // Calculate phase segments within the bar
   const renderPhaseSegment = (
@@ -871,7 +877,7 @@ function RoughEstimateBar({ epic, dateRange, jiraBaseUrl, onHover }: RoughEstima
         borderRadius: '4px',
         border: '1px dashed rgba(0,0,0,0.3)',
         overflow: 'hidden',
-        background: '#f0f0f0',
+        background: TIMELINE_ROUGH_BG,
         boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         cursor: 'pointer',
       }}
@@ -971,8 +977,8 @@ function RoughEstimateBars({ epic, dateRange, jiraBaseUrl }: RoughEstimateBarsPr
                 fontSize: '10px',
                 padding: '2px 6px',
                 borderRadius: '4px',
-                background: '#fef3c7',
-                color: '#92400e',
+                background: TIMELINE_ROUGH_BADGE_BG,
+                color: TIMELINE_ROUGH_BADGE_TEXT,
                 fontWeight: 500
               }}
             >
@@ -1673,7 +1679,7 @@ export function TimelineContent({
                     key={code}
                     className="legend-item"
                     style={{
-                      borderLeft: `3px solid ${lightenColor(getRoleColor(code), 0.5)}`,
+                      borderLeft: `3px solid ${lightenColor(getRoleColor(code), TIMELINE_ROLE_BORDER_TINT)}`,
                       paddingLeft: 6,
                     }}
                   >
@@ -1743,7 +1749,7 @@ export function TimelineContent({
                     key={code}
                     className="legend-item"
                     style={{
-                      borderLeft: `3px solid ${lightenColor(getRoleColor(code), 0.5)}`,
+                      borderLeft: `3px solid ${lightenColor(getRoleColor(code), TIMELINE_ROLE_BORDER_TINT)}`,
                       paddingLeft: 6,
                     }}
                   >

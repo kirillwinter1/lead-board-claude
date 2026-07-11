@@ -1,5 +1,6 @@
 import { useState, Fragment, useEffect, useRef } from 'react'
 import { mockEpics, DemoEpic, DemoStory } from '../mockData'
+import { hexToRgba } from '../../../constants/colors'
 // Design-system exception: this is a static marketing mock rendered outside any tenant,
 // so there is no WorkflowConfigContext / Jira metadata to resolve icons from. getIssueIcon()
 // requires that context, hence the direct local icon imports here.
@@ -206,7 +207,7 @@ function DemoEpicRow({
           className="demo-status-badge"
           data-tooltip={`Статус: ${epic.status}`}
           style={{
-            background: `${epic.statusColor}15`,
+            background: hexToRgba(epic.statusColor, 0.08),
             color: epic.statusColor,
             borderColor: epic.statusColor
           }}

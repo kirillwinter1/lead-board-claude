@@ -16,7 +16,7 @@ import {
   EpicInfo
 } from '../../api/metrics'
 import { SingleSelectDropdown } from '../SingleSelectDropdown'
-import { CHART_GRID, CHART_AXIS, CHART_TICK, CHART_TOOLTIP_BG } from '../../constants/colors'
+import { CHART_GRID, CHART_AXIS, CHART_TICK, CHART_TOOLTIP_BG, TEXT_SUBTLE, PROGRESS_IN_PROGRESS } from '../../constants/colors'
 import './EpicBurndownChart.css'
 
 interface EpicBurndownChartProps {
@@ -195,7 +195,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
                   <Line
                     type={burndownData.planEstimateDays != null ? 'stepAfter' : 'monotone'}
                     dataKey="ideal"
-                    stroke="#97a0af"
+                    stroke={TEXT_SUBTLE}
                     strokeWidth={2}
                     strokeDasharray="5 5"
                     dot={false}
@@ -204,7 +204,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
                   <Line
                     type="monotone"
                     dataKey="actual"
-                    stroke="#0065ff"
+                    stroke={PROGRESS_IN_PROGRESS}
                     strokeWidth={3}
                     dot={false}
                     name="Actual"

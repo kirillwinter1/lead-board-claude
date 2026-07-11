@@ -1,11 +1,11 @@
-import { BG_SUBTLE } from '../../constants/colors'
+import { BG_SUBTLE, DSR_GREEN, WARNING_ORANGE, TEXT_MUTED, TEXT_SUBTLE } from '../../constants/colors'
 
 export function RiceScoreBadge({ score, normalized }: { score: number | null; normalized?: number | null }) {
   if (score == null) {
     return (
       <span style={{
         fontSize: 11,
-        color: '#97A0AF',
+        color: TEXT_SUBTLE,
         background: BG_SUBTLE,
         padding: '2px 6px',
         borderRadius: 3,
@@ -17,7 +17,7 @@ export function RiceScoreBadge({ score, normalized }: { score: number | null; no
   }
 
   const displayValue = normalized != null ? normalized : score
-  const color = displayValue >= 70 ? '#36B37E' : displayValue >= 40 ? '#FF8B00' : '#6B778C'
+  const color = displayValue >= 70 ? DSR_GREEN : displayValue >= 40 ? WARNING_ORANGE : TEXT_MUTED
 
   return (
     <span style={{

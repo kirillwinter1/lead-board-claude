@@ -4,8 +4,8 @@ import { MetricCard } from '../components/metrics/MetricCard'
 import { CompetencyRating } from '../components/competency/CompetencyRating'
 import { teamsApi, MemberProfileResponse, Absence } from '../api/teams'
 import { competencyApi, CompetencyLevel } from '../api/competency'
-import { ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from '../components/AbsenceModal'
-import { ERROR_TEXT } from '../constants/colors'
+import { ABSENCE_TYPE_LABELS } from '../components/AbsenceModal'
+import { ERROR_TEXT, ABSENCE_COLORS, hexToRgba } from '../constants/colors'
 import { TrendChart } from '../components/member/TrendChart'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { RoleBadge } from '../components/RoleBadge'
@@ -232,8 +232,8 @@ export function MemberProfilePage() {
                 gap: 8,
                 padding: '6px 12px',
                 borderRadius: 6,
-                background: ABSENCE_COLORS[a.absenceType] + '15',
-                border: `1px solid ${ABSENCE_COLORS[a.absenceType]}30`,
+                background: hexToRgba(ABSENCE_COLORS[a.absenceType], 0.08),
+                border: `1px solid ${hexToRgba(ABSENCE_COLORS[a.absenceType], 0.19)}`,
                 fontSize: 13,
               }}>
                 <span style={{
