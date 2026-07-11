@@ -228,3 +228,14 @@
   background: #ffebe6;
   border-radius: 8px;
 }
+
+/* On phones the fixed 400x500 panel would overflow the viewport — go full-screen. */
+@media (max-width: 480px) {
+  .chat-panel {
+    width: 100%;
+    height: 100%;
+    bottom: 0;
+    right: 0;
+    border-radius: 0;
+  }
+}

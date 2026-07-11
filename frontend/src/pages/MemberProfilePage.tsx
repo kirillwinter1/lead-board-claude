@@ -8,6 +8,8 @@ import { ABSENCE_TYPE_LABELS } from '../components/AbsenceModal'
 import { ERROR_TEXT, ABSENCE_COLORS, hexToRgba } from '../constants/colors'
 import { TrendChart } from '../components/member/TrendChart'
 import { StatusBadge } from '../components/board/StatusBadge'
+import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { getStatusStyles, type StatusStyle } from '../api/board'
 import { RoleBadge } from '../components/RoleBadge'
 import { GradeBadge } from '../components/GradeBadge'
 import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
@@ -45,6 +47,7 @@ export function MemberProfilePage() {
   const [competencies, setCompetencies] = useState<CompetencyLevel[]>([])
   const [availableComponents, setAvailableComponents] = useState<string[]>([])
   const [upcomingAbsences, setUpcomingAbsences] = useState<Absence[]>([])
+  const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
 
   const loadProfile = useCallback(async () => {
     if (!teamId || !memberId) return
@@ -64,6 +67,10 @@ export function MemberProfilePage() {
   useEffect(() => {
     loadProfile()
   }, [loadProfile])
+
+  useEffect(() => {
+    getStatusStyles().then(setStatusStyles).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!memberId || !teamId) return
@@ -123,6 +130,7 @@ export function MemberProfilePage() {
     : '0'
 
   return (
+    <StatusStylesProvider value={statusStyles}>
     <main className="main-content">
       {/* Header */}
       <div className="page-header" style={{ marginBottom: 12 }}>
@@ -425,5 +433,6 @@ export function MemberProfilePage() {
         </div>
       </div>
     </main>
+    </StatusStylesProvider>
   )
 }
