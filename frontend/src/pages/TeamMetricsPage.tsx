@@ -6,6 +6,7 @@ import { getConfig } from '../api/config'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { THROUGHPUT_EPIC, THROUGHPUT_STORY, THROUGHPUT_TOTAL } from '../constants/colors'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { EmptyState } from '../components/EmptyState'
 import { FilterBar } from '../components/FilterBar'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { MetricsFilterProvider, useMetricsFilter } from '../contexts/MetricsFilterContext'
@@ -289,13 +290,13 @@ function TeamMetricsPageContent() {
               </MetricsSection>
             </>
           ) : (
-            <div className="chart-empty">No metrics data available for this period</div>
+            <EmptyState variant="inline" message="No metrics data available for this period" />
           )}
         </div>
       )}
 
       {!loading && !error && !selectedTeamId && teams.length === 0 && (
-        <div className="empty">No active teams found. Create a team in the Teams section first.</div>
+        <EmptyState message="No active teams found. Create a team in the Teams section first." />
       )}
     </main>
     </StatusStylesProvider>

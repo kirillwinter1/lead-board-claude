@@ -66,20 +66,7 @@
   color: white;
 }
 
-.mywork-empty {
-  padding: 60px;
-  text-align: center;
-  color: #6b778c;
-  background: white;
-  border-radius: 8px;
-}
-
-.mywork-section-empty {
-  padding: 20px;
-  text-align: center;
-  color: #6b778c;
-  font-size: 13px;
-}
+/* F91 — .mywork-empty / .mywork-section-empty replaced by the shared EmptyState. */
 
 .mywork-sections {
   display: flex;

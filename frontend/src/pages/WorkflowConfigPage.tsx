@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import {
@@ -16,6 +16,7 @@ import {
   ProjectConfigInfo,
 } from '../api/workflowConfig'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
+import { ColorPicker as SharedColorPicker } from '../components/ColorPicker'
 import { BG_SUBTLE, ERROR_BG, ERROR_TEXT, SUCCESS_BG } from '../constants/colors'
 import './WorkflowConfigPage.css'
 
@@ -65,90 +66,14 @@ const STATUS_CATEGORY_DEFAULT_COLORS: Record<string, string> = {
   DONE: '#E3FCEF',
 }
 
+// F91 — both pickers now delegate to the shared ColorPicker. Palettes stay here
+// (they are this page's config vocabulary); the popover/positioning/a11y is shared.
 function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <div className="color-picker">
-      <button
-        className="color-picker-trigger"
-        style={{ backgroundColor: value }}
-        onClick={() => setOpen(!open)}
-        type="button"
-        title="Choose color"
-      />
-      {open && (
-        <>
-          <div className="color-picker-backdrop" onClick={() => setOpen(false)} />
-          <div className="color-picker-dropdown">
-            {ATLASSIAN_COLORS.map(c => (
-              <button
-                key={c.hex}
-                className={`color-swatch ${value.toUpperCase() === c.hex.toUpperCase() ? 'selected' : ''}`}
-                style={{ backgroundColor: c.hex }}
-                title={c.name}
-                onClick={() => { onChange(c.hex); setOpen(false) }}
-                type="button"
-              />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
+  return <SharedColorPicker value={value} onChange={onChange} palette={ATLASSIAN_COLORS} columns={5} />
 }
 
 function StatusColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const [pos, setPos] = useState({ top: 0, left: 0 })
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open, ref])
-
-  const handleOpen = () => {
-    if (!open && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect()
-      setPos({ top: rect.bottom + 4, left: rect.left })
-    }
-    setOpen(!open)
-  }
-
-  return (
-    <div className="color-picker" ref={ref}>
-      <button
-        ref={triggerRef}
-        className="color-picker-trigger"
-        style={{ backgroundColor: value, width: 22, height: 22 }}
-        onClick={handleOpen}
-        type="button"
-        title="Choose color"
-      />
-      {open && (
-        <div className="color-picker-dropdown" style={{ top: pos.top, left: pos.left }}>
-          {STATUS_BG_COLORS.map(c => (
-            <button
-              key={c.hex}
-              className={`color-swatch ${value.toUpperCase() === c.hex.toUpperCase() ? 'selected' : ''}`}
-              style={{ backgroundColor: c.hex }}
-              title={c.name}
-              onClick={() => onChange(c.hex)}
-              type="button"
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
+  return <SharedColorPicker value={value} onChange={onChange} palette={STATUS_BG_COLORS} columns={7} />
 }
 
 // --- Auto-suggest functions ---

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import axios from 'axios'
 import { MetricCard } from '../components/metrics/MetricCard'
+import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { fetchBugMetrics, BugMetricsResponse } from '../api/metrics'
 import { getPriorityColor } from '../helpers/priorityColors'
@@ -217,7 +218,7 @@ export function BugMetricsPage() {
       )}
 
       {data.openBugs === 0 && data.resolvedBugs === 0 && (
-        <div className="empty-state">No bugs found. Configure bug types in Workflow Config.</div>
+        <EmptyState message="No bugs found. Configure bug types in Workflow Config." />
       )}
     </div>
   )

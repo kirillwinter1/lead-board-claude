@@ -285,6 +285,8 @@ export function ProjectGanttView({ projects, jiraBaseUrl, zoom, expanded, onTogg
                     {p.issueKey}
                   </a>
                   <span className="pt-project-summary" title={p.summary}>{p.summary}</span>
+                  {/* intentionally custom: bar sizing/alignment is bound to the Gantt row-height CSS
+                      (.pt-progress-bar-bg), not portable to the shared ProgressBar. See F91. */}
                   <div className="pt-project-progress">
                     <div className="pt-progress-bar-bg">
                       <div

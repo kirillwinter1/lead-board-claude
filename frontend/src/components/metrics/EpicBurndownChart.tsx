@@ -16,6 +16,7 @@ import {
   EpicInfo
 } from '../../api/metrics'
 import { SingleSelectDropdown } from '../SingleSelectDropdown'
+import { EmptyState } from '../EmptyState'
 import { CHART_GRID, CHART_AXIS, CHART_TICK, CHART_TOOLTIP_BG, TEXT_SUBTLE, PROGRESS_IN_PROGRESS } from '../../constants/colors'
 import './EpicBurndownChart.css'
 
@@ -94,7 +95,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
     return (
       <div className="burndown-section">
         <h3>Epic Burndown</h3>
-        <div className="burndown-empty">No in-progress or completed epics found for this team.</div>
+        <EmptyState variant="inline" message="No in-progress or completed epics found for this team." />
       </div>
     )
   }
@@ -123,7 +124,7 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
 
       {loading && <div className="burndown-loading">Loading burndown data...</div>}
 
-      {error && <div className="burndown-empty">Error: {error}</div>}
+      {error && <EmptyState variant="inline" message={`Error: ${error}`} />}
 
       {!loading && !error && burndownData && (
         <>
@@ -214,13 +215,11 @@ export function EpicBurndownChart({ teamId }: EpicBurndownChartProps) {
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="burndown-empty">
-              No burndown data available for this epic.
-              <br />
-              <small style={{ color: CHART_TICK }}>
-                Burndown requires stories with estimates assigned to this epic.
-              </small>
-            </div>
+            <EmptyState
+              variant="inline"
+              message="No burndown data available for this epic."
+              hint="Burndown requires stories with estimates assigned to this epic."
+            />
           )}
         </>
       )}

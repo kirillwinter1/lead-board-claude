@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { myWorkApi, type MyWorkResponse, type MyTask, type QueueStory, type MyAnalytics, type MyCompletedTask, type DsrBreakdown } from '../api/myWork'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { EmptyState } from '../components/EmptyState'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { TeamBadge } from '../components/TeamBadge'
 import { RoleBadge } from '../components/RoleBadge'
@@ -111,7 +112,7 @@ interface TaskTableProps {
 
 function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssueTypeCategory }: TaskTableProps) {
   if (rows.length === 0) {
-    return <div className="mywork-section-empty">{emptyLabel}</div>
+    return <EmptyState variant="inline" message={emptyLabel} />
   }
   return (
     <table className="profile-tasks-table mywork-task-table">
@@ -198,7 +199,7 @@ function DsrBreakdownTable({ title, rows }: { title: string; rows: DsrBreakdown[
         <span className="section-badge">{rows.length}</span>
       </div>
       {rows.length === 0 ? (
-        <div className="mywork-section-empty">No data for this period</div>
+        <EmptyState variant="inline" message="No data for this period" />
       ) : (
         <table className="profile-tasks-table">
           <thead>
@@ -231,7 +232,7 @@ function DsrBreakdownTable({ title, rows }: { title: string; rows: DsrBreakdown[
 
 function CompletedTasksTable({ tasks, onLog }: { tasks: MyCompletedTask[]; onLog: (target: LogTimeTarget) => void }) {
   if (tasks.length === 0) {
-    return <div className="mywork-section-empty">No completed tasks in this period</div>
+    return <EmptyState variant="inline" message="No completed tasks in this period" />
   }
   return (
     <table className="profile-tasks-table">
@@ -331,7 +332,7 @@ function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange, o
         {analytics.weeklyTrend.length > 0 ? (
           <TrendChart data={analytics.weeklyTrend} />
         ) : (
-          <div className="mywork-section-empty">No trend data for this period</div>
+          <EmptyState variant="inline" message="No trend data for this period" />
         )}
       </div>
 
@@ -396,7 +397,7 @@ export function MyWorkPage() {
     content = null
   } else if (!data.hasMembership || !data.member) {
     content = (
-      <div className="mywork-empty">You are not a member of any team yet. Ask your team lead to add you.</div>
+      <EmptyState message="You are not a member of any team yet. Ask your team lead to add you." />
     )
   } else {
     const { member, upcomingAbsences, activeTasks, upcomingAssigned, teamQueue, worklogCalendar } = data

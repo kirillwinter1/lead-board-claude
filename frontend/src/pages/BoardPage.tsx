@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { updateEpicOrder, updateStoryOrder } from '../api/epics'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { FilterPanel, BoardTable } from '../components/board'
+import { EmptyState } from '../components/EmptyState'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { BoardSkeleton } from '../components/skeletons'
 import { ViewToggle } from '../components/ViewToggle'
@@ -232,7 +233,7 @@ export function BoardPage() {
               {loading && <BoardSkeleton />}
               {error && <div className="error">Error: {error}</div>}
               {!loading && !error && filteredBoard.length === 0 && (
-                <div className="empty">No epics found</div>
+                <EmptyState message="No epics found" />
               )}
               {!loading && !error && filteredBoard.length > 0 && (
                 <BoardTable

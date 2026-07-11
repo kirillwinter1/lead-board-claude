@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { getMonthlyDsr, MonthlyDsrPoint } from '../../api/metrics'
+import { EmptyState } from '../EmptyState'
 import {
   DSR_GREEN,
   DSR_YELLOW,
@@ -63,7 +64,7 @@ export function DsrTrendChart({ teamId }: DsrTrendChartProps) {
     return (
       <div className="velocity-section">
         <h3>DSR Trend</h3>
-        <div className="velocity-empty">Failed to load: {error}</div>
+        <EmptyState variant="inline" message={`Failed to load: ${error}`} />
       </div>
     )
   }
@@ -73,7 +74,7 @@ export function DsrTrendChart({ teamId }: DsrTrendChartProps) {
     return (
       <div className="velocity-section">
         <h3>DSR Trend</h3>
-        <div className="velocity-empty">No epic data available for DSR trend</div>
+        <EmptyState variant="inline" message="No epic data available for DSR trend" />
       </div>
     )
   }

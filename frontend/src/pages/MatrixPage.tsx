@@ -10,6 +10,7 @@ import { teamsApi, Team } from '../api/teams'
 import { getConfig } from '../api/config'
 import { getMatrix, triage, getRecommendations, MatrixView, MatrixCard as MatrixCardData, Quadrant, RecommendationView } from '../api/matrixApi'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { EmptyState } from '../components/EmptyState'
 import { FilterBar } from '../components/FilterBar'
 import { MatrixQuadrant } from '../components/matrix/MatrixQuadrant'
 import { MatrixUnassigned, UNASSIGNED_ZONE_ID } from '../components/matrix/MatrixUnassigned'
@@ -168,7 +169,7 @@ export function MatrixPage() {
       {triageError && <div className="error" role="alert">{triageError}</div>}
 
       {!loading && !error && !selectedTeamId && teams.length === 0 && (
-        <div className="empty">No active teams found. Create a team in the Teams section first.</div>
+        <EmptyState message="No active teams found. Create a team in the Teams section first." />
       )}
 
       {!loading && !error && selectedTeamId && (

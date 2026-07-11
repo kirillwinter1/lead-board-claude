@@ -26,9 +26,10 @@ import { RiceForm } from '../components/rice/RiceForm'
 import { RiceScoreBadge } from '../components/rice/RiceScoreBadge'
 import { Modal } from '../components/Modal'
 import { ProjectListSkeleton, GanttSkeleton } from '../components/skeletons'
+import { ProgressBar } from '../components/ProgressBar'
+import { EmptyState } from '../components/EmptyState'
 import { getApiCache, setApiCache } from '../hooks/useApiCache'
 import {
-  PROGRESS_COMPLETE, PROGRESS_IN_PROGRESS, PROGRESS_TRACK,
   LINK_COLOR, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_SUBTLE,
   BG_SUBTLE, BORDER_DEFAULT, AVATAR_BG,
   ERROR_TEXT, INFO_BG, WARNING_BG, WARNING_BORDER, WARNING_ORANGE, SEPARATOR, BG_PANEL, BG_PAGE,
@@ -53,31 +54,6 @@ function formatHours(seconds: number | null): string {
   if (hours < 8) return `${hours}h`
   const days = Math.round(hours / 8)
   return `${days}d`
-}
-
-function ProgressBar({ percent, width = 100 }: { percent: number; width?: number }) {
-  const clampedPercent = Math.max(0, Math.min(percent, 100))
-  const color = clampedPercent >= 100 ? PROGRESS_COMPLETE : PROGRESS_IN_PROGRESS
-  return (
-    <div style={{
-      width,
-      height: 6,
-      background: PROGRESS_TRACK,
-      borderRadius: 3,
-      overflow: 'hidden',
-      flexShrink: 0,
-    }}>
-      {clampedPercent > 0 && (
-        <div style={{
-          width: `${clampedPercent}%`,
-          minWidth: 2,
-          height: '100%',
-          background: color,
-          borderRadius: 3,
-        }} />
-      )}
-    </div>
-  )
 }
 
 function JiraLink({ issueKey, jiraBaseUrl }: { issueKey: string; jiraBaseUrl: string }) {
@@ -766,10 +742,10 @@ export function ProjectsPage() {
   if (listProjects.length === 0) {
     return (
       <main className="main-content">
-        <div style={{ padding: 32, textAlign: 'center', color: TEXT_MUTED }}>
-          <h2 style={{ margin: '0 0 8px', color: TEXT_PRIMARY }}>No Projects Found</h2>
-          <p>Configure a PROJECT issue type in Workflow Config and sync from Jira to see projects here.</p>
-        </div>
+        <EmptyState
+          message="No Projects Found"
+          hint="Configure a PROJECT issue type in Workflow Config and sync from Jira to see projects here."
+        />
       </main>
     )
   }
@@ -947,7 +923,7 @@ export function ProjectsPage() {
 
                     {/* Bottom row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <ProgressBar percent={p.progressPercent} width={120} />
+                      <ProgressBar value={p.progressPercent} width={120} ariaLabel={`${p.issueKey} progress: ${p.progressPercent}%`} />
                       {p.totalEstimateSeconds != null && p.totalEstimateSeconds > 0 ? (
                         <span style={{ fontSize: 12, color: TEXT_SECONDARY, fontWeight: 500 }}>
                           {formatHours(p.totalLoggedSeconds)}/{formatHours(p.totalEstimateSeconds)} ({p.progressPercent}%)
@@ -1158,9 +1134,7 @@ export function ProjectsPage() {
           />
         )}
         {view === 'gantt' && !loading && sortedTimelineProjects.length === 0 && (
-          <div style={{ padding: 40, textAlign: 'center', color: TEXT_MUTED, fontSize: 14 }}>
-            No projects with timeline data
-          </div>
+          <EmptyState variant="inline" message="No projects with timeline data" />
         )}
       </main>
     </StatusStylesProvider>
