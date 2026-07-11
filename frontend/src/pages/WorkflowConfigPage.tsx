@@ -69,11 +69,11 @@ const STATUS_CATEGORY_DEFAULT_COLORS: Record<string, string> = {
 // F91 — both pickers now delegate to the shared ColorPicker. Palettes stay here
 // (they are this page's config vocabulary); the popover/positioning/a11y is shared.
 function ColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  return <SharedColorPicker value={value} onChange={onChange} palette={ATLASSIAN_COLORS} columns={5} />
+  return <SharedColorPicker value={value} onChange={onChange} palette={ATLASSIAN_COLORS} columns={5} ariaLabel="Choose role color" />
 }
 
 function StatusColorPicker({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  return <SharedColorPicker value={value} onChange={onChange} palette={STATUS_BG_COLORS} columns={7} />
+  return <SharedColorPicker value={value} onChange={onChange} palette={STATUS_BG_COLORS} columns={7} ariaLabel="Choose status color" />
 }
 
 // --- Auto-suggest functions ---
@@ -1510,6 +1510,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                         disabled={colIdx === 0}
                         onClick={() => group.forEach(st => moveStatus(wizardStatuses, setWizardStatuses, wizardStatusFilter, st.jiraStatusName, -1))}
                         title="Move left"
+                        aria-label="Move column left"
                       >&larr;</button>
                       <span>{colIdx + 1}</span>
                       <button
@@ -1517,6 +1518,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                         disabled={colIdx === sortedOrders.length - 1}
                         onClick={() => group.forEach(st => moveStatus(wizardStatuses, setWizardStatuses, wizardStatusFilter, st.jiraStatusName, 1))}
                         title="Move right"
+                        aria-label="Move column right"
                       >&rarr;</button>
                     </div>
                     {group.map(st => {
@@ -1943,6 +1945,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                         disabled={colIdx === 0}
                         onClick={() => group.forEach(st => moveStatus(statuses, setStatuses, statusFilter, st.jiraStatusName, -1))}
                         title="Move left"
+                        aria-label="Move column left"
                       >&larr;</button>
                       <span>{colIdx + 1}</span>
                       <button
@@ -1950,6 +1953,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                         disabled={colIdx === sortedOrders.length - 1}
                         onClick={() => group.forEach(st => moveStatus(statuses, setStatuses, statusFilter, st.jiraStatusName, 1))}
                         title="Move right"
+                        aria-label="Move column right"
                       >&rarr;</button>
                     </div>
                     {group.map(st => {

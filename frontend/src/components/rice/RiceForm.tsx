@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { riceApi, RiceTemplate, RiceTemplateListItem, RiceAssessment, RiceAssessmentRequest, AssessmentAnswerEntry, RiceCriteria } from '../../api/rice'
 import { BG_SUBTLE, INFO_BG, INFO_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_SUBTLE, LINK_COLOR, SEPARATOR, BORDER_DEFAULT } from '../../constants/colors'
+import './RiceForm.css'
 
 interface RiceFormProps {
   issueKey: string
@@ -230,6 +231,7 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
                       return (
                         <label
                           key={opt.id}
+                          className="rice-option"
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
@@ -249,7 +251,7 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
                             name={`criteria-${c.id}`}
                             checked={isSelected}
                             onChange={() => handleSelect(c.id, opt.id, c.selectionType)}
-                            style={{ display: 'none' }}
+                            className="rice-option-input"
                           />
                           <span>{opt.label}</span>
                           <span style={{ color: isSelected ? LINK_COLOR : TEXT_SUBTLE, fontWeight: 600 }}>

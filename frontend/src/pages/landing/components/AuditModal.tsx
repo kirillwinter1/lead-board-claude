@@ -111,7 +111,7 @@ export function AuditModal({ isOpen, onClose }: AuditModalProps) {
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             onClick={e => e.stopPropagation()}
           >
-            <button className="landing-modal-close" onClick={handleClose}>
+            <button className="landing-modal-close" onClick={handleClose} aria-label="Close">
               &times;
             </button>
 

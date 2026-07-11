@@ -1,3 +1,4 @@
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react'
 import './CompetencyRating.css'
 
 const LEVEL_LABELS: Record<number, string> = {
@@ -34,6 +35,15 @@ export function CompetencyRating({ level, onChange, readonly = false, showLabel 
             style={i <= level ? { backgroundColor: LEVEL_COLORS[level] } : undefined}
             onClick={() => !readonly && onChange?.(i)}
             title={LEVEL_LABELS[i]}
+            {...(!readonly && {
+              role: 'button',
+              tabIndex: 0,
+              'aria-label': `Set rating to ${i} — ${LEVEL_LABELS[i]}`,
+              'aria-pressed': i <= level,
+              onKeyDown: (e: ReactKeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange?.(i) }
+              },
+            })}
           />
         ))}
       </div>
