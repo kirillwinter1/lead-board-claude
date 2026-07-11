@@ -31,8 +31,8 @@ Before changing anything, audit the target area.
 
 **1.1 Identify which page(s) to inspect:**
 ```
-Board → src/pages/BoardPage.tsx + BoardPage.css (1644 lines)
-Timeline → src/pages/TimelinePage.tsx + TimelinePage.css (1480 lines)
+Board → src/pages/BoardPage.tsx + BoardPage.css (~1460 lines)
+Timeline → src/pages/TimelinePage.tsx + TimelinePage.css (~450 lines, down from ~1500 after F91 CSS hygiene)
 Metrics → src/pages/TeamMetricsPage.tsx + TeamMetricsPage.css
 Data Quality → src/pages/DataQualityPage.tsx + DataQualityPage.css
 Projects → src/pages/ProjectsPage.tsx + ProjectsPage.css
@@ -64,9 +64,16 @@ grep -E 'StatusBadge|TeamBadge|MetricCard|FilterBar|Modal|MultiSelectDropdown|Si
 
 | Component | File | Purpose | Imports |
 |-----------|------|---------|---------|
-| `StatusBadge` | `components/board/StatusBadge.tsx` | Render ANY status with correct color | 7 |
+| `StatusBadge` | `components/board/StatusBadge.tsx` | Render ANY status with correct color; `maxWidth` prop truncates long statuses | 7+ |
 | `TeamBadge` | `components/TeamBadge.tsx` | Team name with accent color | 2 |
 | `RiceScoreBadge` | `components/rice/RiceScoreBadge.tsx` | RICE score badge | 1 |
+| `SeverityBadge` | `components/SeverityBadge.tsx` | ERROR/WARNING/INFO badge, re-exports `SEVERITY_COLORS` | 3+ |
+| `RoleBadge` | `components/RoleBadge.tsx` (F91) | Member role pill (SA/DEV/QA + custom) — color from `getRoleColor()`, never hardcoded | — |
+| `GradeBadge` | `components/GradeBadge.tsx` (F91) | Member seniority pill (junior/middle/senior) — colors from `GRADE_COLORS` | — |
+| `ProgressBar` | `components/ProgressBar.tsx` (F91) | Single-segment progress bar with ARIA `role="progressbar"`. **Not** for stacked/multi-segment bars — `CapacityBars` and `ProjectGanttView` stay custom by design (see JSDoc) | — |
+| `EmptyState` | `components/EmptyState.tsx` (F91) | Unified "no data" placeholder, `variant="page"\|"inline"` | — |
+| `ColorPicker` | `components/ColorPicker.tsx` (F91) | Popover color picker with fixed-position dropdown; consolidated 3 prior copies (TeamsPage, WorkflowConfigPage×2) | — |
+| `DarkTooltip` | `components/DarkTooltip.tsx` (F91) | Portal-rendered dark tooltip for Timeline (`Title`/`Label`/`Value`/`Divider`/`Progress` subcomponents). **Not** for Board's light hover-cards (`HoverInfoCard`/`IssueTooltip`/`ProjectTooltip`/`StatusHistoryTooltip`) or CSS-anchored arrow tooltips (`MyWorklogCalendar`, `AbsenceTimeline`) — those are deliberately separate patterns | — |
 | `MetricCard` | `components/metrics/MetricCard.tsx` | Metric card with trend | 5 |
 | `FilterBar` | `components/FilterBar.tsx` | Filter container + chips | 5 |
 | `FilterChips` | `components/FilterChips.tsx` | Active filter chips | 5 |
@@ -94,67 +101,66 @@ grep -E 'StatusBadge|TeamBadge|MetricCard|FilterBar|Modal|MultiSelectDropdown|Si
 
 ### Phase 3: Identify Duplication
 
-**Known duplication hotspots (verified in codebase):**
+**Status as of F91 (2026-07-11):** the historical hotspots below (status
+rendering, SeverityBadge, DSR colors, tooltips, FilterBar, empty states) were
+closed by the 2026-03-08 Desktop UI Consistency pass and the F91 UI
+Consistency Pass. `DataQualityPage` already uses `StatusBadge` + `FilterBar`;
+`SeverityBadge`, DSR colors, tooltips, empty states and color pickers are now
+shared components/tokens (see the component table above and
+`constants/colors.ts`). Treat this section as a checklist to re-verify, not
+a fixed list of known-bad files — new pages/components can reintroduce the
+same patterns.
 
-#### 3.1 Status rendering without StatusBadge
-- `DataQualityPage.tsx:150` — renders `{issue.status}` as plain text
-- `landing/components/DemoBoard.tsx` — inline color style for status
+**Current known hotspots (verified in codebase, F91):**
 
-**Fix:** Replace with `<StatusBadge status={issue.status} />`
+#### 3.1 `DataQualityPage.tsx` `SummaryCard` still takes a raw hex `color` prop
+- `pages/DataQualityPage.tsx:67` — local `SummaryCard` function, called with
+  literal hex colors (`"#6b7280"`, `"#dc2626"`, `"#d97706"`, `"#9ca3af"`)
+  instead of `SEVERITY_COLORS`/`constants/colors.ts` tokens.
 
-#### 3.2 SummaryCard duplicates MetricCard
-- `DataQualityPage.tsx:109-116` — inline `SummaryCard` function with borderLeftColor, padding, background
-- Should use `MetricCard` or extract a shared `SummaryCard`
+**Fix:** Pass tokens from `constants/colors.ts` (or `SEVERITY_COLORS`) instead
+of hardcoded hex; consider whether `SummaryCard` can become `MetricCard`.
 
-**Fix:** Replace with `<MetricCard title={...} value={...} />` or extend MetricCard
+#### 3.2 `ProjectsPage.tsx` still has page-local `JiraLink`/`AssigneeBadge`
+- `pages/ProjectsPage.tsx:59` (`JiraLink`), `:78` (`AssigneeBadge`) — small
+  page-local components, not yet extracted to `src/components/`.
 
-#### 3.3 SeverityBadge is page-local
-- `DataQualityPage.tsx:94-102` — inline `SeverityBadge` with backgroundColor, color, border, padding, borderRadius, fontSize
+**Fix:** If the same pattern appears in 2+ pages, extract to
+`components/`; otherwise low priority (single-use, not visually inconsistent).
 
-**Fix:** Extract to `components/SeverityBadge.tsx` or parametrize StatusBadge
+#### 3.3 Stacked/multi-segment progress is intentionally custom
+- `components/planning/CapacityBars.tsx`, `components/ProjectGanttView.tsx`
+  do NOT use the shared `ProgressBar` (single-segment only) — this is a
+  documented exception (see `ProgressBar.tsx` JSDoc), not a bug. Don't "fix"
+  these into `ProgressBar` without a new component that supports segments.
 
-#### 3.4 DSR colors defined in 4+ files
-- `DsrBreakdownChart.tsx:36-47` — `#36B37E`, `#FFAB00`, `#FF5630`
-- `ForecastAccuracyChart.tsx:40-44` — same colors
-- `AssigneeTable.tsx` — same colors inline
-- `VelocityChart.tsx` — same colors
-
-**Fix:** Centralize in a single constant file or extend `WorkflowConfigContext`
-
-#### 3.5 Tooltip styling duplication
-- `BoardPage.css` — `.priority-tooltip`, `.forecast-tooltip`, `.info-tooltip` (separate implementations)
-- Similar tooltip patterns across MetricsPage
-
-**Fix:** Extract base `.tooltip` class in App.css, page-specific variants extend it
-
-#### 3.6 DataQualityPage doesn't use FilterBar
-- Custom filter UI instead of shared `FilterBar` component
-
-**Fix:** Migrate to `FilterBar` + `MultiSelectDropdown`
-
-#### 3.7 Empty states not shared
-- Each page implements its own "no data" message with different styling
-
-**Fix:** Extract to `<EmptyState icon={...} message={...} />` component
+#### 3.4 Check before adding a new visual primitive
+Before writing a new badge/progress-bar/empty-state/color-picker/tooltip,
+check the shared component table above first — F91 consolidated all of these
+into `components/`. A new one-off copy is now almost always the wrong move.
 
 ### Phase 4: Refactor to Shared Layer
 
-**Order of operations (least risk → most risk):**
+**Order of operations (least risk → most risk) — generic recipe for future audits.**
+Items 1-6 were the F91 UI Consistency Pass scope and are done (status badges,
+severity/color centralization, FilterBar, EmptyState, tooltip consolidation
+into `DarkTooltip`, TeamBadge/RiceScoreBadge CSS); reuse this order for the
+*next* round of duplication rather than re-doing these:
 
-1. **Replace plain-text status with StatusBadge** — zero-risk, visual improvement
-2. **Replace page-local SummaryCard/SeverityBadge with shared components** — low risk
-3. **Centralize DSR/Priority color constants** — extract to `constants/colors.ts`
-4. **Migrate DataQualityPage filters to FilterBar** — medium risk, test thoroughly
-5. **Extract shared EmptyState component** — low risk
-6. **Consolidate tooltip CSS** — medium risk, verify positioning
-7. **Convert TeamBadge/RiceScoreBadge inline styles to CSS** — low risk but many files
+1. **Replace plain-text rendering with the shared badge component** (StatusBadge/SeverityBadge/RoleBadge/GradeBadge) — zero-risk, visual improvement
+2. **Replace page-local card/badge functions with shared components** — low risk
+3. **Centralize new color literals in `constants/colors.ts`** — before adding any hex to a component
+4. **Migrate custom filter UI to `FilterBar` + `MultiSelectDropdown`/`SingleSelectDropdown`** — medium risk, test thoroughly
+5. **Replace page-local empty-state markup with `EmptyState`** — low risk
+6. **Replace page-local dark tooltips with `DarkTooltip`; keep light hover-cards on `HoverInfoCard`** — medium risk, verify positioning
+7. **Convert new inline-style badges to CSS classes** — low risk but many files
 
 ### Phase 5: Verify on Key Pages
 
 After each change, visually verify these pages (desktop only):
 
 ```
-/board           — Board (most complex, 1644 lines CSS)
+/board           — Board (most complex, ~1460 lines CSS)
 /timeline        — Timeline/Gantt
 /metrics         — Team Metrics (charts, MetricCards)
 /data-quality    — Data Quality (tables, severity badges)
@@ -207,21 +213,39 @@ After each change, visually verify these pages (desktop only):
 - Same table header styling
 - Same filter bar height and spacing
 
+### R7: Timeline uses muted `TIMELINE_*` tokens — never brighten
+- Gantt bars/phases on Timeline intentionally use a dimmer palette than the
+  equivalent Board colors — this is a deliberate design decision (F91), not
+  an oversight to "fix" by matching Board brightness.
+- Source of truth: `TIMELINE_PHASE_TINT`, `TIMELINE_PHASE_TINT_ROUGH`,
+  `TIMELINE_ROLE_BORDER_TINT`, `TIMELINE_BAR_TRACK`, `TIMELINE_FLAGGED_BORDER`,
+  `TIMELINE_BLOCKED_BORDER`, `TIMELINE_ROUGH_BG`, `TIMELINE_ROUGH_BADGE_BG`,
+  `TIMELINE_ROUGH_BADGE_TEXT` in `constants/colors.ts`.
+- **NEVER** brighten/replace these with full-saturation Board colors without
+  an explicit redesign request.
+- Exception: chart/timeline **segments** that use status color as data (bar
+  fills, not labels) use `resolveStatusBgColor(status, statusStyles)` from
+  `StatusBadge.tsx` — precedents `DsrBreakdownChart`, F87 `StoryBar`. Status
+  **labels/badges** still go through `StatusBadge` per R1.
+
 ---
 
 ## Anti-Patterns
 
-| Anti-Pattern | Example in Codebase | Correct Approach |
+| Anti-Pattern | Example | Correct Approach |
 |-------------|---------------------|------------------|
-| Plain-text status rendering | `DataQualityPage.tsx:150` `{issue.status}` | `<StatusBadge status={issue.status} />` |
-| Page-local badge function | `DataQualityPage.tsx:94` `SeverityBadge` inline | Extract to `components/SeverityBadge.tsx` |
-| Page-local card function | `DataQualityPage.tsx:109` `SummaryCard` inline | Use `MetricCard` or extract shared component |
-| DSR colors in 4+ files | `DsrBreakdownChart.tsx:36`, `AssigneeTable.tsx`, `ForecastAccuracyChart.tsx` | Single constant in `constants/colors.ts` |
-| Inline badge styling | `TeamBadge.tsx` — entire badge in `style={{}}` | CSS class `.team-badge` |
-| `color + '20'` opacity pattern | `FilterChips.tsx`, `ProjectGanttView.tsx` | CSS variable or `rgba()` helper |
-| Custom filter UI | `DataQualityPage.tsx` — own filter implementation | Use `FilterBar` + `MultiSelectDropdown` |
-| Per-page empty state | Every page has its own "no data" div | Shared `EmptyState` component |
-| Tooltip style duplication | `.priority-tooltip`, `.forecast-tooltip`, `.info-tooltip` | Base `.tooltip` class + variants |
+| Plain-text status rendering | any `{issue.status}` / `{task.status}` string | `<StatusBadge status={...} />` |
+| Page-local role/grade badge | inline role or grade pill in a page | `<RoleBadge role={...} />` / `<GradeBadge grade={...} />` |
+| Page-local progress bar | one-off `<div style={{width: pct+'%'}}>` | `<ProgressBar value={...} ariaLabel={...} />` (unless stacked/multi-segment — see R2/Phase 3.3) |
+| Page-local empty state | Every page rolling its own "no data" div | Shared `EmptyState` component |
+| Page-local color picker popup | New popover color swatch grid | Shared `ColorPicker` component |
+| Page-local dark tooltip | New portal/fixed-position navy tooltip | `DarkTooltip` (unless it's a light hover-card — use `HoverInfoCard` instead) |
+| New hardcoded hex color literal | `color="#dc2626"` etc. in a component | Token from `constants/colors.ts` |
+| `color + '20'` opacity pattern | string-concat alpha hack | `hexToRgba(color, alpha)` from `constants/colors.ts` |
+| Custom filter UI | own filter implementation instead of shared | Use `FilterBar` + `MultiSelectDropdown` |
+| Brightened Timeline colors | matching Board's saturated palette on Timeline | Use `TIMELINE_*` muted tokens — see R7 |
+| Icon-only button without label | `<button onClick={...}><Icon /></button>` | Add `aria-label` |
+| `alert()` for form errors | `alert('Invalid value')` | Inline error message in the form |
 
 ---
 
@@ -231,14 +255,23 @@ When reviewing a PR that touches UI:
 
 - [ ] **StatusBadge used?** — Any status string MUST go through StatusBadge
 - [ ] **TeamBadge used?** — Team name MUST use TeamBadge or team.color
+- [ ] **RoleBadge/GradeBadge used?** — Not a page-local role or grade pill
+- [ ] **ProgressBar used?** — Not a page-local single-segment progress div (stacked bars are the documented exception)
+- [ ] **EmptyState used?** — Not a page-local "no data" div
+- [ ] **ColorPicker used?** — Not a new page-local color popover
+- [ ] **DarkTooltip used for dark/portal tooltips?** — Light hover-cards still use `HoverInfoCard`
 - [ ] **No new inline styles for permanent patterns?** — colors, padding, fontSize in `style={{}}`
-- [ ] **No hardcoded hex colors in TSX?** — Use constants, contexts, or CSS variables
+- [ ] **No hardcoded hex colors in TSX?** — Use constants from `constants/colors.ts`, contexts, or CSS variables
+- [ ] **No `color + '20'` alpha hack?** — Use `hexToRgba()` from `constants/colors.ts`
 - [ ] **No page-local component that duplicates shared one?** — Check `src/components/` first
 - [ ] **FilterBar used for filters?** — Not custom divs with dropdowns
 - [ ] **Role colors from getRoleColor()?** — Not hardcoded SA=#1558BC, DEV=#803FA5, QA=#206A83
 - [ ] **Issue icons from getIssueIcon()?** — Not local icon imports
-- [ ] **Language consistent?** — No RU labels in English page (except Jira data)
+- [ ] **Timeline colors from TIMELINE_* tokens?** — Not brightened to match Board (R7)
+- [ ] **Language consistent?** — No RU labels in English page (except Jira data, and landing/GuidePage which are bilingual by design)
 - [ ] **Empty state handled?** — Loading, error, and empty states present
+- [ ] **Icon-only buttons have aria-label?** — Modal close, icon buttons, etc.
+- [ ] **No `alert()` for validation errors?** — Inline error message instead
 - [ ] **Typography matches other pages?** — Same h2/h3 sizes, same label styles
 
 ---
@@ -266,29 +299,41 @@ After any UI refactoring, verify visually:
 
 ---
 
-## Implementation Order (recommended)
+## Implementation Order (recommended, for the next duplication pass)
 
-**Phase 1 — Quick wins (1-2 hours, zero risk):**
-1. Replace `{issue.status}` in DataQualityPage with StatusBadge
-2. Replace SummaryCard in DataQualityPage with MetricCard
+The 2026-03-08 Desktop UI Consistency pass and the F91 UI Consistency Pass
+(2026-07-11) already executed this recipe against the whole app (status
+badges, DSR/severity colors, FilterBar, EmptyState, tooltips, role/grade
+badges, progress bars, color pickers, a11y, RU→EN, CSS hygiene — see
+`ai-ru/features/F91_UI_CONSISTENCY.md`). Reuse this order for whatever new
+duplication the next audit finds — don't assume these specific line items
+still need doing:
 
-**Phase 2 — Color centralization (2-3 hours, low risk):**
-3. Extract DSR colors to `constants/colors.ts`
-4. Update DsrBreakdownChart, ForecastAccuracyChart, AssigneeTable, VelocityChart to import from constants
+**Phase 1 — Quick wins (zero risk):**
+1. Replace plain-text status/role/grade rendering with the matching shared badge
+2. Replace page-local card/badge functions with shared components
 
-**Phase 3 — Component extraction (3-4 hours, medium risk):**
-5. Extract SeverityBadge to shared component
-6. Extract EmptyState component
-7. Migrate DataQualityPage filters to FilterBar
+**Phase 2 — Color centralization (low risk):**
+3. Extract new color literals to `constants/colors.ts`
+4. Replace `color + 'NN'` alpha hacks with `hexToRgba()`
 
-**Phase 4 — Style migration (4-6 hours, medium risk):**
-8. Convert TeamBadge inline styles to CSS class
-9. Convert RiceScoreBadge inline styles to CSS class
-10. Consolidate tooltip base CSS
+**Phase 3 — Component extraction (medium risk):**
+5. Extract new page-local badges/cards to `components/`
+6. Migrate custom empty states to `EmptyState`
+7. Migrate custom filters to `FilterBar`
 
-**Phase 5 — Language cleanup (2-3 hours, low risk):**
-11. Standardize app page labels to English
-12. Move Russian strings to constants (prep for i18n)
+**Phase 4 — Style migration (medium risk):**
+8. Convert new inline-style badges to CSS classes
+9. Consolidate new tooltip patterns into `DarkTooltip` (dark/portal) or `HoverInfoCard` (light/anchored)
+
+**Phase 5 — Language cleanup (low risk):**
+10. Standardize app page labels to English (exception: landing, GuidePage)
+11. Update tests for translated strings
+
+**Phase 6 — a11y (low risk):**
+12. `aria-label` on icon-only buttons
+13. Replace `alert()` with inline errors
+14. Visually-hidden (not `display:none`) for keyboard-focusable elements
 
 ---
 
@@ -297,10 +342,17 @@ After any UI refactoring, verify visually:
 ### Sources of Truth (extend, never duplicate)
 | File | Role |
 |------|------|
-| `components/board/StatusBadge.tsx` | Status rendering |
+| `components/board/StatusBadge.tsx` | Status rendering (`maxWidth` prop for truncation) |
 | `components/board/StatusStylesContext.tsx` | Status colors from backend |
 | `contexts/WorkflowConfigContext.tsx` | Workflow config, role colors, issue icons |
 | `components/TeamBadge.tsx` | Team badge with color |
+| `components/RoleBadge.tsx` | Member role pill (F91) |
+| `components/GradeBadge.tsx` | Member seniority pill (F91) |
+| `components/ProgressBar.tsx` | Single-segment progress bar with ARIA (F91) |
+| `components/EmptyState.tsx` | Unified empty state (F91) |
+| `components/ColorPicker.tsx` | Popover color picker (F91) |
+| `components/DarkTooltip.tsx` | Portal dark tooltip for Timeline (F91) |
+| `components/SeverityBadge.tsx` | Severity badge, re-exports `SEVERITY_COLORS` |
 | `components/metrics/MetricCard.tsx` | Metric cards |
 | `components/FilterBar.tsx` | Filter container |
 | `components/FilterChips.tsx` | Filter chips |
@@ -308,18 +360,17 @@ After any UI refactoring, verify visually:
 | `components/Skeleton.tsx` | Loading skeletons |
 | `helpers/priorityColors.ts` | Priority color mapping |
 | `constants/teamColors.ts` | Team color palette |
+| `constants/colors.ts` | Every other color token — DSR, severity, grade, absence, timeline (muted, see R7), tooltip, text hierarchy, `hexToRgba()` helper |
 | `components/board/helpers.ts` | Issue icons, formatCompact |
 | `App.css` | Global styles, .btn classes, loading/error/empty |
 
-### Worst Offenders (most inconsistency)
-| File | Issue |
-|------|-------|
-| `pages/DataQualityPage.tsx` | Page-local SummaryCard, SeverityBadge, plain-text status, custom filters |
-| `pages/ProjectsPage.tsx:47-69` | Inline ProgressBar, JiraLink, AssigneeBadge functions |
-| `components/metrics/DsrBreakdownChart.tsx:36-47` | DSR color constants duplicated |
-| `components/metrics/AssigneeTable.tsx` | DSR colors inline |
-| `components/ProjectGanttView.tsx` | Heavy inline styles for progress/colors |
-| `pages/BoardPage.css` | 1644 lines, contains shareable tooltip/badge patterns |
+### Deliberately custom (not a duplication bug — do not "fix")
+| File | Why it's custom |
+|------|------|
+| `components/planning/CapacityBars.tsx` | Stacked/multi-segment capacity indicator — `ProgressBar` is single-segment only |
+| `components/ProjectGanttView.tsx` | Gantt bars positioned by date range with status-driven coloring, not a linear progress fill |
+| `components/board/StatusBadge.tsx` (`resolveStatusBgColor`) used directly in `DsrBreakdownChart`, F87 `StoryBar` | Chart/timeline segments use status color as data (bar fill), not a label — see design-system.md carve-out |
+| `pages/landing/`, `pages/GuidePage.tsx` | RU / bilingual by design (R5 exception), not a language-consistency bug |
 
 ---
 

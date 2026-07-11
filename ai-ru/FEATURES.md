@@ -89,6 +89,7 @@
 | F89 | Planning Poker rework: комната по ключу эпика, публикация оценок в Jira (Original Estimate сабтасков), итоги в человеко-днях + сравнение rough→poker с % ошибки, доска rough→clean, создание стори в Jira с сабтасками+компонентом | 2026-07-08 | [features/F89](features/F89_PLANNING_POKER_REWORK.md) |
 | F88 | My Work — личный рабочий стол участника | 2026-07-07 | [features/F88](features/F88_MY_WORK.md) |
 | F90 | Log time — списание времени со страницы My Work | 2026-07-08 | [features/F90](features/F90_LOG_TIME_MY_WORK.md) |
+| F91 | UI Consistency Pass (аудит визуальных багов, shared-примитивы, RU→EN, цвета на токенах, a11y, CSS-гигиена) | 2026-07-11 | [features/F91](features/F91_UI_CONSISTENCY.md) |
 
 ## Бэклог (BF)
 

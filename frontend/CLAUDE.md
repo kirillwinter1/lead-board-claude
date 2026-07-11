@@ -79,10 +79,19 @@ src/
 
 ## Цветовая схема ролей
 
+Ниже — дефолтные цвета (fallback, если роль не сконфигурирована). Реальные
+цвета ролей живут в Workflow Config (`workflow_roles.color`) и резолвятся
+через `getRoleColor(code)` из `WorkflowConfigContext` — НЕ хардкодить SA/DEV/QA
+цвета в компонентах, использовать `RoleBadge` или `getRoleColor()`.
+
 | Роль | Текст | Прогресс-бар | Фон (light) |
 |------|-------|--------------|-------------|
-| SA   | #1558BC | #669DF1 | #E9F2FE |
+| SA   | #1558BC | #669DF1 | #E9F2FF |
 | DEV  | #803FA5 | #B55FEB | #F8EEFE |
 | QA   | #206A83 | #6CC3E0 | #E7F9FF |
 
-Пример использования (см. `BoardPage.css` `.role-chip.*`).
+Пример использования (см. `BoardPage.css` `.role-chip.*`, `components/RoleBadge.tsx`).
+
+Прочие цветовые токены (DSR, severity, grade, absence, timeline muted palette,
+tooltip) централизованы в `frontend/src/constants/colors.ts` — единственный
+источник правды, новые hardcoded hex-цвета в компонентах не добавлять.
