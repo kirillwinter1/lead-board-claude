@@ -775,6 +775,7 @@ export function PokerRoomPage() {
             className={`poker-copy-link-btn ${copied ? 'copied' : ''}`}
             onClick={handleCopyLink}
             title="Copy room link"
+            aria-label="Copy room link"
           >
             <IconLink />
             <span>{copied ? 'Copied' : 'Copy link'}</span>
@@ -1261,7 +1262,7 @@ export function PokerRoomPage() {
                 <p>Waiting for participants</p>
                 <div className="poker-participants-share">
                   <small>Share the room link:</small>
-                  <button className="poker-share-code-btn" onClick={handleCopyLink}>
+                  <button className="poker-share-code-btn" onClick={handleCopyLink} aria-label="Copy room link">
                     <IconLink />
                     <span>{copied ? 'Copied' : 'Copy link'}</span>
                   </button>

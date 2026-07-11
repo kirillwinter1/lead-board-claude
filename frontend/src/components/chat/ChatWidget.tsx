@@ -295,7 +295,7 @@ export function ChatWidget() {
 
   if (!isOpen) {
     return (
-      <button className="chat-bubble" onClick={() => setIsOpen(true)} title="AI Assistant">
+      <button className="chat-bubble" onClick={() => setIsOpen(true)} title="AI Assistant" aria-label="Open AI Assistant">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
@@ -308,10 +308,10 @@ export function ChatWidget() {
       <div className="chat-header">
         <span className="chat-header-title">AI Assistant</span>
         <div className="chat-header-actions">
-          <button className="chat-header-btn" onClick={handleClear} title="Clear history">
+          <button className="chat-header-btn" onClick={handleClear} title="Clear history" aria-label="Clear chat history">
             Clear
           </button>
-          <button className="chat-header-btn" onClick={() => setIsOpen(false)} title="Close">
+          <button className="chat-header-btn" onClick={() => setIsOpen(false)} title="Close" aria-label="Close chat">
             ✕
           </button>
         </div>
