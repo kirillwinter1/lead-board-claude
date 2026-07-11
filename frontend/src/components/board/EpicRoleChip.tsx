@@ -1,12 +1,13 @@
 import { useState, useRef } from 'react'
 import { formatCompact } from './helpers'
 import type { EpicRoleChipProps } from './types'
-import { lightenColor } from '../../constants/colors'
+import { lightenColor, ERROR_TEXT } from '../../constants/colors'
 
 export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config, onUpdate, roleColor, estimateSource }: EpicRoleChipProps) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState<string>('')
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const roughEstimate = metrics.roughEstimateDays
@@ -24,12 +25,14 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
   const handleClick = () => {
     if (!epicInTodo || !config?.enabled) return
     setValue(roughEstimate?.toString() ?? '')
+    setSaveError(null)
     setEditing(true)
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
   const handleSave = async () => {
     setSaving(true)
+    setSaveError(null)
     try {
       const days = value.trim() === '' ? null : parseFloat(value)
       if (days !== null && isNaN(days)) {
@@ -38,8 +41,9 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
       await onUpdate(epicKey, role, days)
       setEditing(false)
     } catch (err) {
+      // F91: inline error instead of a native alert() — the input stays open.
       console.error('Failed to save rough estimate:', err)
-      alert('Failed to save: ' + (err instanceof Error ? err.message : 'Unknown error'))
+      setSaveError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
       setSaving(false)
     }
@@ -63,7 +67,11 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
   if (epicInTodo) {
     if (editing) {
       return (
-        <div className="epic-role-chip todo editing" style={{ color: roleColor, borderColor }}>
+        <div
+          className="epic-role-chip todo editing"
+          style={{ color: roleColor, borderColor: saveError ? ERROR_TEXT : borderColor }}
+          title={saveError ? `Failed to save: ${saveError}` : undefined}
+        >
           <span className="epic-role-label">{label}</span>
           <input
             ref={inputRef}
@@ -77,7 +85,11 @@ export function EpicRoleChip({ label, role, metrics, epicInTodo, epicKey, config
             onBlur={handleBlur}
             className="epic-role-input"
             disabled={saving}
+            aria-invalid={saveError ? true : undefined}
           />
+          {saveError && (
+            <span role="alert" className="epic-role-error">Failed to save: {saveError}</span>
+          )}
         </div>
       )
     }

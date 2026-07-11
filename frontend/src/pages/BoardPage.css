@@ -529,6 +529,24 @@
   border-style: solid;
   border-color: #0052cc;
   background: white;
+  position: relative;
+}
+
+/* F91 — inline save error (replaces native alert()). Floated below the fixed-size chip. */
+.epic-role-error {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 10;
+  min-width: 120px;
+  max-width: 200px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #ffebe6;
+  color: #de350b;
+  font-size: 10px;
+  line-height: 1.3;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 .epic-role-input {

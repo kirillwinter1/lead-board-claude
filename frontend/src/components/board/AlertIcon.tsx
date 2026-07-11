@@ -1,6 +1,25 @@
 import { createPortal } from 'react-dom'
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
 import type { BoardNode } from './types'
+import { SEVERITY_COLORS } from '../SeverityBadge'
+
+/** Small colour-coded severity dot — replaces the 🔴🟡🔵 emoji. Colour from SEVERITY_COLORS. */
+function SeverityDot({ severity }: { severity: string }) {
+  const colors = SEVERITY_COLORS[severity] || SEVERITY_COLORS.INFO
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-block',
+        width: 8,
+        height: 8,
+        borderRadius: '50%',
+        background: colors.text,
+        flexShrink: 0,
+      }}
+    />
+  )
+}
 
 export function AlertIcon({ node }: { node: BoardNode }) {
   const { ref, showTooltip, tooltipPos, handleMouseEnter, handleMouseLeave } = useTooltipPosition<HTMLDivElement>({
@@ -26,13 +45,6 @@ export function AlertIcon({ node }: { node: BoardNode }) {
     ERROR: 'ERROR',
     WARNING: 'WARNING',
     INFO: 'INFO'
-  }
-
-  // Severity icons
-  const severityIcons: Record<string, string> = {
-    ERROR: '🔴',
-    WARNING: '🟡',
-    INFO: '🔵'
   }
 
   // Human-readable rule names
@@ -94,8 +106,9 @@ export function AlertIcon({ node }: { node: BoardNode }) {
             {alerts.map((alert, idx) => (
               <div key={idx} className={`alert-tooltip-item alert-${alert.severity.toLowerCase()}`}>
                 <div className="alert-item-header">
-                  <span className="alert-severity">
-                    {severityIcons[alert.severity]} {severityLabels[alert.severity] || alert.severity}
+                  <span className="alert-severity" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <SeverityDot severity={alert.severity} />
+                    {severityLabels[alert.severity] || alert.severity}
                   </span>
                 </div>
                 <div className="alert-message">

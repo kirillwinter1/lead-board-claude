@@ -7,6 +7,7 @@ import { SearchInput } from '../components/SearchInput'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
+import { EmptyState } from '../components/EmptyState'
 import { getIssueIcon } from '../components/board/helpers'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import './PlanningPokerPage.css'
@@ -18,7 +19,39 @@ import {
   createSession,
 } from '../api/poker'
 import { getStatusStyles, type StatusStyle } from '../api/board'
-import { INFO_BG, SUCCESS_BG, INFO_TEXT, SUCCESS_TEXT, BORDER_DEFAULT, TEXT_SECONDARY } from '../constants/colors'
+import { INFO_BG, SUCCESS_BG, INFO_TEXT, SUCCESS_TEXT, BG_SUBTLE, TEXT_SECONDARY } from '../constants/colors'
+
+/**
+ * F91 — poker session status pill. These are session lifecycle states
+ * (PREPARING/ACTIVE/COMPLETED), NOT Jira statuses, so StatusBadge does not
+ * apply. Coloured from design tokens. Deliberately NOT className="status-badge"
+ * to avoid colliding with the global Jira-status class.
+ */
+const SESSION_STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
+  PREPARING: { bg: INFO_BG, color: INFO_TEXT, label: 'Preparing' },
+  ACTIVE: { bg: SUCCESS_BG, color: SUCCESS_TEXT, label: 'Active' },
+  COMPLETED: { bg: BG_SUBTLE, color: TEXT_SECONDARY, label: 'Completed' },
+}
+
+function SessionStatusBadge({ status }: { status: string }) {
+  const s = SESSION_STATUS_STYLE[status] ?? { bg: BG_SUBTLE, color: TEXT_SECONDARY, label: status }
+  return (
+    <span
+      className="poker-session-status-badge"
+      style={{
+        display: 'inline-block',
+        padding: '2px 8px',
+        borderRadius: 4,
+        fontSize: 12,
+        fontWeight: 600,
+        background: s.bg,
+        color: s.color,
+      }}
+    >
+      {s.label}
+    </span>
+  )
+}
 
 // Two overlapping poker cards — line-art empty-state icon (no emoji)
 function PlanningIcon() {
@@ -145,19 +178,6 @@ export function PlanningPokerPage() {
     }
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PREPARING':
-        return <span className="status-badge" style={{ background: INFO_BG, color: INFO_TEXT }}>Preparing</span>
-      case 'ACTIVE':
-        return <span className="status-badge" style={{ background: SUCCESS_BG, color: SUCCESS_TEXT }}>Active</span>
-      case 'COMPLETED':
-        return <span className="status-badge" style={{ background: BORDER_DEFAULT, color: TEXT_SECONDARY }}>Completed</span>
-      default:
-        return <span className="status-badge">{status}</span>
-    }
-  }
-
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '—'
     return new Date(dateStr).toLocaleDateString(undefined, {
@@ -272,7 +292,7 @@ export function PlanningPokerPage() {
                       )}
                     </span>
                   </td>
-                  <td>{getStatusBadge(session.status)}</td>
+                  <td><SessionStatusBadge status={session.status} /></td>
                   <td>{session.stories.length}</td>
                   <td>{formatDate(session.createdAt)}</td>
                   <td>
@@ -359,11 +379,9 @@ function EpicPicker({ epics, loading, search, onSearch, onSelect, onCancel, crea
       {loading ? (
         <div className="loading-small">Loading epics...</div>
       ) : epics.length === 0 ? (
-        <div className="chart-empty">
-          No epics available for estimation
-        </div>
+        <EmptyState variant="inline" message="No epics available for estimation" />
       ) : filtered.length === 0 ? (
-        <div className="chart-empty">Nothing found for “{search}”</div>
+        <EmptyState variant="inline" message={`Nothing found for “${search}”`} />
       ) : (
         <div className="epic-picker-list">
           {filtered.map(epic => {
