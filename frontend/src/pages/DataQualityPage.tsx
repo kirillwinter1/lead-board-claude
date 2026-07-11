@@ -91,7 +91,7 @@ function ViolationRow({ issue }: { issue: IssueViolations }) {
           <button
             type="button"
             className="expander-btn"
-            aria-label={expanded ? 'Свернуть нарушения' : 'Развернуть нарушения'}
+            aria-label={expanded ? 'Collapse violations' : 'Expand violations'}
             aria-expanded={expanded}
             onClick={e => { e.stopPropagation(); setExpanded(!expanded) }}
           >

@@ -15,9 +15,9 @@ vi.mock('../api/statusHistory', async (importOriginal) => {
 
 describe('formatDuration', () => {
   it('formats days, hours, and sub-hour durations', () => {
-    expect(api.formatDuration(3 * 86400)).toBe('3д')
-    expect(api.formatDuration(5 * 3600)).toBe('5ч')
-    expect(api.formatDuration(600)).toBe('<1ч')
+    expect(api.formatDuration(3 * 86400)).toBe('3d')
+    expect(api.formatDuration(5 * 3600)).toBe('5h')
+    expect(api.formatDuration(600)).toBe('<1h')
   })
 })
 
@@ -51,12 +51,12 @@ describe('StatusHistoryTooltip', () => {
     expect(await screen.findByText('New')).toBeInTheDocument()
     expect(screen.getByText('Development')).toBeInTheDocument()
     // current status highlighted with a "сейчас" marker
-    expect(screen.getByText('сейчас')).toBeInTheDocument()
+    expect(screen.getByText('now')).toBeInTheDocument()
     // total + "without New" total (9д total − 2д New = 7д)
-    expect(screen.getByText('Всего')).toBeInTheDocument()
-    expect(screen.getByText('9д')).toBeInTheDocument() // total
-    expect(screen.getByText('Без «New»')).toBeInTheDocument()
-    expect(screen.getByText('7д')).toBeInTheDocument() // total without New
+    expect(screen.getByText('Total')).toBeInTheDocument()
+    expect(screen.getByText('9d')).toBeInTheDocument() // total
+    expect(screen.getByText('Excl. “New”')).toBeInTheDocument()
+    expect(screen.getByText('7d')).toBeInTheDocument() // total without New
   })
 
   it('does not fetch again on a second hover (cached)', async () => {

@@ -34,7 +34,7 @@ export function StatusAgeBadge({ days, level, reason, issueKey }: StatusAgeBadge
         cursor: issueKey ? 'help' : undefined,
       }}
     >
-      {days}д
+      {days}d
     </span>
   )
 

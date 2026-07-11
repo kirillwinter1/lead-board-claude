@@ -1110,7 +1110,7 @@ export function ProjectsPage() {
                             </div>
                             {isLoadingCommitment && !commitment && (
                               <div style={{ padding: 8, fontSize: 12, color: TEXT_MUTED }}>
-                                Загружаем commitment…
+                                Loading commitment…
                               </div>
                             )}
                             {commitment && <ProjectCommitmentView commitment={commitment} />}

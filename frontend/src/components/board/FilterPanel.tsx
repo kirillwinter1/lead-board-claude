@@ -238,7 +238,7 @@ export function FilterPanel({
         <button
           className={`btn btn-sm btn-toggle ${includeArchived ? 'btn-toggle-active' : ''}`}
           onClick={onIncludeArchivedToggle}
-          title="Закрытые эпики старше 14 дней"
+          title="Closed epics older than 14 days"
         >
           Show archived
         </button>

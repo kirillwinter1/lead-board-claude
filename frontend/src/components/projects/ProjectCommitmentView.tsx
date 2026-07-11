@@ -40,14 +40,7 @@ const STATUS_ICON: Record<CommitmentStatus, string> = {
 }
 
 function pluralEpics(n: number): string {
-  // ru pluralization: 1 эпик / 2-4 эпика / 5+ эпиков. Numbers ending 11..14 are
-  // always genitive plural, otherwise last digit rules apply.
-  const mod100 = n % 100
-  const mod10 = n % 10
-  if (mod100 >= 11 && mod100 <= 14) return 'эпиков'
-  if (mod10 === 1) return 'эпик'
-  if (mod10 >= 2 && mod10 <= 4) return 'эпика'
-  return 'эпиков'
+  return n === 1 ? 'epic' : 'epics'
 }
 
 /**
@@ -78,8 +71,8 @@ export function ProjectCommitmentView({ commitment }: ProjectCommitmentViewProps
         }}
       >
         {commitment.desiredQuarter
-          ? `У проекта нет эпиков с привязанными командами для ${commitment.desiredQuarter}.`
-          : 'Заявленный квартал не установлен — нет данных по командам.'}
+          ? `The project has no epics with assigned teams for ${commitment.desiredQuarter}.`
+          : 'No desired quarter set — no team data available.'}
       </div>
     )
   }
@@ -158,12 +151,12 @@ export function ProjectCommitmentView({ commitment }: ProjectCommitmentViewProps
                 </strong>
                 {team.otherQuarterEpics > 0 && (
                   <span style={{ color: TEXT_MUTED }}>
-                    · {team.otherQuarterEpics} в другом квартале
+                    · {team.otherQuarterEpics} in another quarter
                   </span>
                 )}
                 {team.uncommittedEpics > 0 && (
                   <span style={{ color: TEXT_MUTED }}>
-                    · {team.uncommittedEpics} без коммита
+                    · {team.uncommittedEpics} uncommitted
                   </span>
                 )}
               </div>

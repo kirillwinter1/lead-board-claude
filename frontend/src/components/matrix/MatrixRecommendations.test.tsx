@@ -33,9 +33,9 @@ describe('MatrixRecommendations', () => {
       needsEstimation: [],
     }
     render(<MatrixRecommendations data={data} jiraBaseUrl="https://j/" />)
-    expect(screen.getByText(/Zero Bug Policy — 2 открытых багов/)).toBeInTheDocument()
+    expect(screen.getByText(/Zero Bug Policy — 2 open bugs/)).toBeInTheDocument()
     expect(screen.getByText('BUG-1')).toBeInTheDocument()
-    expect(screen.getByText(/Нет распределённых задач/)).toBeInTheDocument()
+    expect(screen.getByText(/No assigned tasks/)).toBeInTheDocument()
   })
 
   it('renders a recommended story once with its role composition and total', () => {
@@ -55,13 +55,13 @@ describe('MatrixRecommendations', () => {
       needsEstimation: [],
     }
     render(<MatrixRecommendations data={data} jiraBaseUrl="https://j/" />)
-    expect(screen.getByText(/0 багов, политика соблюдается/)).toBeInTheDocument()
+    expect(screen.getByText(/0 bugs, policy upheld/)).toBeInTheDocument()
     // story shown once, not per role
     expect(screen.getAllByText('PROJ-1')).toHaveLength(1)
-    expect(screen.getByText('DEV 16ч')).toBeInTheDocument()
-    expect(screen.getByText('QA 8ч')).toBeInTheDocument()
-    expect(screen.getByText('SA 8ч')).toBeInTheDocument()
-    expect(screen.getByText('Всего 32ч')).toBeInTheDocument()
+    expect(screen.getByText('DEV 16h')).toBeInTheDocument()
+    expect(screen.getByText('QA 8h')).toBeInTheDocument()
+    expect(screen.getByText('SA 8h')).toBeInTheDocument()
+    expect(screen.getByText('Total 32h')).toBeInTheDocument()
   })
 
   it('renders the needs-estimation warning list', () => {
@@ -72,7 +72,7 @@ describe('MatrixRecommendations', () => {
       ],
     }
     render(<MatrixRecommendations data={data} jiraBaseUrl="https://j/" />)
-    expect(screen.getByText(/Требует нарезки/)).toBeInTheDocument()
+    expect(screen.getByText(/Needs breakdown/)).toBeInTheDocument()
     expect(screen.getByText('PROJ-9')).toBeInTheDocument()
   })
 

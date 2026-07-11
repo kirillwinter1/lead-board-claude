@@ -55,7 +55,7 @@ export function MemberProfilePage() {
       setData(result)
     } catch (e: unknown) {
       const axiosErr = e as { response?: { data?: { error?: string } }; message?: string }
-      setError(axiosErr.response?.data?.error || axiosErr.message || 'Ошибка загрузки профиля')
+      setError(axiosErr.response?.data?.error || axiosErr.message || 'Failed to load profile')
     } finally {
       setLoading(false)
     }
@@ -89,10 +89,10 @@ export function MemberProfilePage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b778c' }}>Загрузка профиля...</div>
+        <div style={{ padding: 40, textAlign: 'center', color: '#6b778c' }}>Loading profile...</div>
       </main>
     )
   }
@@ -102,10 +102,10 @@ export function MemberProfilePage() {
       <main className="main-content">
         <div className="page-header">
           <div className="page-header-left">
-            <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+            <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
           </div>
         </div>
-        <div style={{ padding: 40, textAlign: 'center', color: ERROR_TEXT }}>{error || 'Нет данных'}</div>
+        <div style={{ padding: 40, textAlign: 'center', color: ERROR_TEXT }}>{error || 'No data'}</div>
       </main>
     )
   }
@@ -127,10 +127,10 @@ export function MemberProfilePage() {
       {/* Header */}
       <div className="page-header" style={{ marginBottom: 12 }}>
         <div className="page-header-left">
-          <Link to={`/teams/${teamId}`} className="back-link">&larr; Назад к команде</Link>
+          <Link to={`/teams/${teamId}`} className="back-link">&larr; Back to team</Link>
         </div>
         <div className="member-profile-period">
-          <label>Период:</label>
+          <label>Period:</label>
           <input type="date" value={from} onChange={e => setFrom(e.target.value)} />
           <span>—</span>
           <input type="date" value={to} onChange={e => setTo(e.target.value)} />
@@ -149,7 +149,7 @@ export function MemberProfilePage() {
           <div className="member-info-badges">
             <RoleBadge role={member.role} />
             <GradeBadge grade={member.grade} />
-            <span className="member-info-team">{member.teamName} &middot; {member.hoursPerDay}h/день</span>
+            <span className="member-info-team">{member.teamName} &middot; {member.hoursPerDay}h/day</span>
           </div>
         </div>
       </div>
@@ -157,38 +157,38 @@ export function MemberProfilePage() {
       {/* Summary Cards */}
       <div className="member-summary-cards">
         <MetricCard
-          title="Закрыто задач"
+          title="Tasks closed"
           value={summary.completedCount}
-          subtitle="за период"
+          subtitle="for period"
           trend={summary.completedCount > 0 ? 'up' : 'neutral'}
-          tooltip="Количество задач со статусом Done за выбранный период"
+          tooltip="Number of tasks in Done status for the selected period"
         />
         <MetricCard
-          title="Средний DSR"
+          title="Average DSR"
           value={summary.avgDsr.toFixed(2)}
-          subtitle={summary.avgDsr <= 1.0 ? 'Быстрее оценки' : 'Медленнее оценки'}
+          subtitle={summary.avgDsr <= 1.0 ? 'Faster than estimate' : 'Slower than estimate'}
           trend={summary.avgDsr <= 1.0 ? 'up' : 'down'}
-          tooltip="Delivery Speed Ratio = потрачено / оценено. Меньше 1.0 = делает быстрее, чем оценивает"
+          tooltip="Delivery Speed Ratio = spent / estimated. Below 1.0 = works faster than estimated"
         />
         <MetricCard
           title="Cycle Time"
           value={`${summary.avgCycleTimeDays}d`}
-          subtitle="среднее"
+          subtitle="average"
           trend="neutral"
-          tooltip="Среднее время от начала работы (In Progress) до завершения (Done)"
+          tooltip="Average time from start (In Progress) to completion (Done)"
         />
         <MetricCard
-          title="Загрузка"
+          title="Utilization"
           value={`${summary.utilization}%`}
           subtitle="capacity"
           trend="neutral"
-          tooltip="Процент использования эффективного рабочего времени за период"
+          tooltip="Percentage of effective working time used for the period"
         />
         <MetricCard
-          title="Часы"
+          title="Hours"
           value={`${summary.totalSpentH}/${summary.totalEstimateH}`}
-          subtitle="факт / оценка"
-          tooltip="Суммарные затраченные часы vs суммарная оценка за период"
+          subtitle="actual / estimate"
+          tooltip="Total spent hours vs total estimate for the period"
         />
       </div>
 
@@ -196,7 +196,7 @@ export function MemberProfilePage() {
       {availableComponents.length > 0 && (
         <div className="profile-section" style={{ marginBottom: 16 }}>
           <div className="profile-section-header">
-            <h3>Компетенции</h3>
+            <h3>Competencies</h3>
             <span className="section-badge">{competencies.length}/{availableComponents.length}</span>
           </div>
           <div className="competency-grid">
@@ -221,7 +221,7 @@ export function MemberProfilePage() {
       {upcomingAbsences.length > 0 && (
         <div className="profile-section" style={{ marginBottom: 16 }}>
           <div className="profile-section-header">
-            <h3>Предстоящие отсутствия</h3>
+            <h3>Upcoming absences</h3>
             <span className="section-badge">{upcomingAbsences.length}</span>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, padding: '8px 0' }}>
@@ -264,23 +264,23 @@ export function MemberProfilePage() {
         {/* ===== Completed Tasks ===== */}
         <div className="profile-section full-width">
           <div className="profile-section-header">
-            <h3>Выполненные задачи</h3>
+            <h3>Completed tasks</h3>
             <span className="section-badge">{completedTasks.length}</span>
           </div>
           {completedTasks.length === 0 ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#6b778c', fontSize: 13 }}>
-              Нет выполненных задач за выбранный период
+              No completed tasks for the selected period
             </div>
           ) : (
             <table className="profile-tasks-table">
               <thead>
                 <tr>
-                  <th>Задача</th>
-                  <th>Описание</th>
-                  <th style={{ textAlign: 'right' }}>Оценка</th>
-                  <th style={{ textAlign: 'right' }}>Факт</th>
+                  <th>Task</th>
+                  <th>Description</th>
+                  <th style={{ textAlign: 'right' }}>Estimate</th>
+                  <th style={{ textAlign: 'right' }}>Actual</th>
                   <th style={{ textAlign: 'center' }}>DSR</th>
-                  <th>Дата</th>
+                  <th>Date</th>
                 </tr>
               </thead>
               <tbody>
@@ -311,7 +311,7 @@ export function MemberProfilePage() {
                 ))}
                 {/* Totals row */}
                 <tr className="tasks-totals-row">
-                  <td colSpan={2}>Итого</td>
+                  <td colSpan={2}>Total</td>
                   <td className="task-hours" style={{ textAlign: 'right' }}>{formatHours(summary.totalEstimateH)}</td>
                   <td style={{ textAlign: 'right' }}>
                     <span className={`task-hours ${summary.totalSpentH > summary.totalEstimateH ? 'over' : 'under'}`}>
@@ -333,34 +333,34 @@ export function MemberProfilePage() {
         {/* ===== Trend Chart ===== */}
         <div className="profile-section full-width">
           <div className="profile-section-header">
-            <h3>Тренд по неделям</h3>
+            <h3>Weekly trend</h3>
           </div>
           {weeklyTrend.length > 0 ? (
             <>
               <TrendChart data={weeklyTrend} />
               <div className="profile-stats-row">
                 <div className="profile-stat">
-                  <div className="profile-stat-label">DSR тренд</div>
+                  <div className="profile-stat-label">DSR trend</div>
                   <div className={`profile-stat-value ${getDsrStatClass(summary.avgDsr)}`}>
                     {summary.avgDsr < 1 ? '\u2191' : '\u2193'} {summary.avgDsr.toFixed(2)}
                   </div>
-                  <div className="profile-stat-hint">за период</div>
+                  <div className="profile-stat-hint">for period</div>
                 </div>
                 <div className="profile-stat">
-                  <div className="profile-stat-label">Задач / неделю</div>
+                  <div className="profile-stat-label">Tasks / week</div>
                   <div className="profile-stat-value">{avgTasksPerWeek}</div>
-                  <div className="profile-stat-hint">среднее</div>
+                  <div className="profile-stat-hint">average</div>
                 </div>
                 <div className="profile-stat">
-                  <div className="profile-stat-label">Часов / неделю</div>
+                  <div className="profile-stat-label">Hours / week</div>
                   <div className="profile-stat-value">{avgHoursPerWeek}</div>
-                  <div className="profile-stat-hint">залогировано</div>
+                  <div className="profile-stat-hint">logged</div>
                 </div>
               </div>
             </>
           ) : (
             <div style={{ padding: 20, textAlign: 'center', color: '#6b778c', fontSize: 13 }}>
-              Нет данных для отображения тренда
+              No data to show the trend
             </div>
           )}
         </div>
@@ -368,22 +368,22 @@ export function MemberProfilePage() {
         {/* ===== In Progress + Upcoming ===== */}
         <div className="profile-section full-width">
           <div className="profile-section-header">
-            <h3>Текущие и предстоящие задачи</h3>
+            <h3>Current and upcoming tasks</h3>
             <span className="section-badge">{activeTasks.length + upcomingTasks.length}</span>
           </div>
           {activeTasks.length === 0 && upcomingTasks.length === 0 ? (
             <div style={{ padding: 20, textAlign: 'center', color: '#6b778c', fontSize: 13 }}>
-              Нет текущих и предстоящих задач
+              No current or upcoming tasks
             </div>
           ) : (
             <table className="profile-tasks-table">
               <thead>
                 <tr>
-                  <th>Задача</th>
-                  <th>Описание</th>
-                  <th style={{ textAlign: 'center' }}>Статус</th>
-                  <th style={{ textAlign: 'right' }}>Оценка</th>
-                  <th style={{ textAlign: 'right' }}>Потрачено</th>
+                  <th>Task</th>
+                  <th>Description</th>
+                  <th style={{ textAlign: 'center' }}>Status</th>
+                  <th style={{ textAlign: 'right' }}>Estimate</th>
+                  <th style={{ textAlign: 'right' }}>Spent</th>
                 </tr>
               </thead>
               <tbody>

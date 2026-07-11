@@ -1360,11 +1360,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Сопоставьте типы задач Jira с категориями LeadBoard:
-          {' '}<strong>EPIC</strong> — фичи,
-          {' '}<strong>STORY</strong> — рабочие задачи,
-          {' '}<strong>SUBTASK</strong> — подзадачи с привязкой к роли,
-          {' '}<strong>IGNORE</strong> — не отслеживать.
+          Map Jira issue types to LeadBoard categories:
+          {' '}<strong>EPIC</strong> — features,
+          {' '}<strong>STORY</strong> — work items,
+          {' '}<strong>SUBTASK</strong> — subtasks tied to a role,
+          {' '}<strong>IGNORE</strong> — don't track.
         </div>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
@@ -1459,8 +1459,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Роли отражают типы работ в команде (анализ, разработка, тестирование).
-          LeadBoard использует роли для расчёта прогресса и прогноза сроков.
+          Roles reflect the kinds of work in the team (analysis, development, testing).
+          LeadBoard uses roles to compute progress and forecast dates.
           <br /><br />
           <strong>Sort order defines the pipeline sequence</strong> — tasks are processed in this order (e.g. Analysis → Development → Testing).
         </div>
@@ -1546,15 +1546,15 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Сопоставьте статусы Jira с категориями LeadBoard:
+          Map Jira statuses to LeadBoard categories:
           <br /><br />
-          <strong>NEW</strong> — задача не начата,
-          <strong> REQUIREMENTS</strong> — сбор требований (эпики),
-          <strong> PLANNED</strong> — запланировано (эпики),
-          <strong> IN_PROGRESS</strong> — в работе,
-          <strong> DONE</strong> — завершено.
+          <strong>NEW</strong> — not started,
+          <strong> REQUIREMENTS</strong> — gathering requirements (epics),
+          <strong> PLANNED</strong> — planned (epics),
+          <strong> IN_PROGRESS</strong> — in progress,
+          <strong> DONE</strong> — completed.
           <br />
-          <strong>Score Weight</strong> — вес для расчёта % завершения.
+          <strong>Score Weight</strong> — weight for computing % complete.
         </div>
         <div className="status-filter">
           {['PROJECT', 'EPIC', 'STORY', 'BUG', 'SUBTASK'].map(f => (
@@ -1654,10 +1654,10 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Типы связей определяют зависимости между задачами:
-          {' '}<strong>BLOCKS</strong> — блокирующие зависимости (отображаются на доске),
-          {' '}<strong>RELATED</strong> — информационные связи,
-          {' '}<strong>IGNORE</strong> — не отслеживать.
+          Link types define dependencies between issues:
+          {' '}<strong>BLOCKS</strong> — blocking dependencies (shown on the board),
+          {' '}<strong>RELATED</strong> — informational links,
+          {' '}<strong>IGNORE</strong> — don't track.
         </div>
         <div className="workflow-table-wrapper">
           <table className="workflow-table">
@@ -1703,8 +1703,8 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
     return (
       <>
         <div className="wizard-info-block">
-          Проверьте конфигурацию перед сохранением. LeadBoard будет использовать
-          эти маппинги для доски, метрик и прогнозов.
+          Review the configuration before saving. LeadBoard will use
+          these mappings for the board, metrics, and forecasts.
         </div>
         <div className="wizard-review">
           <div className="wizard-review-card">

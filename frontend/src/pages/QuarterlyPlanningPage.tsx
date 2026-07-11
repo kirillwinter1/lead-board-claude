@@ -561,7 +561,7 @@ export function QuarterlyPlanningPage() {
               cursor: pendingCount > 0 ? 'pointer' : 'not-allowed',
             }}
           >
-            Опубликовать → Jira{pendingCount > 0 ? ` (${pendingCount})` : ''}
+            Publish → Jira{pendingCount > 0 ? ` (${pendingCount})` : ''}
           </button>
         </div>
       </div>

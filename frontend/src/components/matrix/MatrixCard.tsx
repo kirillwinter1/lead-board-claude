@@ -24,7 +24,7 @@ export function MatrixCard({ card, jiraBaseUrl }: MatrixCardProps) {
   }
 
   const priorityIconUrl = getPriorityIconUrl(card.priority)
-  const estimateLabel = card.estimateHours != null ? `${card.estimateHours}ч` : '—'
+  const estimateLabel = card.estimateHours != null ? `${card.estimateHours}h` : '—'
 
   return (
     <div

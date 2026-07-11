@@ -146,7 +146,7 @@ export function InQuarterColumn({
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: 18, color: TEXT_PRIMARY }}>
-            В квартале <span style={{ color: LINK_COLOR }}>{targetQuarter}</span>
+            In quarter <span style={{ color: LINK_COLOR }}>{targetQuarter}</span>
           </h2>
           <span style={{ fontSize: 12, color: TEXT_MUTED }}>
             {epics.length} {epics.length === 1 ? 'epic' : 'epics'} · {Math.round(totalEstimatedDays)} estimated person-days

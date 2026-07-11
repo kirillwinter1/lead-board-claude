@@ -318,7 +318,7 @@ describe('TeamMembersPage', () => {
       renderTeamMembersPage()
 
       await waitFor(() => {
-        expect(screen.getByText('Настройки планирования')).toBeInTheDocument()
+        expect(screen.getByText('Planning settings')).toBeInTheDocument()
       })
     })
 
@@ -326,19 +326,19 @@ describe('TeamMembersPage', () => {
       renderTeamMembersPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Настройки планирования'))
+        fireEvent.click(screen.getByText('Planning settings'))
       })
 
-      expect(screen.getByText('Коэффициенты грейдов')).toBeInTheDocument()
-      expect(screen.getByText('Буфер рисков')).toBeInTheDocument()
-      expect(screen.getByText('WIP лимиты (рекомендательные)')).toBeInTheDocument()
+      expect(screen.getByText('Grade coefficients')).toBeInTheDocument()
+      expect(screen.getByText('Risk buffer')).toBeInTheDocument()
+      expect(screen.getByText('WIP limits (advisory)')).toBeInTheDocument()
     })
 
     it('should show grade coefficient inputs', async () => {
       renderTeamMembersPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Настройки планирования'))
+        fireEvent.click(screen.getByText('Planning settings'))
       })
 
       expect(screen.getByDisplayValue('0.8')).toBeInTheDocument() // Senior
@@ -350,10 +350,10 @@ describe('TeamMembersPage', () => {
       renderTeamMembersPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Настройки планирования'))
+        fireEvent.click(screen.getByText('Planning settings'))
       })
 
-      expect(screen.getByText('Сохранить настройки')).toBeInTheDocument()
+      expect(screen.getByText('Save settings')).toBeInTheDocument()
     })
 
     it('should call updatePlanningConfig on save', async () => {
@@ -362,10 +362,10 @@ describe('TeamMembersPage', () => {
       renderTeamMembersPage()
 
       await waitFor(() => {
-        fireEvent.click(screen.getByText('Настройки планирования'))
+        fireEvent.click(screen.getByText('Planning settings'))
       })
 
-      fireEvent.click(screen.getByText('Сохранить настройки'))
+      fireEvent.click(screen.getByText('Save settings'))
 
       await waitFor(() => {
         expect(teamsApi.updatePlanningConfig).toHaveBeenCalledWith(1, expect.any(Object))
