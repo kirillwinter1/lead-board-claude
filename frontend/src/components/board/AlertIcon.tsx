@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom'
 import { useTooltipPosition } from '../../hooks/useTooltipPosition'
 import type { BoardNode } from './types'
-import { SEVERITY_COLORS } from '../SeverityBadge'
+import { SEVERITY_COLORS } from '../../constants/colors'
 
 /** Small colour-coded severity dot — replaces the 🔴🟡🔵 emoji. Colour from SEVERITY_COLORS. */
 function SeverityDot({ severity }: { severity: string }) {
