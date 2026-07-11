@@ -48,6 +48,11 @@
   padding: 2px 8px;
 }
 
+/* F91 — anchor the inline save error (.epic-role-error, defined in BoardPage.css). */
+.planning-role-chip.epic-role-chip.editing {
+  position: relative;
+}
+
 /* Remaining-work chips reuse the estimate-chip look but are display-only. */
 .planning-role-chip.epic-role-chip.todo.readonly {
   cursor: default;
