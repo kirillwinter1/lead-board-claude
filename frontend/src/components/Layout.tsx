@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { SetupWizardPage } from '../pages/SetupWizardPage'
 import { getTenantSlug, setTenantSlug } from '../utils/tenant'
 import { ChatWidget } from './chat/ChatWidget'
+import { TEXT_PRIMARY, TEXT_MUTED, TEXT_SUBTLE } from '../constants/colors'
 import './Header.css'
 
 declare const __APP_VERSION__: string
@@ -130,8 +131,8 @@ export function Layout() {
       {auth.authenticated ? (
         tenantError ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 56px)', gap: '16px', padding: '24px' }}>
-            <h2 style={{ margin: 0, color: '#333' }}>Tenant not found</h2>
-            <p style={{ margin: 0, color: '#666', textAlign: 'center' }}>
+            <h2 style={{ margin: 0, color: TEXT_PRIMARY }}>Tenant not found</h2>
+            <p style={{ margin: 0, color: TEXT_MUTED, textAlign: 'center' }}>
               The tenant <strong>"{getTenantSlug()}"</strong> does not exist.
               Please check your tenant slug or register a new workspace.
             </p>
@@ -158,15 +159,15 @@ export function Layout() {
         ) : null
       ) : auth.loading ? null : (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 56px)', gap: '16px' }}>
-          <h2 style={{ margin: 0, color: '#333' }}>Log in to continue</h2>
-          <p style={{ margin: 0, color: '#666' }}>You need to authenticate with Atlassian to access the board</p>
+          <h2 style={{ margin: 0, color: TEXT_PRIMARY }}>Log in to continue</h2>
+          <p style={{ margin: 0, color: TEXT_MUTED }}>You need to authenticate with Atlassian to access the board</p>
           <button className="btn btn-secondary" onClick={handleLogin} style={{ fontSize: '16px', padding: '10px 24px' }}>
             Login with Atlassian
           </button>
         </div>
       )}
       {auth.authenticated && <ChatWidget />}
-      <div style={{ position: 'fixed', bottom: '8px', right: '12px', fontSize: '11px', color: '#aaa', pointerEvents: 'none', zIndex: 1 }}>
+      <div style={{ position: 'fixed', bottom: '8px', right: '12px', fontSize: '11px', color: TEXT_SUBTLE, pointerEvents: 'none', zIndex: 1 }}>
         v{__APP_VERSION__}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { riceApi, RiceTemplate, RiceTemplateListItem, RiceAssessment, RiceAssessmentRequest, AssessmentAnswerEntry, RiceCriteria } from '../../api/rice'
-import { BG_SUBTLE, INFO_BG } from '../../constants/colors'
+import { BG_SUBTLE, INFO_BG, INFO_BORDER, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_MUTED, TEXT_SUBTLE, LINK_COLOR, SEPARATOR, BORDER_DEFAULT } from '../../constants/colors'
 
 interface RiceFormProps {
   issueKey: string
@@ -140,11 +140,11 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
   }
 
   if (loading) {
-    return <div style={{ padding: 12, color: '#6B778C', fontSize: 13 }}>Loading RICE...</div>
+    return <div style={{ padding: 12, color: TEXT_MUTED, fontSize: 13 }}>Loading RICE...</div>
   }
 
   if (!template) {
-    return <div style={{ padding: 12, color: '#97A0AF', fontSize: 13 }}>No RICE templates available</div>
+    return <div style={{ padding: 12, color: TEXT_SUBTLE, fontSize: 13 }}>No RICE templates available</div>
   }
 
   const grouped = groupByParameter(template.criteria)
@@ -152,18 +152,18 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
 
   return (
     <div style={{
-      borderTop: '1px solid #EBECF0',
+      borderTop: `1px solid ${SEPARATOR}`,
       marginTop: 8,
       paddingTop: 12,
     }}>
       {/* Header with template selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#172B4D' }}>RICE Scoring</span>
+        <span style={{ fontSize: 14, fontWeight: 600, color: TEXT_PRIMARY }}>RICE Scoring</span>
         {templates.length > 1 && (
           <select
             value={selectedTemplateId ?? ''}
             onChange={e => setSelectedTemplateId(Number(e.target.value))}
-            style={{ fontSize: 12, padding: '3px 6px', border: '1px solid #DFE1E6', borderRadius: 3 }}
+            style={{ fontSize: 12, padding: '3px 6px', border: `1px solid ${BORDER_DEFAULT}`, borderRadius: 3 }}
           >
             {templates.map(t => (
               <option key={t.id} value={t.id}>{t.name}</option>
@@ -171,7 +171,7 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
           </select>
         )}
         {!templates.length || templates.length === 1 ? (
-          <span style={{ fontSize: 12, color: '#6B778C' }}>
+          <span style={{ fontSize: 12, color: TEXT_MUTED }}>
             {template.name}
           </span>
         ) : null}
@@ -199,10 +199,10 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
               justifyContent: 'space-between',
               marginBottom: 6,
             }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#42526E', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: TEXT_SECONDARY, textTransform: 'uppercase' }}>
                 {PARAM_LABELS[param] || param}
               </span>
-              <span style={{ fontSize: 12, color: '#0052CC', fontWeight: 600 }}>
+              <span style={{ fontSize: 12, color: LINK_COLOR, fontWeight: 600 }}>
                 {param === 'CONFIDENCE' || param === 'EFFORT'
                   ? (paramSum > 0 ? paramSum : '—')
                   : `\u03A3 = ${paramSum}`
@@ -212,16 +212,16 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
 
             <div style={{
               background: '#fff',
-              border: '1px solid #EBECF0',
+              border: `1px solid ${SEPARATOR}`,
               borderRadius: 4,
               padding: '8px 12px',
             }}>
               {criteria.map(c => (
                 <div key={c.id} style={{ marginBottom: criteria.indexOf(c) < criteria.length - 1 ? 8 : 0 }}>
-                  <div style={{ fontSize: 12, color: '#172B4D', fontWeight: 500, marginBottom: 4 }}>
+                  <div style={{ fontSize: 12, color: TEXT_PRIMARY, fontWeight: 500, marginBottom: 4 }}>
                     {c.name}
                     {c.description && (
-                      <span style={{ color: '#97A0AF', fontWeight: 400 }}> — {c.description}</span>
+                      <span style={{ color: TEXT_SUBTLE, fontWeight: 400 }}> — {c.description}</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -235,12 +235,12 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
                             alignItems: 'center',
                             gap: 4,
                             fontSize: 12,
-                            color: isSelected ? '#0052CC' : '#42526E',
+                            color: isSelected ? LINK_COLOR : TEXT_SECONDARY,
                             cursor: 'pointer',
                             padding: '3px 8px',
                             borderRadius: 3,
                             background: isSelected ? INFO_BG : BG_SUBTLE,
-                            border: isSelected ? '1px solid #B3D4FF' : '1px solid transparent',
+                            border: isSelected ? `1px solid ${INFO_BORDER}` : '1px solid transparent',
                             transition: 'all 0.1s',
                           }}
                         >
@@ -252,7 +252,7 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
                             style={{ display: 'none' }}
                           />
                           <span>{opt.label}</span>
-                          <span style={{ color: isSelected ? '#0052CC' : '#97A0AF', fontWeight: 600 }}>
+                          <span style={{ color: isSelected ? LINK_COLOR : TEXT_SUBTLE, fontWeight: 600 }}>
                             +{opt.score}
                           </span>
                         </label>
@@ -272,18 +272,18 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '10px 0',
-        borderTop: '2px solid #DFE1E6',
+        borderTop: `2px solid ${BORDER_DEFAULT}`,
         marginTop: 4,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 13, color: '#172B4D' }}>
+          <span style={{ fontSize: 13, color: TEXT_PRIMARY }}>
             RICE Score = ({preview.reach} × {preview.impact} × {preview.confidence ?? '?'}) / {preview.effort ?? '?'}
-            = <strong style={{ fontSize: 15, color: preview.score != null ? '#0052CC' : '#97A0AF' }}>
+            = <strong style={{ fontSize: 15, color: preview.score != null ? LINK_COLOR : TEXT_SUBTLE }}>
               {preview.score != null ? preview.score.toFixed(1) : '—'}
             </strong>
           </span>
           {assessment?.normalizedScore != null && (
-            <span style={{ fontSize: 12, color: '#6B778C' }}>
+            <span style={{ fontSize: 12, color: TEXT_MUTED }}>
               Normalized: <strong>{assessment.normalizedScore.toFixed(0)}/100</strong>
             </span>
           )}
@@ -295,8 +295,8 @@ export function RiceForm({ issueKey, onSaved }: RiceFormProps) {
             padding: '6px 16px',
             fontSize: 13,
             fontWeight: 600,
-            background: saving || preview.score == null ? '#DFE1E6' : '#0052CC',
-            color: saving || preview.score == null ? '#6B778C' : '#fff',
+            background: saving || preview.score == null ? BORDER_DEFAULT : LINK_COLOR,
+            color: saving || preview.score == null ? TEXT_MUTED : '#fff',
             border: 'none',
             borderRadius: 3,
             cursor: saving || preview.score == null ? 'not-allowed' : 'pointer',

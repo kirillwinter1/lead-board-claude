@@ -3,6 +3,7 @@ import { projectsApi, type ProjectDetailDto } from '../../api/projects'
 import { HoverInfoCard } from '../HoverInfoCard'
 import { TeamBadge } from '../TeamBadge'
 import { TooltipIssueHeader } from './TooltipIssueHeader'
+import { TEXT_PRIMARY, TEXT_SECONDARY, TEXT_SUBTLE } from '../../constants/colors'
 
 // F85 — tooltip проекта: иконка+ключ / название / описание, затем прогресс, дедлайн, команды.
 // Команды выводятся из списка эпиков проекта (distinct по имени).
@@ -19,22 +20,22 @@ export function ProjectTooltip({ projectKey, children }: { projectKey: string; c
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <TooltipIssueHeader issueType={p.issueType} issueKey={p.issueKey} summary={p.summary} />
             {p.description ? (
-              <div style={{ color: '#42526e', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'hidden', lineHeight: 1.4 }}>
+              <div style={{ color: TEXT_SECONDARY, whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'hidden', lineHeight: 1.4 }}>
                 {p.description}
               </div>
             ) : (
-              <div style={{ color: '#97a0af', fontStyle: 'italic' }}>No description</div>
+              <div style={{ color: TEXT_SUBTLE, fontStyle: 'italic' }}>No description</div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#42526e' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: TEXT_SECONDARY }}>
               <span>Progress</span>
-              <span style={{ fontWeight: 600, color: '#172b4d' }}>
+              <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>
                 {p.progressPercent}% · {p.completedEpicCount}/{p.epics.length} epics
               </span>
             </div>
             {p.expectedDone && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#42526e' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: TEXT_SECONDARY }}>
                 <span>Deadline</span>
-                <span style={{ fontWeight: 600, color: '#172b4d' }}>{p.expectedDone}</span>
+                <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>{p.expectedDone}</span>
               </div>
             )}
             {teams.length > 0 && (

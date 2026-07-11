@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { hexToRgba } from '../constants/colors'
 import './MultiSelectDropdown.css'
 
 interface SingleSelectOption {
@@ -102,7 +103,7 @@ export function SingleSelectDropdown({
                 key={option.value}
                 className={`filter-dropdown-item ${selected === option.value ? 'filter-dropdown-item-selected' : ''}`}
                 style={selected === option.value && option.color ? {
-                  backgroundColor: option.color + '25',
+                  backgroundColor: hexToRgba(option.color, 0.145),
                 } : undefined}
                 onClick={() => { onChange(option.value); setIsOpen(false) }}
               >

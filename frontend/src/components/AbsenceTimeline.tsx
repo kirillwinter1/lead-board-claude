@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { teamsApi, Absence, TeamMember, CreateAbsenceRequest } from '../api/teams'
-import { AbsenceModal, ABSENCE_TYPE_LABELS, ABSENCE_COLORS } from './AbsenceModal'
-import { ERROR_BG, ERROR_TEXT } from '../constants/colors'
+import { AbsenceModal, ABSENCE_TYPE_LABELS } from './AbsenceModal'
+import { ERROR_BG, ERROR_TEXT, ABSENCE_COLORS, hexToRgba } from '../constants/colors'
 import './AbsenceTimeline.css'
 
 const DAY_WIDTH = 32
@@ -204,7 +204,7 @@ export function AbsenceTimeline({ teamId, members, teamColor, canManage }: Absen
                     className="absence-member-avatar-placeholder"
                     style={{
                       borderColor: teamColor || '#ddd',
-                      backgroundColor: teamColor ? teamColor + '20' : '#f0f0f0',
+                      backgroundColor: teamColor ? hexToRgba(teamColor, 0.125) : '#f0f0f0',
                       color: teamColor || '#666',
                     }}
                   >

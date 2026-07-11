@@ -1,14 +1,14 @@
 .guide-page {
   display: flex;
   min-height: calc(100vh - 56px);
-  background: #f8f9fa;
+  background: #f4f5f7;
 }
 
 .guide-sidebar-area {
   width: 260px;
   min-width: 260px;
   background: #fff;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid #dfe1e6;
   position: sticky;
   top: 56px;
   height: calc(100vh - 56px);
@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #172b4d;
 }
 
 .guide-lang-toggle {
@@ -43,7 +43,7 @@
   padding: 2px 6px;
   font-size: 12px;
   font-weight: 500;
-  color: #888;
+  color: #6b778c;
   cursor: pointer;
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
@@ -56,7 +56,7 @@
 
 .guide-lang-btn.active {
   color: #1558bc;
-  background: #e9f2fe;
+  background: #e9f2ff;
   font-weight: 600;
 }
 
@@ -74,7 +74,7 @@
 }
 
 .guide-content-area p {
-  color: #666;
+  color: #6b778c;
   font-size: 15px;
   line-height: 1.6;
 }
@@ -90,7 +90,7 @@
     position: static;
     height: auto;
     border-right: none;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid #dfe1e6;
     padding: 16px;
   }
 

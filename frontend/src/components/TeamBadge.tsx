@@ -1,3 +1,5 @@
+import { hexToRgba } from '../constants/colors'
+
 interface TeamBadgeProps {
   name: string | null
   color: string | null
@@ -19,7 +21,7 @@ export function TeamBadge({ name, color }: TeamBadgeProps) {
         padding: '2px 8px',
         borderRadius: 4,
         borderLeft: `3px solid ${color}`,
-        backgroundColor: color + '14',
+        backgroundColor: hexToRgba(color, 0.08),
         color: color,
         fontSize: 12,
         fontWeight: 600,

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { hexToRgba } from '../constants/colors'
 import './MultiSelectDropdown.css'
 
 interface MultiSelectDropdownProps {
@@ -76,7 +77,7 @@ export function MultiSelectDropdown({
                 key={option}
                 className={`filter-dropdown-item ${selected.has(option) ? 'filter-dropdown-item-selected' : ''}`}
                 style={selected.has(option) && colorMap?.get(option) ? {
-                  backgroundColor: colorMap.get(option)! + '25',
+                  backgroundColor: hexToRgba(colorMap.get(option)!, 0.145),
                 } : undefined}
                 onClick={() => onToggle(option)}
               >

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { TimeInStatusResponse } from '../../api/metrics'
 import { StatusBadge } from '../board/StatusBadge'
-import { lightenColor } from '../../constants/colors'
+import { lightenColor, DSR_RED } from '../../constants/colors'
 import './TimeInStatusTable.css'
 
 interface TimeInStatusTableProps {
@@ -58,7 +58,7 @@ export function TimeInStatusTable({ data }: TimeInStatusTableProps) {
   const heatColor = (value: number, max: number): string => {
     if (max === 0) return 'transparent'
     const intensity = Math.min(value / max, 1)
-    return lightenColor('#FF5630', 1 - intensity * 0.4) // light red heatmap
+    return lightenColor(DSR_RED, 1 - intensity * 0.4) // light red heatmap
   }
 
   const sortIndicator = (key: SortKey) => {

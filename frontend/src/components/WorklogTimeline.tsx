@@ -2,9 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { teamsApi, TeamMember, WorklogTimelineResponse, WorklogMember, WorklogDayInfo } from '../api/teams'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
-import { ABSENCE_COLORS } from './AbsenceModal'
 import { AbsenceType } from '../api/teams'
-import { ERROR_TEXT } from '../constants/colors'
+import { ERROR_TEXT, ABSENCE_COLORS, hexToRgba } from '../constants/colors'
 import './WorklogTimeline.css'
 
 const DAY_WIDTH = 32
@@ -163,7 +162,7 @@ export function WorklogTimeline({ teamId, from: propFrom, to: propTo }: WorklogT
             <span
               className="worklog-member-avatar-placeholder"
               style={{
-                backgroundColor: roleColor + '20',
+                backgroundColor: hexToRgba(roleColor, 0.125),
                 color: roleColor,
                 borderColor: roleColor,
               }}
@@ -180,7 +179,7 @@ export function WorklogTimeline({ teamId, from: propFrom, to: propTo }: WorklogT
           <span
             className="worklog-role-badge"
             style={{
-              backgroundColor: roleColor + '20',
+              backgroundColor: hexToRgba(roleColor, 0.125),
               color: roleColor,
             }}
           >
@@ -341,7 +340,7 @@ export function WorklogTimeline({ teamId, from: propFrom, to: propTo }: WorklogT
                   className="worklog-role-separator-right"
                   style={{
                     height: SEPARATOR_HEIGHT,
-                    backgroundColor: getRoleColor(group.role) + '15',
+                    backgroundColor: hexToRgba(getRoleColor(group.role), 0.08),
                   }}
                 />
                 {group.members.map(m => renderMemberRow(m, days))}

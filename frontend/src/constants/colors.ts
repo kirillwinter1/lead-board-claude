@@ -36,6 +36,15 @@ export const GRADE_COLORS: Record<string, { bg: string; text: string }> = {
   senior: { bg: '#e0f2f1', text: '#00695c' },
 }
 
+// Absence type colors — member vacation/sick/day-off/other pills.
+// Used by AbsenceModal, AbsenceTimeline, WorklogTimeline, MyWorklogCalendar, MemberProfilePage, MyWorkPage.
+export const ABSENCE_COLORS: Record<string, string> = {
+  VACATION: '#4C9AFF',
+  SICK_LEAVE: '#FF5630',
+  DAY_OFF: '#FF991F',
+  OTHER: '#97A0AF',
+}
+
 // Severity colors — used in DataQualityPage
 export const SEVERITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   ERROR: { bg: '#fee2e2', text: '#dc2626', border: '#fca5a5' },
@@ -90,6 +99,9 @@ export const WARNING_BG = '#FFFAE6'
 export const WARNING_BORDER = '#FFE380'
 export const WARNING_TEXT = '#7B4A00'
 
+// Warning accent orange — RICE mid-band, WARNING-severity text/dots
+export const WARNING_ORANGE = '#FF8B00'
+
 // Success (Atlassian green tones)
 export const SUCCESS_BG = '#E3FCEF'
 export const SUCCESS_TEXT = '#006644'
@@ -122,6 +134,18 @@ export const TOOLTIP_PROGRESS_TRACK = '#42526e'
 export const TOOLTIP_SUCCESS = '#22c55e'
 export const TOOLTIP_VALUE = '#e5e7eb'
 export const TOOLTIP_ACCENT = '#FFD700'
+
+// Timeline (muted Gantt palette) — intentionally dimmer than Board equivalents; см. дизайн-решение F91
+export const TIMELINE_PHASE_TINT = 0.65
+export const TIMELINE_PHASE_TINT_ROUGH = 0.8
+export const TIMELINE_ROLE_BORDER_TINT = 0.5
+export const TIMELINE_BAR_TRACK = '#e5e7eb'
+export const TIMELINE_FLAGGED_BORDER = '#f97316'
+export const TIMELINE_BLOCKED_BORDER = '#ef4444'
+export const TIMELINE_ROUGH_BG = '#f0f0f0'
+export const TIMELINE_ROUGH_BADGE_BG = '#fef3c7'
+export const TIMELINE_ROUGH_BADGE_TEXT = '#92400e'
+export const TOOLTIP_DANGER = '#ef4444'
 
 // Eisenhower Matrix quadrant colors (F77) — used in MatrixQuadrant / MatrixUnassigned.
 // P1 important+urgent (red), P2 important/not urgent (amber), P3 not important/urgent (purple),

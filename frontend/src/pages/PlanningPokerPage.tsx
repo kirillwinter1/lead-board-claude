@@ -18,7 +18,7 @@ import {
   createSession,
 } from '../api/poker'
 import { getStatusStyles, type StatusStyle } from '../api/board'
-import { INFO_BG, SUCCESS_BG } from '../constants/colors'
+import { INFO_BG, SUCCESS_BG, INFO_TEXT, SUCCESS_TEXT, BORDER_DEFAULT, TEXT_SECONDARY } from '../constants/colors'
 
 // Two overlapping poker cards — line-art empty-state icon (no emoji)
 function PlanningIcon() {
@@ -148,11 +148,11 @@ export function PlanningPokerPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PREPARING':
-        return <span className="status-badge" style={{ background: INFO_BG, color: '#0747a6' }}>Preparing</span>
+        return <span className="status-badge" style={{ background: INFO_BG, color: INFO_TEXT }}>Preparing</span>
       case 'ACTIVE':
-        return <span className="status-badge" style={{ background: SUCCESS_BG, color: '#006644' }}>Active</span>
+        return <span className="status-badge" style={{ background: SUCCESS_BG, color: SUCCESS_TEXT }}>Active</span>
       case 'COMPLETED':
-        return <span className="status-badge" style={{ background: '#dfe1e6', color: '#42526e' }}>Completed</span>
+        return <span className="status-badge" style={{ background: BORDER_DEFAULT, color: TEXT_SECONDARY }}>Completed</span>
       default:
         return <span className="status-badge">{status}</span>
     }

@@ -7,6 +7,7 @@ import { RoleBadge } from '../components/RoleBadge'
 import { GradeBadge } from '../components/GradeBadge'
 import { AbsenceTimeline } from '../components/AbsenceTimeline'
 import { WorklogTimeline } from '../components/WorklogTimeline'
+import { hexToRgba } from '../constants/colors'
 import './TeamsPage.css'
 
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
@@ -327,7 +328,7 @@ export function TeamMembersPage() {
                           height: 28,
                           borderRadius: '50%',
                           border: team.color ? `2px solid ${team.color}` : '2px solid #ddd',
-                          backgroundColor: team.color ? team.color + '20' : '#f0f0f0',
+                          backgroundColor: team.color ? hexToRgba(team.color, 0.125) : '#f0f0f0',
                           color: team.color || '#666',
                           fontSize: 12,
                           fontWeight: 600,

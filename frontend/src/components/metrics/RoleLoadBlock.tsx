@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { getRoleLoad, RoleLoadResponse, RoleLoadInfo, UtilizationStatus, RoleLoadAlert } from '../../api/forecast'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
+import { WARNING_BG, WARNING_BORDER, TEXT_SECONDARY } from '../../constants/colors'
 import './RoleLoadBlock.css'
 
 interface RoleLoadBlockProps {
@@ -100,11 +101,11 @@ export function RoleLoadBlock({ teamId }: RoleLoadBlockProps) {
           <div style={{
             marginTop: 12,
             padding: '8px 12px',
-            background: '#FFFAE6',
-            border: '1px solid #FFE380',
+            background: WARNING_BG,
+            border: `1px solid ${WARNING_BORDER}`,
             borderRadius: 6,
             fontSize: 12,
-            color: '#42526e',
+            color: TEXT_SECONDARY,
           }}>
             {recs.map((r, i) => <div key={i}>• {r}</div>)}
           </div>

@@ -1,3 +1,4 @@
+import { hexToRgba } from '../constants/colors'
 import './FilterChips.css'
 
 export interface FilterChip {
@@ -22,8 +23,8 @@ export function FilterChips({ chips, onClearAll }: FilterChipsProps) {
           key={`${chip.category}-${chip.value}-${i}`}
           className="filter-chip"
           style={chip.color ? {
-            backgroundColor: chip.color + '20',
-            borderColor: chip.color + '50',
+            backgroundColor: hexToRgba(chip.color, 0.125),
+            borderColor: hexToRgba(chip.color, 0.31),
           } : undefined}
         >
           {chip.color && (

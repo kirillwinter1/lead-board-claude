@@ -10,6 +10,7 @@ import { IssueTooltip } from './IssueTooltip'
 import { ProjectTooltip } from './ProjectTooltip'
 import { TeamBadge } from '../TeamBadge'
 import { StatusAgeBadge } from '../StatusAgeBadge'
+import { DSR_RED, INFO_BG, INFO_TEXT, SUCCESS_BG, SUCCESS_TEXT, ERROR_BG } from '../../constants/colors'
 import { useWorkflowConfig } from '../../contexts/WorkflowConfigContext'
 import type { BoardRowProps } from './types'
 
@@ -65,7 +66,7 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   <a href={node.jiraUrl} target="_blank" rel="noopener noreferrer" className="issue-key">
                     {node.issueKey}
                   </a>
-                  {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: '#ff5630', backgroundColor: '#ffebe6', lineHeight: '16px' }}>FLG</span>}
+                  {node.flagged && <span className="flag-indicator" title="Flagged — work paused" style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: DSR_RED, backgroundColor: ERROR_BG, lineHeight: '16px' }}>FLG</span>}
                   <span className="issue-title">{node.title}</span>
                 </IssueTooltip>
               </div>
@@ -91,8 +92,8 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                       fontSize: 10,
                       padding: '1px 5px',
                       borderRadius: 3,
-                      background: '#DEEBFF',
-                      color: '#0747A6',
+                      background: INFO_BG,
+                      color: INFO_TEXT,
                       fontWeight: 500,
                       whiteSpace: 'nowrap',
                       lineHeight: '16px',
@@ -108,8 +109,8 @@ export function BoardRow({ node, level, expanded, onToggle, hasChildren, roughEs
                   fontSize: 10,
                   padding: '1px 5px',
                   borderRadius: 3,
-                  background: '#E3FCEF',
-                  color: '#006644',
+                  background: SUCCESS_BG,
+                  color: SUCCESS_TEXT,
                   fontWeight: 500,
                   whiteSpace: 'nowrap',
                   lineHeight: '16px',
