@@ -6,7 +6,7 @@ import { HomeRedirect } from '../App'
 import { myWorkApi, type MyWorkResponse } from '../api/myWork'
 import { useAuth } from '../contexts/AuthContext'
 
-vi.mock('../api/myWork', () => ({ myWorkApi: { getMyWork: vi.fn(), logTime: vi.fn() } }))
+vi.mock('../api/myWork', () => ({ myWorkApi: { getMyWork: vi.fn(), logTime: vi.fn(), worklogCalendar: vi.fn() } }))
 vi.mock('../api/board', () => ({ getStatusStyles: vi.fn().mockResolvedValue({}) }))
 vi.mock('../contexts/WorkflowConfigContext', () => ({
   useWorkflowConfig: () => ({
@@ -85,13 +85,13 @@ describe('MyWorkPage', () => {
         key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
         parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+        estimateH: 8, spentH: 4, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-1',
       }],
       upcomingAssigned: [{
         key: 'LB-2', summary: 'Upcoming task', issueType: 'Bug', status: 'To Do',
         parentKey: null, parentSummary: null, epicKey: null, epicSummary: null,
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 4, spentH: null, jiraUrl: 'https://jira.example.com/LB-2',
+        estimateH: 4, spentH: null, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-2',
       }],
       teamQueue: [{
         key: 'LB-3', summary: 'Queue story', issueType: 'Story', status: 'Backlog',
@@ -129,13 +129,13 @@ describe('MyWorkPage', () => {
         key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
         parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+        estimateH: 8, spentH: 4, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-1',
       }],
       upcomingAssigned: [{
         key: 'LB-2', summary: 'Upcoming task', issueType: 'Bug', status: 'To Do',
         parentKey: null, parentSummary: null, epicKey: null, epicSummary: null,
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 4, spentH: null, jiraUrl: 'https://jira.example.com/LB-2',
+        estimateH: 4, spentH: null, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-2',
       }],
       teamQueue: [{
         key: 'LB-3', summary: 'Queue story', issueType: 'Story', status: 'Backlog',
@@ -222,7 +222,7 @@ describe('MyWorkPage', () => {
         completedTasks: [{
           key: 'LB-10', summary: 'Completed task', epicKey: 'LB-200', epicSummary: 'Epic X',
           teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-          estimateH: 8, spentH: 7, dsr: 0.88, doneDate: '2026-06-10', jiraUrl: 'https://jira.example.com/LB-10',
+          estimateH: 8, spentH: 7, remainingH: 0, dsr: 0.88, doneDate: '2026-06-10', jiraUrl: 'https://jira.example.com/LB-10',
         }],
         dsrByParentType: [
           { key: 'Story', label: 'Story', taskCount: 4, estimateH: 32, spentH: 30, dsr: 0.94 },
@@ -301,13 +301,13 @@ describe('MyWorkPage', () => {
         key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
         parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+        estimateH: 8, spentH: 4, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-1',
       }],
       upcomingAssigned: [{
         key: 'LB-2', summary: 'Upcoming task', issueType: 'Bug', status: 'To Do',
         parentKey: null, parentSummary: null, epicKey: null, epicSummary: null,
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 4, spentH: null, jiraUrl: 'https://jira.example.com/LB-2',
+        estimateH: 4, spentH: null, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-2',
       }],
       teamQueue: [{
         key: 'LB-3', summary: 'Queue story', issueType: 'Story', status: 'Backlog',
@@ -365,7 +365,7 @@ describe('MyWorkPage', () => {
         completedTasks: [{
           key: 'LB-10', summary: 'Completed task', epicKey: 'LB-200', epicSummary: 'Epic X',
           teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-          estimateH: 8, spentH: 7, dsr: 0.88, doneDate: '2026-06-10', jiraUrl: 'https://jira.example.com/LB-10',
+          estimateH: 8, spentH: 7, remainingH: 0, dsr: 0.88, doneDate: '2026-06-10', jiraUrl: 'https://jira.example.com/LB-10',
         }],
         dsrByParentType: [],
         dsrByEpic: [],
@@ -399,7 +399,7 @@ describe('MyWorkPage', () => {
         key: 'LB-1', summary: 'Active task', issueType: 'Story', status: 'In Progress',
         parentKey: null, parentSummary: null, epicKey: 'LB-100', epicSummary: 'Epic A',
         teamId: 1, teamName: 'Team Alpha', teamColor: '#FF0000',
-        estimateH: 8, spentH: 4, jiraUrl: 'https://jira.example.com/LB-1',
+        estimateH: 8, spentH: 4, remainingH: 4, jiraUrl: 'https://jira.example.com/LB-1',
       }],
       upcomingAssigned: [],
       teamQueue: [],
@@ -418,11 +418,11 @@ describe('MyWorkPage', () => {
     fireEvent.click(screen.getByTitle('Log time'))
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Hours')).toBeInTheDocument()
+      expect(screen.getByLabelText('Time spent')).toBeInTheDocument()
     })
 
-    fireEvent.change(screen.getByLabelText('Hours'), { target: { value: '2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Log time' }))
+    fireEvent.change(screen.getByLabelText('Time spent'), { target: { value: '2h' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => {
       expect(myWorkApi.getMyWork).toHaveBeenCalledTimes(2)

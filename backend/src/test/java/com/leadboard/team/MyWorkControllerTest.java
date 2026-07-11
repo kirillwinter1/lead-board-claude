@@ -19,11 +19,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
-import java.math.BigDecimal;
 import java.net.URI;
 import java.time.LocalDate;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -107,22 +107,59 @@ class MyWorkControllerTest {
     }
 
     @Test
+    void worklogCalendarReturns200WithDaysForMonth() throws Exception {
+        LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
+        when(auth.getAtlassianAccountId()).thenReturn("acc-1");
+        when(authorizationService.getCurrentAuth()).thenReturn(auth);
+        when(myWorkService.getWorklogCalendar(eq("acc-1"), eq(java.time.YearMonth.of(2026, 7))))
+                .thenReturn(java.util.List.of(new MyWorkResponse.CalendarDay(
+                        LocalDate.parse("2026-06-29"), "WORKDAY",
+                        new java.math.BigDecimal("1.0"), new java.math.BigDecimal("8.0"), null, java.util.List.of())));
+
+        mockMvc.perform(get("/api/me/worklog-calendar").param("month", "2026-07"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].date").value("2026-06-29"))
+                .andExpect(jsonPath("$[0].dayType").value("WORKDAY"));
+
+        verify(myWorkService).getWorklogCalendar(eq("acc-1"), eq(java.time.YearMonth.of(2026, 7)));
+    }
+
+    @Test
+    void worklogCalendarReturns401WhenAuthMissing() throws Exception {
+        when(authorizationService.getCurrentAuth()).thenReturn(null);
+
+        mockMvc.perform(get("/api/me/worklog-calendar").param("month", "2026-07"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void worklogCalendarReturns400OnInvalidMonth() throws Exception {
+        LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
+        when(auth.getAtlassianAccountId()).thenReturn("acc-1");
+        when(authorizationService.getCurrentAuth()).thenReturn(auth);
+
+        mockMvc.perform(get("/api/me/worklog-calendar").param("month", "not-a-month"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void logTimeReturns200WithWorklogId() throws Exception {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
         when(myWorklogService.logTime(eq("acc-1"), eq("LB-1"), eq(LocalDate.parse("2026-07-08")),
-                eq(new BigDecimal("2.5")), eq("done")))
+                eq(9000), eq(21600), eq("done")))
                 .thenReturn("42");
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"done\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":9000,"
+                                + "\"remainingEstimateSeconds\":21600,\"comment\":\"done\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.worklogId").value("42"));
 
         verify(myWorklogService).logTime(eq("acc-1"), eq("LB-1"), eq(LocalDate.parse("2026-07-08")),
-                eq(new BigDecimal("2.5")), eq("done"));
+                eq(9000), eq(21600), eq("done"));
     }
 
     @Test
@@ -130,12 +167,12 @@ class MyWorkControllerTest {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
-        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+        when(myWorklogService.logTime(anyString(), anyString(), any(), anyInt(), anyInt(), any()))
                 .thenThrow(new MyWorklogService.LogTimeValidationException("Hours must be between 0 and 24"));
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":25,\"comment\":\"\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":90000,\"remainingEstimateSeconds\":0,\"comment\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("Hours must be between 0 and 24"));
     }
@@ -145,12 +182,12 @@ class MyWorkControllerTest {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
-        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+        when(myWorklogService.logTime(anyString(), anyString(), any(), anyInt(), anyInt(), any()))
                 .thenThrow(new MyWorklogService.LogTimeForbiddenException("You can log time only on your own tasks"));
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":9000,\"remainingEstimateSeconds\":21600,\"comment\":\"\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("You can log time only on your own tasks"));
     }
@@ -160,12 +197,12 @@ class MyWorkControllerTest {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
-        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+        when(myWorklogService.logTime(anyString(), anyString(), any(), anyInt(), anyInt(), any()))
                 .thenThrow(new JiraWriteService.NoUserTokenException("no token"));
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":9000,\"remainingEstimateSeconds\":21600,\"comment\":\"\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("Jira session expired — re-login via Atlassian"));
     }
@@ -175,12 +212,12 @@ class MyWorkControllerTest {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
-        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+        when(myWorklogService.logTime(anyString(), anyString(), any(), anyInt(), anyInt(), any()))
                 .thenThrow(WebClientResponseException.create(500, "err", HttpHeaders.EMPTY, new byte[0], null));
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":9000,\"remainingEstimateSeconds\":21600,\"comment\":\"\"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Jira API error"));
     }
@@ -193,13 +230,13 @@ class MyWorkControllerTest {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
-        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+        when(myWorklogService.logTime(anyString(), anyString(), any(), anyInt(), anyInt(), any()))
                 .thenThrow(new WebClientRequestException(
                         new java.io.IOException("boom"), HttpMethod.POST, URI.create("https://api.atlassian.com/x"), HttpHeaders.EMPTY));
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":9000,\"remainingEstimateSeconds\":21600,\"comment\":\"\"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Jira API error"));
     }
@@ -209,13 +246,13 @@ class MyWorkControllerTest {
         LeadBoardAuthentication auth = mock(LeadBoardAuthentication.class);
         when(auth.getAtlassianAccountId()).thenReturn("acc-1");
         when(authorizationService.getCurrentAuth()).thenReturn(auth);
-        when(myWorklogService.logTime(anyString(), anyString(), any(), any(), any()))
+        when(myWorklogService.logTime(anyString(), anyString(), any(), anyInt(), anyInt(), any()))
                 .thenThrow(new MyWorklogService.JiraNoIdException(
                         "Jira did not confirm the worklog — check Jira before retrying"));
 
         mockMvc.perform(post("/api/me/worklog")
                         .contentType(APPLICATION_JSON)
-                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"hours\":2.5,\"comment\":\"\"}"))
+                        .content("{\"issueKey\":\"LB-1\",\"date\":\"2026-07-08\",\"timeSpentSeconds\":9000,\"remainingEstimateSeconds\":21600,\"comment\":\"\"}"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("Jira did not confirm the worklog — check Jira before retrying"));
     }

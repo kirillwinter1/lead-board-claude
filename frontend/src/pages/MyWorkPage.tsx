@@ -73,7 +73,9 @@ function taskRows(tasks: MyTask[], showSpent: boolean, onLog?: (target: LogTimeT
     ) : (
       <span className="task-hours">{formatHours(t.estimateH)}</span>
     ),
-    onLog: onLog ? () => onLog({ key: t.key, summary: t.summary }) : undefined,
+    onLog: onLog
+      ? () => onLog({ key: t.key, summary: t.summary, originalEstimateH: t.estimateH, spentH: t.spentH, remainingH: t.remainingH })
+      : undefined,
   }))
 }
 
@@ -267,7 +269,7 @@ function CompletedTasksTable({ tasks, onLog }: { tasks: MyCompletedTask[]; onLog
                 type="button"
                 className="mywork-log-btn"
                 title="Log time"
-                onClick={() => onLog({ key: t.key, summary: t.summary })}
+                onClick={() => onLog({ key: t.key, summary: t.summary, originalEstimateH: t.estimateH, spentH: t.spentH, remainingH: t.remainingH })}
               >
                 +
               </button>
@@ -396,6 +398,10 @@ export function MyWorkPage() {
   } else {
     const { member, upcomingAbsences, activeTasks, upcomingAssigned, teamQueue, worklogCalendar } = data
     const initials = member.displayName ? member.displayName.split(' ').map(w => w[0]).join('') : '?'
+    // Current calendar month ('YYYY-MM') — the calendar's starting page; /api/me/work
+    // returns worklogCalendar for exactly this month.
+    const now = new Date()
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
     content = (
       <>
@@ -499,11 +505,11 @@ export function MyWorkPage() {
           </TaskSection>
         </div>
 
-        <div className="profile-section full-width">
+        <div className="profile-section full-width mywork-cal-section">
           <div className="profile-section-header">
-            <h3>Time Logged &mdash; Last 4 Weeks</h3>
+            <h3>Time Logged</h3>
           </div>
-          <MyWorklogCalendar days={worklogCalendar} />
+          <MyWorklogCalendar initialDays={worklogCalendar} initialMonth={currentMonth} />
         </div>
 
         {data.analytics && (

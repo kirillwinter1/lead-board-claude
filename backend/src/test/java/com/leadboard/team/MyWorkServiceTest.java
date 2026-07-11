@@ -255,10 +255,11 @@ class MyWorkServiceTest {
     }
 
     @Test
-    void worklogCalendarCovers4WeeksWithNormAndAbsences() {
-        LocalDate today = LocalDate.of(2026, 7, 7); // Tuesday
-        LocalDate calFrom = LocalDate.of(2026, 6, 15); // Monday, 3 weeks before this week's Monday
-        LocalDate calTo = LocalDate.of(2026, 7, 12);   // Sunday of this week
+    void worklogCalendarBuildsCurrentMonthGridWithNormAndAbsences() {
+        LocalDate today = LocalDate.of(2026, 7, 7); // Tuesday — current month is July 2026
+        // July 2026: 1st is Wednesday -> grid starts Mon 29.06; 31st is Friday -> grid ends Sun 02.08.
+        LocalDate calFrom = LocalDate.of(2026, 6, 29); // Monday <= 1st of month
+        LocalDate calTo = LocalDate.of(2026, 8, 2);    // Sunday >= last of month
         LocalDate holiday = LocalDate.of(2026, 7, 1);
 
         TeamEntity team1 = createTeam(1L, "Alpha", "#111111");
@@ -277,59 +278,117 @@ class MyWorkServiceTest {
             cursor = cursor.plusDays(1);
         }
         WorkdaysResponseDto calendarInfo = new WorkdaysResponseDto(calFrom, calTo, "RU",
-                28, workdayDates.size(), 8, 1, workdayDates, List.of(new HolidayDto(holiday, "Test Holiday")));
+                35, workdayDates.size(), 8, 1, workdayDates, List.of(new HolidayDto(holiday, "Test Holiday")));
         when(workCalendarService.getWorkdaysInfo(calFrom, calTo)).thenReturn(calendarInfo);
 
         // Worklogs on 06.07 across two issues (1h + 2h).
-        // Worklogs on 16.06 across two issues with non-round seconds (600s + 600s): each rounds to
-        // 0.2h, but the daily total must round the raw sum (1200s -> 0.3h), not sum the rounded parts.
+        // Worklogs on 30.06 (an adjacent-month day inside the grid) across two issues with non-round
+        // seconds (600s + 600s): each rounds to 0.2h, but the daily total must round the raw sum
+        // (1200s -> 0.3h), not sum the rounded parts.
         when(worklogRepository.findDailyWorklogsByAuthorPerIssue("acc-1", calFrom, calTo)).thenReturn(List.of(
                 new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-1", 3600L},
                 new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 7, 6)), "SUB-2", 7200L},
-                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 6, 16)), "SUB-3", 600L},
-                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 6, 16)), "SUB-4", 600L}
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 6, 30)), "SUB-3", 600L},
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 6, 30)), "SUB-4", 600L}
         ));
 
-        // Vacation absence for team1 membership, 22.06-23.06.
+        // Vacation absence for team1 membership, 22.07-23.07.
         MemberAbsenceEntity vacation = new MemberAbsenceEntity();
         vacation.setAbsenceType(AbsenceType.VACATION);
-        vacation.setStartDate(LocalDate.of(2026, 6, 22));
-        vacation.setEndDate(LocalDate.of(2026, 6, 23));
+        vacation.setStartDate(LocalDate.of(2026, 7, 22));
+        vacation.setEndDate(LocalDate.of(2026, 7, 23));
         when(absenceRepository.findByMemberIdAndDateRange(10L, calFrom, calTo)).thenReturn(List.of(vacation));
 
         MyWorkResponse r = service.getMyWork("acc-1", from, to, null, today);
 
-        assertEquals(28, r.worklogCalendar().size());
-        assertEquals(LocalDate.of(2026, 6, 15), r.worklogCalendar().get(0).date());
+        List<MyWorkResponse.CalendarDay> cal = r.worklogCalendar();
+        assertEquals(35, cal.size()); // 5 full Mon-Sun weeks
+
+        // Grid starts on a Monday <= 1st of month and ends on a Sunday >= last of month.
+        LocalDate first = cal.get(0).date();
+        LocalDate last = cal.get(cal.size() - 1).date();
+        assertEquals(calFrom, first);
+        assertEquals(DayOfWeek.MONDAY, first.getDayOfWeek());
+        assertFalse(first.isAfter(LocalDate.of(2026, 7, 1)));
+        assertEquals(calTo, last);
+        assertEquals(DayOfWeek.SUNDAY, last.getDayOfWeek());
+        assertFalse(last.isBefore(LocalDate.of(2026, 7, 31)));
+
+        // Adjacent-month days are present in the grid (leading June + trailing August tails).
+        assertNotNull(findDay(r, LocalDate.of(2026, 6, 29)));
+        assertNotNull(findDay(r, LocalDate.of(2026, 6, 30)));
+        assertNotNull(findDay(r, LocalDate.of(2026, 8, 1)));
+        assertNotNull(findDay(r, LocalDate.of(2026, 8, 2)));
 
         MyWorkResponse.CalendarDay julySixth = findDay(r, LocalDate.of(2026, 7, 6));
         assertEquals(0, new BigDecimal("3.0").compareTo(julySixth.loggedH()));
         assertEquals(2, julySixth.byIssue().size());
         assertEquals("WORKDAY", julySixth.dayType());
 
-        MyWorkResponse.CalendarDay juneTwentySecond = findDay(r, LocalDate.of(2026, 6, 22));
-        assertEquals("VACATION", juneTwentySecond.absenceType());
-        assertEquals(0, BigDecimal.ZERO.compareTo(juneTwentySecond.normH()));
+        MyWorkResponse.CalendarDay julyTwentySecond = findDay(r, LocalDate.of(2026, 7, 22));
+        assertEquals("VACATION", julyTwentySecond.absenceType());
+        assertEquals(0, BigDecimal.ZERO.compareTo(julyTwentySecond.normH()));
 
         MyWorkResponse.CalendarDay julyFirst = findDay(r, holiday);
         assertEquals("HOLIDAY", julyFirst.dayType());
 
-        MyWorkResponse.CalendarDay juneTwentieth = findDay(r, LocalDate.of(2026, 6, 20)); // Saturday
-        assertEquals("WEEKEND", juneTwentieth.dayType());
+        MyWorkResponse.CalendarDay julyFourth = findDay(r, LocalDate.of(2026, 7, 4)); // Saturday
+        assertEquals("WEEKEND", julyFourth.dayType());
 
-        MyWorkResponse.CalendarDay plainWorkday = findDay(r, LocalDate.of(2026, 6, 16)); // Tuesday, no absence
-        assertEquals("WORKDAY", plainWorkday.dayType());
-        assertNull(plainWorkday.absenceType());
-        assertEquals(0, new BigDecimal("6.0").compareTo(plainWorkday.normH()));
+        // Worklog falls on the correct (adjacent-month) day, with the day-level rounding rule.
+        MyWorkResponse.CalendarDay juneThirtieth = findDay(r, LocalDate.of(2026, 6, 30)); // Tuesday, no absence
+        assertEquals("WORKDAY", juneThirtieth.dayType());
+        assertNull(juneThirtieth.absenceType());
+        assertEquals(0, new BigDecimal("6.0").compareTo(juneThirtieth.normH()));
         // Rounding: 600s + 600s = 1200s -> 0.3h at the day level (NOT 0.2 + 0.2 = 0.4).
-        assertEquals(0, new BigDecimal("0.3").compareTo(plainWorkday.loggedH()));
-        assertEquals(2, plainWorkday.byIssue().size());
-        MyWorkResponse.DayIssue sub3 = plainWorkday.byIssue().stream()
+        assertEquals(0, new BigDecimal("0.3").compareTo(juneThirtieth.loggedH()));
+        assertEquals(2, juneThirtieth.byIssue().size());
+        MyWorkResponse.DayIssue sub3 = juneThirtieth.byIssue().stream()
                 .filter(bi -> bi.issueKey().equals("SUB-3")).findFirst().orElseThrow();
-        MyWorkResponse.DayIssue sub4 = plainWorkday.byIssue().stream()
+        MyWorkResponse.DayIssue sub4 = juneThirtieth.byIssue().stream()
                 .filter(bi -> bi.issueKey().equals("SUB-4")).findFirst().orElseThrow();
         assertEquals(0, new BigDecimal("0.2").compareTo(sub3.hours()));
         assertEquals(0, new BigDecimal("0.2").compareTo(sub4.hours()));
+    }
+
+    @Test
+    void getWorklogCalendarForExplicitMonthAlignsToFullWeeks() {
+        // February 2026: 1st is Sunday -> grid starts Mon 26.01; 28th is Saturday -> grid ends Sun 01.03.
+        java.time.YearMonth month = java.time.YearMonth.of(2026, 2);
+        LocalDate calFrom = LocalDate.of(2026, 1, 26); // Monday <= 1st
+        LocalDate calTo = LocalDate.of(2026, 3, 1);    // Sunday >= last
+
+        TeamEntity team1 = createTeam(1L, "Alpha", "#111111");
+        TeamMemberEntity member = createMember(10L, team1);
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of(member));
+
+        WorkdaysResponseDto calendarInfo = new WorkdaysResponseDto(calFrom, calTo, "RU",
+                35, 0, 8, 0, List.of(), List.of());
+        when(workCalendarService.getWorkdaysInfo(calFrom, calTo)).thenReturn(calendarInfo);
+        when(worklogRepository.findDailyWorklogsByAuthorPerIssue("acc-1", calFrom, calTo)).thenReturn(List.<Object[]>of(
+                new Object[]{java.sql.Date.valueOf(LocalDate.of(2026, 2, 10)), "SUB-1", 3600L}
+        ));
+
+        List<MyWorkResponse.CalendarDay> cal = service.getWorklogCalendar("acc-1", month);
+
+        assertEquals(35, cal.size());
+        assertEquals(calFrom, cal.get(0).date());
+        assertEquals(DayOfWeek.MONDAY, cal.get(0).date().getDayOfWeek());
+        assertEquals(calTo, cal.get(cal.size() - 1).date());
+        assertEquals(DayOfWeek.SUNDAY, cal.get(cal.size() - 1).date().getDayOfWeek());
+
+        MyWorkResponse.CalendarDay feb10 = cal.stream()
+                .filter(d -> d.date().equals(LocalDate.of(2026, 2, 10))).findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("1.0").compareTo(feb10.loggedH()));
+    }
+
+    @Test
+    void getWorklogCalendarReturnsEmptyWhenNoMembership() {
+        when(memberRepository.findAllByJiraAccountIdAndActiveTrue("acc-1")).thenReturn(List.of());
+
+        List<MyWorkResponse.CalendarDay> cal = service.getWorklogCalendar("acc-1", java.time.YearMonth.of(2026, 2));
+
+        assertTrue(cal.isEmpty());
     }
 
     @Test
