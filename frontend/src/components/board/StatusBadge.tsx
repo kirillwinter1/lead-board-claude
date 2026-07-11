@@ -46,22 +46,28 @@ const badgeBaseStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-export function StatusBadge({ status, color }: { status: string; color?: string | null }) {
+export function StatusBadge({ status, color, maxWidth }: { status: string; color?: string | null; maxWidth?: number }) {
   const statusStyles = useStatusStyles()
   const statusClass = status.toLowerCase().replace(/\s+/g, '-')
 
   const effectiveColor = color ?? statusStyles[status]?.color
 
+  // Opt-in truncation for tight layouts (e.g. Timeline labels). Replaces the former
+  // global `.status-badge { max-width }` leak that affected every badge in the app.
+  const clampStyle: CSSProperties = maxWidth
+    ? { maxWidth, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }
+    : {}
+
   if (effectiveColor) {
     return (
       <span
         className="status-badge"
-        style={{ ...badgeBaseStyle, backgroundColor: effectiveColor, color: getContrastColor(effectiveColor) }}
+        style={{ ...badgeBaseStyle, ...clampStyle, backgroundColor: effectiveColor, color: getContrastColor(effectiveColor) }}
       >
         {status}
       </span>
     )
   }
 
-  return <span className={`status-badge ${statusClass}`} style={badgeBaseStyle}>{status}</span>
+  return <span className={`status-badge ${statusClass}`} style={{ ...badgeBaseStyle, ...clampStyle }}>{status}</span>
 }

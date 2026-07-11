@@ -10,6 +10,7 @@ import { AbsenceTimeline } from '../components/AbsenceTimeline'
 import { WorklogTimeline } from '../components/WorklogTimeline'
 import { hexToRgba } from '../constants/colors'
 import './TeamsPage.css'
+import './TeamMembersPage.css'
 
 const GRADES = ['JUNIOR', 'MIDDLE', 'SENIOR'] as const
 
