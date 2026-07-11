@@ -144,6 +144,26 @@ public class PokerSessionService {
         return storyRepository.save(story);
     }
 
+    /**
+     * Edit a not-yet-estimated story's fields (title, description, roles, component).
+     * Only PENDING stories can be edited — once voting has started the roles map to
+     * cast votes and must not change. Updates the local copy; Jira sync of an
+     * already-created story is handled by the caller (controller/jiraService).
+     */
+    @Transactional
+    public PokerStoryEntity updateStory(Long storyId, AddStoryRequest request) {
+        PokerStoryEntity story = storyRepository.findByIdWithSession(storyId)
+                .orElseThrow(() -> new IllegalArgumentException("Story not found"));
+        if (story.getStatus() != StoryStatus.PENDING) {
+            throw new IllegalStateException("Only a not-yet-estimated story can be edited");
+        }
+        story.setTitle(request.title());
+        story.setDescription(request.description());
+        story.setJiraComponent(request.component());
+        story.setNeedsRoles(request.needsRoles());
+        return storyRepository.save(story);
+    }
+
     @Transactional
     public void updateStoryJiraKey(Long storyId, String jiraKey) {
         PokerStoryEntity story = storyRepository.findById(storyId)

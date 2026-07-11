@@ -229,6 +229,103 @@
   opacity: 0.7;
 }
 
+.poker-story-item.previewed {
+  border-color: #0052cc;
+  box-shadow: 0 0 0 1px #0052cc inset;
+}
+
+/* ===== Story preview (main panel while PREPARING) ===== */
+.poker-story-preview {
+  max-width: 640px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.poker-story-preview-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.poker-story-preview-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.poker-story-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.poker-local-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b778c;
+  background: #f4f5f7;
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.poker-story-preview-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #172b4d;
+  margin: 16px 0 8px;
+}
+
+.poker-story-preview-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #42526e;
+  white-space: pre-wrap;
+  margin-bottom: 20px;
+}
+
+.poker-story-preview-desc.muted {
+  color: #97a0af;
+  font-style: italic;
+}
+
+.poker-story-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #ebecf0;
+}
+
+.poker-preview-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.poker-preview-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b778c;
+}
+
+.poker-preview-value {
+  font-size: 14px;
+  color: #172b4d;
+}
+
+.btn.btn-danger {
+  background: #de350b;
+  color: #fff;
+  border: 1px solid #de350b;
+}
+
+.btn.btn-danger:hover:not(:disabled) {
+  background: #bf2600;
+  border-color: #bf2600;
+}
+
 .poker-story-header {
   display: flex;
   justify-content: space-between;
@@ -259,6 +356,21 @@
 }
 
 .estimate-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Role chips on a not-yet-estimated story card — shows which roles it needs */
+.poker-story-roles {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.poker-role-chip {
   font-size: 10px;
   padding: 2px 6px;
   border-radius: 3px;
@@ -1096,6 +1208,10 @@
   font-size: 12px;
   font-weight: 600;
   color: #42526e;
+}
+
+.poker-field-required {
+  color: #de350b;
 }
 
 .poker-field .filter-input {

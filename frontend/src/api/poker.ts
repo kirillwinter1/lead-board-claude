@@ -50,6 +50,7 @@ export interface PokerStory {
   storyKey: string | null
   title: string
   description: string | null
+  component: string | null
   needsRoles: string[]
   status: 'PENDING' | 'VOTING' | 'REVEALED' | 'COMPLETED'
   finalEstimates: Record<string, number | null>
@@ -152,6 +153,20 @@ export async function addStory(
     request
   )
   return response.data
+}
+
+// Edit a not-yet-estimated story (title/description/roles/component). Facilitator-only.
+// If the story is already in Jira, the backend syncs title+description there too.
+export async function updateStory(
+  storyId: number,
+  request: AddStoryRequest
+): Promise<PokerStory> {
+  const response = await axios.put(`/api/poker/stories/${storyId}`, request)
+  return response.data
+}
+
+export async function deleteStory(storyId: number): Promise<void> {
+  await axios.delete(`/api/poker/stories/${storyId}`)
 }
 
 // ===== Session summary (Completed screen: rough → poker → Δ) =====

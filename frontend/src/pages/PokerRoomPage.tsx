@@ -24,6 +24,8 @@ import {
   getSessionSummary,
   publishSession,
   addStory,
+  updateStory,
+  deleteStory,
   AddStoryRequest,
   formatDays,
   formatDayValue,
@@ -135,14 +137,19 @@ export function PokerRoomPage() {
   // Copy link
   const [copied, setCopied] = useState(false)
 
-  // Add story modal
+  // Add / edit story modal
   const [showAddStory, setShowAddStory] = useState(false)
+  const [editingStoryId, setEditingStoryId] = useState<number | null>(null)
   const [newStoryTitle, setNewStoryTitle] = useState('')
   const [newStoryDescription, setNewStoryDescription] = useState('')
   const [newStoryComponent, setNewStoryComponent] = useState<string | null>(null)
   const [newStoryNeedsRoles, setNewStoryNeedsRoles] = useState<Set<string>>(new Set(getRoleCodes()))
   const [components, setComponents] = useState<JiraComponent[]>([])
   const [addingStory, setAddingStory] = useState(false)
+
+  // Story preview (click a card → detail in the main panel), and delete-in-progress
+  const [previewStoryId, setPreviewStoryId] = useState<number | null>(null)
+  const [deletingStory, setDeletingStory] = useState(false)
 
   // Import existing stories modal
   const [showImportStories, setShowImportStories] = useState(false)
@@ -434,11 +441,7 @@ export function PokerRoomPage() {
     })
   }
 
-  const handleOpenAddStory = async () => {
-    setShowAddStory(true)
-    setNewStoryTitle('')
-    setNewStoryDescription('')
-    setNewStoryComponent(null)
+  const loadComponentsOnce = async () => {
     if (projectKey && components.length === 0) {
       try {
         const comps = await getProjectComponents(projectKey)
@@ -450,24 +453,65 @@ export function PokerRoomPage() {
     }
   }
 
+  const handleOpenAddStory = async () => {
+    setEditingStoryId(null)
+    setNewStoryTitle('')
+    setNewStoryDescription('')
+    setNewStoryComponent(null)
+    setNewStoryNeedsRoles(new Set(getRoleCodes()))
+    setShowAddStory(true)
+    await loadComponentsOnce()
+  }
+
+  const resetStoryForm = () => {
+    setShowAddStory(false)
+    setEditingStoryId(null)
+    setNewStoryTitle('')
+    setNewStoryDescription('')
+    setNewStoryComponent(null)
+    setNewStoryNeedsRoles(new Set(getRoleCodes()))
+  }
+
+  const handleOpenEditStory = async (story: PokerStory) => {
+    setEditingStoryId(story.id)
+    setNewStoryTitle(story.title)
+    setNewStoryDescription(story.description ?? '')
+    setNewStoryComponent(story.component ?? null)
+    setNewStoryNeedsRoles(new Set(story.needsRoles))
+    setShowAddStory(true)
+    await loadComponentsOnce()
+  }
+
   const handleAddStory = async () => {
-    if (!session || !newStoryTitle.trim()) return
+    if (!session || !newStoryTitle.trim() || !newStoryDescription.trim()) return
 
     const request: AddStoryRequest = {
       title: newStoryTitle.trim(),
       needsRoles: Array.from(newStoryNeedsRoles),
-      description: newStoryDescription.trim() || undefined,
+      description: newStoryDescription.trim(),
       component: newStoryComponent || undefined,
     }
 
     setAddingStory(true)
     setError(null)
+
+    // Edit mode — update the existing story (and its Jira issue if it has a key).
+    if (editingStoryId != null) {
+      try {
+        const updated = await updateStory(editingStoryId, request)
+        setStories(prev => prev.map(s => (s.id === updated.id ? updated : s)))
+        resetStoryForm()
+      } catch (err: unknown) {
+        setError('Failed to update story: ' + apiError(err))
+      } finally {
+        setAddingStory(false)
+      }
+      return
+    }
+
     const closeAndReset = (story: PokerStory) => {
       setStories(prev => [...prev, story])
-      setShowAddStory(false)
-      setNewStoryTitle('')
-      setNewStoryDescription('')
-      setNewStoryComponent(null)
+      resetStoryForm()
     }
     try {
       // A new story is created in Jira together with its subtasks (F23), so it
@@ -487,6 +531,20 @@ export function PokerRoomPage() {
       }
     } finally {
       setAddingStory(false)
+    }
+  }
+
+  const handleDeleteStory = async (storyId: number) => {
+    setDeletingStory(true)
+    setError(null)
+    try {
+      await deleteStory(storyId)
+      setStories(prev => prev.filter(s => s.id !== storyId))
+      if (previewStoryId === storyId) setPreviewStoryId(null)
+    } catch (err: unknown) {
+      setError('Failed to delete story: ' + apiError(err))
+    } finally {
+      setDeletingStory(false)
     }
   }
 
@@ -633,6 +691,11 @@ export function PokerRoomPage() {
     return { totals, grand }
   }, [storyRows, completedRoleCodes])
 
+  // Story selected in the sidebar → previewed in the main panel (PREPARING only)
+  const previewStory = previewStoryId != null
+    ? stories.find(s => s.id === previewStoryId) ?? null
+    : null
+
   // Loading states
   if (authLoading || loading) {
     return <main className="main-content"><div className="loading">Loading room...</div></main>
@@ -770,7 +833,10 @@ export function PokerRoomPage() {
               stories.map(story => (
                 <div
                   key={story.id}
-                  className={`poker-story-item ${story.id === currentStoryId ? 'active' : ''} ${story.status.toLowerCase()}`}
+                  className={`poker-story-item ${story.id === currentStoryId ? 'active' : ''} ${story.id === previewStoryId ? 'previewed' : ''} ${story.status.toLowerCase()}`}
+                  onClick={() => setPreviewStoryId(story.id)}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className="poker-story-header">
                     <span className="poker-story-key">
@@ -781,6 +847,7 @@ export function PokerRoomPage() {
                           target="_blank"
                           rel="noopener noreferrer"
                           className="issue-key"
+                          onClick={e => e.stopPropagation()}
                         >
                           {story.storyKey}
                         </a>
@@ -796,6 +863,15 @@ export function PokerRoomPage() {
                   <div className="poker-story-title">{story.title}</div>
                   {story.description && story.description.trim() && (
                     <div className="poker-story-sub">{story.description}</div>
+                  )}
+                  {story.status !== 'COMPLETED' && story.needsRoles.length > 0 && (
+                    <div className="poker-story-roles">
+                      {story.needsRoles.map(role => (
+                        <span key={role} className="poker-role-chip" style={roleLightStyle(role)}>
+                          {getRoleDisplayName(role)}
+                        </span>
+                      ))}
+                    </div>
                   )}
                   {story.status === 'COMPLETED' && (
                     <div className="poker-story-estimates">
@@ -829,7 +905,86 @@ export function PokerRoomPage() {
 
         {/* Main area */}
         <div className="poker-main">
-          {session.status === 'PREPARING' ? (
+          {session.status === 'PREPARING' && previewStory ? (
+            <div className="poker-story-preview">
+              <div className="poker-story-preview-head">
+                <div className="poker-story-preview-title">
+                  <img className="poker-story-icon" src={storyIcon} alt="" />
+                  {previewStory.storyKey ? (
+                    <a
+                      href={`${jiraBaseUrl}${previewStory.storyKey}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="issue-key"
+                    >
+                      {previewStory.storyKey}
+                    </a>
+                  ) : (
+                    <span className="poker-local-badge">local · not in Jira</span>
+                  )}
+                </div>
+                {isFacilitator && previewStory.status === 'PENDING' && (
+                  <div className="poker-story-preview-actions">
+                    <button
+                      className="btn btn-secondary btn-small"
+                      onClick={() => handleOpenEditStory(previewStory)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="btn btn-danger btn-small"
+                      onClick={() => handleDeleteStory(previewStory.id)}
+                      disabled={deletingStory}
+                    >
+                      {deletingStory ? 'Deleting…' : 'Delete'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <h2 className="poker-story-preview-name">{previewStory.title}</h2>
+
+              {previewStory.description && previewStory.description.trim() ? (
+                <div className="poker-story-preview-desc">{previewStory.description}</div>
+              ) : (
+                <div className="poker-story-preview-desc muted">No description</div>
+              )}
+
+              <div className="poker-story-preview-meta">
+                <div className="poker-preview-field">
+                  <span className="poker-preview-label">Roles</span>
+                  <div className="poker-story-roles">
+                    {previewStory.needsRoles.map(role => (
+                      <span key={role} className="poker-role-chip" style={roleLightStyle(role)}>
+                        {getRoleDisplayName(role)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {previewStory.component && (
+                  <div className="poker-preview-field">
+                    <span className="poker-preview-label">Component</span>
+                    <span className="poker-preview-value">{previewStory.component}</span>
+                  </div>
+                )}
+              </div>
+
+              {previewStory.status === 'COMPLETED' && (
+                <div className="poker-story-preview-meta">
+                  <div className="poker-preview-field">
+                    <span className="poker-preview-label">Final estimate</span>
+                    <div className="poker-story-estimates">
+                      {previewStory.needsRoles.map(role => (
+                        <span key={role} className="estimate-badge" style={roleLightStyle(role)}>
+                          {role}: {formatDays(previewStory.finalEstimates[role] ?? 0)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : session.status === 'PREPARING' ? (
             <div className="poker-preparing">
               <div className="poker-preparing-icon"><IconStack /></div>
               <h3>Session setup</h3>
@@ -1124,8 +1279,8 @@ export function PokerRoomPage() {
         </div>
       </div>
 
-      {/* Add Story Modal */}
-      <Modal isOpen={showAddStory} onClose={() => setShowAddStory(false)} title="Add story">
+      {/* Add / Edit Story Modal */}
+      <Modal isOpen={showAddStory} onClose={resetStoryForm} title={editingStoryId != null ? 'Edit story' : 'Add story'}>
         <div className="poker-add-story">
           <div className="poker-field">
             <label className="poker-field-label">Story title</label>
@@ -1139,7 +1294,7 @@ export function PokerRoomPage() {
             />
           </div>
           <div className="poker-field">
-            <label className="poker-field-label">Description</label>
+            <label className="poker-field-label">Description <span className="poker-field-required">*</span></label>
             <textarea
               className="filter-input poker-textarea"
               placeholder="What needs to be done…"
@@ -1183,15 +1338,17 @@ export function PokerRoomPage() {
           </div>
         </div>
         <div className="modal-actions">
-          <button className="btn btn-secondary" onClick={() => setShowAddStory(false)}>
+          <button className="btn btn-secondary" onClick={resetStoryForm}>
             Cancel
           </button>
           <button
             className="btn btn-primary"
             onClick={handleAddStory}
-            disabled={!newStoryTitle.trim() || newStoryNeedsRoles.size === 0 || addingStory}
+            disabled={!newStoryTitle.trim() || !newStoryDescription.trim() || newStoryNeedsRoles.size === 0 || addingStory}
           >
-            {addingStory ? 'Adding…' : 'Add story'}
+            {addingStory
+              ? (editingStoryId != null ? 'Saving…' : 'Adding…')
+              : (editingStoryId != null ? 'Save' : 'Add story')}
           </button>
         </div>
       </Modal>

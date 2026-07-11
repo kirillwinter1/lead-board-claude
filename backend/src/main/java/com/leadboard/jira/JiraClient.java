@@ -485,6 +485,33 @@ public class JiraClient {
         }
     }
 
+    /**
+     * Update an issue's summary and (optionally) description in Jira. Used when a poker
+     * story that already exists in Jira is edited in the room, so the local copy never
+     * contradicts Jira (jira-integration rule). Role/component structure is not touched
+     * here — that maps to subtasks and is out of scope for an inline edit.
+     */
+    public void updateStoryFields(String issueKey, String summary, String description) {
+        String accessToken = oauthService.getValidAccessToken();
+        String cloudId = oauthService.getCloudIdForCurrentUser();
+
+        Map<String, Object> fields = new java.util.HashMap<>();
+        if (summary != null && !summary.isBlank()) {
+            fields.put("summary", summary);
+        }
+        if (description != null && !description.isBlank()) {
+            fields.put("description", toAdf(description));
+        }
+        if (fields.isEmpty()) return;
+
+        Map<String, Object> body = Map.of("fields", fields);
+        if (accessToken != null && cloudId != null) {
+            updateIssueWithOAuth(issueKey, body, accessToken, cloudId);
+        } else {
+            updateIssueWithBasicAuth(issueKey, body);
+        }
+    }
+
     private void updateIssueWithOAuth(String issueKey, Map<String, Object> body, String accessToken, String cloudId) {
         String baseUrl = ATLASSIAN_API_BASE + "/ex/jira/" + cloudId;
 
