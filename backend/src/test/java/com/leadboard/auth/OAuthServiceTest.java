@@ -4,8 +4,7 @@ import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
 import com.leadboard.tenant.TenantContext;
 import com.leadboard.tenant.TenantEntity;
-import com.leadboard.tenant.TenantJiraConfigEntity;
-import com.leadboard.tenant.TenantJiraConfigRepository;
+import com.leadboard.tenant.TenantJiraConfigReader;
 import com.leadboard.tenant.TenantService;
 import com.leadboard.tenant.TenantUserEntity;
 import org.junit.jupiter.api.AfterEach;
@@ -50,14 +49,14 @@ class OAuthServiceTest {
     private TenantService tenantService;
 
     @Mock
-    private TenantJiraConfigRepository tenantJiraConfigRepository;
+    private TenantJiraConfigReader tenantJiraConfigReader;
 
     private OAuthService oAuthService;
 
     @BeforeEach
     void setUp() {
         oAuthService = new OAuthService(oauthProperties, appProperties, userRepository, tokenRepository, sessionRepository,
-                tenantService, tenantJiraConfigRepository);
+                tenantService, tenantJiraConfigReader);
 
         // Setup default properties
         when(oauthProperties.getAuthorizationUri()).thenReturn("https://auth.atlassian.com/authorize");
@@ -191,9 +190,7 @@ class OAuthServiceTest {
         }
 
         private void mockTenantCloudId(String cloudId) {
-            TenantJiraConfigEntity config = new TenantJiraConfigEntity();
-            config.setJiraCloudId(cloudId);
-            when(tenantJiraConfigRepository.findActive()).thenReturn(Optional.of(config));
+            when(tenantJiraConfigReader.findActiveCloudId()).thenReturn(Optional.of(cloudId));
         }
 
         @Test
@@ -207,7 +204,7 @@ class OAuthServiceTest {
             assertTrue(result.allowed());
             assertNull(result.errorCode());
             verify(tenantService).addUserToTenant(tenant, user, AppRole.ADMIN);
-            verifyNoInteractions(tenantJiraConfigRepository);
+            verifyNoInteractions(tenantJiraConfigReader);
         }
 
         @Test
@@ -244,7 +241,7 @@ class OAuthServiceTest {
         void shouldDenyJoinWhenTenantHasNoCloudId() {
             when(tenantService.findTenantUser(1L, 42L)).thenReturn(Optional.empty());
             when(tenantService.tenantHasUsers(1L)).thenReturn(true);
-            when(tenantJiraConfigRepository.findActive()).thenReturn(Optional.empty());
+            when(tenantJiraConfigReader.findActiveCloudId()).thenReturn(Optional.empty());
 
             OAuthService.MembershipGateResult result =
                     oAuthService.applyMembershipGate(tenant, user, List.of(TENANT_CLOUD_ID));
@@ -308,7 +305,7 @@ class OAuthServiceTest {
             TenantUserEntity membership = new TenantUserEntity();
             membership.setActive(true);
             when(tenantService.findTenantUser(1L, 42L)).thenReturn(Optional.of(membership));
-            when(tenantJiraConfigRepository.findActive()).thenReturn(Optional.empty());
+            when(tenantJiraConfigReader.findActiveCloudId()).thenReturn(Optional.empty());
 
             OAuthService.MembershipGateResult result =
                     oAuthService.applyMembershipGate(tenant, user, List.of(TENANT_CLOUD_ID));
@@ -328,6 +325,19 @@ class OAuthServiceTest {
 
             assertEquals(TENANT_CLOUD_ID, cloudId);
             assertFalse(TenantContext.hasTenant(), "must restore the (absent) tenant context after the lookup");
+        }
+
+        @Test
+        @DisplayName("resolveTenantJiraCloudId sets TenantContext BEFORE the reader call — the reader's "
+                + "REQUIRES_NEW session resolves its schema on entry, so a late switch would read public")
+        void shouldSetTenantContextBeforeReaderCall() {
+            when(tenantJiraConfigReader.findActiveCloudId()).thenAnswer(invocation -> {
+                assertTrue(TenantContext.hasTenant(), "tenant context must already be set when the reader runs");
+                assertEquals("tenant_acme", TenantContext.getCurrentSchema());
+                return Optional.of(TENANT_CLOUD_ID);
+            });
+
+            assertEquals(TENANT_CLOUD_ID, oAuthService.resolveTenantJiraCloudId(tenant));
         }
     }
 

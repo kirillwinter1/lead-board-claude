@@ -6,8 +6,7 @@ import com.leadboard.config.AppProperties;
 import com.leadboard.config.AtlassianOAuthProperties;
 import com.leadboard.tenant.TenantContext;
 import com.leadboard.tenant.TenantEntity;
-import com.leadboard.tenant.TenantJiraConfigEntity;
-import com.leadboard.tenant.TenantJiraConfigRepository;
+import com.leadboard.tenant.TenantJiraConfigReader;
 import com.leadboard.tenant.TenantService;
 import com.leadboard.tenant.TenantUserEntity;
 import org.slf4j.Logger;
@@ -42,7 +41,7 @@ public class OAuthService {
     private final OAuthTokenRepository tokenRepository;
     private final SessionRepository sessionRepository;
     private final TenantService tenantService;
-    private final TenantJiraConfigRepository tenantJiraConfigRepository;
+    private final TenantJiraConfigReader tenantJiraConfigReader;
     private final WebClient webClient;
 
     // Support concurrent OAuth flows (multiple users logging in simultaneously)
@@ -61,14 +60,14 @@ public class OAuthService {
                         OAuthTokenRepository tokenRepository,
                         SessionRepository sessionRepository,
                         TenantService tenantService,
-                        TenantJiraConfigRepository tenantJiraConfigRepository) {
+                        TenantJiraConfigReader tenantJiraConfigReader) {
         this.oauthProperties = oauthProperties;
         this.appProperties = appProperties;
         this.userRepository = userRepository;
         this.tokenRepository = tokenRepository;
         this.sessionRepository = sessionRepository;
         this.tenantService = tenantService;
-        this.tenantJiraConfigRepository = tenantJiraConfigRepository;
+        this.tenantJiraConfigReader = tenantJiraConfigReader;
         // Use the JDK/OS DNS resolver instead of Netty's native UDP resolver, which
         // fails to resolve auth.atlassian.com on some networks (UnknownHostException)
         // and breaks the OAuth token exchange.
@@ -298,16 +297,16 @@ public class OAuthService {
      * tenant schema (no {@code tenant_id} column), so this temporarily switches
      * {@link TenantContext} to the given tenant, then restores whatever context was active
      * before (normally none — the OAuth callback is hit on the bare backend host, not a
-     * tenant subdomain).
+     * tenant subdomain). The read goes through {@link TenantJiraConfigReader} because this
+     * runs inside the {@code @Transactional} callback whose Hibernate session is already
+     * pinned to the public schema — see the reader's javadoc.
      */
     String resolveTenantJiraCloudId(TenantEntity tenant) {
         Long previousTenantId = TenantContext.getCurrentTenantId();
         String previousSchema = TenantContext.hasTenant() ? TenantContext.getCurrentSchema() : null;
         try {
             TenantContext.setTenant(tenant.getId(), tenant.getSchemaName());
-            return tenantJiraConfigRepository.findActive()
-                    .map(TenantJiraConfigEntity::getJiraCloudId)
-                    .orElse(null);
+            return tenantJiraConfigReader.findActiveCloudId().orElse(null);
         } catch (Exception e) {
             log.warn("Failed to resolve Jira cloudId for tenant '{}': {}", tenant.getSlug(), e.getMessage());
             return null;
