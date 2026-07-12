@@ -42,59 +42,6 @@
   margin-top: 4px;
 }
 
-/* Category Summary Row */
-.category-summary-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.category-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: white;
-  border: 1px solid #dfe1e6;
-  border-radius: 16px;
-  padding: 4px 10px;
-  font-size: 12px;
-  color: #42526e;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  transition: background-color 0.15s, border-color 0.15s;
-}
-
-.category-chip:hover {
-  background: #f4f5f7;
-}
-
-.category-chip.active {
-  background: #e9f2ff;
-  border-color: #669df1;
-  color: #1558bc;
-  font-weight: 600;
-}
-
-.category-chip-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: #f0f1f3;
-  color: #6b778c;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.category-chip.active .category-chip-count {
-  background: #669df1;
-  color: white;
-}
-
 /* Category label inside expanded violation detail */
 .violation-category {
   font-size: 11px;

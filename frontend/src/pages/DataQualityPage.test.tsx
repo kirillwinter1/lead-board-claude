@@ -235,18 +235,33 @@ describe('DataQualityPage', () => {
   })
 
   describe('Category filtering', () => {
-    it('should render category summary chips from byCategory', async () => {
+    it('should not render the category summary chips row', async () => {
       renderDataQualityPage()
 
       await waitFor(() => {
-        const row = document.querySelector('.category-summary-row')
-        expect(row).toBeInTheDocument()
-        // 3 categories in byCategory
-        expect(document.querySelectorAll('.category-chip').length).toBe(3)
+        expect(screen.getByText('STORY-1')).toBeInTheDocument()
       })
+
+      expect(document.querySelector('.category-summary-row')).toBeNull()
+      expect(document.querySelectorAll('.category-chip').length).toBe(0)
     })
 
-    it('should filter the table when a category chip is clicked', async () => {
+    it('should show category options with counts from byCategory', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('All categories')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByText('All categories'))
+
+      const menu = document.querySelector('.filter-dropdown-menu') as HTMLElement
+      expect(within(menu).getByText('Estimates (12)')).toBeInTheDocument()
+      expect(within(menu).getByText('Team (9)')).toBeInTheDocument()
+      expect(within(menu).getByText('Due Dates (7)')).toBeInTheDocument()
+    })
+
+    it('should filter the table when a category is selected in the dropdown', async () => {
       renderDataQualityPage()
 
       await waitFor(() => {
@@ -254,10 +269,10 @@ describe('DataQualityPage', () => {
         expect(screen.getByText('EPIC-1')).toBeInTheDocument()
       })
 
-      // Click the "Estimates" category chip — only STORY-1 has an ESTIMATES violation
-      const estimatesChip = Array.from(document.querySelectorAll('.category-chip'))
-        .find(el => el.textContent?.includes('Estimates')) as HTMLElement
-      fireEvent.click(estimatesChip)
+      fireEvent.click(screen.getByText('All categories'))
+      const menu = document.querySelector('.filter-dropdown-menu') as HTMLElement
+      // Только STORY-1 имеет нарушение категории ESTIMATES
+      fireEvent.click(within(menu).getByText('Estimates (12)'))
 
       await waitFor(() => {
         expect(screen.getByText('STORY-1')).toBeInTheDocument()
