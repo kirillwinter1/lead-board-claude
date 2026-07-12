@@ -7,9 +7,10 @@ import { EmptyState } from '../components/EmptyState'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { StatusBadge } from '../components/board/StatusBadge'
-import { SeverityBadge, SEVERITY_COLORS } from '../components/SeverityBadge'
+import { SeverityBadge } from '../components/SeverityBadge'
 import { FilterBar } from '../components/FilterBar'
 import { SingleSelectDropdown } from '../components/SingleSelectDropdown'
+import { MultiSelectDropdown } from '../components/MultiSelectDropdown'
 import { FilterChip } from '../components/FilterChips'
 import './DataQualityPage.css'
 
@@ -63,6 +64,8 @@ interface Team {
   name: string
   color: string | null
 }
+
+const SEVERITIES = ['ERROR', 'WARNING', 'INFO']
 
 function SummaryCard({ title, value, color }: { title: string; value: number; color: string }) {
   return (
@@ -140,7 +143,7 @@ export function DataQualityPage() {
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
   const [statusStyles, setStatusStyles] = useState<Record<string, StatusStyle>>({})
-  const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set(['ERROR', 'WARNING', 'INFO']))
+  const [severityFilter, setSeverityFilter] = useState<Set<string>>(new Set())
 
   // Sync teamId with URL
   const selectedTeamId = searchParams.get('teamId') ? Number(searchParams.get('teamId')) : null
@@ -198,9 +201,11 @@ export function DataQualityPage() {
   const filteredViolations = useMemo(() => {
     if (!data) return []
     return data.violations.filter(issue => {
-      // Filter by severity
-      const hasMatchingSeverity = issue.violations.some(v => severityFilter.has(v.severity))
-      if (!hasMatchingSeverity) return false
+      // Filter by severity (empty selection = show all)
+      if (severityFilter.size > 0) {
+        const hasMatchingSeverity = issue.violations.some(v => severityFilter.has(v.severity))
+        if (!hasMatchingSeverity) return false
+      }
 
       // Filter by category
       if (categoryFilter) {
@@ -229,6 +234,14 @@ export function DataQualityPage() {
   const categoryLabelByCode = useMemo(() => {
     const m: Record<string, string> = {}
     for (const r of data?.rules || []) m[r.category] = r.categoryLabel
+    return m
+  }, [data])
+
+  // Counts per severity for dropdown options — from the full report of the
+  // selected team, independent of client-side filters
+  const severityCountMap = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const [k, v] of Object.entries(data?.summary.bySeverity || {})) m.set(k, v)
     return m
   }, [data])
 
@@ -310,7 +323,7 @@ export function DataQualityPage() {
     const counts = new Map<string, number>()
     for (const issue of data.violations) {
       for (const v of issue.violations) {
-        if (severityFilter.has(v.severity)) {
+        if (severityFilter.size === 0 || severityFilter.has(v.severity)) {
           counts.set(v.category, (counts.get(v.category) || 0) + 1)
         }
       }
@@ -347,15 +360,12 @@ export function DataQualityPage() {
         onRemove: () => setRuleFilter(null),
       })
     }
-    for (const s of ['ERROR', 'WARNING', 'INFO']) {
-      if (!severityFilter.has(s)) {
-        result.push({
-          category: 'Hidden',
-          value: `Hide ${s}`,
-          color: SEVERITY_COLORS[s]?.text,
-          onRemove: () => toggleSeverity(s),
-        })
-      }
+    if (severityFilter.size > 0) {
+      result.push({
+        category: 'Severity',
+        value: SEVERITIES.filter(s => severityFilter.has(s)).join(', '),
+        onRemove: () => setSeverityFilter(new Set()),
+      })
     }
     return result
   }, [selectedTeamId, ruleFilter, categoryFilter, severityFilter, teams, categoryLabelByCode, rulesByName, handleCategoryChange])
@@ -364,7 +374,7 @@ export function DataQualityPage() {
     setSelectedTeamId(null)
     setRuleFilter(null)
     setCategoryFilter(null)
-    setSeverityFilter(new Set(['ERROR', 'WARNING', 'INFO']))
+    setSeverityFilter(new Set())
   }
 
   return (
@@ -387,22 +397,14 @@ export function DataQualityPage() {
           placeholder="All teams"
         />
 
-        <div className="filter-checkboxes" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          {['ERROR', 'WARNING', 'INFO'].map(severity => (
-            <button
-              key={severity}
-              className={`btn btn-sm btn-toggle ${severityFilter.has(severity) ? 'btn-toggle-active' : ''}`}
-              onClick={() => toggleSeverity(severity)}
-              style={severityFilter.has(severity) ? {
-                backgroundColor: SEVERITY_COLORS[severity]?.bg,
-                borderColor: SEVERITY_COLORS[severity]?.border,
-                color: SEVERITY_COLORS[severity]?.text,
-              } : undefined}
-            >
-              {severity}
-            </button>
-          ))}
-        </div>
+        <MultiSelectDropdown
+          label="Severity"
+          options={SEVERITIES}
+          selected={severityFilter}
+          onToggle={toggleSeverity}
+          placeholder="Severity"
+          countMap={severityCountMap}
+        />
 
         <SingleSelectDropdown
           label="Category"

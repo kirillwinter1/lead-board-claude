@@ -268,9 +268,4 @@
   transform: rotate(90deg);
 }
 
-/* Severity Badge in Filter */
-.filter-checkbox .severity-badge {
-  margin-left: 4px;
-}
-
 /* ============================================ */

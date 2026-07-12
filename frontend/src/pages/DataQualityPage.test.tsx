@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import axios from 'axios'
 import { DataQualityPage } from './DataQualityPage'
@@ -153,6 +153,84 @@ describe('DataQualityPage', () => {
       await waitFor(() => {
         expect(screen.getByText('All categories')).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('Severity filter', () => {
+    it('should render severity dropdown with per-severity counts', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Severity')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByText('Severity'))
+
+      const menu = document.querySelector('.filter-dropdown-menu') as HTMLElement
+      expect(menu).toBeInTheDocument()
+      expect(within(menu).getByText('ERROR')).toBeInTheDocument()
+      expect(within(menu).getByText('WARNING')).toBeInTheDocument()
+      expect(within(menu).getByText('INFO')).toBeInTheDocument()
+      // counts aus summary.bySeverity: ERROR 5, WARNING 10, INFO 3
+      expect(within(menu).getByText('5')).toBeInTheDocument()
+      expect(within(menu).getByText('10')).toBeInTheDocument()
+      expect(within(menu).getByText('3')).toBeInTheDocument()
+    })
+
+    it('should filter the table when a severity is selected', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('STORY-1')).toBeInTheDocument()
+        expect(screen.getByText('EPIC-1')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByText('Severity'))
+      const menu = document.querySelector('.filter-dropdown-menu') as HTMLElement
+      // STORY-1 имеет ERROR-нарушение, EPIC-1 — только INFO
+      fireEvent.click(within(menu).getByText('ERROR'))
+
+      await waitFor(() => {
+        expect(screen.getByText('STORY-1')).toBeInTheDocument()
+        expect(screen.queryByText('EPIC-1')).not.toBeInTheDocument()
+      })
+    })
+
+    it('should show a severity chip and restore all rows on chip remove', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('EPIC-1')).toBeInTheDocument()
+      })
+
+      fireEvent.click(screen.getByText('Severity'))
+      const menu = document.querySelector('.filter-dropdown-menu') as HTMLElement
+      fireEvent.click(within(menu).getByText('ERROR'))
+
+      await waitFor(() => {
+        const chipsRow = document.querySelector('.filter-bar-chips') as HTMLElement
+        expect(chipsRow).toBeInTheDocument()
+        expect(within(chipsRow).getByText('ERROR')).toBeInTheDocument()
+      })
+
+      const chipsRow = document.querySelector('.filter-bar-chips') as HTMLElement
+      const severityChip = within(chipsRow).getByText('ERROR').closest('.filter-chip') as HTMLElement
+      fireEvent.click(severityChip.querySelector('.filter-chip-remove') as HTMLElement)
+
+      await waitFor(() => {
+        expect(screen.getByText('EPIC-1')).toBeInTheDocument()
+      })
+    })
+
+    it('should not render the old severity toggle buttons', async () => {
+      renderDataQualityPage()
+
+      await waitFor(() => {
+        expect(screen.getByText('Total Issues')).toBeInTheDocument()
+      })
+
+      expect(document.querySelector('.filter-checkboxes')).toBeNull()
+      expect(document.querySelector('.btn-toggle')).toBeNull()
     })
   })
 
