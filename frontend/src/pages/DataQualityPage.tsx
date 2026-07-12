@@ -258,10 +258,6 @@ export function DataQualityPage() {
     }
   }, [rulesByName])
 
-  const toggleCategory = useCallback((cat: string) => {
-    handleCategoryChange(categoryFilter === cat ? null : cat)
-  }, [categoryFilter, handleCategoryChange])
-
   const toggleSeverity = (severity: string) => {
     setSeverityFilter(prev => {
       const next = new Set(prev)
@@ -290,15 +286,21 @@ export function DataQualityPage() {
     [teams]
   )
 
-  // Category options: unique categories from the rules catalog, sorted by label
+  // Category options: unique categories from the rules catalog, sorted by label.
+  // Counts come from the backend byCategory total (full report of the selected
+  // team, independent of client-side filters)
   const categoryOptions = useMemo(() => {
     if (!data) return []
     const seen = new Map<string, string>()
     for (const r of (data.rules || [])) {
       if (!seen.has(r.category)) seen.set(r.category, r.categoryLabel)
     }
+    const byCategory = data.summary.byCategory || {}
     return Array.from(seen.entries())
-      .map(([value, label]) => ({ value, label }))
+      .map(([value, label]) => ({
+        value,
+        label: value in byCategory ? `${label} (${byCategory[value]})` : label,
+      }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [data])
 
@@ -313,25 +315,6 @@ export function DataQualityPage() {
       .map(r => ({ value: r.name, label: r.label }))
       .sort((a, b) => a.label.localeCompare(b.label))
   }, [data, categoryFilter])
-
-  // Category summary chips "CategoryLabel N". Counts are computed from the current
-  // severity filter (not the static backend byCategory total) so they stay consistent
-  // with the filtered table; independent of the selected category/rule so each chip
-  // shows its own count. Equals summary.byCategory when all severities are enabled.
-  const categorySummary = useMemo(() => {
-    if (!data) return []
-    const counts = new Map<string, number>()
-    for (const issue of data.violations) {
-      for (const v of issue.violations) {
-        if (severityFilter.size === 0 || severityFilter.has(v.severity)) {
-          counts.set(v.category, (counts.get(v.category) || 0) + 1)
-        }
-      }
-    }
-    return Array.from(counts.entries())
-      .map(([code, count]) => ({ code, count, label: categoryLabelByCode[code] || code }))
-      .sort((a, b) => b.count - a.count)
-  }, [data, severityFilter, categoryLabelByCode])
 
   const chips = useMemo(() => {
     const result: FilterChip[] = []
@@ -435,23 +418,6 @@ export function DataQualityPage() {
               <SummaryCard title="Warnings" value={data.summary.issuesWithWarnings} color="#d97706" />
               <SummaryCard title="Info" value={data.summary.issuesWithInfo} color="#9ca3af" />
             </div>
-
-            {categorySummary.length > 0 && (
-              <div className="category-summary-row">
-                {categorySummary.map(cat => (
-                  <button
-                    key={cat.code}
-                    type="button"
-                    className={`category-chip ${categoryFilter === cat.code ? 'active' : ''}`}
-                    onClick={() => toggleCategory(cat.code)}
-                    aria-pressed={categoryFilter === cat.code}
-                  >
-                    <span className="category-chip-label">{cat.label}</span>
-                    <span className="category-chip-count">{cat.count}</span>
-                  </button>
-                ))}
-              </div>
-            )}
 
             <div className="report-meta">
               Generated: {formatDate(data.generatedAt)}
