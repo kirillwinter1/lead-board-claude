@@ -49,13 +49,12 @@ public class RetrospectiveTimelineService {
         // Load STORY and BUG level issues for team
         List<JiraIssueEntity> stories = issueRepository.findByBoardCategoryInAndTeamId(List.of("STORY", "BUG"), teamId);
 
-        // Filter out stories that were never started (still in NEW/TODO status)
-        List<JiraIssueEntity> startedStories = stories.stream()
-                .filter(s -> {
-                    StatusCategory cat = workflowConfigService.categorize(s.getStatus(), s.getIssueType());
-                    return cat != StatusCategory.NEW && cat != StatusCategory.TODO;
-                })
-                .toList();
+        // "Never started" cannot be judged by story status alone: subtasks may already
+        // be done / have logged work while the story itself still sits in NEW/TODO
+        // (story status lags reality). Consider every story — buildRetroStory() returns
+        // null for stories with no subtask activity and no transitions, so the truly
+        // untouched ones are filtered there.
+        List<JiraIssueEntity> startedStories = stories;
 
         if (startedStories.isEmpty()) {
             return new RetrospectiveResult(teamId, OffsetDateTime.now(), List.of());
