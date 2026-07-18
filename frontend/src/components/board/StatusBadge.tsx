@@ -46,7 +46,20 @@ const badgeBaseStyle: CSSProperties = {
   whiteSpace: 'nowrap',
 }
 
-export function StatusBadge({ status, color, maxWidth }: { status: string; color?: string | null; maxWidth?: number }) {
+// Dense variant for tight layouts (e.g. Timeline labels) — same colors/weight,
+// smaller type and padding so the pill doesn't dominate compact rows.
+const compactStyle: CSSProperties = {
+  padding: '2px 6px',
+  fontSize: 9,
+  letterSpacing: 0.4,
+}
+
+export function StatusBadge({ status, color, maxWidth, compact }: {
+  status: string
+  color?: string | null
+  maxWidth?: number
+  compact?: boolean
+}) {
   const statusStyles = useStatusStyles()
   const statusClass = status.toLowerCase().replace(/\s+/g, '-')
 
@@ -58,16 +71,18 @@ export function StatusBadge({ status, color, maxWidth }: { status: string; color
     ? { maxWidth, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', verticalAlign: 'middle' }
     : {}
 
+  const sizeStyle = compact ? compactStyle : undefined
+
   if (effectiveColor) {
     return (
       <span
         className="status-badge"
-        style={{ ...badgeBaseStyle, ...clampStyle, backgroundColor: effectiveColor, color: getContrastColor(effectiveColor) }}
+        style={{ ...badgeBaseStyle, ...sizeStyle, ...clampStyle, backgroundColor: effectiveColor, color: getContrastColor(effectiveColor) }}
       >
         {status}
       </span>
     )
   }
 
-  return <span className={`status-badge ${statusClass}`} style={{ ...badgeBaseStyle, ...clampStyle }}>{status}</span>
+  return <span className={`status-badge ${statusClass}`} style={{ ...badgeBaseStyle, ...sizeStyle, ...clampStyle }}>{status}</span>
 }

@@ -6,6 +6,7 @@ import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
 import { StatusStylesProvider, useStatusStyles } from '../components/board/StatusStylesContext'
 import { EmptyState } from '../components/EmptyState'
+import { ProgressBar } from '../components/ProgressBar'
 import { resolveStatusBgColor } from '../components/board/StatusBadge'
 import { StatusBadge } from '../components/board/StatusBadge'
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
@@ -35,6 +36,15 @@ import {
 } from '../utils/dateGrid'
 
 type PhaseSource = 'retro' | 'forecast' | 'hybrid'
+
+// Fixed width of the right meta column (status badge + progress) in epic labels.
+// Shared by both label rows so badges and progress bars align to one vertical
+// grid line across all epics, and summaries truncate at a consistent point.
+// Sized to fit the longest status (ЗАПЛАНИРОВАНО) in the compact badge.
+const LABEL_META_WIDTH = 112
+// Epic present only in retrospective data (absent from the unified plan) — either a done
+// epic or a not-yet-plannable epic (e.g. NEW) whose stories already started.
+type TimelinePlannedEpic = PlannedEpic & { _retroOnly?: boolean }
 type ActualsMode = 'worklog' | 'status'
 type TimelineCache = { forecast: ForecastResponse; unifiedPlan: UnifiedPlanningResult }
 
@@ -182,9 +192,9 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
         onMouseMove={handleMouseMove}
         onMouseLeave={() => setShowTooltip(false)}
       >
-        {/* Row 1: Icon + Key + Status badge + Progress */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {/* Row 1: Icon + Key left, status badge in the fixed meta column (tooltip-style header) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
             <img src={epicIconUrl} alt="Epic" style={{ width: 16, height: 16 }} />
             <a
               href={`${jiraBaseUrl}${epic.epicKey}`}
@@ -197,31 +207,23 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
             {dueDateIndicator}
             {epic.flagged && <span style={{ fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 3, color: DSR_RED, backgroundColor: ERROR_BG, lineHeight: '16px' }} title="Flagged">FLG</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span title={epic.status || ''}>
-              <StatusBadge status={epic.status || 'Unknown'} maxWidth={130} />
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-              <div style={{
-                width: 32,
-                height: 5,
-                backgroundColor: '#dfe1e6',
-                borderRadius: 2,
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  width: `${progress}%`,
-                  height: '100%',
-                  backgroundColor: progress >= 100 ? DSR_GREEN : PROGRESS_IN_PROGRESS,
-                }} />
-              </div>
-              <span style={{ fontSize: 9, color: TEXT_MUTED, minWidth: 22 }}>{progress}%</span>
-            </div>
+          <div style={{ width: LABEL_META_WIDTH, flexShrink: 0 }}>
+            <StatusBadge status={epic.status || 'Unknown'} maxWidth={LABEL_META_WIDTH} compact />
           </div>
         </div>
-        <span className="gantt-label-title" title={epic.summary}>
-          {epic.summary}
-        </span>
+        {/* Row 2: Summary left, progress in the same meta column. No native title attrs —
+            the row already shows the rich DarkTooltip on hover; a browser tooltip is noise. */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span className="gantt-label-title" style={{ flex: 1, minWidth: 0 }}>
+            {epic.summary}
+          </span>
+          <div style={{ width: LABEL_META_WIDTH, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <ProgressBar value={progress} height={4} ariaLabel={`${epic.epicKey} progress`} />
+            </div>
+            <span style={{ fontSize: 8, color: TEXT_MUTED, minWidth: 20, textAlign: 'right' }}>{progress}%</span>
+          </div>
+        </div>
       </div>
 
       {showTooltip && (
@@ -300,7 +302,7 @@ function EpicLabel({ epic, epicForecast, jiraBaseUrl, rowHeight }: EpicLabelProp
                     .filter(role => epic.roleProgress![role])
                     .map(role => { const progress = epic.roleProgress![role]; return progress && (
                     <tr key={role}>
-                      <td style={{ padding: '3px 0', width: 50 }}>
+                      <td style={{ padding: '3px 0', width: 50, whiteSpace: 'nowrap' }}>
                         <span style={{ color: getRoleColor(role) }}>●</span> {role}
                         {progress.completed && <span style={{ marginLeft: 4 }}>✓</span>}
                       </td>
@@ -754,6 +756,30 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
               🚫 Blocked by: {hoveredStory.blockedBy.join(', ')}
             </div>
           )}
+
+          {/* Planning warnings — the reason for the "!" badge on the bar. Story-level and
+              global warnings can duplicate the same type ("No estimate" vs the verbose
+              variant) — keep the most descriptive message per type. */}
+          {(() => {
+            const all = [
+              ...(hoveredStory.warnings || []),
+              ...globalWarnings.filter(w => w.issueKey === hoveredStory.storyKey),
+            ]
+            const byType = new Map<string, PlanningWarning>()
+            for (const w of all) {
+              const key = w.type || w.message
+              const prev = byType.get(key)
+              if (!prev || (w.message?.length || 0) > (prev.message?.length || 0)) byType.set(key, w)
+            }
+            const unique = Array.from(byType.values()).filter(w => w.message)
+            return unique.length > 0 && (
+              <div style={{ color: WARNING_ORANGE, marginTop: '10px', fontSize: '12px', borderTop: `1px solid ${TOOLTIP_DIVIDER}`, paddingTop: '8px' }}>
+                {unique.map(w => (
+                  <div key={w.type || w.message}>⚠️ {w.message}</div>
+                ))}
+              </div>
+            )
+          })()}
         </DarkTooltip>
       )}
     </>
@@ -1126,7 +1152,7 @@ function mergeHybridEpics(
   })
 
   // Add retro-only epics (not in plan — removed/moved epics with historical data)
-  const retroOnlyEpics: PlannedEpic[] = []
+  const retroOnlyEpics: TimelinePlannedEpic[] = []
   for (const retroEpic of retroResult.epics) {
     if (planEpicKeys.has(retroEpic.epicKey)) continue
 
@@ -1169,6 +1195,7 @@ function mergeHybridEpics(
     })
 
     retroOnlyEpics.push({
+      _retroOnly: true,
       epicKey: retroEpic.epicKey,
       summary: retroEpic.summary,
       autoScore: 0,
@@ -1190,8 +1217,8 @@ function mergeHybridEpics(
     })
   }
 
-  // Done (retro-only) epics render at the top so the Gantt reads top-to-bottom
-  // (completed work above, active/planned work below) — consistent with the board.
+  // Retro-only epics are tagged (_retroOnly) and reordered at render time by status
+  // category: done ones above plan epics, unfinished ones below — see the `epics` memo.
   return [...retroOnlyEpics, ...mergedPlanEpics]
 }
 
@@ -1526,12 +1553,23 @@ export function TimelineContent({
     return headers.length * ZOOM_UNIT_WIDTH[zoom]
   }, [headers.length, zoom])
 
-  // Get epics from unified plan
+  // Get epics from unified plan, ordered consistently with the Board:
+  // done retro-only epics on top (completed band), plan epics in backend manual_order,
+  // unfinished retro-only epics (e.g. NEW epics whose stories already started) at the bottom.
   const epics = useMemo(() => {
     if (!unifiedPlan) return []
-    if (!filteredEpicKeys) return unifiedPlan.epics
-    return unifiedPlan.epics.filter(epic => filteredEpicKeys.has(epic.epicKey))
-  }, [unifiedPlan, filteredEpicKeys])
+    const list = filteredEpicKeys
+      ? unifiedPlan.epics.filter(epic => filteredEpicKeys.has(epic.epicKey))
+      : unifiedPlan.epics
+    const isRetroOnly = (e: PlannedEpic) => Boolean((e as TimelinePlannedEpic)._retroOnly)
+    const isDoneEpic = (e: PlannedEpic) =>
+      Boolean(e.status) && statusStyles[e.status as string]?.statusCategory === 'DONE'
+    return [
+      ...list.filter(e => isRetroOnly(e) && isDoneEpic(e)),
+      ...list.filter(e => !isRetroOnly(e)),
+      ...list.filter(e => isRetroOnly(e) && !isDoneEpic(e)),
+    ]
+  }, [unifiedPlan, filteredEpicKeys, statusStyles])
 
   // Match with forecast for status info
   const epicForecasts = useMemo(() => {
@@ -1557,6 +1595,8 @@ export function TimelineContent({
     return (todayOffset / totalDays) * 100
   }, [dateRange])
 
+  // Only true filters get chips. Zoom and snapshot date are display parameters —
+  // they're already visible in the dropdowns above, a removable chip would be noise.
   const chips = useMemo<FilterChip[]>(() => {
     const result: FilterChip[] = []
 
@@ -1574,35 +1614,13 @@ export function TimelineContent({
       })
     }
 
-    if (zoom !== 'week') {
-      result.push({
-        category: 'Scale',
-        value: zoom.charAt(0).toUpperCase() + zoom.slice(1),
-        onRemove: () => setZoom('week'),
-      })
-    }
-
-    if (isHistoricalMode && selectedHistoricalDate) {
-      result.push({
-        category: 'Date',
-        value: new Date(selectedHistoricalDate).toLocaleDateString('en-US', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        }),
-        onRemove: () => handleHistoricalDateChange(''),
-      })
-    }
-
     return result
-  }, [isHistoricalMode, selectedHistoricalDate, selectedTeamId, showFilterBar, teams, zoom])
+  }, [selectedTeamId, showFilterBar, teams])
 
   const clearFilters = () => {
     if (teams.length > 1) {
       setSelectedTeamId(null)
     }
-    setZoom('week')
-    handleHistoricalDateChange('')
   }
 
   const needsTeamSelection = isTeamControlled && selectedTeamId === null

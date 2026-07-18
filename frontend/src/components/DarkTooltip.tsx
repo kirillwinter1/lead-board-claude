@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react'
 import type { ReactNode, CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -35,8 +36,28 @@ function clampLeft(left: number, maxWidth: number): number {
 export function DarkTooltip({
   top, left, minWidth = 300, maxWidth = 420, interactive = false, children,
 }: DarkTooltipProps) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Vertical clamp/flip. Height is only known after render, so adjust the DOM node
+  // in a layout effect (before paint): if the box would overflow the bottom edge,
+  // flip it above the cursor (callers pass top = cursorY + 12); as a last resort
+  // pin it to the bottom edge. Runs on every render — top changes with mousemove.
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const margin = 8
+    const height = el.offsetHeight
+    let adjusted = top
+    if (adjusted + height > window.innerHeight - margin) {
+      const above = top - height - 24
+      adjusted = above >= margin ? above : Math.max(margin, window.innerHeight - height - margin)
+    }
+    el.style.top = `${adjusted}px`
+  })
+
   return createPortal(
     <div
+      ref={ref}
       style={{
         position: 'fixed',
         top,
