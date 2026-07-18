@@ -103,12 +103,8 @@ describe('FixModal', () => {
     expect(badges()).toHaveLength(2)
     expect(badges()[1].textContent).toBe('In Review')
 
-    // Pick "Done" from the "New status" dropdown
-    const trigger = document.querySelector('.filter-dropdown-trigger') as HTMLElement
-    fireEvent.click(trigger)
-    const doneOption = Array.from(document.querySelectorAll('.filter-dropdown-item-label'))
-      .find(el => el.textContent === 'Done') as HTMLElement
-    fireEvent.click(doneOption)
+    // Pick "Done" from the "New status" native select
+    fireEvent.change(screen.getByLabelText('New status'), { target: { value: 'Done' } })
 
     // The right-hand badge now reflects the new selection
     await waitFor(() => expect(badges()[1].textContent).toBe('Done'))

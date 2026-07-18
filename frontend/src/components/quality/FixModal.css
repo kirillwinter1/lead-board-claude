@@ -123,11 +123,16 @@
   font-weight: 600;
 }
 
-.fix-input-label input {
+.fix-input-label input,
+.fix-input-label select {
   font-size: 13px;
   padding: 6px 8px;
   border: 1px solid transparent;
   border-radius: 4px;
+}
+
+.fix-input-label select {
+  cursor: pointer;
 }
 
 .fix-warning-box {

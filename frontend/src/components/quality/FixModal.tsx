@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import axios from 'axios'
 import { Modal } from '../Modal'
-import { SingleSelectDropdown } from '../SingleSelectDropdown'
 import { RiceForm } from '../rice/RiceForm'
 import { StatusBadge } from '../board/StatusBadge'
 import { getIssueIcon } from '../board/helpers'
@@ -322,14 +321,20 @@ export function FixModal({ issueKey, rule, ruleLabel, onClose, onApplied }: FixM
               {activeInputs.map(inp => (
                 <div key={inp.name} className="fix-input-row">
                   {inp.type === 'select' ? (
-                    <SingleSelectDropdown
-                      label={inp.label}
-                      options={(inp.options ?? []).map(o => ({ ...o, color: o.color ?? undefined }))}
-                      selected={inputValues[inp.name] || null}
-                      onChange={v => setInput(inp.name, v ?? '')}
-                      placeholder={inp.label}
-                      allowClear={!inp.required}
-                    />
+                    <label className="fix-input-label" style={{ color: TEXT_SECONDARY }}>
+                      <span>{inp.label}</span>
+                      <select
+                        value={inputValues[inp.name] ?? ''}
+                        required={inp.required}
+                        onChange={e => setInput(inp.name, e.target.value)}
+                        style={{ borderColor: BORDER_DEFAULT, color: TEXT_PRIMARY, background: BG_PAGE }}
+                      >
+                        {!inp.required && <option value="">—</option>}
+                        {(inp.options ?? []).map(o => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </label>
                   ) : (
                     <label className="fix-input-label" style={{ color: TEXT_SECONDARY }}>
                       <span>{inp.label}</span>
