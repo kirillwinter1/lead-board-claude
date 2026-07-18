@@ -231,7 +231,9 @@ describe('FixModal', () => {
     await waitFor(() => expect(screen.getByText('Already resolved in Jira')).toBeInTheDocument())
     expect(screen.queryByRole('button', { name: 'Apply' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    // The shared Modal now also renders an X button with aria-label "Close" —
+    // target the footer action button specifically.
+    fireEvent.click(screen.getByText('Close', { selector: 'button.btn' }))
     expect(onApplied).toHaveBeenCalled()
   })
 
