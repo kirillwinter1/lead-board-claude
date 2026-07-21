@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Service
 public class WorkflowConfigService {
@@ -853,10 +854,10 @@ public class WorkflowConfigService {
      */
     public List<String> getStatusNamesForCategory(StatusCategory target, BoardCategory boardCat) {
         if (target == null || boardCat == null) return List.of();
-        ensureLoaded();
+        ConfigSnapshot s = snapshot();
         String prefix = boardCat.name() + ":";
         List<String> names = new ArrayList<>();
-        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
             String key = entry.getKey();
             if (key.startsWith(prefix) && entry.getValue() == target) {
                 names.add(key.substring(prefix.length()));
@@ -873,7 +874,7 @@ public class WorkflowConfigService {
      */
     public List<String> orderStatusNames(BoardCategory boardCat, List<String> names) {
         if (names == null || names.isEmpty()) return List.of();
-        ensureLoaded();
+        ConfigSnapshot s = snapshot();
         String prefix = boardCat == null ? null : boardCat.name() + ":";
         return names.stream()
                 .filter(Objects::nonNull)
@@ -881,7 +882,7 @@ public class WorkflowConfigService {
                 .sorted(Comparator
                         .comparingInt((String n) -> prefix == null
                                 ? Integer.MAX_VALUE
-                                : statusSortOrder.getOrDefault(prefix + n, Integer.MAX_VALUE))
+                                : s.statusSortOrder.getOrDefault(prefix + n, Integer.MAX_VALUE))
                         .thenComparing(Comparator.naturalOrder()))
                 .collect(Collectors.toList());
     }
