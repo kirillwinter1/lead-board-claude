@@ -38,6 +38,7 @@ import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -304,6 +305,9 @@ public class SyncService {
         syncStateRepository.save(state);
 
         List<String> statusChangedKeys = new ArrayList<>();
+        // Keys needing worklog re-import: status change OR logged-time change (a worklog
+        // can be added in Jira without any status transition).
+        Set<String> worklogChangedKeys = new LinkedHashSet<>();
         Timer.Sample syncTimer = observabilityMetrics.startSyncTimer();
 
         try {
@@ -341,6 +345,9 @@ public class SyncService {
                     SyncResult result = saveOrUpdateIssue(issue, projectKey);
                     if (result.statusChanged) {
                         statusChangedKeys.add(issue.getKey());
+                    }
+                    if (result.statusChanged || result.timeSpentChanged) {
+                        worklogChangedKeys.add(issue.getKey());
                     }
                     if (result.created) {
                         createdCount++;
@@ -430,7 +437,7 @@ public class SyncService {
 
             // Import worklogs: full import if table empty, otherwise incremental for changed subtasks
             try {
-                worklogImportService.importWorklogsAfterSync(projectKey, statusChangedKeys);
+                worklogImportService.importWorklogsAfterSync(projectKey, new ArrayList<>(worklogChangedKeys));
             } catch (Exception e) {
                 log.error("Failed to import worklogs after sync", e);
             }
@@ -483,7 +490,7 @@ public class SyncService {
         }
     }
 
-    private record SyncResult(boolean statusChanged, boolean created) {}
+    private record SyncResult(boolean statusChanged, boolean created, boolean timeSpentChanged) {}
 
     private SyncResult saveOrUpdateIssue(JiraIssue jiraIssue, String projectKey) {
         JiraIssueEntity existing = issueRepository.findByIssueKey(jiraIssue.getKey())
@@ -493,6 +500,7 @@ public class SyncService {
 
         String previousStatus = existing != null ? existing.getStatus() : null;
         Boolean previousFlagged = existing != null ? existing.getFlagged() : null;
+        Long previousTimeSpent = existing != null ? existing.getTimeSpentSeconds() : null;
 
         // Preserve local Lead Board data
         Map<String, BigDecimal> savedRoughEstimates = entity.getRoughEstimates();
@@ -689,7 +697,12 @@ public class SyncService {
             flagChangelogService.detectAndRecordFlagChange(prevEntity, entity);
         }
 
-        return new SyncResult(statusChanged, isNew);
+        // Logged time can change without a status transition (worklog added in Jira) —
+        // the worklog import must be triggered for these subtasks too, otherwise
+        // issue_worklogs never learns about the new entries.
+        boolean timeSpentChanged = !java.util.Objects.equals(previousTimeSpent, entity.getTimeSpentSeconds());
+
+        return new SyncResult(statusChanged, isNew, timeSpentChanged);
     }
 
     private LocalDate parseLocalDate(String dateStr) {

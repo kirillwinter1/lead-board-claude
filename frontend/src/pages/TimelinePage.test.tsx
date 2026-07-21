@@ -305,6 +305,94 @@ describe('TimelinePage', () => {
       })
     })
 
+    it('renders hybrid phase segments as direct children of the bar (no wrapper div)', async () => {
+      // Regression: the hybrid solid+striped pair was wrapped in a bare <div>. On
+      // .story-bar:hover the CSS filter on that 0-height wrapper made it the containing
+      // block for the absolute segments — height:100% collapsed to 0 and the phase
+      // disappeared (the bar looked grey on hover).
+      const daysFromNow = (n: number) => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() + n)
+        return d.toISOString().slice(0, 10)
+      }
+      const plan = JSON.parse(JSON.stringify(mockUnifiedPlan))
+      plan.epics[0].stories = [
+        {
+          storyKey: 'PROJ-1',
+          summary: 'Hybrid Story',
+          status: 'In Progress',
+          issueType: 'Story',
+          autoScore: null,
+          startDate: daysAgo(5),
+          endDate: daysFromNow(5),
+          warnings: [],
+          phases: {
+            DEV: {
+              assigneeAccountId: null,
+              assigneeDisplayName: null,
+              startDate: daysAgo(5),
+              endDate: daysFromNow(5),
+              hours: 40,
+              noCapacity: false,
+            },
+          },
+        },
+      ]
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue(plan as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue({
+        teamId: 1,
+        calculatedAt: new Date().toISOString(),
+        epics: [
+          {
+            epicKey: 'EPIC-1',
+            summary: 'First Epic',
+            status: 'In Progress',
+            startDate: daysAgo(5),
+            endDate: null,
+            progressPercent: 0,
+            stories: [
+              {
+                storyKey: 'PROJ-1',
+                summary: 'Hybrid Story',
+                status: 'In Progress',
+                issueType: 'Story',
+                completed: false,
+                startDate: daysAgo(5),
+                endDate: null,
+                progressPercent: 0,
+                autoScore: null,
+                totalEstimateSeconds: null,
+                totalLoggedSeconds: null,
+                roleProgress: null,
+                phases: {
+                  DEV: { roleCode: 'DEV', startDate: daysAgo(5), endDate: null, durationDays: 5, active: true },
+                },
+                worklogDays: null,
+                statusIntervals: null,
+              },
+            ],
+          },
+        ],
+      } as any)
+
+      const { container } = renderTimelinePage()
+
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-1"]')).toBeTruthy()
+      })
+
+      const bar = container.querySelector('.story-bar[aria-label="Story PROJ-1"]') as HTMLElement
+      const striped = bar.querySelector('.phase-bar-forecast') as HTMLElement
+      const solid = Array.from(bar.querySelectorAll('div')).find(
+        el => (el as HTMLElement).style.backgroundColor !== ''
+      ) as HTMLElement
+      expect(striped).toBeTruthy()
+      expect(solid).toBeTruthy()
+      expect(striped.parentElement).toBe(bar)
+      expect(solid.parentElement).toBe(bar)
+    })
+
     it('falls back to StatusBadge palette for status without configured color', async () => {
       vi.mocked(boardApi.getStatusStyles).mockResolvedValue({} as any)
       const { container } = renderTimelinePage()

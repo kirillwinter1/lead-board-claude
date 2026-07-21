@@ -609,6 +609,68 @@ class SyncServiceTest {
         }
     }
 
+    // ==================== Worklog Import Trigger Tests ====================
+
+    @Nested
+    @DisplayName("Worklog import trigger")
+    class WorklogImportTriggerTests {
+
+        // Regression (2026-07-18): worklog import ran only for subtasks whose STATUS
+        // changed during the sync. Time logged in Jira without a status transition
+        // (issue updated, spent grows) never reached issue_worklogs, so the Timeline
+        // "Logged time" mode had no worklog days and fell back to solid phase bars.
+
+        @Test
+        @DisplayName("should trigger worklog import when time spent changed without status change")
+        void shouldTriggerWorklogImportOnTimeSpentChange() {
+            String projectKey = "LB";
+            JiraIssue jiraIssue = createJiraIssue("LB-608", "Subtask", "В работе", "Подзадача");
+            JiraIssue.JiraTimeTracking tt = new JiraIssue.JiraTimeTracking();
+            tt.setTimeSpentSeconds(18000L);
+            jiraIssue.getFields().setTimetracking(tt);
+            JiraSearchResponse response = createSearchResponse(List.of(jiraIssue), true);
+
+            JiraIssueEntity existing = createExistingEntity("LB-608", "В работе"); // status unchanged
+            existing.setTimeSpentSeconds(3600L); // 1h -> 5h
+
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
+            when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
+            when(issueRepository.findByIssueKey("LB-608")).thenReturn(Optional.of(existing));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            syncService.syncProject(projectKey);
+
+            verify(worklogImportService).importWorklogsAfterSync(
+                    eq(projectKey), argThat(keys -> keys.contains("LB-608")));
+        }
+
+        @Test
+        @DisplayName("should not schedule worklog import for issues without status or time changes")
+        void shouldNotTriggerWorklogImportWhenNothingChanged() {
+            String projectKey = "LB";
+            JiraIssue jiraIssue = createJiraIssue("LB-608", "Subtask", "В работе", "Подзадача");
+            JiraIssue.JiraTimeTracking tt = new JiraIssue.JiraTimeTracking();
+            tt.setTimeSpentSeconds(18000L);
+            jiraIssue.getFields().setTimetracking(tt);
+            JiraSearchResponse response = createSearchResponse(List.of(jiraIssue), true);
+
+            JiraIssueEntity existing = createExistingEntity("LB-608", "В работе");
+            existing.setTimeSpentSeconds(18000L); // unchanged
+
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(createSyncState(projectKey)));
+            when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(response);
+            when(issueRepository.findByIssueKey("LB-608")).thenReturn(Optional.of(existing));
+            when(issueRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            syncService.syncProject(projectKey);
+
+            verify(worklogImportService).importWorklogsAfterSync(
+                    eq(projectKey), argThat(List::isEmpty));
+        }
+    }
+
     // ==================== Helper Methods ====================
 
     private JiraIssue createJiraIssue(String key, String summary, String status, String issueType) {

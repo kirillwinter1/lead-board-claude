@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay, StatusInterval } from '../api/forecast'
@@ -495,8 +495,12 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       const pastPercent = (pastDays / totalPhaseDays) * phaseWidthPercent
       const futurePercent = phaseWidthPercent - pastPercent
 
+      // Fragment, NOT a wrapper <div>: .story-bar:hover > div applies filter to direct
+      // children, and a filter on the 0-height wrapper would turn it into the containing
+      // block for these absolute segments — height:100% collapses to 0 and the phase
+      // vanishes on hover (bar looked grey).
       return (
-        <div key={phaseType}>
+        <Fragment key={phaseType}>
           {/* Solid part (retro/actual) */}
           <div
             style={{
@@ -520,7 +524,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
               opacity: phase.noCapacity ? 0.4 : 0.7
             } as React.CSSProperties}
           />
-        </div>
+        </Fragment>
       )
     }
 
@@ -654,7 +658,12 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
       </div>
 
       {hoveredStory && (
-        <DarkTooltip top={tooltipPos.y + 12} left={tooltipPos.x + 12} minWidth={300} maxWidth={420} interactive>
+        /* NOT interactive: the tooltip follows the cursor, and near the right viewport
+           edge clampLeft pulls it under the pointer — with pointer-events:auto that
+           triggers a mouseleave/mouseenter loop on the bar (rapid tooltip flicker).
+           The tooltip can't be reached by the mouse anyway (it unmounts on bar leave);
+           the clickable Jira link lives on the bar's story number. */
+        <DarkTooltip top={tooltipPos.y + 12} left={tooltipPos.x + 12} minWidth={300} maxWidth={420}>
           {/* Header: Type icon + Key + AutoScore + Status */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
