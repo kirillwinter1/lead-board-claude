@@ -74,3 +74,40 @@ These ERRORs appear in every startup and are safe (pre-existing, handled with ca
    read before tenant migrations run; caught, app continues
 2. `relation "jira_sync_state" does not exist` — SyncService startup recovery; caught as WARN
 Both resolve after TenantMigrationService runs (~14:18:31 in logs). App starts healthy.
+Confirmed again on F87-F91 deploy (2026-07-12): same 2 errors, same pattern, harmless.
+
+## Flyway logs are nearly invisible in prod — this is expected, not a red flag
+
+`backend/src/main/resources/application-prod.yml` sets `logging.level.root: WARN` and
+`com.leadboard: INFO`. Flyway itself logs under `org.flywaydb` (root logger), so its normal
+"Successfully applied N migrations" / "Schema is up to date" INFO lines are suppressed in
+prod container logs — `docker logs onelane-backend | grep -i flyway` can return **zero
+matches even on a fully successful migration run**. Do not treat this as a failure signal.
+To confirm migrations actually ran, rely on: (a) app reaching "Started LeadBoardApplication
+in Ns" — a Flyway checksum/validation failure throws and Spring Boot never gets there; (b)
+`c.l.tenant.TenantMigrationService` INFO lines (`com.leadboard` package, not suppressed) —
+"Running tenant migrations for N active tenants" / "Tenant schema 'X' migrated successfully";
+(c) absence of `FlywayException`/checksum-mismatch text anywhere in the log; (d) `/api/health`
+returning the new version.
+
+## docker image prune -f after docker load with buildx --platform builds — safe, misleading output
+
+After `docker build --platform linux/amd64 ...` (uses buildx, emits attestation/manifest-list
+objects) + `docker load` on the server, running `docker image prune -f` may print
+`untagged: sha256:<old-image-id>` lines that look like it just deleted your rollback-tagged
+image (e.g. the ID behind `onelane-backend:v0.83.0-prev`). It did not — those lines come with
+"Total reclaimed space: 0B" and refer to dangling buildx attestation/manifest artifacts sharing
+that digest prefix, not the tagged image. **Always verify with `docker images | grep onelane`
+immediately after** rather than assuming the rollback tag survived — confirmed intact on the
+2026-07-12 deploy, but the alarming output is worth a double-check every time.
+
+## Deploy history
+
+- 2026-07-12: main @ 2901e7c (F87–F91 + OAuth tenant-pinning fix) deployed, v0.83.0 → v0.91.0.
+  Production had NOT been updated since a v0.83.0 image despite F84-F86 being merged earlier —
+  don't trust "last deployed = latest merged feature" assumptions; always read the live
+  `/api/health` version as ground truth for the running baseline before deploying.
+  Rollback tags `onelane-backend:v0.83.0-prev` / `onelane-frontend:v0.83.0-prev` preserved.
+  Verified specifically: no `tenant_jira_config does not exist` errors post-deploy (the bug
+  PR #34 fixed), only the 2 known-safe startup errors above, external endpoints (/, /api/health,
+  /login) all 200.
