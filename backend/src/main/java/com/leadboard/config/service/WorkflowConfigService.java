@@ -937,11 +937,18 @@ public class WorkflowConfigService {
         // Find issue type mapped to this role code
         for (Map.Entry<String, String> entry : s.typeToRoleCode.entrySet()) {
             if (entry.getValue().equalsIgnoreCase(roleCode)) {
-                // Return the original name (not lowercased key)
-                for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(s.defaultConfigId)) {
-                    if (m.getJiraTypeName().toLowerCase().equals(entry.getKey()) &&
-                        roleCode.equalsIgnoreCase(m.getWorkflowRoleCode())) {
-                        return m.getJiraTypeName();
+                // Recover the original (non-lowercased) type name. typeToRoleCode is the merged
+                // view across ALL configs, so the mapping may live in any config — not just the
+                // default. In a multi-project tenant where the subtask type is mapped only in a
+                // second config, searching defaultConfigId alone returned null, and callers
+                // (PokerJiraService/JiraWriteService) then sent Jira the bare role code ("DEV")
+                // → "issuetype is not valid". Search every config in the merged view.
+                for (Long configId : s.allConfigIds) {
+                    for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(configId)) {
+                        if (m.getJiraTypeName().toLowerCase().equals(entry.getKey()) &&
+                            roleCode.equalsIgnoreCase(m.getWorkflowRoleCode())) {
+                            return m.getJiraTypeName();
+                        }
                     }
                 }
             }

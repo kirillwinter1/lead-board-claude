@@ -221,7 +221,25 @@ public class StoryForecastService {
             );
         }
 
-        AssigneeScheduleInner assigneeSchedule = assigneeSchedules.get(assigneeAccountId);
+        AssigneeScheduleInner assigneeSchedule =
+                assigneeAccountId != null ? assigneeSchedules.get(assigneeAccountId) : null;
+        if (assigneeSchedule == null) {
+            // No suitable assignee/schedule (e.g. team has no active members with this role).
+            // Degrade gracefully — like an unassigned story with no capacity — instead of
+            // dereferencing null (which surfaced as HTTP 500). Mirrors UnifiedPlanningService.planPhase,
+            // which returns a noCapacity phase rather than throwing.
+            return new StorySchedule(
+                    storyKey,
+                    null,
+                    null,
+                    epicStartDate,
+                    epicStartDate,
+                    BigDecimal.ZERO,
+                    true,
+                    false,
+                    List.of()
+            );
+        }
 
         // Check dependencies
         List<String> blockingStories = new ArrayList<>();

@@ -21,14 +21,14 @@ import './TeamsPage.css'
 import './MemberProfilePage.css'
 import './MyWorkPage.css'
 
-function defaultFrom(): string {
+export function defaultFrom(): string {
   const d = new Date()
   d.setDate(d.getDate() - 90)
-  return d.toISOString().slice(0, 10)
+  return localDateKey(d)
 }
 
-function defaultTo(): string {
-  return new Date().toISOString().slice(0, 10)
+export function defaultTo(): string {
+  return localDateKey(new Date())
 }
 
 function overHoursClass(estimateH: number | null, spentH: number | null): string {

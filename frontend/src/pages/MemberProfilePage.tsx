@@ -12,7 +12,7 @@ import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { RoleBadge } from '../components/RoleBadge'
 import { GradeBadge } from '../components/GradeBadge'
-import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
+import { getDsrClass, formatHours, formatDate, localDateKey } from '../components/member/dsrFormat'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 
@@ -27,11 +27,11 @@ function getDsrStatClass(dsr: number): string {
 function getDefaultFrom(): string {
   const d = new Date()
   d.setDate(d.getDate() - 30)
-  return d.toISOString().slice(0, 10)
+  return localDateKey(d)
 }
 
 function getDefaultTo(): string {
-  return new Date().toISOString().slice(0, 10)
+  return localDateKey()
 }
 
 // ======================== MAIN PAGE ========================

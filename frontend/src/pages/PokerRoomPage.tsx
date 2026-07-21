@@ -94,6 +94,19 @@ function fmtNum(n: number): string {
   return String(r)
 }
 
+// Parse the per-role Final estimate inputs into the numeric payload sent to the
+// backend. Inputs are <input type="number"> strings that may be fractional
+// (e.g. "0.5", "3.5"); parseInt would silently truncate them (0.5 -> 0), so we
+// use Number to preserve fractions. Empty -> null; anything non-numeric -> NaN
+// (unchanged from the previous parseInt behaviour).
+export function parseFinalEstimates(inputs: Record<string, string>): Record<string, number | null> {
+  const estimates: Record<string, number | null> = {}
+  for (const [role, value] of Object.entries(inputs)) {
+    estimates[role] = value ? Number(value) : null
+  }
+  return estimates
+}
+
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
@@ -407,10 +420,7 @@ export function PokerRoomPage() {
 
   const handleSetFinal = () => {
     if (!currentStoryId) return
-    const estimates: Record<string, number | null> = {}
-    for (const [role, value] of Object.entries(finalEstimateInputs)) {
-      estimates[role] = value ? parseInt(value) : null
-    }
+    const estimates = parseFinalEstimates(finalEstimateInputs)
     sendSetFinal(currentStoryId, estimates)
   }
 

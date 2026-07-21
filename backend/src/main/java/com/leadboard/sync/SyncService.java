@@ -294,13 +294,30 @@ public class SyncService {
     public void syncProject(String projectKey, Integer months) {
         JiraSyncStateEntity state = getOrCreateSyncState(projectKey);
 
+        // Candidate 4: the incremental cursor is anchored on the START of the *previous* sync,
+        // not its completion. Capture it BEFORE the atomic claim below overwrites
+        // lastSyncStartedAt with the current time.
+        OffsetDateTime previousSyncStartedAt = state.getLastSyncStartedAt();
+
+        // Cheap early-out (also covers "obviously in progress"); the real guard is the atomic
+        // claim below.
         if (state.isSyncInProgress()) {
             log.warn("Sync already in progress for project: {}", projectKey);
             return;
         }
 
+        // Candidate 5 (TOCTOU): claim the sync atomically. The read-check above is not atomic —
+        // a scheduled sync and a manual trigger can both see sync_in_progress=false and enter,
+        // running the sync twice and duplicating synthetic changelog entries. A single
+        // conditional UPDATE (false -> true) lets only one caller win; the loser bails.
+        OffsetDateTime startedAt = OffsetDateTime.now();
+        if (syncStateRepository.tryStartSync(projectKey, startedAt) == 0) {
+            log.warn("Sync already in progress for project: {} (lost atomic claim)", projectKey);
+            return;
+        }
+        // Keep the in-memory entity consistent with what tryStartSync just persisted.
         state.setSyncInProgress(true);
-        state.setLastSyncStartedAt(OffsetDateTime.now());
+        state.setLastSyncStartedAt(startedAt);
         state.setLastError(null);
         syncStateRepository.save(state);
 
@@ -318,7 +335,15 @@ public class SyncService {
             OffsetDateTime lastSync = state.getLastSyncCompletedAt();
             String jql;
             if (lastSync != null) {
-                String lastSyncTime = lastSync.minusMinutes(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+                // Candidate 4: anchor the incremental cursor on the moment the PREVIOUS sync
+                // started, not when it completed. With ORDER BY updated DESC and multi-page
+                // pagination, an issue updated *during* a long sync shifts into an already-consumed
+                // page and is skipped; the next cursor built from completedAt-1min would advance
+                // past its 'updated' and lose it permanently. Anchoring on the previous start time
+                // (minus the 1-minute safety buffer) guarantees such issues are re-fetched next run.
+                // lastSyncCompletedAt is still the gate that distinguishes incremental from full sync.
+                OffsetDateTime cursor = previousSyncStartedAt != null ? previousSyncStartedAt : lastSync;
+                String lastSyncTime = cursor.minusMinutes(1).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
                 jql = String.format("project = %s AND updated >= '%s' ORDER BY updated DESC", projectKey, lastSyncTime);
                 log.info("Incremental sync for project: {} (changes since {})", projectKey, lastSyncTime);
             } else if (months != null && months > 0) {

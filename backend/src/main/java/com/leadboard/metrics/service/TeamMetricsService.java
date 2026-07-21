@@ -245,8 +245,13 @@ public class TeamMetricsService {
         OffsetDateTime fromDt = from.atStartOfDay().atOffset(ZoneOffset.UTC);
         OffsetDateTime toDt = to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 
+        // Current window is inclusive [from, to] → toDt = (to+1)@00:00, so it spans
+        // periodDays+1 days. The prev_period query in getExtendedMetricsByAssigneeV2
+        // uses [prevFromDt, fromDt); to give it the same length as the current window,
+        // prevFrom must be periodDays+1 days before `from` (not periodDays), otherwise
+        // the previous period is a day short and the trend delta is biased.
         long periodDays = ChronoUnit.DAYS.between(from, to);
-        LocalDate prevFrom = from.minusDays(periodDays);
+        LocalDate prevFrom = from.minusDays(periodDays + 1);
         OffsetDateTime prevFromDt = prevFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 
         List<Object[]> data = metricsRepository.getExtendedMetricsByAssigneeV2(teamId, fromDt, toDt, prevFromDt);
@@ -367,9 +372,14 @@ public class TeamMetricsService {
      */
     public ExecutiveSummary getExecutiveSummary(Long teamId, LocalDate from, LocalDate to,
                                                  DsrService dsrService, VelocityService velocityService) {
+        // The current window [from, to] is INCLUSIVE on both ends (calculateThroughput
+        // queries done_at BETWEEN from AND to+1), so it spans periodDays+1 calendar days.
+        // ChronoUnit.DAYS.between is exclusive, so the previous window must also cover
+        // periodDays+1 days to be a fair comparison — otherwise it is one day shorter and
+        // an even workload shows a false "UP" trend.
         long periodDays = ChronoUnit.DAYS.between(from, to);
-        LocalDate prevFrom = from.minusDays(periodDays);
         LocalDate prevTo = from.minusDays(1);
+        LocalDate prevFrom = prevTo.minusDays(periodDays);
 
         // Throughput
         ExecutiveSummary.KpiCard throughputKpi;

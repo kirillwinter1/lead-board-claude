@@ -137,6 +137,9 @@ class SyncServiceTest {
 
         // Common setup
         when(jiraConfigResolver.getTeamFieldId()).thenReturn(null);
+        // Candidate 5: syncProject now claims the sync via an atomic conditional UPDATE.
+        // Default to "claim won" so the normal-path tests run the full sync; race tests override.
+        when(syncStateRepository.tryStartSync(anyString(), any())).thenReturn(1);
     }
 
     // ==================== Regression Tests ====================
@@ -389,6 +392,41 @@ class SyncServiceTest {
         }
 
         @Test
+        @DisplayName("incremental cursor anchors on the previous sync START, not its completion (candidate 4)")
+        void incrementalCursorUsesLastSyncStartedAt() {
+            // Candidate 4: with ORDER BY updated DESC and >1min pagination, an issue updated during
+            // a long sync slips into an already-consumed page. If the next cursor is built from
+            // completedAt-1min it advances past that issue's 'updated' and loses it forever. The
+            // cursor must anchor on when the previous sync STARTED, not when it finished.
+            String projectKey = "LB";
+            JiraSyncStateEntity syncState = createSyncState(projectKey);
+            // Persisted state left by a previous long-running sync: started 2h ago, finished 1h ago.
+            OffsetDateTime prevStart = OffsetDateTime.now().minusHours(2);
+            OffsetDateTime prevComplete = OffsetDateTime.now().minusHours(1);
+            syncState.setLastSyncStartedAt(prevStart);
+            syncState.setLastSyncCompletedAt(prevComplete);
+
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(syncState));
+            when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(createSearchResponse(List.of(), true));
+
+            syncService.syncProject(projectKey);
+
+            ArgumentCaptor<String> jqlCaptor = ArgumentCaptor.forClass(String.class);
+            verify(jiraClient).search(jqlCaptor.capture(), anyInt(), any());
+            String jql = jqlCaptor.getValue();
+
+            java.time.format.DateTimeFormatter fmt =
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+            String expected = prevStart.minusMinutes(1).format(fmt);
+            String wrong = prevComplete.minusMinutes(1).format(fmt);
+            assertTrue(jql.contains(expected),
+                    "cursor must use previous sync START (" + expected + "); jql=" + jql);
+            assertFalse(jql.contains(wrong),
+                    "cursor must NOT use previous sync COMPLETION (" + wrong + "); jql=" + jql);
+        }
+
+        @Test
         @DisplayName("should do full sync when no previous sync")
         void shouldDoFullSyncWhenNoPreviousSync() {
             // Given
@@ -492,6 +530,54 @@ class SyncServiceTest {
 
             // Then: JiraClient should not be called
             verify(jiraClient, never()).search(anyString(), anyInt(), any());
+        }
+    }
+
+    // ==================== Atomic Claim (candidate 5: TOCTOU) ====================
+
+    @Nested
+    @DisplayName("Sync claim is atomic (candidate 5: TOCTOU on sync_in_progress)")
+    class AtomicClaimTests {
+
+        // The scheduled sync and a manual trigger can both observe sync_in_progress=false in the
+        // non-atomic read-check-write and enter, running a full sync twice and duplicating
+        // synthetic changelog. syncProject now claims the sync with a single conditional UPDATE
+        // (tryStartSync: false -> true). A genuine multi-thread race can't be exercised with pure
+        // Mockito; these tests pin the atomic-claim CONTRACT — the guarantee is provided by the
+        // DB-level WHERE sync_in_progress = false.
+
+        @Test
+        @DisplayName("claims the sync atomically before hitting Jira")
+        void claimsAtomicallyBeforeSearch() {
+            String projectKey = "LB";
+            JiraSyncStateEntity state = createSyncState(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(state));
+            when(jiraClient.search(anyString(), anyInt(), any())).thenReturn(createSearchResponse(List.of(), true));
+
+            syncService.syncProject(projectKey);
+
+            InOrder inOrder = inOrder(syncStateRepository, jiraClient);
+            inOrder.verify(syncStateRepository).tryStartSync(eq(projectKey), any());
+            inOrder.verify(jiraClient).search(anyString(), anyInt(), any());
+        }
+
+        @Test
+        @DisplayName("bails without syncing when the atomic claim is lost to a concurrent runner")
+        void bailsWhenClaimLost() {
+            String projectKey = "LB";
+            // syncInProgress=false -> the cheap early read passes; only the atomic claim stops us.
+            JiraSyncStateEntity state = createSyncState(projectKey);
+            when(jiraConfigResolver.getProjectKey()).thenReturn(projectKey);
+            when(syncStateRepository.findByProjectKey(projectKey)).thenReturn(Optional.of(state));
+            // A concurrent runner already flipped the flag in the DB -> our conditional UPDATE
+            // matches 0 rows.
+            when(syncStateRepository.tryStartSync(eq(projectKey), any())).thenReturn(0);
+
+            syncService.syncProject(projectKey);
+
+            verify(jiraClient, never()).search(anyString(), anyInt(), any());
+            verify(autoScoreService, never()).recalculateAll();
         }
     }
 

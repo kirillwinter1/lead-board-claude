@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { MyWorkPage } from './MyWorkPage'
+import { MyWorkPage, defaultFrom, defaultTo } from './MyWorkPage'
 import { HomeRedirect } from '../App'
 import { myWorkApi, type MyWorkResponse } from '../api/myWork'
 import { useAuth } from '../contexts/AuthContext'
@@ -532,5 +532,36 @@ describe('MyWorkPage', () => {
       expect(screen.getByText('BOARD')).toBeInTheDocument()
     })
     expect(screen.queryByText('MYWORK')).toBeNull()
+  })
+})
+
+describe('default analytics period', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // Between 00:00 and 03:00 MSK, `new Date().toISOString()` still points at the
+  // previous UTC day, so the default range dropped "today" from analytics and
+  // Completed. Defaults must follow the LOCAL calendar day, same as
+  // LogTimeModal.todayLocal.
+  it('defaultTo returns the local calendar day, not the UTC day', () => {
+    // 2026-07-11 00:30 in a UTC+3 zone == 2026-07-10 21:30 UTC.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-10T21:30:00.000Z'))
+    const now = new Date()
+    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    expect(defaultTo()).toBe(localToday)
+    if (now.getUTCDate() !== now.getDate()) {
+      expect(defaultTo()).not.toBe(new Date().toISOString().slice(0, 10))
+    }
+  })
+
+  it('defaultFrom is 90 local days before defaultTo', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-10T21:30:00.000Z'))
+    const to = new Date(defaultTo() + 'T00:00:00')
+    const from = new Date(defaultFrom() + 'T00:00:00')
+    const diffDays = Math.round((to.getTime() - from.getTime()) / 86_400_000)
+    expect(diffDays).toBe(90)
   })
 })

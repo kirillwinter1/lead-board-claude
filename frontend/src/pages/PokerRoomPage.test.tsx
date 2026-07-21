@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { PokerRoomPage } from './PokerRoomPage'
+import { PokerRoomPage, parseFinalEstimates } from './PokerRoomPage'
 import { AuthProvider } from '../contexts/AuthContext'
 import * as pokerApi from '../api/poker'
 import * as configApi from '../api/config'
@@ -193,6 +193,21 @@ describe('PokerRoomPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/failed to load/i)).toBeInTheDocument()
       })
+    })
+  })
+
+  describe('parseFinalEstimates', () => {
+    it('preserves fractional final estimates instead of truncating them', () => {
+      const payload = parseFinalEstimates({ SA: '0.5', DEV: '3.5', QA: '2' })
+      expect(payload.SA).toBe(0.5)
+      expect(payload.DEV).toBe(3.5)
+      expect(payload.QA).toBe(2)
+    })
+
+    it('maps empty input to null', () => {
+      const payload = parseFinalEstimates({ SA: '', DEV: '1' })
+      expect(payload.SA).toBeNull()
+      expect(payload.DEV).toBe(1)
     })
   })
 
