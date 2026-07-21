@@ -171,21 +171,18 @@ function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssu
   )
 }
 
-function FocusTaskList({ tasks, showSpent, emptyLabel, onLog, getIssueTypeIconUrl, getIssueTypeCategory }: {
-  tasks: MyTask[]
-  showSpent: boolean
+function FocusTaskRows({ rows, emptyLabel, getIssueTypeIconUrl, getIssueTypeCategory }: {
+  rows: TaskRow[]
   emptyLabel: string
-  onLog: (target: LogTimeTarget) => void
   getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
   getIssueTypeCategory: (typeName: string | null | undefined) => string | null
 }) {
-  const rows = taskRows(tasks, showSpent, onLog)
   if (rows.length === 0) return <EmptyState variant="inline" message={emptyLabel} />
 
   return (
     <div className="mywork-focus-tasks">
       {rows.map(row => (
-        <div className="mywork-focus-task" key={row.key}>
+        <div className={`mywork-focus-task ${row.onLog ? '' : 'mywork-focus-task--no-log'}`.trim()} key={row.key}>
           <img
             src={getIssueIcon(row.issueType, getIssueTypeIconUrl(row.issueType), getIssueTypeCategory(row.issueType))}
             className="issue-type-icon"
@@ -215,6 +212,24 @@ function FocusTaskList({ tasks, showSpent, emptyLabel, onLog, getIssueTypeIconUr
   )
 }
 
+function FocusTaskList({ tasks, showSpent, emptyLabel, onLog, getIssueTypeIconUrl, getIssueTypeCategory }: {
+  tasks: MyTask[]
+  showSpent: boolean
+  emptyLabel: string
+  onLog: (target: LogTimeTarget) => void
+  getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
+  getIssueTypeCategory: (typeName: string | null | undefined) => string | null
+}) {
+  return (
+    <FocusTaskRows
+      rows={taskRows(tasks, showSpent, onLog)}
+      emptyLabel={emptyLabel}
+      getIssueTypeIconUrl={getIssueTypeIconUrl}
+      getIssueTypeCategory={getIssueTypeCategory}
+    />
+  )
+}
+
 function TaskSection({ title, count, children, defaultExpanded = true, className = '' }: { title: string; count: number; children: ReactNode; defaultExpanded?: boolean; className?: string }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
   return (
@@ -232,6 +247,60 @@ function TaskSection({ title, count, children, defaultExpanded = true, className
         <span className="section-badge">{count}</span>
       </button>
       {expanded && children}
+    </div>
+  )
+}
+
+function TeamQueueSection({ stories, getIssueTypeIconUrl, getIssueTypeCategory }: {
+  stories: QueueStory[]
+  getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
+  getIssueTypeCategory: (typeName: string | null | undefined) => string | null
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const rows = queueRows(stories)
+  const previewRows = rows.slice(0, 3)
+
+  return (
+    <div className="profile-section full-width mywork-team-queue">
+      <button
+        type="button"
+        className="profile-section-header mywork-section-toggle"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(value => !value)}
+      >
+        <span className="mywork-section-title">
+          <span className={`mywork-section-chevron ${expanded ? 'expanded' : ''}`} aria-hidden="true">&#9656;</span>
+          <h3>Team Queue</h3>
+          {!expanded && rows.length > 0 && (
+            <span className="mywork-queue-preview-label">Top {Math.min(3, rows.length)}</span>
+          )}
+        </span>
+        <span className="section-badge">{rows.length}</span>
+      </button>
+
+      {expanded ? (
+        <TaskTable
+          rows={rows}
+          rightHeader="My Phase"
+          emptyLabel="No stories in the queue"
+          getIssueTypeIconUrl={getIssueTypeIconUrl}
+          getIssueTypeCategory={getIssueTypeCategory}
+        />
+      ) : (
+        <>
+          <FocusTaskRows
+            rows={previewRows}
+            emptyLabel="No stories in the queue"
+            getIssueTypeIconUrl={getIssueTypeIconUrl}
+            getIssueTypeCategory={getIssueTypeCategory}
+          />
+          {rows.length > previewRows.length && (
+            <button type="button" className="mywork-queue-more" onClick={() => setExpanded(true)}>
+              View all {rows.length} tasks
+            </button>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -614,11 +683,11 @@ export function MyWorkPage() {
           </div>
         )}
 
-        <div className="mywork-focus-layout">
+        <div className={`mywork-focus-layout ${upcomingAssigned.length === 0 ? 'mywork-focus-layout--up-next-empty' : ''}`.trim()}>
           <TaskSection
             title="In Progress"
             count={activeTasks.length}
-            className="mywork-focus-card mywork-focus-card--active"
+            className={`mywork-focus-card mywork-focus-card--active ${activeTasks.length === 0 ? 'mywork-focus-card--empty' : ''}`.trim()}
           >
             <FocusTaskList
               tasks={activeTasks}
@@ -635,7 +704,7 @@ export function MyWorkPage() {
           <TaskSection
             title="Up Next"
             count={upcomingAssigned.length}
-            className="mywork-focus-card mywork-focus-card--next"
+            className={`mywork-focus-card mywork-focus-card--next ${upcomingAssigned.length === 0 ? 'mywork-focus-card--empty' : ''}`.trim()}
           >
             <FocusTaskList
               tasks={upcomingAssigned}
@@ -653,15 +722,11 @@ export function MyWorkPage() {
         </div>
 
         <div className="mywork-secondary-sections">
-          <TaskSection title="Team Queue" count={teamQueue.length} defaultExpanded={false}>
-            <TaskTable
-              rows={queueRows(teamQueue)}
-              rightHeader="My Phase"
-              emptyLabel="No stories in the queue"
-              getIssueTypeIconUrl={getIssueTypeIconUrl}
-              getIssueTypeCategory={getIssueTypeCategory}
-            />
-          </TaskSection>
+          <TeamQueueSection
+            stories={teamQueue}
+            getIssueTypeIconUrl={getIssueTypeIconUrl}
+            getIssueTypeCategory={getIssueTypeCategory}
+          />
         </div>
 
         <Modal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} title="Monthly Worklog" maxWidth={980}>

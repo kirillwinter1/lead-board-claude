@@ -166,15 +166,57 @@ describe('MyWorkPage', () => {
 
     expect(inProgressToggle).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('LB-1')).toBeNull()
-    // Up Next stays expanded; the lower-priority team queue starts collapsed.
+    // Up Next stays expanded; Team Queue exposes a compact preview while the
+    // full table remains collapsed.
     expect(screen.getByText('LB-2')).toBeInTheDocument()
-    expect(screen.queryByText('LB-3')).toBeNull()
+    expect(screen.getByText('LB-3')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Team Queue/i })).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(inProgressToggle)
 
     expect(inProgressToggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('LB-1')).toBeInTheDocument()
+  })
+
+  it('previews three Team Queue rows and reveals the rest on demand', async () => {
+    const response: MyWorkResponse = {
+      hasMembership: true,
+      member: oneTeamMember,
+      upcomingAbsences: [],
+      activeTasks: [],
+      upcomingAssigned: [],
+      teamQueue: Array.from({ length: 4 }, (_, index) => ({
+        key: `LB-Q${index + 1}`,
+        summary: `Queue story ${index + 1}`,
+        issueType: 'Story',
+        status: 'Backlog',
+        teamId: 1,
+        teamName: 'Team Alpha',
+        teamColor: '#FF0000',
+        epicKey: null,
+        epicSummary: null,
+        myPhaseSubtasks: 1,
+        myPhaseEstimateH: 4,
+        jiraUrl: `https://jira.example.com/LB-Q${index + 1}`,
+      })),
+      worklogCalendar: [],
+      analytics: null,
+    }
+    vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
+
+    renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByText('LB-Q1')).toBeInTheDocument()
+    })
+
+    expect(screen.getByText('LB-Q3')).toBeInTheDocument()
+    expect(screen.queryByText('LB-Q4')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'View all 4 tasks' }))
+
+    expect(screen.getByText('LB-Q4')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Team Queue/i })).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('team filter chips refetch with teamId', async () => {
