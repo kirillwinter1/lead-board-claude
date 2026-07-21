@@ -512,6 +512,10 @@ class DsrServiceTest {
         when(workCalendarService.countWorkdays(
                 eq(LocalDate.of(2025, 1, 10)), eq(LocalDate.of(2025, 1, 17))))
                 .thenReturn(6);
+        // The shared boundary day (Jan 10 2025) is a Friday — a real workday, so the
+        // double-counted day is dropped once. (On a weekend boundary isWorkday is false
+        // and the day was never double-counted, so nothing is subtracted.)
+        when(workCalendarService.isWorkday(LocalDate.of(2025, 1, 10))).thenReturn(true);
         when(flagChangelogService.calculateFlaggedWorkdays(any(), any(), any()))
                 .thenReturn(0);
 
@@ -522,6 +526,58 @@ class DsrServiceTest {
         // as an uninterrupted run — the boundary day must not be counted twice.
         assertEquals(10, result.epics().get(0).inProgressWorkdays(),
                 "same-day pause/resume must not double-count the boundary workday");
+    }
+
+    @Test
+    void calculateDsr_pauseAndResumeSameNonWorkday_doesNotUnderCount() {
+        // Guard for the boundary-dedup: when the shared pause/resume day is a weekend,
+        // countWorkdays already counted it zero times in each period, so it must NOT be
+        // subtracted — otherwise the in-progress span is under-counted by a day.
+        JiraIssueEntity epic = createEpic("PROJ-1", "Weekend Bounce Epic",
+                OffsetDateTime.of(2025, 1, 17, 0, 0, 0, 0, ZoneOffset.UTC));
+
+        setupChangelog("PROJ-1", List.of(
+                changelogEntry(null, "In Progress",
+                        OffsetDateTime.of(2025, 1, 6, 10, 0, 0, 0, ZoneOffset.UTC)),
+                changelogEntry("In Progress", "Blocked",
+                        OffsetDateTime.of(2025, 1, 11, 10, 0, 0, 0, ZoneOffset.UTC)),
+                changelogEntry("Blocked", "In Progress",
+                        OffsetDateTime.of(2025, 1, 11, 15, 0, 0, 0, ZoneOffset.UTC)),
+                changelogEntry("In Progress", "Done",
+                        OffsetDateTime.of(2025, 1, 17, 10, 0, 0, 0, ZoneOffset.UTC))
+        ));
+        when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
+        when(workflowConfigService.isEpicInProgress("Blocked")).thenReturn(false);
+        when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
+
+        JiraIssueEntity story = createStory("PROJ-1-S1", "PROJ-1");
+        JiraIssueEntity subtask = createSubtask("PROJ-1-ST1", "PROJ-1-S1");
+        subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
+
+        when(issueRepository.findEpicsForDsr(any(), any(), any()))
+                .thenReturn(List.of(epic));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
+                .thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1-S1")))
+                .thenReturn(List.of(subtask));
+        when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        // Jan 11 2025 is a Saturday. [Jan 6..11] = Mon..Fri = 5; [Jan 11..17] = Mon..Fri = 5.
+        when(workCalendarService.countWorkdays(
+                eq(LocalDate.of(2025, 1, 6)), eq(LocalDate.of(2025, 1, 11))))
+                .thenReturn(5);
+        when(workCalendarService.countWorkdays(
+                eq(LocalDate.of(2025, 1, 11)), eq(LocalDate.of(2025, 1, 17))))
+                .thenReturn(5);
+        when(workCalendarService.isWorkday(LocalDate.of(2025, 1, 11))).thenReturn(false);
+        when(flagChangelogService.calculateFlaggedWorkdays(any(), any(), any()))
+                .thenReturn(0);
+
+        DsrResponse result = service.calculateDsr(1L,
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 1, 31));
+
+        assertEquals(10, result.epics().get(0).inProgressWorkdays(),
+                "weekend boundary was never double-counted, so it must not be subtracted");
     }
 
     @Test
