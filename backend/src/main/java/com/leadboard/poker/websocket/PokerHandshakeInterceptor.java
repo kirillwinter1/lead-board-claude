@@ -5,6 +5,7 @@ import com.leadboard.auth.SessionRepository;
 import com.leadboard.config.AppProperties;
 import com.leadboard.tenant.TenantContext;
 import com.leadboard.tenant.TenantRepository;
+import com.leadboard.tenant.TenantUserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -40,13 +41,16 @@ public class PokerHandshakeInterceptor implements HandshakeInterceptor {
 
     private final SessionRepository sessionRepository;
     private final TenantRepository tenantRepository;
+    private final TenantUserRepository tenantUserRepository;
     private final AppProperties appProperties;
 
     public PokerHandshakeInterceptor(SessionRepository sessionRepository,
                                      TenantRepository tenantRepository,
+                                     TenantUserRepository tenantUserRepository,
                                      AppProperties appProperties) {
         this.sessionRepository = sessionRepository;
         this.tenantRepository = tenantRepository;
+        this.tenantUserRepository = tenantUserRepository;
         this.appProperties = appProperties;
     }
 
@@ -90,6 +94,17 @@ public class PokerHandshakeInterceptor implements HandshakeInterceptor {
                         .orElse(null);
         if (schema == null) {
             log.warn("Poker WS handshake rejected: tenant {} not found or inactive", tenantId);
+            return false;
+        }
+
+        // /ws/** is permitAll, so this handshake is the only auth point for poker sockets.
+        // Enforce the same F82 contract as LeadBoardAuthenticationFilter: a user must have
+        // an ACTIVE tenant_users membership — a deactivated (jira_access_lost) row, or no
+        // membership at all (e.g. a null-tenant session reaching a tenant subdomain), is
+        // denied exactly like a non-member.
+        Long userId = authSession.getUser().getId();
+        if (tenantUserRepository.findByTenantIdAndUserIdAndActiveTrue(tenantId, userId).isEmpty()) {
+            log.warn("Poker WS handshake rejected: user {} is not an active member of tenant {}", userId, tenantId);
             return false;
         }
 

@@ -77,8 +77,12 @@ export function MyWorklogCalendar({ initialDays, initialMonth }: MyWorklogCalend
     setError(false)
     requestedMonth.current = target
     if (target === initialMonth) {
-      // The current month is already loaded — reuse it, no round-trip.
+      // The current month is already loaded — reuse it, no round-trip. Clear any
+      // in-flight loading state too: a still-pending fetch for another month will
+      // no-op in its .finally() guard (requestedMonth.current has moved on), so if
+      // we don't reset here the grid stays frozen (opacity 0.5 + pointer-events:none).
       setDays(initialDays)
+      setLoading(false)
       return
     }
     setLoading(true)

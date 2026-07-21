@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
-import { myWorkApi, type MyWorkResponse, type MyTask, type QueueStory, type MyAnalytics, type MyCompletedTask, type DsrBreakdown } from '../api/myWork'
+import { myWorkApi, type MyWorkResponse, type MyTask, type QueueStory, type MyAnalytics, type MyCompletedTask, type DsrBreakdown, type CalendarDay } from '../api/myWork'
 import { getStatusStyles, type StatusStyle } from '../api/board'
 import { StatusStylesProvider } from '../components/board/StatusStylesContext'
 import { EmptyState } from '../components/EmptyState'
@@ -16,6 +16,7 @@ import { TrendChart } from '../components/member/TrendChart'
 import { getDsrClass, formatHours, formatDate } from '../components/member/dsrFormat'
 import { MyWorklogCalendar } from '../components/member/MyWorklogCalendar'
 import { LogTimeModal, type LogTimeTarget } from '../components/member/LogTimeModal'
+import { Modal } from '../components/Modal'
 import './TeamsPage.css'
 import './MemberProfilePage.css'
 import './MyWorkPage.css'
@@ -115,7 +116,8 @@ function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssu
     return <EmptyState variant="inline" message={emptyLabel} />
   }
   return (
-    <table className="profile-tasks-table mywork-task-table">
+    <div className="mywork-task-scroll">
+      <table className="profile-tasks-table mywork-task-table">
       <colgroup>
         <col className="mywork-col-type" />
         <col className="mywork-col-key" />
@@ -164,14 +166,59 @@ function TaskTable({ rows, rightHeader, emptyLabel, getIssueTypeIconUrl, getIssu
           </tr>
         ))}
       </tbody>
-    </table>
+      </table>
+    </div>
   )
 }
 
-function TaskSection({ title, count, children }: { title: string; count: number; children: ReactNode }) {
-  const [expanded, setExpanded] = useState(true)
+function FocusTaskList({ tasks, showSpent, emptyLabel, onLog, getIssueTypeIconUrl, getIssueTypeCategory }: {
+  tasks: MyTask[]
+  showSpent: boolean
+  emptyLabel: string
+  onLog: (target: LogTimeTarget) => void
+  getIssueTypeIconUrl: (typeName: string | null | undefined) => string | null
+  getIssueTypeCategory: (typeName: string | null | undefined) => string | null
+}) {
+  const rows = taskRows(tasks, showSpent, onLog)
+  if (rows.length === 0) return <EmptyState variant="inline" message={emptyLabel} />
+
   return (
-    <div className="profile-section full-width">
+    <div className="mywork-focus-tasks">
+      {rows.map(row => (
+        <div className="mywork-focus-task" key={row.key}>
+          <img
+            src={getIssueIcon(row.issueType, getIssueTypeIconUrl(row.issueType), getIssueTypeCategory(row.issueType))}
+            className="issue-type-icon"
+            alt={row.issueType}
+          />
+          <div className="mywork-focus-task-main">
+            <div className="mywork-focus-task-heading">
+              <a href={row.jiraUrl} target="_blank" rel="noopener noreferrer" className="task-key">{row.key}</a>
+              <span className="mywork-focus-task-summary">{row.summary}</span>
+            </div>
+            <div className="mywork-focus-task-context">
+              {row.parentLabel || row.epicLabel || 'No parent'}
+              {row.parentLabel && row.epicLabel && <span> &middot; {row.epicLabel}</span>}
+            </div>
+          </div>
+          <div className="mywork-focus-task-badges">
+            <StatusBadge status={row.status} />
+            <TeamBadge name={row.teamName} color={row.teamColor} />
+          </div>
+          <div className="mywork-focus-task-hours">{row.right}</div>
+          {row.onLog && (
+            <button type="button" className="mywork-log-btn" title="Log time" onClick={row.onLog}>+</button>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function TaskSection({ title, count, children, defaultExpanded = true, className = '' }: { title: string; count: number; children: ReactNode; defaultExpanded?: boolean; className?: string }) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  return (
+    <div className={`profile-section full-width ${className}`.trim()}>
       <button
         type="button"
         className="profile-section-header mywork-section-toggle"
@@ -185,6 +232,99 @@ function TaskSection({ title, count, children }: { title: string; count: number;
         <span className="section-badge">{count}</span>
       </button>
       {expanded && children}
+    </div>
+  )
+}
+
+// ======================== DAILY FOCUS SIDEBAR ========================
+
+const WEEKDAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function currentWeek(days: CalendarDay[]): CalendarDay[] {
+  const now = new Date()
+  const monday = new Date(now)
+  monday.setHours(0, 0, 0, 0)
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+  const sunday = new Date(monday)
+  sunday.setDate(monday.getDate() + 6)
+  const from = localDateKey(monday)
+  const to = localDateKey(sunday)
+  return days.filter(day => day.date >= from && day.date <= to)
+}
+
+function WorklogFocusPanel({ days, onOpen }: { days: CalendarDay[]; onOpen: () => void }) {
+  const week = currentWeek(days)
+  const today = localDateKey(new Date())
+  const loggedH = week.reduce((sum, day) => sum + day.loggedH, 0)
+  const normH = week.reduce((sum, day) => sum + day.normH, 0)
+
+  return (
+    <div className="profile-section mywork-focus-panel mywork-focus-card mywork-focus-card--time">
+      <div className="profile-section-header">
+        <div>
+          <h3>Time Logged</h3>
+          <span className="mywork-focus-subtitle">This week</span>
+        </div>
+        <strong className="mywork-focus-total">{formatHours(loggedH)} / {formatHours(normH)}</strong>
+      </div>
+      <div className="mywork-week-preview">
+        {week.length > 0 ? week.map((day, index) => {
+          const isFuture = day.date > today
+          const isLow = day.dayType === 'WORKDAY' && !day.absenceType && !isFuture && day.loggedH < day.normH * 0.5
+          const isComplete = day.dayType === 'WORKDAY' && !day.absenceType && day.loggedH >= day.normH && day.normH > 0
+          return (
+            <div
+              key={day.date}
+              className={[
+                'mywork-week-day',
+                day.date === today ? 'today' : '',
+                isLow ? 'low' : '',
+                isComplete ? 'complete' : '',
+                day.dayType !== 'WORKDAY' || day.absenceType ? 'off' : '',
+                isFuture ? 'future' : '',
+              ].filter(Boolean).join(' ')}
+              title={`${day.date}: ${formatHours(day.loggedH)} / ${formatHours(day.normH)}`}
+            >
+              <span>{WEEKDAY_SHORT[index]}</span>
+              <strong>{day.loggedH}h</strong>
+            </div>
+          )
+        }) : (
+          <EmptyState variant="inline" message="No worklog data for this week" />
+        )}
+      </div>
+      <button type="button" className="mywork-focus-action" aria-haspopup="dialog" onClick={onOpen}>
+        Open monthly calendar
+      </button>
+    </div>
+  )
+}
+
+function PerformanceSnapshot({ analytics, onOpen }: { analytics: MyAnalytics; onOpen: () => void }) {
+  const summary = analytics.summary
+  return (
+    <div className="profile-section mywork-focus-panel mywork-focus-card mywork-focus-card--performance">
+      <div className="profile-section-header">
+        <div>
+          <h3>Performance Snapshot</h3>
+          <span className="mywork-focus-subtitle">Selected period</span>
+        </div>
+      </div>
+      <div className="mywork-snapshot-grid">
+        <div><span>Closed</span><strong>{summary.completedCount}</strong></div>
+        <div><span>Avg DSR</span><strong>{summary.avgDsr?.toFixed(2) ?? '—'}</strong></div>
+        <div><span>Cycle</span><strong>{summary.avgCycleTimeDays != null ? `${summary.avgCycleTimeDays}d` : '—'}</strong></div>
+      </div>
+      <button type="button" className="mywork-focus-action" aria-haspopup="dialog" onClick={onOpen}>
+        View performance details
+      </button>
     </div>
   )
 }
@@ -297,9 +437,9 @@ interface MyPerformanceSectionProps {
 function MyPerformanceSection({ analytics, from, to, onFromChange, onToChange, onLog }: MyPerformanceSectionProps) {
   const s = analytics.summary
   return (
-    <div className="mywork-analytics">
+    <div className="mywork-analytics-detail">
       <div className="mywork-analytics-header">
-        <h3>My Performance</h3>
+        <span className="mywork-analytics-description">Detailed personal analytics across all teams</span>
         <div className="member-profile-period">
           <input type="date" aria-label="From" value={from} onChange={e => onFromChange(e.target.value)} />
           <span>—</span>
@@ -365,6 +505,8 @@ export function MyWorkPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [logTarget, setLogTarget] = useState<LogTimeTarget | null>(null)
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const [performanceOpen, setPerformanceOpen] = useState(false)
 
   // Status colors are shared across the tenant and don't depend on the
   // selected period/team — load once.
@@ -472,28 +614,46 @@ export function MyWorkPage() {
           </div>
         )}
 
-        <div className="mywork-sections">
-          <TaskSection title="In Progress" count={activeTasks.length}>
-            <TaskTable
-              rows={taskRows(activeTasks, true, setLogTarget)}
-              rightHeader="Est / Spent"
+        <div className="mywork-focus-layout">
+          <TaskSection
+            title="In Progress"
+            count={activeTasks.length}
+            className="mywork-focus-card mywork-focus-card--active"
+          >
+            <FocusTaskList
+              tasks={activeTasks}
+              showSpent
               emptyLabel="No active tasks"
+              onLog={setLogTarget}
               getIssueTypeIconUrl={getIssueTypeIconUrl}
               getIssueTypeCategory={getIssueTypeCategory}
             />
           </TaskSection>
 
-          <TaskSection title="Up Next" count={upcomingAssigned.length}>
-            <TaskTable
-              rows={taskRows(upcomingAssigned, false, setLogTarget)}
-              rightHeader="Est"
+          <WorklogFocusPanel days={worklogCalendar} onOpen={() => setCalendarOpen(true)} />
+
+          <TaskSection
+            title="Up Next"
+            count={upcomingAssigned.length}
+            className="mywork-focus-card mywork-focus-card--next"
+          >
+            <FocusTaskList
+              tasks={upcomingAssigned}
+              showSpent={false}
               emptyLabel="No upcoming tasks"
+              onLog={setLogTarget}
               getIssueTypeIconUrl={getIssueTypeIconUrl}
               getIssueTypeCategory={getIssueTypeCategory}
             />
           </TaskSection>
 
-          <TaskSection title="Team Queue" count={teamQueue.length}>
+          {data.analytics && (
+            <PerformanceSnapshot analytics={data.analytics} onOpen={() => setPerformanceOpen(true)} />
+          )}
+        </div>
+
+        <div className="mywork-secondary-sections">
+          <TaskSection title="Team Queue" count={teamQueue.length} defaultExpanded={false}>
             <TaskTable
               rows={queueRows(teamQueue)}
               rightHeader="My Phase"
@@ -504,22 +664,25 @@ export function MyWorkPage() {
           </TaskSection>
         </div>
 
-        <div className="profile-section full-width mywork-cal-section">
-          <div className="profile-section-header">
-            <h3>Time Logged</h3>
+        <Modal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} title="Monthly Worklog" maxWidth={980}>
+          <div className="mywork-calendar-dialog">
+            <MyWorklogCalendar initialDays={worklogCalendar} initialMonth={currentMonth} />
           </div>
-          <MyWorklogCalendar initialDays={worklogCalendar} initialMonth={currentMonth} />
-        </div>
+        </Modal>
 
         {data.analytics && (
-          <MyPerformanceSection
-            analytics={data.analytics}
-            from={from}
-            to={to}
-            onFromChange={setFrom}
-            onToChange={setTo}
-            onLog={setLogTarget}
-          />
+          <Modal isOpen={performanceOpen} onClose={() => setPerformanceOpen(false)} title="My Performance" maxWidth={1200}>
+            <div className="mywork-performance-dialog">
+              <MyPerformanceSection
+                analytics={data.analytics}
+                from={from}
+                to={to}
+                onFromChange={setFrom}
+                onToChange={setTo}
+                onLog={setLogTarget}
+              />
+            </div>
+          </Modal>
         )}
       </>
     )

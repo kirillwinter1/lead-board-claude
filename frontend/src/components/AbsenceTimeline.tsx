@@ -14,8 +14,14 @@ function formatDateShort(d: Date): string {
   return d.toLocaleDateString('en-US', { day: '2-digit', month: '2-digit' })
 }
 
+// Local (not UTC) YYYY-MM-DD — toISOString() shifts the day by one in timezones east
+// of UTC, so the fetched range would drift a day off the rendered grid and absences on
+// the last visible day would not load.
 function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function daysBetween(a: Date, b: Date): number {

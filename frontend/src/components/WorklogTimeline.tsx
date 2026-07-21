@@ -20,8 +20,14 @@ const ABSENCE_SHORT: Record<string, string> = {
   OTHER: 'OTH',
 }
 
+// Local (not UTC) YYYY-MM-DD. toISOString() converts to UTC and can shift the day
+// by one — in any timezone east of UTC (the project runs in UTC+3) local midnight
+// is still "yesterday" in UTC, which would drop today's column from the range.
 function toDateStr(d: Date): string {
-  return d.toISOString().slice(0, 10)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function getRatioClass(ratio: number): string {

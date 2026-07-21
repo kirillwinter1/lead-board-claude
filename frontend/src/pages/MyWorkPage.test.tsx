@@ -114,6 +114,11 @@ describe('MyWorkPage', () => {
 
     expect(screen.getByText('LB-1').closest('a')).toHaveAttribute('href', 'https://jira.example.com/LB-1')
     expect(screen.getByText('LB-2').closest('a')).toHaveAttribute('href', 'https://jira.example.com/LB-2')
+
+    const teamQueueToggle = screen.getByRole('button', { name: /Team Queue/i })
+    expect(teamQueueToggle).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(teamQueueToggle)
+
     expect(screen.getByText('LB-3').closest('a')).toHaveAttribute('href', 'https://jira.example.com/LB-3')
 
     // Team badges render for both the header and task rows.
@@ -161,9 +166,10 @@ describe('MyWorkPage', () => {
 
     expect(inProgressToggle).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('LB-1')).toBeNull()
-    // The other two sections stay expanded.
+    // Up Next stays expanded; the lower-priority team queue starts collapsed.
     expect(screen.getByText('LB-2')).toBeInTheDocument()
-    expect(screen.getByText('LB-3')).toBeInTheDocument()
+    expect(screen.queryByText('LB-3')).toBeNull()
+    expect(screen.getByRole('button', { name: /Team Queue/i })).toHaveAttribute('aria-expanded', 'false')
 
     fireEvent.click(inProgressToggle)
 
@@ -237,11 +243,13 @@ describe('MyWorkPage', () => {
     renderMyWorkPage()
 
     await waitFor(() => {
-      expect(screen.getByText('My Performance')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'View performance details' })).toBeInTheDocument()
     })
 
+    fireEvent.click(screen.getByRole('button', { name: 'View performance details' }))
+
     expect(screen.getByText('Closed tasks')).toBeInTheDocument()
-    expect(screen.getByText('0.87')).toBeInTheDocument()
+    expect(screen.getAllByText('0.87').length).toBeGreaterThan(0)
     expect(screen.getByText('DSR by Task Type')).toBeInTheDocument()
     expect(screen.getByText('DSR by Epic')).toBeInTheDocument()
     expect(screen.getByText('Epic X')).toBeInTheDocument()
@@ -279,6 +287,11 @@ describe('MyWorkPage', () => {
     vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
 
     renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'View performance details' })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'View performance details' }))
 
     await waitFor(() => {
       expect(screen.getByLabelText('From')).toBeInTheDocument()
@@ -374,6 +387,11 @@ describe('MyWorkPage', () => {
     vi.mocked(myWorkApi.getMyWork).mockResolvedValue(response)
 
     renderMyWorkPage()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'View performance details' })).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'View performance details' }))
 
     await waitFor(() => {
       expect(screen.getByText('Completed task')).toBeInTheDocument()

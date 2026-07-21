@@ -119,7 +119,19 @@ public class AutoScoreService {
             return epic.getAutoScore();
         }
 
-        BigDecimal score = calculator.calculate(epic);
+        // Preload RICE and alignment data so a single-epic recalculate persists the same
+        // score as the batch path — calculateAlignmentBoost returns 0 when alignment data
+        // is not preloaded, so without this the stored score loses the alignment boost.
+        List<JiraIssueEntity> singleList = List.of(epic);
+        calculator.preloadRiceData(singleList);
+        calculator.preloadAlignmentData(projectAlignmentService.preloadAlignmentData(singleList));
+        BigDecimal score;
+        try {
+            score = calculator.calculate(epic);
+        } finally {
+            calculator.clearRiceData();
+            calculator.clearAlignmentData();
+        }
         epic.setAutoScore(score);
         epic.setAutoScoreCalculatedAt(OffsetDateTime.now());
         issueRepository.save(epic);

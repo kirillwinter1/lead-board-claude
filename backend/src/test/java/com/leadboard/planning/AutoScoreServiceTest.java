@@ -148,6 +148,33 @@ class AutoScoreServiceTest {
     // ==================== recalculateForTeam() Tests ====================
 
     @Nested
+    @DisplayName("recalculateForEpic() preload parity")
+    class RecalculateForEpicPreloadTests {
+
+        @Test
+        @DisplayName("single-epic recalculate must preload RICE and alignment like the batch path")
+        void recalculateForEpic_preloadsAlignmentAndRiceLikeBatch() {
+            // Bug reproduction: recalculateAll/recalculateForTeam preload RICE and
+            // alignment data before calculate(), and getScoreDetails does the same with
+            // the explicit comment "so single-epic breakdown matches batch calculation".
+            // recalculateForEpic calls calculator.calculate() with no preload — and
+            // AutoScoreCalculator.calculateAlignmentBoost returns ZERO whenever
+            // preloadedAlignmentData == null (no single-mode fallback by design), so the
+            // persisted score silently loses the alignment boost (up to -10 vs batch).
+            JiraIssueEntity epic = createEpic("LB-1", "Epic");
+            when(issueRepository.findByIssueKey("LB-1")).thenReturn(Optional.of(epic));
+            when(workflowConfigService.isDone(any(), any(), any())).thenReturn(false);
+            when(calculator.calculate(epic)).thenReturn(BigDecimal.valueOf(50));
+            when(projectAlignmentService.preloadAlignmentData(List.of(epic))).thenReturn(Map.of());
+
+            autoScoreService.recalculateForEpic("LB-1");
+
+            verify(calculator).preloadRiceData(List.of(epic));
+            verify(calculator).preloadAlignmentData(any());
+        }
+    }
+
+    @Nested
     @DisplayName("recalculateForTeam()")
     class RecalculateForTeamTests {
 

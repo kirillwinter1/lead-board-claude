@@ -9,8 +9,11 @@ import com.leadboard.team.TeamMemberEntity;
 import com.leadboard.team.TeamMemberRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -58,6 +61,13 @@ public class WorklogImportService {
     private final IssueWorklogRepository worklogRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final WorkflowConfigService workflowConfigService;
+
+    // Self-reference (through the Spring proxy) so per-issue @Transactional applies when
+    // importWorklogsForIssue is invoked from the @Async loops below — a plain this.-call
+    // would bypass the proxy and run the delete+insert without a transaction.
+    @Autowired
+    @Lazy
+    private WorklogImportService self;
 
     public WorklogImportService(JiraClient jiraClient,
                                 JiraIssueRepository issueRepository,
@@ -115,7 +125,7 @@ public class WorklogImportService {
 
             for (String issueKey : issueKeys) {
                 try {
-                    int count = importWorklogsForIssue(issueKey);
+                    int count = self.importWorklogsForIssue(issueKey);
                     if (count > 0) state.imported.incrementAndGet();
                     state.processed.incrementAndGet();
 
@@ -160,7 +170,7 @@ public class WorklogImportService {
 
             for (JiraIssueEntity subtask : subtasks) {
                 try {
-                    int count = importWorklogsForIssue(subtask.getIssueKey());
+                    int count = self.importWorklogsForIssue(subtask.getIssueKey());
                     if (count > 0) state.imported.incrementAndGet();
                     state.processed.incrementAndGet();
                     Thread.sleep(RATE_LIMIT_MS);
@@ -183,8 +193,11 @@ public class WorklogImportService {
 
     /**
      * Import worklogs for a single issue. Idempotent: deletes existing and re-inserts.
+     * Transactional so the delete + re-insert are atomic — a failure mid-insert rolls
+     * back the delete instead of leaving the issue with its worklogs partially wiped.
      * @return number of worklogs imported
      */
+    @Transactional
     public int importWorklogsForIssue(String issueKey) {
         List<JiraWorklogResponse.WorklogEntry> worklogs = jiraClient.fetchIssueWorklogs(issueKey);
 

@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 @Service
 public class WorkflowConfigService {
@@ -29,44 +28,19 @@ public class WorkflowConfigService {
     private final ObjectMapper objectMapper;
     private final JiraConfigResolver jiraConfigResolver;
 
-    // Per-tenant cache: tenantId → loaded flag. -1L = no tenant (public/legacy).
-    private final ConcurrentHashMap<Long, Boolean> loadedTenants = new ConcurrentHashMap<>();
+    /**
+     * Per-tenant cache of fully-loaded, immutable configuration snapshots.
+     * Key = TenantContext.getCurrentTenantId(); {@link #NO_TENANT_KEY} (-1L) for the
+     * single-tenant / .env context (no tenant).
+     *
+     * <p>Each snapshot is built once from the DB under the loading thread's tenant
+     * context and never mutated afterwards. Readers resolve THEIR OWN tenant's
+     * snapshot on every call, so a long-running task under tenant A can never observe
+     * a reload triggered by an interleaving tenant B request (BUG-60).
+     */
+    private final ConcurrentHashMap<Long, ConfigSnapshot> snapshots = new ConcurrentHashMap<>();
 
-    // Cached lookups (for current tenant — reloaded when tenant changes)
-    private volatile Long defaultConfigId;
-    private volatile List<Long> allConfigIds = List.of();
-    // Global (merged) lookups — used when projectKey is unknown
-    private final ConcurrentHashMap<String, BoardCategory> typeToCategory = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> typeToRoleCode = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, StatusCategory> statusLookup = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> statusToRoleCode = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> statusSortOrder = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> statusScoreWeight = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, LinkCategory> linkTypeLookup = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> statusColor = new ConcurrentHashMap<>();
-    // Per-project lookups — used when projectKey is known (key = "PROJECT_KEY:value")
-    private final ConcurrentHashMap<String, BoardCategory> projectTypeToCategory = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> projectTypeToRoleCode = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, StatusCategory> projectStatusLookup = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> projectStatusToRoleCode = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> projectStatusSortOrder = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Integer> projectStatusScoreWeight = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, String> projectStatusColor = new ConcurrentHashMap<>();
-    private volatile List<WorkflowRoleEntity> cachedRoles = List.of();
-    private volatile Map<String, Integer> scoreWeightsMap = Map.of();
-
-    // Sets for quick lookups
-    private volatile Set<String> projectTypeNames = Set.of();
-    private volatile Set<String> epicTypeNames = Set.of();
-    private volatile Set<String> storyTypeNames = Set.of();
-    private volatile Set<String> bugTypeNames = Set.of();
-    private volatile Set<String> subtaskTypeNames = Set.of();
-    private volatile String projectKey;
-    private volatile String epicLinkType;
-    private volatile String epicLinkName;
-
-    // Track which tenant is currently loaded
-    private volatile Long currentlyLoadedTenantId = null;
+    private static final long NO_TENANT_KEY = -1L;
 
     public WorkflowConfigService(
             ProjectConfigurationRepository configRepo,
@@ -87,38 +61,64 @@ public class WorkflowConfigService {
 
     @PostConstruct
     public void init() {
-        loadConfiguration();
-    }
-
-    public synchronized void clearCache() {
-        Long tenantId = TenantContext.getCurrentTenantId();
-        if (tenantId != null) {
-            loadedTenants.remove(tenantId);
-        }
-        loadConfiguration();
+        // Warm the snapshot for the startup (default) context. DB errors while loading
+        // must never crash the application — buildSnapshot() returns an empty snapshot
+        // on failure, preserving the previous fail-soft semantics.
+        snapshot();
     }
 
     /**
-     * Ensure configuration is loaded for the current tenant.
-     * Call this before any cache read in a multi-tenant context.
-     * Synchronized to prevent race conditions when multiple threads
-     * switch between tenants concurrently (BUG-60).
+     * Invalidate the cached snapshot for the CURRENT tenant only (other tenants keep
+     * their snapshots), then eagerly rebuild it. Call after a configuration change.
      */
-    public synchronized void ensureLoaded() {
-        Long tenantId = TenantContext.getCurrentTenantId();
-        if (tenantId == null) {
-            // No tenant context — use default (already loaded at startup)
-            return;
-        }
-        if (!tenantId.equals(currentlyLoadedTenantId)) {
-            // Different tenant — reload
-            loadConfiguration();
-            currentlyLoadedTenantId = tenantId;
-            loadedTenants.put(tenantId, true);
-        }
+    public synchronized void clearCache() {
+        long key = currentKey();
+        snapshots.remove(key);
+        loadSnapshot(key);
     }
 
-    private void loadConfiguration() {
+    /**
+     * Ensure configuration is loaded for the current tenant. Kept for backward
+     * compatibility — snapshot resolution now happens implicitly inside every reader,
+     * so callers no longer strictly need this. Resolving the snapshot triggers a
+     * lazy load if the current tenant has none yet.
+     */
+    public void ensureLoaded() {
+        snapshot();
+    }
+
+    // ==================== Snapshot resolution & loading ====================
+
+    private static long currentKey() {
+        Long tenantId = TenantContext.getCurrentTenantId();
+        return tenantId != null ? tenantId : NO_TENANT_KEY;
+    }
+
+    /**
+     * Resolve the immutable configuration snapshot for the current tenant, loading it
+     * (double-checked, synchronized) on first access.
+     */
+    private ConfigSnapshot snapshot() {
+        long key = currentKey();
+        ConfigSnapshot snap = snapshots.get(key);
+        if (snap != null) return snap;
+        return loadSnapshot(key);
+    }
+
+    private synchronized ConfigSnapshot loadSnapshot(long key) {
+        // Double-checked: another thread may have loaded it while we waited for the lock.
+        ConfigSnapshot existing = snapshots.get(key);
+        if (existing != null) return existing;
+        ConfigSnapshot snap = buildSnapshot();
+        snapshots.put(key, snap);
+        return snap;
+    }
+
+    /**
+     * Build an immutable snapshot from the DB using the CURRENT thread's tenant context.
+     * On any failure returns an empty snapshot (fail-soft — never throws).
+     */
+    private ConfigSnapshot buildSnapshot() {
         try {
             // Find ALL project configurations for this tenant
             List<String> allKeys = jiraConfigResolver.getAllProjectKeys();
@@ -140,10 +140,7 @@ public class WorkflowConfigService {
 
             if (configs.isEmpty()) {
                 log.warn("No project configuration found in DB. Using empty config.");
-                defaultConfigId = null;
-                allConfigIds = List.of();
-                projectKey = null;
-                return;
+                return ConfigSnapshot.empty();
             }
 
             // Sort: default first, then by creation time
@@ -164,28 +161,27 @@ public class WorkflowConfigService {
                 log.info("Auto-assigned project key '{}' to default configuration", firstKey);
             }
 
-            defaultConfigId = defaultConfig.getId();
-            allConfigIds = configs.stream().map(ProjectConfigurationEntity::getId).toList();
-            projectKey = defaultConfig.getProjectKey();
+            Long defaultConfigId = defaultConfig.getId();
+            List<Long> allConfigIds = configs.stream().map(ProjectConfigurationEntity::getId).toList();
+            String projectKey = defaultConfig.getProjectKey();
 
             // ==== Merged loading: union all configs (global first-wins) + per-project maps ====
 
-            // Clear all caches
-            typeToCategory.clear();
-            typeToRoleCode.clear();
-            statusLookup.clear();
-            statusToRoleCode.clear();
-            statusSortOrder.clear();
-            statusScoreWeight.clear();
-            statusColor.clear();
-            linkTypeLookup.clear();
-            projectTypeToCategory.clear();
-            projectTypeToRoleCode.clear();
-            projectStatusLookup.clear();
-            projectStatusToRoleCode.clear();
-            projectStatusSortOrder.clear();
-            projectStatusScoreWeight.clear();
-            projectStatusColor.clear();
+            Map<String, BoardCategory> typeToCategory = new HashMap<>();
+            Map<String, String> typeToRoleCode = new HashMap<>();
+            Map<String, StatusCategory> statusLookup = new HashMap<>();
+            Map<String, String> statusToRoleCode = new HashMap<>();
+            Map<String, Integer> statusSortOrder = new HashMap<>();
+            Map<String, Integer> statusScoreWeight = new HashMap<>();
+            Map<String, String> statusColor = new HashMap<>();
+            Map<String, LinkCategory> linkTypeLookup = new HashMap<>();
+            Map<String, BoardCategory> projectTypeToCategory = new HashMap<>();
+            Map<String, String> projectTypeToRoleCode = new HashMap<>();
+            Map<String, StatusCategory> projectStatusLookup = new HashMap<>();
+            Map<String, String> projectStatusToRoleCode = new HashMap<>();
+            Map<String, Integer> projectStatusSortOrder = new HashMap<>();
+            Map<String, Integer> projectStatusScoreWeight = new HashMap<>();
+            Map<String, String> projectStatusColor = new HashMap<>();
 
             Set<String> projectNames = new HashSet<>();
             Set<String> epicNames = new HashSet<>();
@@ -273,17 +269,11 @@ public class WorkflowConfigService {
                 }
             }
 
-            cachedRoles = mergedRoles;
-            projectTypeNames = Set.copyOf(projectNames);
-            epicTypeNames = Set.copyOf(epicNames);
-            storyTypeNames = Set.copyOf(storyNames);
-            bugTypeNames = Set.copyOf(bugNames);
-            subtaskTypeNames = Set.copyOf(subtaskNames);
-
             // Load epic link config and score weights from default config
-            epicLinkType = defaultConfig.getEpicLinkType();
-            epicLinkName = defaultConfig.getEpicLinkName();
+            String epicLinkType = defaultConfig.getEpicLinkType();
+            String epicLinkName = defaultConfig.getEpicLinkName();
 
+            Map<String, Integer> scoreWeightsMap = Map.of();
             if (defaultConfig.getStatusScoreWeights() != null && !defaultConfig.getStatusScoreWeights().isEmpty()) {
                 try {
                     scoreWeightsMap = objectMapper.readValue(defaultConfig.getStatusScoreWeights(),
@@ -301,8 +291,22 @@ public class WorkflowConfigService {
                 log.info("Workflow configuration loaded (merged {} configs): {} roles, {} type mappings, {} status mappings, {} link mappings",
                         configs.size(), mergedRoles.size(), totalTypeMappings, totalStatusMappings, totalLinkMappings);
             }
+
+            return new ConfigSnapshot(
+                    defaultConfigId, allConfigIds,
+                    typeToCategory, typeToRoleCode,
+                    statusLookup, statusToRoleCode, statusSortOrder, statusScoreWeight, statusColor,
+                    linkTypeLookup,
+                    projectTypeToCategory, projectTypeToRoleCode,
+                    projectStatusLookup, projectStatusToRoleCode, projectStatusSortOrder,
+                    projectStatusScoreWeight, projectStatusColor,
+                    mergedRoles, scoreWeightsMap,
+                    Set.copyOf(projectNames), Set.copyOf(epicNames), Set.copyOf(storyNames),
+                    Set.copyOf(bugNames), Set.copyOf(subtaskNames),
+                    projectKey, epicLinkType, epicLinkName);
         } catch (Exception e) {
             log.error("Failed to load workflow configuration from DB", e);
+            return ConfigSnapshot.empty();
         }
     }
 
@@ -320,15 +324,18 @@ public class WorkflowConfigService {
      * Tries per-project config first, falls back to global merged config.
      */
     public BoardCategory categorizeIssueType(String jiraTypeName, String projectKey) {
-        ensureLoaded();
+        return categorizeIssueType(snapshot(), jiraTypeName, projectKey);
+    }
+
+    private BoardCategory categorizeIssueType(ConfigSnapshot s, String jiraTypeName, String projectKey) {
         if (jiraTypeName == null) return null;
         String typeKey = jiraTypeName.toLowerCase();
         // Per-project lookup first
         if (projectKey != null) {
-            BoardCategory cat = projectTypeToCategory.get(projectKey + ":" + typeKey);
+            BoardCategory cat = s.projectTypeToCategory.get(projectKey + ":" + typeKey);
             if (cat != null) return cat;
         }
-        return typeToCategory.get(typeKey);
+        return s.typeToCategory.get(typeKey);
     }
 
     public boolean isProject(String jiraTypeName) {
@@ -365,23 +372,23 @@ public class WorkflowConfigService {
     }
 
     public List<String> getBugTypeNames() {
-        return List.copyOf(bugTypeNames);
+        return List.copyOf(snapshot().bugTypeNames);
     }
 
     public List<String> getProjectTypeNames() {
-        return List.copyOf(projectTypeNames);
+        return List.copyOf(snapshot().projectTypeNames);
     }
 
     public List<String> getEpicTypeNames() {
-        return List.copyOf(epicTypeNames);
+        return List.copyOf(snapshot().epicTypeNames);
     }
 
     public List<String> getStoryTypeNames() {
-        return List.copyOf(storyTypeNames);
+        return List.copyOf(snapshot().storyTypeNames);
     }
 
     public List<String> getSubtaskTypeNames() {
-        return List.copyOf(subtaskTypeNames);
+        return List.copyOf(snapshot().subtaskTypeNames);
     }
 
     // ==================== Roles ====================
@@ -391,34 +398,37 @@ public class WorkflowConfigService {
     }
 
     public String getSubtaskRole(String jiraTypeName, String projectKey) {
-        ensureLoaded();
-        if (jiraTypeName == null) return getDefaultRoleCode();
+        ConfigSnapshot s = snapshot();
+        if (jiraTypeName == null) return getDefaultRoleCode(s);
         String typeKey = jiraTypeName.toLowerCase();
         if (projectKey != null) {
-            String role = projectTypeToRoleCode.get(projectKey + ":" + typeKey);
+            String role = s.projectTypeToRoleCode.get(projectKey + ":" + typeKey);
             if (role != null) return role;
         }
-        String role = typeToRoleCode.get(typeKey);
-        return role != null ? role : getDefaultRoleCode();
+        String role = s.typeToRoleCode.get(typeKey);
+        return role != null ? role : getDefaultRoleCode(s);
     }
 
     public String getDefaultRoleCode() {
-        return cachedRoles.stream()
+        return getDefaultRoleCode(snapshot());
+    }
+
+    private String getDefaultRoleCode(ConfigSnapshot s) {
+        return s.cachedRoles.stream()
                 .filter(WorkflowRoleEntity::isDefault)
                 .findFirst()
                 .map(WorkflowRoleEntity::getCode)
                 // No explicit default — use the first role by sort order
-                .or(() -> cachedRoles.stream().findFirst().map(WorkflowRoleEntity::getCode))
+                .or(() -> s.cachedRoles.stream().findFirst().map(WorkflowRoleEntity::getCode))
                 .orElse(null);
     }
 
     public List<WorkflowRoleEntity> getRolesInPipelineOrder() {
-        ensureLoaded();
-        return cachedRoles;
+        return snapshot().cachedRoles;
     }
 
     public List<String> getRoleCodesInPipelineOrder() {
-        return cachedRoles.stream().map(WorkflowRoleEntity::getCode).toList();
+        return snapshot().cachedRoles.stream().map(WorkflowRoleEntity::getCode).toList();
     }
 
     // ==================== Status Categorization ====================
@@ -428,43 +438,39 @@ public class WorkflowConfigService {
     }
 
     public StatusCategory categorize(String status, String issueType, String projectKey) {
-        ensureLoaded();
+        ConfigSnapshot s = snapshot();
         if (status == null) return StatusCategory.NEW;
 
-        BoardCategory cat = categorizeIssueType(issueType, projectKey);
+        BoardCategory cat = categorizeIssueType(s, issueType, projectKey);
         if (cat == null) return StatusCategory.NEW; // Unmapped type
-        return categorizeByBoardCategory(status, cat, projectKey);
+        return categorizeByBoardCategory(s, status, cat, projectKey);
     }
 
     public StatusCategory categorizeEpic(String status) {
-        return categorizeByBoardCategory(status, BoardCategory.EPIC, null);
+        return categorizeByBoardCategory(snapshot(), status, BoardCategory.EPIC, null);
     }
 
     public StatusCategory categorizeEpic(String status, String projectKey) {
-        return categorizeByBoardCategory(status, BoardCategory.EPIC, projectKey);
+        return categorizeByBoardCategory(snapshot(), status, BoardCategory.EPIC, projectKey);
     }
 
     public StatusCategory categorizeStory(String status) {
-        return categorizeByBoardCategory(status, BoardCategory.STORY, null);
+        return categorizeByBoardCategory(snapshot(), status, BoardCategory.STORY, null);
     }
 
     public StatusCategory categorizeStory(String status, String projectKey) {
-        return categorizeByBoardCategory(status, BoardCategory.STORY, projectKey);
+        return categorizeByBoardCategory(snapshot(), status, BoardCategory.STORY, projectKey);
     }
 
     public StatusCategory categorizeSubtask(String status) {
-        return categorizeByBoardCategory(status, BoardCategory.SUBTASK, null);
+        return categorizeByBoardCategory(snapshot(), status, BoardCategory.SUBTASK, null);
     }
 
     public StatusCategory categorizeSubtask(String status, String projectKey) {
-        return categorizeByBoardCategory(status, BoardCategory.SUBTASK, projectKey);
+        return categorizeByBoardCategory(snapshot(), status, BoardCategory.SUBTASK, projectKey);
     }
 
-    private StatusCategory categorizeByBoardCategory(String status, BoardCategory boardCat) {
-        return categorizeByBoardCategory(status, boardCat, null);
-    }
-
-    private StatusCategory categorizeByBoardCategory(String status, BoardCategory boardCat, String projectKey) {
+    private StatusCategory categorizeByBoardCategory(ConfigSnapshot s, String status, BoardCategory boardCat, String projectKey) {
         if (status == null) return StatusCategory.NEW;
 
         String key = buildStatusKey(boardCat.name(), status);
@@ -472,16 +478,16 @@ public class WorkflowConfigService {
         // Per-project lookup first
         if (projectKey != null) {
             String pKey = projectKey + ":" + key;
-            StatusCategory pCat = projectStatusLookup.get(pKey);
+            StatusCategory pCat = s.projectStatusLookup.get(pKey);
             if (pCat != null) return pCat;
         }
 
         // Global lookup
-        StatusCategory cat = statusLookup.get(key);
+        StatusCategory cat = s.statusLookup.get(key);
         if (cat != null) return cat;
 
         // Try case-insensitive
-        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
             if (entry.getKey().startsWith(boardCat.name() + ":") &&
                 entry.getKey().substring(boardCat.name().length() + 1).equalsIgnoreCase(status)) {
                 return entry.getValue();
@@ -491,9 +497,9 @@ public class WorkflowConfigService {
         // BUG fallback: try STORY mappings if no BUG-specific mapping exists
         if (boardCat == BoardCategory.BUG) {
             String storyKey = buildStatusKey("STORY", status);
-            StatusCategory storyCat = statusLookup.get(storyKey);
+            StatusCategory storyCat = s.statusLookup.get(storyKey);
             if (storyCat != null) return storyCat;
-            for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+            for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
                 if (entry.getKey().startsWith("STORY:") &&
                     entry.getKey().substring(6).equalsIgnoreCase(status)) {
                     return entry.getValue();
@@ -502,17 +508,17 @@ public class WorkflowConfigService {
         }
 
         // Fallback: substring matching
-        String s = status.toLowerCase();
-        if (s.contains("done") || s.contains("closed") || s.contains("resolved") ||
-            s.contains("завершен") || s.contains("готов") || s.contains("выполнен")) {
+        String sLower = status.toLowerCase();
+        if (sLower.contains("done") || sLower.contains("closed") || sLower.contains("resolved") ||
+            sLower.contains("завершен") || sLower.contains("готов") || sLower.contains("выполнен")) {
             return StatusCategory.DONE;
         }
-        if (s.contains("progress") || s.contains("work") || s.contains("review") ||
-            s.contains("test") || s.contains("develop") || s.contains("analysis") ||
-            s.contains("accept") || s.contains("e2e") || s.contains("plan") ||
-            s.contains("в работе") || s.contains("ревью") || s.contains("разработ") ||
-            s.contains("анализ") || s.contains("тест") || s.contains("запланирован") ||
-            s.contains("приёмк") || s.contains("приемк") || s.contains("проверк")) {
+        if (sLower.contains("progress") || sLower.contains("work") || sLower.contains("review") ||
+            sLower.contains("test") || sLower.contains("develop") || sLower.contains("analysis") ||
+            sLower.contains("accept") || sLower.contains("e2e") || sLower.contains("plan") ||
+            sLower.contains("в работе") || sLower.contains("ревью") || sLower.contains("разработ") ||
+            sLower.contains("анализ") || sLower.contains("тест") || sLower.contains("запланирован") ||
+            sLower.contains("приёмк") || sLower.contains("приемк") || sLower.contains("проверк")) {
             return StatusCategory.IN_PROGRESS;
         }
 
@@ -540,11 +546,12 @@ public class WorkflowConfigService {
     // ==================== Phase (Role) Determination ====================
 
     public String determinePhase(String status, String issueType) {
-        if (status == null && issueType == null) return getDefaultRoleCode();
+        ConfigSnapshot s = snapshot();
+        if (status == null && issueType == null) return getDefaultRoleCode(s);
 
         // First check by issue type (for subtasks)
         if (issueType != null) {
-            String roleByType = typeToRoleCode.get(issueType.toLowerCase());
+            String roleByType = s.typeToRoleCode.get(issueType.toLowerCase());
             if (roleByType != null) return roleByType;
         }
 
@@ -552,18 +559,18 @@ public class WorkflowConfigService {
         if (status != null) {
             // Try STORY status mappings first (they have role codes)
             String storyKey = buildStatusKey("STORY", status);
-            String role = statusToRoleCode.get(storyKey);
+            String role = s.statusToRoleCode.get(storyKey);
             if (role != null) return role;
 
             // Case-insensitive search
-            for (Map.Entry<String, String> entry : statusToRoleCode.entrySet()) {
+            for (Map.Entry<String, String> entry : s.statusToRoleCode.entrySet()) {
                 String entryStatus = entry.getKey().substring(entry.getKey().indexOf(':') + 1);
                 if (entryStatus.equalsIgnoreCase(status)) return entry.getValue();
             }
 
             // Fallback substring matching: check if the status name contains any configured role's displayName or code
             String lower = status.toLowerCase();
-            for (WorkflowRoleEntity wfRole : cachedRoles) {
+            for (WorkflowRoleEntity wfRole : s.cachedRoles) {
                 if (wfRole.getDisplayName() != null && lower.contains(wfRole.getDisplayName().toLowerCase())) {
                     return wfRole.getCode();
                 }
@@ -576,7 +583,7 @@ public class WorkflowConfigService {
         // Fallback by issue type substring: check against configured roles
         if (issueType != null) {
             String typeLower = issueType.toLowerCase();
-            for (WorkflowRoleEntity wfRole : cachedRoles) {
+            for (WorkflowRoleEntity wfRole : s.cachedRoles) {
                 if (wfRole.getDisplayName() != null && typeLower.contains(wfRole.getDisplayName().toLowerCase())) {
                     return wfRole.getCode();
                 }
@@ -585,12 +592,12 @@ public class WorkflowConfigService {
                 }
             }
             // Bugs default to last role in pipeline (typically QA)
-            if (isBug(issueType) && !cachedRoles.isEmpty()) {
-                return cachedRoles.get(cachedRoles.size() - 1).getCode();
+            if (categorizeIssueType(s, issueType, null) == BoardCategory.BUG && !s.cachedRoles.isEmpty()) {
+                return s.cachedRoles.get(s.cachedRoles.size() - 1).getCode();
             }
         }
 
-        return getDefaultRoleCode();
+        return getDefaultRoleCode(s);
     }
 
     // ==================== Planning-specific ====================
@@ -623,22 +630,23 @@ public class WorkflowConfigService {
 
     public int getStatusScoreWeight(String status) {
         if (status == null) return 0;
+        ConfigSnapshot s = snapshot();
         // First try JSONB score weights map (exact match)
-        Integer weight = scoreWeightsMap.get(status);
+        Integer weight = s.scoreWeightsMap.get(status);
         if (weight != null) return weight;
 
         // Try case-insensitive
-        for (Map.Entry<String, Integer> entry : scoreWeightsMap.entrySet()) {
+        for (Map.Entry<String, Integer> entry : s.scoreWeightsMap.entrySet()) {
             if (entry.getKey().equalsIgnoreCase(status)) return entry.getValue();
         }
 
         // Try DB status_mappings score_weight for EPIC
         String epicKey = buildStatusKey("EPIC", status);
-        Integer dbWeight = statusScoreWeight.get(epicKey);
+        Integer dbWeight = s.statusScoreWeight.get(epicKey);
         if (dbWeight != null) return dbWeight;
 
         // Case-insensitive DB lookup
-        for (Map.Entry<String, Integer> entry : statusScoreWeight.entrySet()) {
+        for (Map.Entry<String, Integer> entry : s.statusScoreWeight.entrySet()) {
             if (entry.getKey().startsWith("EPIC:") &&
                 entry.getKey().substring(5).equalsIgnoreCase(status)) {
                 return entry.getValue();
@@ -650,12 +658,13 @@ public class WorkflowConfigService {
 
     public int getStoryStatusSortOrder(String storyStatus) {
         if (storyStatus == null) return 0;
+        ConfigSnapshot s = snapshot();
         String key = buildStatusKey("STORY", storyStatus);
-        Integer order = statusSortOrder.get(key);
+        Integer order = s.statusSortOrder.get(key);
         if (order != null) return order;
 
         // Case-insensitive
-        for (Map.Entry<String, Integer> entry : statusSortOrder.entrySet()) {
+        for (Map.Entry<String, Integer> entry : s.statusSortOrder.entrySet()) {
             if (entry.getKey().startsWith("STORY:") &&
                 entry.getKey().substring(6).equalsIgnoreCase(storyStatus)) {
                 return entry.getValue();
@@ -667,12 +676,13 @@ public class WorkflowConfigService {
 
     public String getStoryStatusColor(String storyStatus) {
         if (storyStatus == null) return null;
+        ConfigSnapshot s = snapshot();
         String key = buildStatusKey("STORY", storyStatus);
-        String color = statusColor.get(key);
+        String color = s.statusColor.get(key);
         if (color != null) return color;
 
         // Case-insensitive
-        for (Map.Entry<String, String> entry : statusColor.entrySet()) {
+        for (Map.Entry<String, String> entry : s.statusColor.entrySet()) {
             if (entry.getKey().startsWith("STORY:") &&
                 entry.getKey().substring(6).equalsIgnoreCase(storyStatus)) {
                 return entry.getValue();
@@ -684,12 +694,13 @@ public class WorkflowConfigService {
 
     public int getStoryStatusScoreWeight(String storyStatus) {
         if (storyStatus == null) return 0;
+        ConfigSnapshot s = snapshot();
         String key = buildStatusKey("STORY", storyStatus);
-        Integer weight = statusScoreWeight.get(key);
+        Integer weight = s.statusScoreWeight.get(key);
         if (weight != null) return weight;
 
         // Case-insensitive
-        for (Map.Entry<String, Integer> entry : statusScoreWeight.entrySet()) {
+        for (Map.Entry<String, Integer> entry : s.statusScoreWeight.entrySet()) {
             if (entry.getKey().startsWith("STORY:") &&
                 entry.getKey().substring(6).equalsIgnoreCase(storyStatus)) {
                 return entry.getValue();
@@ -746,7 +757,7 @@ public class WorkflowConfigService {
      */
     public int getStatusScoreWeightWithFallback(String status, BoardCategory boardCat) {
         if (status == null || boardCat == null) return 0;
-        ensureLoaded();
+        ConfigSnapshot s = snapshot();
 
         // 1. Try existing DB-driven lookup
         int dbWeight;
@@ -758,7 +769,7 @@ public class WorkflowConfigService {
         if (dbWeight != 0) return dbWeight;
 
         // 2. Category-based fallback: categorize the status, then get default weight
-        StatusCategory statusCategory = categorizeByBoardCategory(status, boardCat);
+        StatusCategory statusCategory = categorizeByBoardCategory(s, status, boardCat, null);
         return getDefaultScoreWeightForCategory(statusCategory, boardCat);
     }
 
@@ -768,10 +779,10 @@ public class WorkflowConfigService {
      */
     public String getFirstStatusNameForCategory(StatusCategory target, BoardCategory boardCat) {
         if (target == null || boardCat == null) return null;
-        ensureLoaded();
+        ConfigSnapshot s = snapshot();
 
         String prefix = boardCat.name() + ":";
-        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
             if (entry.getKey().startsWith(prefix) && entry.getValue() == target) {
                 return entry.getKey().substring(prefix.length());
             }
@@ -780,7 +791,7 @@ public class WorkflowConfigService {
         // BUG fallback: try STORY mappings
         if (boardCat == BoardCategory.BUG) {
             String storyPrefix = "STORY:";
-            for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+            for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
                 if (entry.getKey().startsWith(storyPrefix) && entry.getValue() == target) {
                     return entry.getKey().substring(storyPrefix.length());
                 }
@@ -802,10 +813,10 @@ public class WorkflowConfigService {
      */
     public List<String> getStatusNamesByCategory(StatusCategory target) {
         if (target == null) return List.of();
-        ensureLoaded();
+        ConfigSnapshot s = snapshot();
 
         Set<String> names = new HashSet<>();
-        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
             if (entry.getValue() == target) {
                 int colonIdx = entry.getKey().indexOf(':');
                 if (colonIdx >= 0) {
@@ -820,7 +831,7 @@ public class WorkflowConfigService {
 
     public LinkCategory categorizeLinkType(String linkTypeName) {
         if (linkTypeName == null) return LinkCategory.IGNORE;
-        LinkCategory cat = linkTypeLookup.get(linkTypeName.toLowerCase());
+        LinkCategory cat = snapshot().linkTypeLookup.get(linkTypeName.toLowerCase());
         if (cat != null) return cat;
 
         // Fallback: substring matching
@@ -862,11 +873,12 @@ public class WorkflowConfigService {
 
     public String getSubtaskTypeName(String roleCode) {
         if (roleCode == null) return null;
+        ConfigSnapshot s = snapshot();
         // Find issue type mapped to this role code
-        for (Map.Entry<String, String> entry : typeToRoleCode.entrySet()) {
+        for (Map.Entry<String, String> entry : s.typeToRoleCode.entrySet()) {
             if (entry.getValue().equalsIgnoreCase(roleCode)) {
                 // Return the original name (not lowercased key)
-                for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(defaultConfigId)) {
+                for (IssueTypeMappingEntity m : issueTypeRepo.findByConfigId(s.defaultConfigId)) {
                     if (m.getJiraTypeName().toLowerCase().equals(entry.getKey()) &&
                         roleCode.equalsIgnoreCase(m.getWorkflowRoleCode())) {
                         return m.getJiraTypeName();
@@ -879,22 +891,20 @@ public class WorkflowConfigService {
 
     public String getStoryTypeName() {
         // Return first STORY type name
-        return storyTypeNames.stream().findFirst().orElse("Story");
+        return snapshot().storyTypeNames.stream().findFirst().orElse("Story");
     }
 
     // ==================== Helpers ====================
 
     public Long getDefaultConfigId() {
-        ensureLoaded();
-        return defaultConfigId;
+        return snapshot().defaultConfigId;
     }
 
     /**
      * Returns all config IDs loaded for this tenant (merged view).
      */
     public List<Long> getAllConfigIds() {
-        ensureLoaded();
-        return allConfigIds;
+        return snapshot().allConfigIds;
     }
 
     /**
@@ -902,23 +912,22 @@ public class WorkflowConfigService {
      */
     public Long getConfigIdForProject(String projectKey) {
         if (projectKey == null) return getDefaultConfigId();
-        ensureLoaded();
         return configRepo.findByProjectKey(projectKey)
                 .map(ProjectConfigurationEntity::getId)
                 .orElse(null);
     }
 
     public String getProjectKey() {
-        ensureLoaded();
-        return projectKey;
+        return snapshot().projectKey;
     }
 
     public String getEpicLinkType() {
+        String epicLinkType = snapshot().epicLinkType;
         return epicLinkType != null ? epicLinkType : "parent";
     }
 
     public String getEpicLinkName() {
-        return epicLinkName;
+        return snapshot().epicLinkName;
     }
 
     /**
@@ -926,9 +935,10 @@ public class WorkflowConfigService {
      * Used for backwards compatibility with methods that need lists of status names.
      */
     public List<String> getStatusNames(BoardCategory boardCategory, StatusCategory statusCategory) {
+        ConfigSnapshot s = snapshot();
         List<String> result = new ArrayList<>();
         String prefix = boardCategory.name() + ":";
-        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
             if (entry.getKey().startsWith(prefix) && entry.getValue() == statusCategory) {
                 result.add(entry.getKey().substring(prefix.length()));
             }
@@ -941,16 +951,17 @@ public class WorkflowConfigService {
      * Each entry: [statusName, sortOrder, color].
      */
     public List<StoryPipelineStatus> getStoryPipelineStatuses() {
+        ConfigSnapshot s = snapshot();
         List<StoryPipelineStatus> result = new ArrayList<>();
         String prefix = "STORY:";
-        for (Map.Entry<String, StatusCategory> entry : statusLookup.entrySet()) {
+        for (Map.Entry<String, StatusCategory> entry : s.statusLookup.entrySet()) {
             if (!entry.getKey().startsWith(prefix)) continue;
             StatusCategory cat = entry.getValue();
             if (cat == StatusCategory.NEW || cat == StatusCategory.DONE || cat == StatusCategory.TODO) continue;
 
             String statusName = entry.getKey().substring(prefix.length());
-            int sortOrder = statusSortOrder.getOrDefault(entry.getKey(), 0);
-            String color = statusColor.getOrDefault(entry.getKey(), null);
+            int sortOrder = s.statusSortOrder.getOrDefault(entry.getKey(), 0);
+            String color = s.statusColor.getOrDefault(entry.getKey(), null);
             result.add(new StoryPipelineStatus(statusName, sortOrder, color));
         }
         result.sort(Comparator.comparingInt(StoryPipelineStatus::sortOrder));
@@ -959,7 +970,100 @@ public class WorkflowConfigService {
 
     public record StoryPipelineStatus(String statusName, int sortOrder, String color) {}
 
-    private String buildStatusKey(String issueCategory, String statusName) {
+    private static String buildStatusKey(String issueCategory, String statusName) {
         return issueCategory + ":" + statusName;
+    }
+
+    // ==================== Immutable per-tenant snapshot ====================
+
+    /**
+     * Immutable snapshot of a single tenant's fully-loaded workflow configuration.
+     * Built once by {@link #buildSnapshot()} and never mutated afterwards, so it can be
+     * shared and read concurrently by any number of threads without interference.
+     */
+    private static final class ConfigSnapshot {
+        final Long defaultConfigId;
+        final List<Long> allConfigIds;
+        // Global (merged) lookups — used when projectKey is unknown
+        final Map<String, BoardCategory> typeToCategory;
+        final Map<String, String> typeToRoleCode;
+        final Map<String, StatusCategory> statusLookup;
+        final Map<String, String> statusToRoleCode;
+        final Map<String, Integer> statusSortOrder;
+        final Map<String, Integer> statusScoreWeight;
+        final Map<String, String> statusColor;
+        final Map<String, LinkCategory> linkTypeLookup;
+        // Per-project lookups — used when projectKey is known (key = "PROJECT_KEY:value")
+        final Map<String, BoardCategory> projectTypeToCategory;
+        final Map<String, String> projectTypeToRoleCode;
+        final Map<String, StatusCategory> projectStatusLookup;
+        final Map<String, String> projectStatusToRoleCode;
+        final Map<String, Integer> projectStatusSortOrder;
+        final Map<String, Integer> projectStatusScoreWeight;
+        final Map<String, String> projectStatusColor;
+        final List<WorkflowRoleEntity> cachedRoles;
+        final Map<String, Integer> scoreWeightsMap;
+        // Sets for quick lookups
+        final Set<String> projectTypeNames;
+        final Set<String> epicTypeNames;
+        final Set<String> storyTypeNames;
+        final Set<String> bugTypeNames;
+        final Set<String> subtaskTypeNames;
+        final String projectKey;
+        final String epicLinkType;
+        final String epicLinkName;
+
+        ConfigSnapshot(
+                Long defaultConfigId, List<Long> allConfigIds,
+                Map<String, BoardCategory> typeToCategory, Map<String, String> typeToRoleCode,
+                Map<String, StatusCategory> statusLookup, Map<String, String> statusToRoleCode,
+                Map<String, Integer> statusSortOrder, Map<String, Integer> statusScoreWeight,
+                Map<String, String> statusColor, Map<String, LinkCategory> linkTypeLookup,
+                Map<String, BoardCategory> projectTypeToCategory, Map<String, String> projectTypeToRoleCode,
+                Map<String, StatusCategory> projectStatusLookup, Map<String, String> projectStatusToRoleCode,
+                Map<String, Integer> projectStatusSortOrder, Map<String, Integer> projectStatusScoreWeight,
+                Map<String, String> projectStatusColor,
+                List<WorkflowRoleEntity> cachedRoles, Map<String, Integer> scoreWeightsMap,
+                Set<String> projectTypeNames, Set<String> epicTypeNames, Set<String> storyTypeNames,
+                Set<String> bugTypeNames, Set<String> subtaskTypeNames,
+                String projectKey, String epicLinkType, String epicLinkName) {
+            this.defaultConfigId = defaultConfigId;
+            this.allConfigIds = allConfigIds;
+            this.typeToCategory = typeToCategory;
+            this.typeToRoleCode = typeToRoleCode;
+            this.statusLookup = statusLookup;
+            this.statusToRoleCode = statusToRoleCode;
+            this.statusSortOrder = statusSortOrder;
+            this.statusScoreWeight = statusScoreWeight;
+            this.statusColor = statusColor;
+            this.linkTypeLookup = linkTypeLookup;
+            this.projectTypeToCategory = projectTypeToCategory;
+            this.projectTypeToRoleCode = projectTypeToRoleCode;
+            this.projectStatusLookup = projectStatusLookup;
+            this.projectStatusToRoleCode = projectStatusToRoleCode;
+            this.projectStatusSortOrder = projectStatusSortOrder;
+            this.projectStatusScoreWeight = projectStatusScoreWeight;
+            this.projectStatusColor = projectStatusColor;
+            this.cachedRoles = cachedRoles;
+            this.scoreWeightsMap = scoreWeightsMap;
+            this.projectTypeNames = projectTypeNames;
+            this.epicTypeNames = epicTypeNames;
+            this.storyTypeNames = storyTypeNames;
+            this.bugTypeNames = bugTypeNames;
+            this.subtaskTypeNames = subtaskTypeNames;
+            this.projectKey = projectKey;
+            this.epicLinkType = epicLinkType;
+            this.epicLinkName = epicLinkName;
+        }
+
+        static ConfigSnapshot empty() {
+            return new ConfigSnapshot(
+                    null, List.of(),
+                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
+                    Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(),
+                    List.of(), Map.of(),
+                    Set.of(), Set.of(), Set.of(), Set.of(), Set.of(),
+                    null, null, null);
+        }
     }
 }
