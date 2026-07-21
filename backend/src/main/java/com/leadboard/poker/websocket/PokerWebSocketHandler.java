@@ -34,10 +34,19 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
     private final PokerSessionService sessionService;
     private final PokerJiraService jiraService;
 
-    // Room code -> list of sessions in that room
+    // (tenantId::roomCode) -> list of sessions in that room. The key MUST include the
+    // tenant: roomCode uniqueness is only enforced per schema, so two tenants can mint the
+    // same code — a bare-roomCode key would broadcast one tenant's votes to the other and
+    // let one tenant's last-leaver clearRoom wipe the other's room.
     private final Map<String, CopyOnWriteArrayList<WebSocketSession>> roomSessions = new ConcurrentHashMap<>();
     // Session ID -> participant info
     private final Map<String, ParticipantInfo> sessionParticipants = new ConcurrentHashMap<>();
+
+    // Tenant-scoped in-memory room key. Callers must hold an active TenantContext (every
+    // handler path runs inside withTenant), captured by PokerHandshakeInterceptor.
+    private static String roomKey(String roomCode) {
+        return TenantContext.getCurrentTenantId() + "::" + roomCode;
+    }
 
     public PokerWebSocketHandler(ObjectMapper objectMapper, PokerSessionService sessionService,
                                   PokerJiraService jiraService) {
@@ -88,7 +97,7 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
             }
 
             log.info("WebSocket connection established for room: {}", roomCode);
-            roomSessions.computeIfAbsent(roomCode, k -> new CopyOnWriteArrayList<>()).add(session);
+            roomSessions.computeIfAbsent(roomKey(roomCode), k -> new CopyOnWriteArrayList<>()).add(session);
         });
     }
 
@@ -96,21 +105,26 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         String roomCode = extractRoomCode(session);
         if (roomCode != null) {
-            CopyOnWriteArrayList<WebSocketSession> sessions = roomSessions.get(roomCode);
-            if (sessions != null) {
-                sessions.remove(session);
-                if (sessions.isEmpty()) {
-                    // Last connection left: free in-memory room state (BUG-183)
-                    roomSessions.remove(roomCode);
-                    sessionService.clearRoom(roomCode);
+            // Wrap in withTenant so roomKey()/clearRoom()/removeParticipant() resolve the
+            // same tenant scope as the rest of the handler (this callback otherwise runs
+            // with no TenantContext).
+            withTenant(session, () -> {
+                CopyOnWriteArrayList<WebSocketSession> sessions = roomSessions.get(roomKey(roomCode));
+                if (sessions != null) {
+                    sessions.remove(session);
+                    if (sessions.isEmpty()) {
+                        // Last connection left: free in-memory room state (BUG-183)
+                        roomSessions.remove(roomKey(roomCode));
+                        sessionService.clearRoom(roomCode);
+                    }
                 }
-            }
 
-            ParticipantInfo participant = sessionParticipants.remove(session.getId());
-            if (participant != null) {
-                sessionService.removeParticipant(roomCode, participant.accountId());
-                broadcastToRoom(roomCode, PokerMessage.participantLeft(participant.accountId()));
-            }
+                ParticipantInfo participant = sessionParticipants.remove(session.getId());
+                if (participant != null) {
+                    sessionService.removeParticipant(roomCode, participant.accountId());
+                    broadcastToRoom(roomCode, PokerMessage.participantLeft(participant.accountId()));
+                }
+            });
         }
         log.info("WebSocket connection closed: {}", status);
     }
@@ -303,7 +317,7 @@ public class PokerWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void broadcastToRoom(String roomCode, PokerMessage message, WebSocketSession exclude) throws IOException {
-        CopyOnWriteArrayList<WebSocketSession> sessions = roomSessions.get(roomCode);
+        CopyOnWriteArrayList<WebSocketSession> sessions = roomSessions.get(roomKey(roomCode));
         if (sessions == null) return;
 
         String jsonMessage = objectMapper.writeValueAsString(message);

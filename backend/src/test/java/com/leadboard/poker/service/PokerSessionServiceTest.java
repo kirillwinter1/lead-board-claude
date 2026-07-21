@@ -63,6 +63,50 @@ class PokerSessionServiceTest {
         );
     }
 
+    // ==================== Cross-tenant room isolation ====================
+
+    @Nested
+    @DisplayName("participant map tenant isolation")
+    class ParticipantTenantIsolationTests {
+
+        @org.junit.jupiter.api.AfterEach
+        void clearTenant() {
+            com.leadboard.tenant.TenantContext.clear();
+        }
+
+        @Test
+        @DisplayName("two tenants sharing a room code do not see each other's participants")
+        void participantsAreScopedPerTenant() {
+            // Bug reproduction: the in-memory participant map was keyed by bare roomCode.
+            // roomCode uniqueness is only per schema, so tenant A and tenant B can hold the
+            // same code — a bare key merged their participant lists.
+            String sharedRoomCode = "ABC123";
+
+            com.leadboard.tenant.TenantContext.setTenant(1L, "tenant_a");
+            pokerSessionService.addParticipant(sharedRoomCode,
+                    new ParticipantInfo("acc-A", "Alice", "DEV", true, true));
+
+            com.leadboard.tenant.TenantContext.setTenant(2L, "tenant_b");
+            pokerSessionService.addParticipant(sharedRoomCode,
+                    new ParticipantInfo("acc-B", "Bob", "QA", true, true));
+
+            List<ParticipantInfo> tenantB = pokerSessionService.getParticipants(sharedRoomCode);
+            assertEquals(1, tenantB.size(), "tenant B must see only its own participant");
+            assertEquals("acc-B", tenantB.get(0).accountId());
+
+            com.leadboard.tenant.TenantContext.setTenant(1L, "tenant_a");
+            List<ParticipantInfo> tenantA = pokerSessionService.getParticipants(sharedRoomCode);
+            assertEquals(1, tenantA.size(), "tenant A must see only its own participant");
+            assertEquals("acc-A", tenantA.get(0).accountId());
+
+            // clearRoom in tenant A must not wipe tenant B's room.
+            pokerSessionService.clearRoom(sharedRoomCode);
+            com.leadboard.tenant.TenantContext.setTenant(2L, "tenant_b");
+            assertEquals(1, pokerSessionService.getParticipants(sharedRoomCode).size(),
+                    "tenant A's clearRoom must not affect tenant B");
+        }
+    }
+
     // ==================== createSession() Tests ====================
 
     @Nested

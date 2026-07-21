@@ -1,6 +1,7 @@
 package com.leadboard.poker.service;
 
 import com.leadboard.config.service.WorkflowConfigService;
+import com.leadboard.tenant.TenantContext;
 import com.leadboard.poker.PokerStateException;
 import com.leadboard.poker.dto.*;
 import com.leadboard.poker.entity.PokerSessionEntity;
@@ -293,13 +294,20 @@ public class PokerSessionService {
 
     // ===== Participant Management =====
 
+    // Tenant-scoped key: roomCode is only unique per schema, so the in-memory participant
+    // map must be keyed by (tenant, roomCode) or two tenants sharing a code would see each
+    // other's participants. Callers run inside the handler's withTenant scope.
+    private static String participantKey(String roomCode) {
+        return TenantContext.getCurrentTenantId() + "::" + roomCode;
+    }
+
     public void addParticipant(String roomCode, ParticipantInfo participant) {
-        roomParticipants.computeIfAbsent(roomCode, k -> new ConcurrentHashMap<>())
+        roomParticipants.computeIfAbsent(participantKey(roomCode), k -> new ConcurrentHashMap<>())
                 .put(participant.accountId(), participant);
     }
 
     public void removeParticipant(String roomCode, String accountId) {
-        Map<String, ParticipantInfo> participants = roomParticipants.get(roomCode);
+        Map<String, ParticipantInfo> participants = roomParticipants.get(participantKey(roomCode));
         if (participants != null) {
             participants.remove(accountId);
         }
@@ -307,11 +315,11 @@ public class PokerSessionService {
 
     /** Frees in-memory participant state when the last connection leaves a room (BUG-183). */
     public void clearRoom(String roomCode) {
-        roomParticipants.remove(roomCode);
+        roomParticipants.remove(participantKey(roomCode));
     }
 
     public List<ParticipantInfo> getParticipants(String roomCode) {
-        Map<String, ParticipantInfo> participants = roomParticipants.get(roomCode);
+        Map<String, ParticipantInfo> participants = roomParticipants.get(participantKey(roomCode));
         return participants != null ? List.copyOf(participants.values()) : List.of();
     }
 
