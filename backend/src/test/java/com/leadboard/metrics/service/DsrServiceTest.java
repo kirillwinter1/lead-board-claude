@@ -472,6 +472,59 @@ class DsrServiceTest {
     }
 
     @Test
+    void calculateDsr_pauseAndResumeSameDay_countsBoundaryDayOnce() {
+        // Bug reproduction: a same-day pause/resume closes period [Jan 6, Jan 10] and
+        // opens [Jan 10, Jan 17]; countWorkdays is inclusive on both ends, so the
+        // boundary day is counted twice, inflating in-progress workdays and DSR.
+        JiraIssueEntity epic = createEpic("PROJ-1", "Bounce Epic",
+                OffsetDateTime.of(2025, 1, 17, 0, 0, 0, 0, ZoneOffset.UTC));
+
+        setupChangelog("PROJ-1", List.of(
+                changelogEntry(null, "In Progress",
+                        OffsetDateTime.of(2025, 1, 6, 10, 0, 0, 0, ZoneOffset.UTC)),
+                changelogEntry("In Progress", "Blocked",
+                        OffsetDateTime.of(2025, 1, 10, 10, 0, 0, 0, ZoneOffset.UTC)),
+                changelogEntry("Blocked", "In Progress",
+                        OffsetDateTime.of(2025, 1, 10, 15, 0, 0, 0, ZoneOffset.UTC)),
+                changelogEntry("In Progress", "Done",
+                        OffsetDateTime.of(2025, 1, 17, 10, 0, 0, 0, ZoneOffset.UTC))
+        ));
+        when(workflowConfigService.isEpicInProgress("In Progress")).thenReturn(true);
+        when(workflowConfigService.isEpicInProgress("Blocked")).thenReturn(false);
+        when(workflowConfigService.isEpicInProgress("Done")).thenReturn(false);
+
+        JiraIssueEntity story = createStory("PROJ-1-S1", "PROJ-1");
+        JiraIssueEntity subtask = createSubtask("PROJ-1-ST1", "PROJ-1-S1");
+        subtask.setOriginalEstimateSeconds(10L * 8 * 3600);
+
+        when(issueRepository.findEpicsForDsr(any(), any(), any()))
+                .thenReturn(List.of(epic));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1")))
+                .thenReturn(List.of(story));
+        when(issueRepository.findByParentKeyIn(List.of("PROJ-1-S1")))
+                .thenReturn(List.of(subtask));
+        when(snapshotRepository.findByTeamIdAndDateRange(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        // True inclusive workday counts (Jan 2025: 6..10 = Mon..Fri; 13..17 = Mon..Fri)
+        when(workCalendarService.countWorkdays(
+                eq(LocalDate.of(2025, 1, 6)), eq(LocalDate.of(2025, 1, 10))))
+                .thenReturn(5);
+        when(workCalendarService.countWorkdays(
+                eq(LocalDate.of(2025, 1, 10)), eq(LocalDate.of(2025, 1, 17))))
+                .thenReturn(6);
+        when(flagChangelogService.calculateFlaggedWorkdays(any(), any(), any()))
+                .thenReturn(0);
+
+        DsrResponse result = service.calculateDsr(1L,
+                LocalDate.of(2025, 1, 1), LocalDate.of(2025, 1, 31));
+
+        // Contract: Jan 6-17 with a same-day bounce is the same 10 in-progress workdays
+        // as an uninterrupted run — the boundary day must not be counted twice.
+        assertEquals(10, result.epics().get(0).inProgressWorkdays(),
+                "same-day pause/resume must not double-count the boundary workday");
+    }
+
+    @Test
     void calculateDsr_completedEpicWithoutChangelog_fallsBackToStartedAt() {
         // Historical epic completed before changelog tracking
         JiraIssueEntity epic = new JiraIssueEntity();

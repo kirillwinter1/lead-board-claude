@@ -9,6 +9,7 @@ import com.leadboard.sync.JiraIssueEntity;
 import com.leadboard.sync.JiraIssueRepository;
 import com.leadboard.team.*;
 import com.leadboard.team.dto.PlanningConfigDto;
+import com.leadboard.tenant.TenantContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -96,6 +97,33 @@ class UnifiedPlanningServiceTest {
 
         // Default batch loading mock — returns empty; tests override with specific data
         when(issueRepository.findByParentKeyIn(anyList())).thenReturn(List.of());
+    }
+
+    @Test
+    void planCache_isScopedPerTenant() {
+        // Bug reproduction: planCache is keyed by teamId only. Every tenant schema has
+        // teams.id starting from 1 (BIGSERIAL per schema), so tenant B asking for its
+        // team 1 within the 60s TTL gets tenant A's cached plan — and the nightly
+        // snapshot job iterates tenants sequentially well inside that TTL.
+        try {
+            TenantContext.setTenant(1L, "tenant_a");
+            JiraIssueEntity epicA = createEpic("EPIC-A", "Tenant A epic", new BigDecimal("10"));
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID)).thenReturn(List.of(epicA));
+            UnifiedPlanningResult planA = service.calculatePlan(TEAM_ID);
+            assertEquals(List.of("EPIC-A"),
+                    planA.epics().stream().map(PlannedEpic::epicKey).toList(),
+                    "sanity: tenant A sees its own epics");
+
+            TenantContext.setTenant(2L, "tenant_b");
+            JiraIssueEntity epicB = createEpic("EPIC-B", "Tenant B epic", new BigDecimal("10"));
+            when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID)).thenReturn(List.of(epicB));
+            UnifiedPlanningResult planB = service.calculatePlan(TEAM_ID);
+            assertEquals(List.of("EPIC-B"),
+                    planB.epics().stream().map(PlannedEpic::epicKey).toList(),
+                    "tenant B must get a plan built from its own schema, not tenant A's cached plan");
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     @Test

@@ -51,7 +51,16 @@ public class UnifiedPlanningService {
     private static final long CACHE_TTL_MS = 60_000; // 60 seconds
     private static final int EARLY_EXIT_WORKDAYS = 130; // ~6 months horizon for fast estimation
 
-    private final ConcurrentHashMap<Long, CachedPlan> planCache = new ConcurrentHashMap<>();
+    // Keyed by (tenant, team): every tenant schema has teams.id starting from 1
+    // (BIGSERIAL per schema), so a teamId-only key would hand tenant B tenant A's
+    // cached plan within the TTL — and the nightly snapshot job iterates tenants
+    // sequentially well inside that window.
+    private final ConcurrentHashMap<String, CachedPlan> planCache = new ConcurrentHashMap<>();
+
+    private static String planCacheKey(Long teamId) {
+        Long tenantId = com.leadboard.tenant.TenantContext.getCurrentTenantId();
+        return (tenantId != null ? tenantId : -1L) + ":" + teamId;
+    }
 
     private record CachedPlan(UnifiedPlanningResult result, Instant cachedAt) {
         boolean isExpired() {
@@ -92,7 +101,7 @@ public class UnifiedPlanningService {
      * Main entry point for unified planning. Results are cached for 60 seconds.
      */
     public UnifiedPlanningResult calculatePlan(Long teamId) {
-        CachedPlan cached = planCache.get(teamId);
+        CachedPlan cached = planCache.get(planCacheKey(teamId));
         if (cached != null && !cached.isExpired()) {
             log.debug("Returning cached plan for team {} (age {}ms)", teamId,
                     Instant.now().toEpochMilli() - cached.cachedAt().toEpochMilli());
@@ -105,7 +114,7 @@ public class UnifiedPlanningService {
      * Invalidate plan cache for a specific team (call after sync/reorder).
      */
     public void invalidatePlanCache(Long teamId) {
-        planCache.remove(teamId);
+        planCache.remove(planCacheKey(teamId));
     }
 
     /**
@@ -225,7 +234,7 @@ public class UnifiedPlanningService {
                 utilization
         );
 
-        planCache.put(teamId, new CachedPlan(result, Instant.now()));
+        planCache.put(planCacheKey(teamId), new CachedPlan(result, Instant.now()));
         return result;
     }
 

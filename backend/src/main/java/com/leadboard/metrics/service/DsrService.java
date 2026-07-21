@@ -222,8 +222,17 @@ public class DsrService {
         }
 
         int totalWorkdays = 0;
+        LocalDate prevTo = null;
         for (DatePeriod period : periods) {
-            totalWorkdays += workCalendarService.countWorkdays(period.from, period.to);
+            int workdays = workCalendarService.countWorkdays(period.from, period.to);
+            // countWorkdays is inclusive of both endpoints; when a pause and resume happen
+            // on the same workday, that boundary day is the `to` of one period and the
+            // `from` of the next, so it would be counted twice. Drop the shared day once.
+            if (prevTo != null && period.from.equals(prevTo)) {
+                workdays -= 1;
+            }
+            totalWorkdays += workdays;
+            prevTo = period.to;
         }
 
         return new InProgressResult(totalWorkdays, periods);

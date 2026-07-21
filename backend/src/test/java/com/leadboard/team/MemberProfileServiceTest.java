@@ -148,6 +148,29 @@ class MemberProfileServiceTest {
     }
 
     @Test
+    void buildWeeklyTrend_countsTaskCompletedInIsoWeekSpanningNewYear() {
+        // Bug reproduction: the grouping key uses the calendar year (date.getYear())
+        // with the ISO week number, while the bucket key uses the week's Monday year.
+        // A task done on 2026-01-01 (ISO week 1, Monday 2025-12-29) gets key 202601,
+        // the bucket is 202501 — the task silently vanishes from the weekly trend.
+        MemberAnalyticsService analytics =
+                new MemberAnalyticsService(issueRepository, workflowConfigService, workCalendarService);
+        JiraIssueEntity task = createSubtask("PROJ-999", "New Year task",
+                14400L, 10800L,
+                OffsetDateTime.of(2025, 12, 30, 10, 0, 0, 0, ZoneOffset.UTC),
+                OffsetDateTime.of(2026, 1, 1, 10, 0, 0, 0, ZoneOffset.UTC));
+
+        List<MemberProfileResponse.WeeklyTrend> trend =
+                analytics.buildWeeklyTrend(List.of(task), LocalDate.of(2026, 1, 4));
+
+        int totalCompleted = trend.stream()
+                .mapToInt(MemberProfileResponse.WeeklyTrend::tasksCompleted)
+                .sum();
+        assertEquals(1, totalCompleted,
+                "a completed task must appear in exactly one week of the trend");
+    }
+
+    @Test
     void getMemberProfile_summary() {
         JiraIssueEntity t1 = createSubtask("PROJ-400", "Task 1",
                 28800L, 21600L, // 8h, 6h

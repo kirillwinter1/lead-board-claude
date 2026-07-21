@@ -246,17 +246,18 @@ public class ForecastAccuracyService {
         BigDecimal accuracyRatio = BigDecimal.valueOf(plannedDays)
                 .divide(BigDecimal.valueOf(actualDays), 2, RoundingMode.HALF_UP);
 
-        // Schedule variance in working days (with sign)
+        // Schedule variance in working days (with sign). countWorkdays is inclusive of
+        // both endpoints, so it counts one more than the workday *distance* between the
+        // two dates — subtract that shared endpoint to get the actual slip. This also
+        // makes a weekend actualEnd right after a Friday plannedEnd report 0 (no workday
+        // of slip) instead of a spurious +1.
         int scheduleVariance;
-        if (!actualEnd.isAfter(plannedEnd)) {
-            // Early or on time: negative or zero
-            scheduleVariance = -workCalendarService.countWorkdays(actualEnd, plannedEnd);
-            if (actualEnd.isEqual(plannedEnd)) {
-                scheduleVariance = 0;
-            }
+        if (actualEnd.isEqual(plannedEnd)) {
+            scheduleVariance = 0;
+        } else if (actualEnd.isBefore(plannedEnd)) {
+            scheduleVariance = -(workCalendarService.countWorkdays(actualEnd, plannedEnd) - 1);
         } else {
-            // Late: positive
-            scheduleVariance = workCalendarService.countWorkdays(plannedEnd, actualEnd);
+            scheduleVariance = workCalendarService.countWorkdays(plannedEnd, actualEnd) - 1;
         }
 
         String status;

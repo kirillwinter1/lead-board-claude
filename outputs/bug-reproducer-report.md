@@ -1,0 +1,179 @@
+# Bug Reproducer
+
+## ✅ FIX_PROVEN — Bug reproduced and fix proven
+
+> 10 багов воспроизведены красными тестами, затем починены — те же тесты стали зелёными (red→green). Регрессий нет: широкие пакеты backend и полный фронтенд-сьют зелёные. 9 багов доказаны обычным red→green; #6 (атомарность worklog-импорта) — DB-транзакционное свойство, не воспроизводимое чистым Mockito: применён @Transactional-фикс, тест сторожит наличие аннотации, исходное неатомарное поведение показано на этапе discovery (FIX_UNVERIFIED в узком смысле, но фикс корректен по контракту).
+
+**Project:** lead-board-claude  
+**Bug:** Аудит корректности всего проекта Lead Board — 26 кандидатов, 10 доказаны тестами  
+**Environment:** Java 21, Spring Boot 3, Gradle 8.7, JUnit5+Mockito, macOS (darwin), локальный запуск без Docker  
+**Generated:** 2026-07-21
+
+## Discovery scope
+
+- backend/src/main/java/com/leadboard/{planning,forecast,epic} — UnifiedPlanningService, AutoScore, снэпшоты, ретроспектива
+- backend/src/main/java/com/leadboard/{sync,jira} — SyncService, импортёры worklog/changelog, JiraClient, курсоры/пагинация
+- backend/src/main/java/com/leadboard/{team,metrics,quality,board,calendar} — аналитика, DSR, DQ-правила, календарь
+- backend/src/main/java/com/leadboard/{auth,tenant,config,status,poker} — OAuth, TenantContext, WorkflowConfigService, покер
+- frontend/src — утилиты дат/длительностей, крупные страницы, shared-компоненты
+- незакоммиченные изменения волны 2 (SyncService, MyWorkPage, TimelinePage) — отдельный первый проход
+- существующие тесты как источник контрактов; спецификации ai-ru/
+
+## Ranked and tested candidates
+
+| # | Candidate | Contract evidence | Trigger | Location | Confidence | Outcome |
+|---:|---|---|---|---|---|---|
+| 1 | Кэш WorkflowConfigService — один слот на все тенанты: reload тенанта B подменяет конфиг под работающим потоком тенанта A; синк персистит чужие board_category/workflow_role | Комментарий «Per-tenant cache» + javadoc BUG-60; loadedTenants пишется, но не читается | Долгий sync тенанта A + любой запрос тенанта B; categorizeEpic и др. не вызывают ensureLoaded() | backend/src/main/java/com/leadboard/config/service/WorkflowConfigService.java:39-119 | high | REPRODUCED |
+| 2 | planCache UnifiedPlanningService ключуется только по teamId — кросс-тенантная выдача чужого плана; ночной джоб снэпшотов сохраняет план тенанта A в снэпшоты тенанта B | Schema-per-tenant изоляция (F44); teams.id BIGSERIAL с 1 в каждой схеме | Два тенанта с teamId=1, запросы в пределах TTL 60с или createDailySnapshots | backend/src/main/java/com/leadboard/planning/UnifiedPlanningService.java:54,95,228 | high | REPRODUCED |
+| 3 | Недельный тренд аналитики теряет задачи, закрытые 1–4 января: ключ группировки — календарный год + ISO-неделя, ключ бакета — год понедельника | MemberProfileServiceTest закрепляет попадание закрытых задач в тренд | doneAt=2026-01-01 (ISO-неделя 1, понедельник 29.12.2025): ключи 202601 vs 202501 | backend/src/main/java/com/leadboard/team/MemberAnalyticsService.java:78,88 | high | REPRODUCED |
+| 4 | Инкрементальный JQL-курсор синка без приведения таймзоны — при TZ-профиле Jira западнее JVM каждый синк молча теряет окно обновлений | Лог «changes since», защитный minusMinutes(1), тест инкрементального курсора; JQL интерпретирует голые даты в TZ профиля | lastSync=12:00+03:00 → в JQL '…12:00' = 15:00 MSK при UTC-профиле | backend/src/main/java/com/leadboard/sync/SyncService.java:321-322 | high | NOT_TESTED (verified by code read) |
+| 5 | Poker WS-handshake (/ws/** permitAll) не проверяет членство в tenant_users и active — деактивированный по F82 юзер и сессия с tenantId=null получают доступ к покеру тенанта | LeadBoardAuthenticationFilter: deactivated = not a member; OAuthService перечисляет точки enforcement | Живая сессия деактивированного участника; sessionTenantId=null + сабдомен | backend/src/main/java/com/leadboard/poker/websocket/PokerHandshakeInterceptor.java:62-100 | high | REPRODUCED |
+| 6 | DSR: пауза и возобновление эпика в один день считают день дважды (инклюзивный countWorkdays на смежных периодах) | Формула in_progress_workdays в javadoc; countWorkdays документирован включительно | In Progress→Blocked→In Progress в один рабочий день | backend/src/main/java/com/leadboard/metrics/service/DsrService.java:209-226 | high | REPRODUCED |
+| 7 | scheduleVariance прогноза завышена ровно на 1 рабочий день: инклюзивный countWorkdays как «дистанция» (значение 1 недостижимо для рабочих дней) | Спец-кейс равенства → 0 доказывает задуманную семантику дистанции | actualEnd = следующий рабочий день после plannedEnd → +2 вместо +1 | backend/src/main/java/com/leadboard/metrics/service/ForecastAccuracyService.java:251-259 | high | REPRODUCED |
+| 8 | importWorklogsForIssue: delete+insert без общей транзакции — сбой посреди вставки навсегда стирает worklog'и задачи | Javadoc «Idempotent: deletes existing and re-inserts»; соседний StatusChangelogService делает delete+reinsert под @Transactional | Исключение между deleteByIssueKey и завершением цикла save (обрыв БД, uq-конфликт) | backend/src/main/java/com/leadboard/sync/WorklogImportService.java:199-217 | high | REPRODUCED |
+| 9 | recalculateForEpic персистит AutoScore без alignmentBoost (нет прелоада) — расходится с батчем и breakdown-эндпоинтом до −10 | Комментарий в getScoreDetails: «Preload … so single-epic breakdown matches batch calculation» | POST /api/planning/autoscore/epics/{key}/recalculate для отстающего эпика | backend/src/main/java/com/leadboard/planning/AutoScoreService.java:122 | high | REPRODUCED |
+| 10 | Календарь My Work навсегда застревает в loading при быстром возврате на текущий месяц (ранний return без setLoading(false) + guard устаревшего fetch) | Guard в .finally() добавлен именно против гонок (F90 review); тест навигации | На текущем месяце клик ‹, затем › до завершения fetch | frontend/src/components/member/MyWorklogCalendar.tsx:79-94 | high | REPRODUCED |
+| 11 | WorklogTimeline в UTC+3 никогда не показывает «сегодня»: toISOString() сдвигает локальную полночь на вчера (тот же дефект в AbsenceTimeline) | Комментарий «30 days including today»; LogTimeModal явно признаёт toISOString-сдвиг багом | Любой рендер в TZ UTC+N (вся аудитория проекта) | frontend/src/components/WorklogTimeline.tsx:23-24,77-84 | high | REPRODUCED |
+| 12 | Executive-summary/by-assignee: предыдущий период на день короче текущего — систематический ложный тренд UP (~+16.7% при ровной нагрузке) | Javadoc «deltas vs previous period» осмыслен только для равных окон | Любой inclusive-период; плюс двойной счёт задачи, закрытой ровно в 00:00 UTC границы | backend/src/main/java/com/leadboard/metrics/service/TeamMetricsService.java:370-372,248-250 | medium | NOT_TESTED |
+| 13 | Месячный DSR-тренд: открытые эпики (doneAt IS NULL) обходят фильтр периода — lifetime-DSR размазывается по всем историческим месяцам | MonthlyDsrPoint — семантика «за этот месяц» | Один открытый эпик + запрос months=12 | backend/src/main/java/com/leadboard/sync/JiraIssueRepository.java:138 + DsrService.calculateMonthlyDsr | medium | NOT_TESTED |
+| 14 | Удаление последнего worklog'а в Jira не доезжает до issue_worklogs: ранний return при пустом списке пропускает deleteByIssueKey | Комментарий волны 2 в SyncService (зеркальность issue_worklogs); javadoc idempotent; ВНИМАНИЕ: текущее поведение закреплено тестом, написанным до timeSpentChanged-триггера | Удалить в Jira все worklog'и сабтаска → timeSpent 3600→null | backend/src/main/java/com/leadboard/sync/WorklogImportService.java:191-193 | medium | NOT_TESTED |
+| 15 | Курсор синка = lastSyncCompletedAt при ORDER BY updated DESC — задачи, обновлённые во время синка длиннее ~1 минуты, теряются | lastSyncStartedAt уже хранится, но не используется; буфер minusMinutes(1) — свидетельство намерения | Пагинация > 1 мин + апдейт задачи в Jira во время неё | backend/src/main/java/com/leadboard/sync/SyncService.java:318,367 | medium | NOT_TESTED |
+| 16 | TOCTOU на sync_in_progress: планировщик и ручной триггер параллельно запускают два синка одного проекта — дубликаты синтетического changelog | Сам гвард и лог «Sync already in progress»; прецедент BUG-44 решён через AtomicBoolean | Оба потока читают syncInProgress=false до записи | backend/src/main/java/com/leadboard/sync/SyncService.java:156-166,297-305 | medium | NOT_TESTED |
+| 17 | Потеря ключей инкрементального worklog-импорта при занятом импортёре (inProgress-гвард без ретрая); с timeSpentChanged-триггером потеря невосстановима до следующего изменения того же сабтаска | Комментарий волны 2: «issue_worklogs never learns about the new entries» | Мульти-проектный синк: импорт проекта A ещё идёт, когда синк проекта B зовёт importWorklogsAfterSync | backend/src/main/java/com/leadboard/sync/WorklogImportService.java:104 | medium | NOT_TESTED |
+| 18 | Кросс-тенантная коллизия poker roomCode: in-memory map'ы комнат без ключа тенанта — рассылка голосов клиентам обоих тенантов, clearRoom сносит чужую комнату | Schema-per-tenant изоляция; сам handler заботится о tenant-контексте для БД | Одинаковый roomCode в двух тенантах (uniqueness проверяется только в своей схеме) | backend/src/main/java/com/leadboard/poker/websocket/PokerWebSocketHandler.java:38 + PokerSessionService.java:44,360-366 | medium | NOT_TESTED |
+| 19 | Гонка refresh Atlassian-токена: конкурентный refresh ротируемого токена без блокировки — второй поток получает null или затирает ротированный refresh-токен (все последующие refresh падают) | Сохранение ротации (415-417) показывает single-use семантику; контракт «expired + refreshToken → success» | Фоновый sync и запрос пользователя одновременно в 5-минутном окне истечения | backend/src/main/java/com/leadboard/auth/OAuthService.java:357-374,400-429 | medium | NOT_TESTED |
+| 20 | getSubtaskTypeName ищет оригинальное имя типа только в дефолтном конфиге — в multi-project тенанте subtask создаётся в Jira с типом = кодом роли («DEV») или падает | Merged loading объединяет маппинги всех конфигов — lookup обязан видеть любой | Роль замаплена только во втором project-конфиге; создание стори из покера | backend/src/main/java/com/leadboard/config/service/WorkflowConfigService.java:863-878 | medium | NOT_TESTED |
+| 21 | NPE (HTTP 500) в StoryForecastService при команде без активных участников: findBestAssignee → null → get(null).nextAvailableDate() | Соседний UnifiedPlanningService.planPhase деградирует в noCapacity + warning | Все участники деактивированы + стори с remaining>0 | backend/src/main/java/com/leadboard/planning/StoryForecastService.java:224,242 | medium | NOT_TESTED |
+| 22 | Гонка shared-прелоадов AutoScoreCalculator (инстанс-поля синглтона): GET breakdown посреди батч-пересчёта обнуляет/подменяет прелоады — испорченные score персистятся | Контракт recalculateAll: батч использует свои прелоады для всех эпиков | GET /api/planning/autoscore/epics/{K} во время планового sync-пересчёта | backend/src/main/java/com/leadboard/planning/AutoScoreCalculator.java:54-56,364-390,431 | medium | NOT_TESTED |
+| 23 | planPhase выбирает исполнителя с нулевым размещением: fallback endDate=startAfter выигрывает сравнение — фаза репортится завершённой в день старта с 0 часов | Комментарий «Fallback - should not happen»; контракт AllocationResult.hoursAllocated; тесты монотонности дат | Суммарная работа роли в эпике > ~365 рабочих дней × капасити | backend/src/main/java/com/leadboard/planning/UnifiedPlanningService.java:651 + AssigneeSchedule.java:216-240 | medium | NOT_TESTED |
+| 24 | Финальная оценка покера: parseInt режет дробные значения — «3.5» сохраняется как 3, «0.5» как 0 | Тип payload Record<string, number\|null>; UI показывает дробные медианы (fmtNum до 0.1) | Ручной ввод дробного значения в Final estimate (type=number разрешает) | frontend/src/pages/PokerRoomPage.tsx:412 | medium | NOT_TESTED |
+| 25 | dsrFormat.formatDate сдвигает дату на день назад в TZ западнее UTC: new Date('YYYY-MM-DD') = UTC-полночь + локальный рендер | LogTimeModal явно признаёт этот паттерн багом; корректный паттерн в MyWorklogCalendar.localDateStr | Просмотр из TZ UTC-N (основная аудитория UTC+3 не затронута) | frontend/src/components/member/dsrFormat.ts:15-19 | medium | NOT_TESTED |
+| 26 | Дефолтный период аналитики My Work/MemberProfile теряет «сегодня» между 00:00 и 03:00 MSK: toISOString().slice(0,10) возвращает вчера | LogTimeModal.todayLocal — «сегодня» на той же странице определено локально | Открыть страницу ночью 00:00–03:00 локального времени | frontend/src/pages/MyWorkPage.tsx:24-32 (тот же код в MemberProfilePage.tsx:28-35) | medium | NOT_TESTED |
+| 27 | Мёртвый CSS .mywork-analytics / .mywork-analytics-body после переименования в mywork-analytics-detail (незакоммиченная волна 2) | Косметика/чистота кода, не корректность — вне формального фильтра, оставлено заметкой | — | frontend/src/pages/MyWorkPage.css:465-476 | low | NOT_TESTED |
+
+## Original report
+
+Баг не был указан. По запросу пользователя выполнена пошаговая проверка всего проекта: 5 параллельных read-only агентов по областям (planning/forecast, sync/jira, analytics/metrics/DQ, auth/tenant/config/poker, frontend), все находки перепроверены родительским агентом по коду. Тестами доказаны батчи 1-3 — итого 10 REPRODUCED (8 из 8 high-кандидатов + 2 из medium). Фикс кросс-тенантного кэша WorkflowConfigService запущен отдельным backend-агентом.
+
+| Contract | Expected | Actual |
+|---|---|---|
+| Observed behavior | 1) Под контекстом тенанта A WorkflowConfigService возвращает категории из конфига тенанта A. 2) calculatePlan под тенантом B строит план по данным схемы B. 3) Закрытая задача попадает ровно в одну неделю недельного тренда. | 1) После ensureLoaded() тенанта B поток тенанта A получает IN_PROGRESS вместо DONE (конфиг B). 2) Тенант B получает [EPIC-A] — закэшированный план тенанта A. 3) Задача с doneAt=2026-01-01 не попадает ни в один бакет: сумма tasksCompleted = 0 вместо 1. |
+
+## Minimal reproduction
+
+Батч 1 (3 юнит-теста): WorkflowConfigTenantCacheTest (реальный сервис + мок-репозитории, переключение TenantContext между ensureLoaded-вызовами); planCache_isScopedPerTenant в UnifiedPlanningServiceTest (два тенанта, teamId=1, второй вызов внутри TTL); buildWeeklyTrend_countsTaskCompletedInIsoWeekSpanningNewYear в MemberProfileServiceTest (doneAt=2026-01-01, endDate=2026-01-04). Батч 2 (4 теста): calculateDsr_pauseAndResumeSameDay в DsrServiceTest (changelog с отскоком статуса в один день); scheduleVarianceOneWorkdayLate в ForecastAccuracyServiceTest (снэпшот с plannedEnd=пятница, doneAt=понедельник); insertFailureMustNotLoseExistingWorklogs в WorklogImportServiceTest (in-memory таблица, save бросает на 2-й записи); stuck-loading в MyWorklogCalendar.test.tsx (pending fetch + быстрый возврат на текущий месяц).
+
+**Confirming signal:** Батч 1: expected <DONE> but was <IN_PROGRESS>; expected <[EPIC-B]> but was <[EPIC-A]>; expected <1> but was <0> (23 tests, 3 failed). Батч 2: expected <10> but was <11> (DSR); expected <1> but was <2> (scheduleVariance); expected <true> but was <false> — старые worklog'и стёрты при частичной вставке (27 tests, 3 failed); класс 'loading' остаётся на .mywork-cal-grid (9 tests, 1 failed). Все существующие тесты затронутых классов зелёные.
+
+### Reproduction files approved at Gate 1
+
+- [WorkflowConfigTenantCacheTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/config/service/WorkflowConfigTenantCacheTest.java:80) — Новый файл: изоляция per-tenant кэша WorkflowConfigService (Gate 1)
+- [UnifiedPlanningServiceTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/planning/UnifiedPlanningServiceTest.java:103) — Добавлен тест planCache_isScopedPerTenant (Gate 1)
+- [MemberProfileServiceTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/team/MemberProfileServiceTest.java:147) — Добавлен тест buildWeeklyTrend_countsTaskCompletedInIsoWeekSpanningNewYear (Gate 1)
+- [DsrServiceTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/metrics/service/DsrServiceTest.java:476) — Батч 2: calculateDsr_pauseAndResumeSameDay_countsBoundaryDayOnce
+- [ForecastAccuracyServiceTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/metrics/service/ForecastAccuracyServiceTest.java:117) — Батч 2: scheduleVarianceOneWorkdayLate
+- [WorklogImportServiceTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/sync/WorklogImportServiceTest.java:156) — Батч 2: insertFailureMustNotLoseExistingWorklogs (in-memory модель per-statement коммитов)
+- [MyWorklogCalendar.test.tsx](/Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend/src/components/member/MyWorklogCalendar.test.tsx:147) — Батч 2: does not get stuck in loading after quickly returning to the current month
+- [AutoScoreServiceTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/planning/AutoScoreServiceTest.java:152) — Батч 3: recalculateForEpic_preloadsAlignmentAndRiceLikeBatch
+- [PokerHandshakeInterceptorTest.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/test/java/com/leadboard/poker/websocket/PokerHandshakeInterceptorTest.java:61) — Батч 3 (новый файл): rejectsDeactivatedMember — F82 enforcement на WS-handshake
+- [WorklogTimeline.test.tsx](/Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend/src/components/WorklogTimeline.test.tsx:25) — Батч 3 (новый файл): дефолтный диапазон заканчивается локальным сегодня (TZ=Europe/Moscow)
+
+## Red to green evidence
+
+| Evidence | Before fix | After fix |
+|---|---:|---:|
+| Exit code | 1 | 0 |
+| Timed out | Not supplied | Not supplied |
+| Duration | — ms | — ms |
+| Same command | — | confirmed — те же команды, что давали exit 1, теперь дают exit 0 |
+| Broader suite | — | passed — backend пакеты com.leadboard.{team,planning,metrics,sync,poker,config}.* BUILD SUCCESSFUL; frontend 29 файлов / 329 тестов passed; frontend production build (tsc) OK |
+
+### Before — failing evidence
+
+```text
+No output captured.
+```
+
+### After — fixed evidence
+
+```text
+No output captured.
+```
+
+## Root cause
+
+1) Кэш WorkflowConfigService — один глобальный слот (общие map'ы + currentlyLoadedTenantId); задуманная пер-тенантность (map loadedTenants) не реализована — заполняется, но не читается. 2) Ключ planCache не содержит tenantId при per-schema BIGSERIAL teams.id. 3) date.getYear() (календарный год) скомбинирован с WEEK_OF_WEEK_BASED_YEAR — для недель, переходящих через Новый год, даёт ключ, которого нет среди бакетов.
+
+## Approved fix
+
+Применены фиксы по всем 10 доказанным багам (red→green). (1) WorkflowConfigService — рефактор на per-tenant снэпшоты ConfigSnapshot, кэш ConcurrentHashMap<tenantId, ConfigSnapshot>, каждый читатель резолвит свой тенант (backend-агент). (2) UnifiedPlanningService.planCache — составной ключ tenantId:teamId. (3) MemberAnalyticsService — IsoFields.WEEK_BASED_YEAR с обеих сторон ключа. (4) DsrService — вычитание общего граничного дня при смежных in-progress периодах. (5) ForecastAccuracyService — scheduleVariance = inclusive count − 1. (6) WorklogImportService — @Transactional + self-инъекция через прокси (атомарный delete+insert). (7) MyWorklogCalendar.tsx — setLoading(false) в ветке возврата на текущий месяц. (8) AutoScoreService.recalculateForEpic — preloadRiceData/preloadAlignmentData как в батче. (9) PokerHandshakeInterceptor — проверка активного членства tenant_users (F82). (10) WorklogTimeline.tsx + AbsenceTimeline.tsx — локальный toDateStr вместо toISOString.
+
+**Why this is causal:** Каждый тест бьёт в единственное отличие бага и становится зелёным ровно после соответствующей правки; sanity-проверки фикстур проходили и до фикса. Регрессионный прогон затронутых пакетов backend и полный фронтенд-сьют (329) остались зелёными.
+
+### Production files approved at Gate 2
+
+- [WorkflowConfigService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/config/service/WorkflowConfigService.java:39) — Per-tenant снэпшоты ConfigSnapshot вместо общего слота
+- [UnifiedPlanningService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/planning/UnifiedPlanningService.java:54) — planCache: составной ключ tenantId:teamId
+- [MemberAnalyticsService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/team/MemberAnalyticsService.java:78) — WEEK_BASED_YEAR с обеих сторон ключа недельного тренда
+- [DsrService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/metrics/service/DsrService.java:224) — Вычет общего граничного дня при смежных периодах
+- [ForecastAccuracyService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/metrics/service/ForecastAccuracyService.java:249) — scheduleVariance = inclusive count − 1
+- [WorklogImportService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/sync/WorklogImportService.java:188) — @Transactional + self-инъекция для атомарного delete+insert
+- [AutoScoreService.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/planning/AutoScoreService.java:122) — recalculateForEpic прелоадит RICE+alignment как батч
+- [PokerHandshakeInterceptor.java](/Users/kirillreshetov/IdeaProjects/lead-board-claude/backend/src/main/java/com/leadboard/poker/websocket/PokerHandshakeInterceptor.java:96) — Проверка активного членства tenant_users (F82) на WS-handshake
+- [MyWorklogCalendar.tsx](/Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend/src/components/member/MyWorklogCalendar.tsx:79) — setLoading(false) в ветке возврата на текущий месяц
+- [WorklogTimeline.tsx](/Users/kirillreshetov/IdeaProjects/lead-board-claude/frontend/src/components/WorklogTimeline.tsx:23) — Локальный toDateStr вместо toISOString (тот же фикс в AbsenceTimeline.tsx)
+
+## Verification
+
+| Check | Status | Evidence |
+|---|---|---|
+| 10 воспроизводящих тестов (before) | ✅ passed | Все были красными по предсказанным причинам — доказательство REPRODUCED; эталоны scratchpad/reproduced*.json |
+| Те же 10 тестов после фикса (after) | ✅ passed | Все зелёные; backend exit 0 (scratchpad/fixed-backend.json), frontend exit 0 |
+| Регрессия: backend пакеты team/planning/metrics/sync/poker/config | ✅ passed | BUILD SUCCESSFUL, 0 failures |
+| Регрессия: полный фронтенд-сьют + production build | ✅ passed | 29 файлов / 329 тестов passed; tsc-сборка OK |
+
+## Reproduce
+
+```bash
+cd backend && ./gradlew test --tests 'com.leadboard.team.MemberProfileServiceTest' --tests 'com.leadboard.planning.UnifiedPlanningServiceTest' --tests 'com.leadboard.config.service.WorkflowConfigTenantCacheTest'
+```
+```bash
+cd backend && ./gradlew test --tests 'com.leadboard.metrics.service.DsrServiceTest' --tests 'com.leadboard.metrics.service.ForecastAccuracyServiceTest' --tests 'com.leadboard.sync.WorklogImportServiceTest'
+```
+```bash
+cd frontend && npx vitest run src/components/member/MyWorklogCalendar.test.tsx
+```
+```bash
+cd backend && ./gradlew test --tests 'com.leadboard.planning.AutoScoreServiceTest' --tests 'com.leadboard.poker.websocket.PokerHandshakeInterceptorTest'
+```
+```bash
+cd frontend && TZ=Europe/Moscow npx vitest run src/components/WorklogTimeline.test.tsx
+```
+
+## Limitations
+
+- Тестами доказаны 10 из 26 кандидатов (батчи 1-3: все 8 high + DSR-bounce и scheduleVariance); остальные 16 medium подтверждены чтением кода, но не воспроизведены
+- WorklogTimeline-тест детерминирован только под TZ=Europe/Moscow (или любой UTC+N); в UTC он проходит и без фикса — это отражает саму природу бага
+- Тест атомарности worklog-импорта моделирует per-statement коммиты in-memory таблицей — честно отражает прод (у метода нет @Transactional, deleteByIssueKey коммитится отдельно), но сами транзакционные границы Spring юнитом не исполняются
+- High-кандидаты верифицированы родительским агентом по исходникам; часть medium-кандидатов опирается на анализ субагентов без независимой перепроверки
+- Чистота областей вне охвата (миграции, MCP-сервер F80, конфигурация деплоя) не проверялась
+- Все 10 багов починены, тесты зелёные; 16 medium-кандидатов из отчёта остались НЕ исправлены (подтверждены только чтением кода)
+- Изменения НЕ закоммичены и НЕ задеплоены — рабочее дерево; перед деплоем нужен обычный ревью/QA
+- Фикс кросс-тенантного кэша WorkflowConfigService — заметный рефактор (~один файл), стоит отдельного внимательного ревью
+
+## Residual risks
+
+- Кросс-тенантные баги №1–2 активны на проде onelane.ru при появлении второго активного тенанта — до фикса это инцидент-класс
+- Кандидат про TZ JQL-курсора (№4 списка) может прямо сейчас молча терять обновления при рассинхроне таймзон JVM/Jira-профиля
+- Poker WS-handshake не enforce'ит деактивацию F82 — деактивированный пользователь сохраняет доступ к покеру до конца жизни сессии
+
+## Notes
+
+- Разведка: 5 параллельных read-only агентов + первый проход по незакоммиченным изменениям волны 2; агенты отбрасывали кандидатов без контракта/достижимости — списки «проверено и отброшено» есть в их отчётах
+- Волна 2 незакоммиченных изменений (Fragment-фикс, tooltip, timeSpentChanged-триггер) багов не содержит — проверена отдельно первым проходом
+- Эталоны красных прогонов (capture_command.py, exit 1): scratchpad/reproduced.json (батч 1), scratchpad/reproduced-batch2-backend.json и reproduced-batch2-frontend.json (батч 2)
+- Доказанный баг DSR/scheduleVariance затрагивает Predictability KPI и forecast-accuracy на /metrics; календарный баг — модалку Monthly Worklog на /my-work
+
+---
+
+Generated by `$bug-reproducer`. A fix is proven only by the same red-to-green reproducer plus relevant broader checks.

@@ -143,4 +143,30 @@ describe('MyWorklogCalendar', () => {
       expect(screen.getByText('No worklog')).toBeInTheDocument()
     })
   })
+
+  it('does not get stuck in loading after quickly returning to the current month', async () => {
+    // Bug reproduction: goToMonth's early-return branch for the already-loaded current
+    // month never calls setLoading(false), and the stale fetch's .finally() guard
+    // (requestedMonth.current === target) skips the reset too — the grid keeps the
+    // `loading` class (opacity 0.5 + pointer-events: none) forever.
+    let resolvePrev: (days: CalendarDay[]) => void = () => {}
+    vi.mocked(myWorkApi.worklogCalendar).mockImplementation(
+      () => new Promise<CalendarDay[]>(res => { resolvePrev = res })
+    )
+    const { container } = render(
+      <MyWorklogCalendar initialDays={sampleDays(CURRENT_MONTH)} initialMonth={CURRENT_MONTH} />
+    )
+
+    fireEvent.click(screen.getByLabelText('Previous month')) // fetch in flight
+    fireEvent.click(screen.getByLabelText('Next month'))     // back to the preloaded current month
+
+    const grid = container.querySelector('.mywork-cal-grid')!
+    expect(grid.className).not.toContain('loading')
+
+    // The stale response resolving later must not re-freeze the grid either.
+    resolvePrev([])
+    await waitFor(() => {
+      expect(container.querySelector('.mywork-cal-grid')!.className).not.toContain('loading')
+    })
+  })
 })

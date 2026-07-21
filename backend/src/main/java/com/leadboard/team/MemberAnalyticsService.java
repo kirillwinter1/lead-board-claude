@@ -75,7 +75,10 @@ public class MemberAnalyticsService {
                 .filter(i -> i.getDoneAt() != null)
                 .collect(Collectors.groupingBy(i -> {
                     LocalDate date = i.getDoneAt().toLocalDate();
-                    return date.getYear() * 100 + date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+                    // WEEK_BASED_YEAR (not the calendar year): an ISO week that spans New
+                    // Year belongs to the year of its Monday, so this must match the bucket
+                    // key below — else tasks done in early January vanish from the trend.
+                    return date.get(IsoFields.WEEK_BASED_YEAR) * 100 + date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
                 }));
 
         // Generate last TREND_WEEKS weeks
@@ -85,7 +88,7 @@ public class MemberAnalyticsService {
 
         for (int i = TREND_WEEKS - 1; i >= 0; i--) {
             LocalDate weekStart = currentWeekStart.minusWeeks(i);
-            int weekKey = weekStart.getYear() * 100 + weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+            int weekKey = weekStart.get(IsoFields.WEEK_BASED_YEAR) * 100 + weekStart.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
 
             List<JiraIssueEntity> weekIssues = byWeek.getOrDefault(weekKey, List.of());
 

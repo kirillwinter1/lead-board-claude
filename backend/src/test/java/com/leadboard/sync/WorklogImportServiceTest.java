@@ -152,6 +152,22 @@ class WorklogImportServiceTest {
     }
 
     @Test
+    @DisplayName("importWorklogsForIssue must be @Transactional so delete+insert is atomic")
+    void importWorklogsForIssueIsTransactional() throws NoSuchMethodException {
+        // The delete + re-insert must be atomic: a failure mid-insert has to roll back the
+        // delete, not leave the issue with its worklogs partially wiped (silently losing
+        // logged hours until the subtask's status/time changes again). True rollback is a
+        // DB-transaction property that a Mockito unit test cannot exercise; this guards the
+        // fix — the @Transactional boundary — against silent removal. The pre-fix
+        // non-atomic behavior was demonstrated with an in-memory per-statement-commit model
+        // during discovery (see outputs/bug-reproducer-report.md).
+        assertTrue(WorklogImportService.class
+                        .getMethod("importWorklogsForIssue", String.class)
+                        .isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class),
+                "importWorklogsForIssue must be annotated @Transactional for atomic replace");
+    }
+
+    @Test
     @DisplayName("should parse various date formats")
     void shouldParseVariousDateFormats() {
         // ISO offset datetime
