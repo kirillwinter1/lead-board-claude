@@ -50,10 +50,14 @@ public class AutoScoreCalculator {
     private final WorkflowConfigService workflowConfigService;
     private final RiceAssessmentService riceAssessmentService;
 
+    // Preloaded batch data is thread-scoped: AutoScoreCalculator is a singleton, and a
+    // GET breakdown request preloading+clearing on one thread must not wipe or swap the
+    // maps out from under a concurrent batch recalculate on another (which would persist
+    // scores computed with the wrong tenant's / a null preload).
     // Preloaded RICE data for batch operations (epicKey → effective normalized RICE score)
-    private Map<String, BigDecimal> preloadedEffectiveRice;
+    private final ThreadLocal<Map<String, BigDecimal>> preloadedEffectiveRice = new ThreadLocal<>();
     // Preloaded alignment data for batch operations (epicKey → delayDays)
-    private Map<String, Integer> preloadedAlignmentData;
+    private final ThreadLocal<Map<String, Integer>> preloadedAlignmentData = new ThreadLocal<>();
 
     public AutoScoreCalculator(JiraIssueRepository issueRepository,
                                WorkflowConfigService workflowConfigService,
@@ -284,7 +288,8 @@ public class AutoScoreCalculator {
      * - Standalone epic → use own RICE
      */
     public void preloadRiceData(List<JiraIssueEntity> epics) {
-        preloadedEffectiveRice = new HashMap<>();
+        Map<String, BigDecimal> effectiveRice = new HashMap<>();
+        preloadedEffectiveRice.set(effectiveRice);
 
         // Collect all epic keys and their parent keys
         Set<String> allKeys = new HashSet<>();
@@ -356,24 +361,24 @@ public class AutoScoreCalculator {
             }
 
             if (normalizedScore != null) {
-                preloadedEffectiveRice.put(key, normalizedScore);
+                effectiveRice.put(key, normalizedScore);
             }
         }
     }
 
     public void clearRiceData() {
-        preloadedEffectiveRice = null;
+        preloadedEffectiveRice.remove();
     }
 
     /**
      * Preload alignment data for batch AutoScore calculation.
      */
     public void preloadAlignmentData(Map<String, Integer> alignmentData) {
-        this.preloadedAlignmentData = alignmentData;
+        this.preloadedAlignmentData.set(alignmentData);
     }
 
     public void clearAlignmentData() {
-        this.preloadedAlignmentData = null;
+        this.preloadedAlignmentData.remove();
     }
 
     /**
@@ -383,8 +388,9 @@ public class AutoScoreCalculator {
     private BigDecimal calculateRiceBoost(JiraIssueEntity epic) {
         BigDecimal normalizedScore = null;
 
-        if (preloadedEffectiveRice != null) {
-            normalizedScore = preloadedEffectiveRice.get(epic.getIssueKey());
+        Map<String, BigDecimal> effectiveRice = preloadedEffectiveRice.get();
+        if (effectiveRice != null) {
+            normalizedScore = effectiveRice.get(epic.getIssueKey());
         } else {
             normalizedScore = resolveEffectiveRiceSingle(epic);
         }
@@ -428,10 +434,11 @@ public class AutoScoreCalculator {
      * Uses preloaded data only (no single-mode to avoid cross-package dependency).
      */
     private BigDecimal calculateAlignmentBoost(JiraIssueEntity epic) {
-        if (preloadedAlignmentData == null) {
+        Map<String, Integer> alignmentData = preloadedAlignmentData.get();
+        if (alignmentData == null) {
             return BigDecimal.ZERO;
         }
-        Integer delayDays = preloadedAlignmentData.get(epic.getIssueKey());
+        Integer delayDays = alignmentData.get(epic.getIssueKey());
         if (delayDays == null || delayDays <= 0) {
             return BigDecimal.ZERO;
         }

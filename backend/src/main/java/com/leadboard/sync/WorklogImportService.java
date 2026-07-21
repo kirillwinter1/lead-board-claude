@@ -18,7 +18,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +36,10 @@ public class WorklogImportService {
         final AtomicInteger processed = new AtomicInteger(0);
         final AtomicInteger total = new AtomicInteger(0);
         final AtomicInteger imported = new AtomicInteger(0);
+        // Candidate 6: keys that arrived while an import was already running. They must NOT be
+        // dropped — the active importer drains and processes them when it finishes. A Set gives
+        // free de-duplication if the same subtask is enqueued twice.
+        final Set<String> pending = ConcurrentHashMap.newKeySet();
 
         void reset() {
             processed.set(0);
@@ -105,46 +111,78 @@ public class WorklogImportService {
 
     /**
      * Import worklogs for specific subtask issue keys (called after sync).
+     *
+     * <p>Candidate 6: if an import is already running, the incoming keys are NOT dropped. They
+     * are queued into {@link ProgressState#pending} and the active importer drains them when it
+     * finishes. Lock-free single-consumer pattern: enqueue first, then try to become the active
+     * importer; whoever wins the CAS drains the queue in a loop, so keys queued by a caller that
+     * lost the CAS are always picked up. The trailing re-acquire in the do/while closes the
+     * window where a key is enqueued after the last drain but before the flag is released.
      */
     @Async
     public void importWorklogsForIssuesAsync(List<String> issueKeys) {
         if (issueKeys == null || issueKeys.isEmpty()) return;
 
         ProgressState state = getState();
+        state.pending.addAll(issueKeys);
+
         if (!state.inProgress.compareAndSet(false, true)) {
-            log.warn("Worklog import already in progress, skipping incremental import");
+            log.info("Worklog import busy — {} keys queued for the active run", issueKeys.size());
             return;
         }
 
+        do {
+            try {
+                List<String> batch;
+                while (!(batch = drainPending(state)).isEmpty()) {
+                    importBatch(state, batch);
+                }
+            } finally {
+                state.inProgress.set(false);
+            }
+        } while (!state.pending.isEmpty() && state.inProgress.compareAndSet(false, true));
+    }
+
+    /**
+     * Drain the currently-pending keys into a snapshot list, removing exactly that snapshot from
+     * the set. Keys added concurrently after the snapshot remain queued for the next drain.
+     */
+    private List<String> drainPending(ProgressState state) {
+        if (state.pending.isEmpty()) return List.of();
+        List<String> drained = new ArrayList<>(state.pending);
+        state.pending.removeAll(drained);
+        return drained;
+    }
+
+    /**
+     * Import one batch of subtask keys. Caller must already hold the {@code inProgress} flag.
+     */
+    private void importBatch(ProgressState state, List<String> issueKeys) {
         state.reset();
         state.total.set(issueKeys.size());
 
-        try {
-            log.info("Starting worklog import for {} issues", issueKeys.size());
-            int failed = 0;
+        log.info("Starting worklog import for {} issues", issueKeys.size());
+        int failed = 0;
 
-            for (String issueKey : issueKeys) {
-                try {
-                    int count = self.importWorklogsForIssue(issueKey);
-                    if (count > 0) state.imported.incrementAndGet();
-                    state.processed.incrementAndGet();
+        for (String issueKey : issueKeys) {
+            try {
+                int count = self.importWorklogsForIssue(issueKey);
+                if (count > 0) state.imported.incrementAndGet();
+                state.processed.incrementAndGet();
 
-                    Thread.sleep(RATE_LIMIT_MS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    failed++;
-                    state.processed.incrementAndGet();
-                    log.warn("Failed to import worklogs for {}: {}", issueKey, e.getMessage());
-                }
+                Thread.sleep(RATE_LIMIT_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                failed++;
+                state.processed.incrementAndGet();
+                log.warn("Failed to import worklogs for {}: {}", issueKey, e.getMessage());
             }
-
-            log.info("Worklog import completed: {} imported, {} failed out of {}",
-                    state.imported.get(), failed, issueKeys.size());
-        } finally {
-            state.inProgress.set(false);
         }
+
+        log.info("Worklog import completed: {} imported, {} failed out of {}",
+                state.imported.get(), failed, issueKeys.size());
     }
 
     /**
@@ -188,6 +226,21 @@ public class WorklogImportService {
                     projectKey, state.imported.get(), failed, subtasks.size());
         } finally {
             state.inProgress.set(false);
+        }
+
+        // Candidate 6: incremental keys may have been queued while this full import held the flag.
+        // Drain them so they are not stranded until the next status/time change of the subtask.
+        if (!state.pending.isEmpty() && state.inProgress.compareAndSet(false, true)) {
+            do {
+                try {
+                    List<String> batch;
+                    while (!(batch = drainPending(state)).isEmpty()) {
+                        importBatch(state, batch);
+                    }
+                } finally {
+                    state.inProgress.set(false);
+                }
+            } while (!state.pending.isEmpty() && state.inProgress.compareAndSet(false, true));
         }
     }
 

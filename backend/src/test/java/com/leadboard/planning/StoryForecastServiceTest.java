@@ -389,6 +389,40 @@ class StoryForecastServiceTest {
         assertTrue(schedule.workDays().doubleValue() < 1.0);
     }
 
+    @Test
+    void calculateStoryForecast_withNoActiveMembers_doesNotThrow() {
+        // Bug reproduction: team has no active members with a matching role.
+        // assigneeSchedules is empty -> findBestAssignee returns null ->
+        // assigneeSchedules.get(null) == null -> NPE on nextAvailableDate() (surfaced as HTTP 500).
+        // Contract: degrade gracefully (unassigned / no placement), like UnifiedPlanningService.planPhase.
+        String epicKey = "EPIC-1";
+        Long teamId = 1L;
+
+        JiraIssueEntity epic = createEpic(epicKey, "Epic 1");
+        JiraIssueEntity story = createStory("STORY-1", null, null);
+        JiraIssueEntity subtask = createStory("SUB-1", 28800L, 0L); // 8h remaining on subtask
+
+        when(issueRepository.findByIssueKey(epicKey)).thenReturn(Optional.of(epic));
+        when(issueRepository.findByParentKey(epicKey)).thenReturn(List.of(story));
+        when(issueRepository.findByParentKey("STORY-1")).thenReturn(List.of(subtask));
+        when(memberRepository.findByTeamIdAndActiveTrue(teamId)).thenReturn(List.of()); // no members
+        when(teamService.getPlanningConfig(teamId)).thenReturn(createDefaultConfig());
+        when(storyDependencyService.topologicalSort(anyList(), anyMap())).thenAnswer(inv -> inv.getArgument(0));
+        when(workflowConfigService.isInProgress(anyString(), anyString())).thenReturn(false);
+        when(workflowConfigService.getDefaultRoleCode()).thenReturn("DEV");
+
+        // When / Then: must not throw
+        StoryForecastService.StoryForecast forecast =
+                assertDoesNotThrow(() -> service.calculateStoryForecast(epicKey, teamId));
+
+        assertNotNull(forecast);
+        assertEquals(1, forecast.stories().size());
+        StoryForecastService.StorySchedule schedule = forecast.stories().get(0);
+        assertEquals("STORY-1", schedule.storyKey());
+        assertNull(schedule.assigneeAccountId(), "No member available -> assignee is null");
+        assertTrue(schedule.isUnassigned());
+    }
+
     // ==================== Helper Methods ====================
 
     private JiraIssueEntity createEpic(String key, String summary) {

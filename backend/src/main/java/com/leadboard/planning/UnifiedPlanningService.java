@@ -640,6 +640,8 @@ public class UnifiedPlanningService {
         AssigneeSchedule bestAssignee = null;
         LocalDate bestEndDate = null;
         BigDecimal bestAdjustedHours = hours;
+        boolean bestFullyPlaced = false;
+        BigDecimal bestAllocated = BigDecimal.ZERO;
 
         for (AssigneeSchedule schedule : assigneeSchedules.values()) {
             if (!roleCode.equals(schedule.getRoleCode())) {
@@ -657,10 +659,34 @@ public class UnifiedPlanningService {
             AssigneeSchedule.AllocationResult simulated = schedule.simulateAllocation(
                     adjustedHours, startAfter, calendarHelper);
 
-            if (bestAssignee == null || simulated.endDate().isBefore(bestEndDate)) {
+            // Did this assignee fit ALL the work within the planning horizon?
+            boolean fullyPlaced = simulated.hoursAllocated().compareTo(adjustedHours) >= 0;
+
+            // Pick the best candidate. A fully-booked assignee's simulation falls back to
+            // AllocationResult(startAfter, startAfter, 0) — endDate == startAfter, which is
+            // "earlier" than any real placement. Comparing on endDate alone lets that empty
+            // fallback win, after which allocateHours places 0 hours and the phase is reported
+            // as start==end==startAfter with full hours ("completed on day one"). Guard against
+            // it: a candidate that fits fully always beats one that does not; only when neither
+            // fits do we fall back to whoever places the most work (then earliest finish).
+            boolean better;
+            if (bestAssignee == null) {
+                better = true;
+            } else if (fullyPlaced != bestFullyPlaced) {
+                better = fullyPlaced;
+            } else if (fullyPlaced) {
+                better = simulated.endDate().isBefore(bestEndDate);
+            } else {
+                int cmp = simulated.hoursAllocated().compareTo(bestAllocated);
+                better = cmp > 0 || (cmp == 0 && simulated.endDate().isBefore(bestEndDate));
+            }
+
+            if (better) {
                 bestAssignee = schedule;
                 bestEndDate = simulated.endDate();
                 bestAdjustedHours = adjustedHours;
+                bestFullyPlaced = fullyPlaced;
+                bestAllocated = simulated.hoursAllocated();
             }
         }
 
@@ -669,6 +695,17 @@ public class UnifiedPlanningService {
                     storyKey,
                     WarningType.NO_CAPACITY,
                     "No " + roleCode + " capacity in team"
+            ));
+            return PhaseSchedule.noCapacity(hours);
+        }
+
+        // Best assignee cannot place a single hour within the horizon (fully booked by earlier
+        // work). Report noCapacity rather than fabricating a same-day completion with full hours.
+        if (bestAllocated.compareTo(BigDecimal.ZERO) <= 0) {
+            warnings.add(new PlanningWarning(
+                    storyKey,
+                    WarningType.NO_CAPACITY,
+                    "No available " + roleCode + " capacity within planning horizon"
             ));
             return PhaseSchedule.noCapacity(hours);
         }

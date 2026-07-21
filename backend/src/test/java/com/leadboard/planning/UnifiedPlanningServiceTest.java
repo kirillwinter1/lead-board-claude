@@ -620,6 +620,63 @@ class UnifiedPlanningServiceTest {
                         + blockerStory.endDate() + ", Blocked start: " + blockedStory.startDate());
     }
 
+    @Test
+    void planPhase_fullyBookedAssignee_doesNotFalselyCompleteOnDayOne() {
+        // Bug reproduction: one SA, one epic, two stories both needing SA.
+        // Story 1 needs more SA work than fits in the 365-iteration allocation horizon, fully
+        // booking the SA. When planning story 2, simulateAllocation places zero hours and falls
+        // back to AllocationResult(startAfter, startAfter, 0) — endDate == startAfter (today),
+        // which is "earlier" than any real placement and thus wins. allocateHours then places 0
+        // hours, and story 2's SA phase is reported as start==end==today with full hours and
+        // noCapacity=false: a false same-day completion, earlier than story 1's real finish.
+        JiraIssueEntity epic = createEpic("EPIC-1", "Test Epic", new BigDecimal("80"));
+        JiraIssueEntity story1 = createStory("STORY-1", "Huge SA", "EPIC-1", new BigDecimal("60"));
+        JiraIssueEntity story2 = createStory("STORY-2", "Small SA", "EPIC-1", new BigDecimal("50"));
+        // 3000h SA (buffered 3600h = 450 workdays) exceeds the 365-iteration horizon -> partial placement
+        JiraIssueEntity sa1 = createSubtask("SUB-1", "SA Task", "STORY-1", "Analysis", 3000 * 3600L, 0L);
+        JiraIssueEntity sa2 = createSubtask("SUB-2", "SA Task", "STORY-2", "Analysis", 8 * 3600L, 0L);
+
+        when(issueRepository.findEpicsByTeamOrderByManualOrder(TEAM_ID)).thenReturn(List.of(epic));
+        when(issueRepository.findByParentKeyOrderByManualOrderAsc("EPIC-1")).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("EPIC-1"))).thenReturn(List.of(story1, story2));
+        when(issueRepository.findByParentKeyIn(List.of("STORY-1", "STORY-2"))).thenReturn(List.of(sa1, sa2));
+
+        when(memberRepository.findByTeamIdAndActiveTrue(TEAM_ID)).thenReturn(List.of(
+                createMember("sa-1", "Anna SA", "SA", Grade.MIDDLE, new BigDecimal("8"))
+        ));
+        when(dependencyService.topologicalSort(anyList(), anyMap())).thenReturn(List.of(story1, story2));
+
+        // When
+        UnifiedPlanningResult result = service.calculatePlan(TEAM_ID);
+
+        // Then
+        PlannedEpic plannedEpic = result.epics().get(0);
+        PlannedStory planned1 = plannedEpic.stories().stream()
+                .filter(s -> s.storyKey().equals("STORY-1")).findFirst().orElseThrow();
+        PlannedStory planned2 = plannedEpic.stories().stream()
+                .filter(s -> s.storyKey().equals("STORY-2")).findFirst().orElseThrow();
+
+        PhaseSchedule sa1Phase = planned1.phases().get("SA");
+        PhaseSchedule sa2Phase = planned2.phases().get("SA");
+        assertNotNull(sa1Phase);
+        assertNotNull(sa2Phase);
+
+        // Story 1's SA is only partially placeable but must still occupy real future dates.
+        assertTrue(sa1Phase.endDate().isAfter(LocalDate.now()),
+                "Story 1 SA should span real future dates, not collapse to today");
+
+        // The bug: story 2 SA reported as start==end==today with full hours and not noCapacity.
+        boolean falseSameDayCompletion = !sa2Phase.noCapacity()
+                && sa2Phase.startDate() != null && sa2Phase.endDate() != null
+                && sa2Phase.startDate().equals(sa2Phase.endDate())
+                && sa2Phase.startDate().equals(LocalDate.now());
+        assertFalse(falseSameDayCompletion,
+                "Story 2 SA must not falsely complete on day one when the only SA is fully booked");
+
+        // Correct behavior: no capacity left within the planning horizon.
+        assertTrue(sa2Phase.noCapacity(), "Story 2 SA should be reported as noCapacity");
+    }
+
     // Helper methods
 
     private JiraIssueEntity createEpic(String key, String summary, BigDecimal autoScore) {

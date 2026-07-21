@@ -868,6 +868,49 @@ class AutoScoreCalculatorTest {
 
     // ==================== Helper Methods ====================
 
+    @Test
+    void preloadedAlignmentData_isThreadIsolated() throws Exception {
+        // Bug reproduction: the preload maps used to be shared instance fields on this
+        // singleton. A GET breakdown request that preloads+clears on one thread would wipe
+        // the alignment map out from under a concurrent batch recalculate on another thread,
+        // so that thread's alignmentBoost silently collapsed to 0 and a wrong score was
+        // persisted. With thread-scoped preloads, thread A keeps its own data.
+        JiraIssueEntity epic = createBasicEpic();
+        when(workflowConfigService.getStatusScoreWeightWithFallback(anyString(), any())).thenReturn(0);
+
+        java.util.concurrent.CyclicBarrier barrier = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.atomic.AtomicReference<BigDecimal> threadABoost = new java.util.concurrent.atomic.AtomicReference<>();
+
+        Thread threadA = new Thread(() -> {
+            try {
+                calculator.preloadAlignmentData(Map.of("TEST-123", 5)); // 5 delay days → boost 5
+                barrier.await(); // let thread B interleave its preload+clear
+                barrier.await(); // wait until B has cleared its own (thread-local) data
+                threadABoost.set(calculator.calculateFactors(epic).get("alignmentBoost"));
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        Thread threadB = new Thread(() -> {
+            try {
+                barrier.await();
+                calculator.preloadAlignmentData(Map.of()); // a breakdown request's preload…
+                calculator.clearAlignmentData();           // …then its clear
+                barrier.await();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        threadA.start();
+        threadB.start();
+        threadA.join(5000);
+        threadB.join(5000);
+
+        assertEquals(0, new BigDecimal("5.00").compareTo(threadABoost.get()),
+                "thread A must keep its own preloaded alignment data despite thread B's preload+clear");
+    }
+
     private JiraIssueEntity createBasicEpic() {
         JiraIssueEntity epic = new JiraIssueEntity();
         epic.setIssueKey("TEST-123");

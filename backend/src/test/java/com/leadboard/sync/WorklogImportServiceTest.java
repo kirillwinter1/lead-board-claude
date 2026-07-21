@@ -168,6 +168,37 @@ class WorklogImportServiceTest {
     }
 
     @Test
+    @DisplayName("keys arriving while the importer is busy are queued, not dropped (candidate 6)")
+    void queuedKeysProcessedAfterBusyImport() {
+        // Candidate 6: previously, if importWorklogsForIssuesAsync found an import already running
+        // it logged a WARN and dropped the incoming keys. With the timeSpentChanged trigger a
+        // dropped key may never come back until that same subtask changes again — silent loss.
+        // The importer now queues keys that arrive while busy and drains them before returning.
+        WorklogImportService spy = spy(service);
+        // Wire the self-proxy to the spy so importBatch -> self.importWorklogsForIssue is intercepted.
+        org.springframework.test.util.ReflectionTestUtils.setField(spy, "self", spy);
+
+        List<String> processed = new java.util.ArrayList<>();
+        doAnswer(inv -> {
+            String key = inv.getArgument(0);
+            processed.add(key);
+            if ("A".equals(key)) {
+                // While we are "busy" importing A, a fresh set of keys arrives (as a concurrent
+                // sync would deliver via the timeSpentChanged trigger). The active importer must
+                // pick them up rather than drop them.
+                spy.importWorklogsForIssuesAsync(List.of("B"));
+            }
+            return 0;
+        }).when(spy).importWorklogsForIssue(anyString());
+
+        spy.importWorklogsForIssuesAsync(new java.util.ArrayList<>(List.of("A")));
+
+        assertTrue(processed.contains("A"), "A must be imported");
+        assertTrue(processed.contains("B"),
+                "keys arriving while the importer was busy must be processed, not dropped");
+    }
+
+    @Test
     @DisplayName("should parse various date formats")
     void shouldParseVariousDateFormats() {
         // ISO offset datetime

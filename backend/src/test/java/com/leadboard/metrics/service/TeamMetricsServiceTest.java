@@ -400,6 +400,37 @@ class TeamMetricsServiceTest {
     }
 
     @Test
+    void getExecutiveSummary_evenLoad_throughputTrendIsStable() {
+        // BUG 1 reproduction: the current window [from, to] is inclusive (spans
+        // periodDays+1 days), so the previous window must span the same number of days.
+        // With a perfectly even workload (1 completed STORY per day), current and previous
+        // totals must match → delta 0 → STABLE. The old code made prev one day shorter,
+        // producing a false "UP" trend. A short 4-day window makes that 1-day gap large
+        // enough (33%) to cross the UP threshold if the bug is present.
+        Long teamId = 1L;
+        LocalDate from = LocalDate.of(2024, 1, 1);
+        LocalDate to = LocalDate.of(2024, 1, 4);
+
+        // Even load: return exactly one STORY per day in whatever window is queried.
+        when(metricsRepository.getThroughputByWeek(eq(teamId), any(), any(), any(), any(), any()))
+                .thenAnswer(inv -> {
+                    OffsetDateTime f = inv.getArgument(1);
+                    OffsetDateTime t = inv.getArgument(2);
+                    long daysInWindow = java.time.temporal.ChronoUnit.DAYS.between(f, t);
+                    return Collections.singletonList(new Object[]{
+                            Timestamp.valueOf(f.toLocalDateTime()), "STORY", daysInWindow});
+                });
+
+        ExecutiveSummary summary = service.getExecutiveSummary(teamId, from, to, dsrService, velocityService);
+
+        ExecutiveSummary.KpiCard throughput = summary.throughput();
+        assertEquals("STABLE", throughput.trend(),
+                "even load must not produce a trend; a false UP means the prev window is a day short");
+        assertEquals(0, throughput.deltaPercent().compareTo(BigDecimal.ZERO),
+                "current and previous throughput must be equal for an even workload");
+    }
+
+    @Test
     void getSparklines_buildsAllSeriesFromWeeklyQueries() {
         Long teamId = 1L;
         LocalDate from = LocalDate.of(2024, 3, 1);

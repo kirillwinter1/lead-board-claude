@@ -74,11 +74,30 @@ public class DsrService {
     }
 
     public DsrResponse calculateDsr(Long teamId, LocalDate from, LocalDate to) {
+        // Single-period DSR intentionally includes still-open epics (lifetime in-progress
+        // days), so their ongoing delivery speed is visible on the dashboard.
+        return calculateDsr(teamId, from, to, false);
+    }
+
+    /**
+     * @param excludeOpenEpicsOutsideWindow when true, still-open epics (doneAt IS NULL,
+     *        which the findEpicsForDsr query returns for EVERY window) are only counted if
+     *        their in-progress activity actually intersects [from, to]. Used by the monthly
+     *        trend so an open epic does not pollute months before it even started.
+     */
+    private DsrResponse calculateDsr(Long teamId, LocalDate from, LocalDate to,
+                                     boolean excludeOpenEpicsOutsideWindow) {
         List<JiraIssueEntity> epics = issueRepository.findEpicsForDsr(
                 teamId,
                 from.atStartOfDay().atOffset(ZoneOffset.UTC),
                 to.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC)
         );
+
+        if (excludeOpenEpicsOutsideWindow) {
+            epics = epics.stream()
+                    .filter(epic -> epic.getDoneAt() != null || isInProgressDuringWindow(epic, from, to))
+                    .collect(Collectors.toList());
+        }
 
         log.info("DSR: Found {} epics for team {} between {} and {}",
                 epics.size(), teamId, from, to);
@@ -242,6 +261,22 @@ public class DsrService {
     }
 
     /**
+     * True if the epic's IN_PROGRESS activity overlaps the [from, to] window (inclusive).
+     * For a still-open epic the last period runs to today, so a past month that ended
+     * before the epic entered progress yields no overlap and the epic is excluded.
+     */
+    private boolean isInProgressDuringWindow(JiraIssueEntity epic, LocalDate from, LocalDate to) {
+        InProgressResult result = calculateInProgressWorkdays(epic.getIssueKey(), epic);
+        for (DatePeriod period : result.periods()) {
+            boolean overlaps = !period.from().isAfter(to) && !period.to().isBefore(from);
+            if (overlaps) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Calculates flagged workdays only within IN_PROGRESS periods.
      */
     int calculateFlaggedDaysInPeriods(String issueKey, List<DatePeriod> periods) {
@@ -336,7 +371,9 @@ public class DsrService {
             LocalDate from = ym.atDay(1);
             LocalDate to = ym.atEndOfMonth();
 
-            DsrResponse dsr = calculateDsr(teamId, from, to);
+            // Trend semantics = "this month": an open epic must only count in months where
+            // its in-progress activity actually falls, not in every historical month.
+            DsrResponse dsr = calculateDsr(teamId, from, to, true);
 
             points.add(new MonthlyDsrResponse.MonthlyDsrPoint(
                     ym.toString(), // "2025-01"
