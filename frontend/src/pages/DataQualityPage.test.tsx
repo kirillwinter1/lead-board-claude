@@ -487,9 +487,8 @@ describe('DataQualityPage', () => {
       fireEvent.click(fixBtn)
 
       const applyBtn = await screen.findByRole('button', { name: 'Apply' })
-      // Pick a team so the required select is satisfied
-      fireEvent.click(screen.getByText('Team', { selector: '.filter-dropdown-label' }))
-      fireEvent.click(await screen.findByText('Team A', { selector: '.filter-dropdown-item-label' }))
+      // Pick a team so the required native select is satisfied
+      fireEvent.change(screen.getByLabelText('Team'), { target: { value: '1' } })
       await waitFor(() => expect(applyBtn).not.toBeDisabled())
 
       const callsBefore = mockedAxios.get.mock.calls.filter(
