@@ -1,8 +1,8 @@
 import { useState, useRef, useCallback, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { getStatusHistory, formatDuration, type StatusHistory } from '../api/statusHistory'
-import { StatusBadge } from './board/StatusBadge'
-import { ERROR_TEXT, TEXT_PRIMARY, TEXT_MUTED, LINK_COLOR, SEPARATOR } from '../constants/colors'
+import { getStatusHistory, type StatusHistory } from '../api/statusHistory'
+import { StatusPathContent } from './StatusPathContent'
+import { ERROR_TEXT, TEXT_PRIMARY, TEXT_MUTED } from '../constants/colors'
 
 interface StatusHistoryTooltipProps {
   issueKey: string
@@ -97,66 +97,7 @@ export function StatusHistoryTooltip({ issueKey, children }: StatusHistoryToolti
           {loading && <div style={{ color: TEXT_MUTED }}>Loading…</div>}
           {error && <div style={{ color: ERROR_TEXT }}>Failed to load</div>}
 
-          {history && !loading && (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {history.segments.map((seg, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                      opacity: seg.current ? 1 : 0.9,
-                    }}
-                  >
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                      <StatusBadge status={seg.status} />
-                      {seg.current && (
-                        <span style={{ fontSize: 10, color: LINK_COLOR, fontWeight: 600, whiteSpace: 'nowrap' }}>
-                          now
-                        </span>
-                      )}
-                    </span>
-                    <span
-                      style={{
-                        color: TEXT_PRIMARY,
-                        fontWeight: seg.current ? 700 : 500,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {formatDuration(seg.durationSeconds)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div
-                style={{
-                  borderTop: `1px solid ${SEPARATOR}`,
-                  marginTop: 8,
-                  paddingTop: 6,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                  color: TEXT_MUTED,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Total</span>
-                  <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>{formatDuration(history.totalSeconds)}</span>
-                </div>
-                {history.segments.length > 1 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span>Excl. “{history.segments[0].status}”</span>
-                    <span style={{ fontWeight: 600, color: TEXT_PRIMARY }}>
-                      {formatDuration(history.totalSeconds - history.segments[0].durationSeconds)}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
+          {history && !loading && <StatusPathContent history={history} variant="light" />}
         </div>,
         document.body
       )}

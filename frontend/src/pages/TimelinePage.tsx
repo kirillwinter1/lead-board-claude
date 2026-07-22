@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay, StatusInterval } from '../api/forecast'
 import { getConfig } from '../api/config'
 import { getStatusStyles, StatusStyle } from '../api/board'
+import { getStatusHistory, type StatusHistory } from '../api/statusHistory'
+import { StatusPathContent } from '../components/StatusPathContent'
 import { StatusStylesProvider, useStatusStyles } from '../components/board/StatusStylesContext'
 import { EmptyState } from '../components/EmptyState'
 import { ProgressBar } from '../components/ProgressBar'
@@ -651,6 +653,37 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
+  // F92 — Status path tooltip (Story-statuses mode): lazily loads the hovered story's
+  // status history (same shape/endpoint as the Board's StatusHistoryTooltip) and caches
+  // it per storyKey so re-hovering a story already fetched this session doesn't refetch.
+  const [statusHistory, setStatusHistory] = useState<StatusHistory | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState(false)
+  const historyCacheRef = useRef<Map<string, StatusHistory>>(new Map())
+  const historyAbortRef = useRef<AbortController | null>(null)
+  const historyDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const historyFetchedKeyRef = useRef<string | null>(null)
+
+  const fetchStatusHistory = useCallback((storyKey: string) => {
+    historyAbortRef.current?.abort()
+    const controller = new AbortController()
+    historyAbortRef.current = controller
+    setHistoryLoading(true)
+    setHistoryError(false)
+    getStatusHistory(storyKey, controller.signal)
+      .then(data => {
+        if (controller.signal.aborted) return
+        historyCacheRef.current.set(storyKey, data)
+        setStatusHistory(data)
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setHistoryError(true)
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setHistoryLoading(false)
+      })
+  }, [])
+
   // Show all stories that have dates and phases (including done stories with retro data)
   const activeStories = stories.filter(s => {
     const hasPhases = s.phases && Object.keys(s.phases).length > 0
@@ -665,10 +698,56 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
   const maxLane = Math.max(0, ...Array.from(storyLanes.values())) + 1
   const containerHeight = maxLane * (BAR_HEIGHT + LANE_GAP)
 
+  const getStorySource = (s: PlannedStory | null): PhaseSource =>
+    s ? ((s as PlannedStory & { _source?: PhaseSource })._source || 'forecast') : 'forecast'
+
   const handleHover = (story: PlannedStory | null, pos?: { x: number; y: number }) => {
     setHoveredStory(story)
     if (pos) setTooltipPos(pos)
+
+    if (!story) {
+      // Reset nothing else on unhover (the tooltip unmounts anyway) — just stop any
+      // in-flight fetch so it doesn't resolve into a state nobody is looking at, and
+      // clear loading so an aborted fetch never leaves a re-hover stuck on "Loading…".
+      if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current)
+      historyAbortRef.current?.abort()
+      setHistoryLoading(false)
+      return
+    }
+
+    const showsStatusPath = actualsMode === 'status'
+      && (getStorySource(story) === 'retro' || getStorySource(story) === 'hybrid')
+
+    if (!showsStatusPath) {
+      // Not in Story-statuses mode (or a pure-forecast story) — reset the "already
+      // fetched" marker so switching back to status mode on the same story re-checks
+      // the cache instead of silently no-op'ing.
+      historyFetchedKeyRef.current = null
+      return
+    }
+
+    // onHover also fires on every mousemove within the same bar — only act once per
+    // hover session (when the story actually changes).
+    if (historyFetchedKeyRef.current === story.storyKey) return
+    historyFetchedKeyRef.current = story.storyKey
+
+    const cached = historyCacheRef.current.get(story.storyKey)
+    if (cached) {
+      setStatusHistory(cached)
+      setHistoryLoading(false)
+      setHistoryError(false)
+      return
+    }
+
+    setStatusHistory(null)
+    setHistoryError(false)
+    if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current)
+    historyDebounceRef.current = setTimeout(() => fetchStatusHistory(story.storyKey), 300)
   }
+
+  const showsStatusPath = actualsMode === 'status'
+    && hoveredStory != null
+    && (getStorySource(hoveredStory) === 'retro' || getStorySource(hoveredStory) === 'hybrid')
 
   return (
     <>
@@ -720,74 +799,90 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
             <StatusBadge status={hoveredStory.status} maxWidth={130} />
           </div>
 
-          {/* Summary */}
-          <div style={{ color: TOOLTIP_TEXT, marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
-            {hoveredStory.summary || 'No summary'}
-          </div>
-
-          {/* Progress bar */}
-          {hoveredStory.totalEstimateSeconds && hoveredStory.totalEstimateSeconds > 0 && (
-            <div style={{ marginBottom: '10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
-                <DarkTooltip.Label>Progress</DarkTooltip.Label>
-                <DarkTooltip.Value>
-                  {formatHours(hoveredStory.totalLoggedSeconds)} / {formatHours(hoveredStory.totalEstimateSeconds)}
-                  <DarkTooltip.Label style={{ marginLeft: '6px' }}>
-                    ({hoveredStory.progressPercent ?? 0}%)
-                  </DarkTooltip.Label>
-                </DarkTooltip.Value>
+          {showsStatusPath ? (
+            /* F92 — Story-statuses mode on a retro/hybrid story: show the same status
+               journey as the Board's StatusHistoryTooltip instead of the phases/progress
+               body (which describes the autoplanner forecast, not what actually happened). */
+            <div style={{ marginTop: '4px' }}>
+              <div style={{ fontWeight: 600, color: TOOLTIP_TEXT, marginBottom: 8, fontSize: '12px' }}>Status path</div>
+              {historyLoading && <div style={{ color: TOOLTIP_LABEL, fontSize: '12px' }}>Loading…</div>}
+              {historyError && <div style={{ color: TOOLTIP_DANGER, fontSize: '12px' }}>Failed to load</div>}
+              {statusHistory && !historyLoading && (
+                <StatusPathContent history={statusHistory} variant="dark" />
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Summary */}
+              <div style={{ color: TOOLTIP_TEXT, marginBottom: '10px', fontSize: '12px', lineHeight: 1.4 }}>
+                {hoveredStory.summary || 'No summary'}
               </div>
-              <DarkTooltip.Progress value={hoveredStory.progressPercent ?? 0} max={100} />
-            </div>
-          )}
 
-          {/* Dates */}
-          {hoveredStory.startDate && hoveredStory.endDate && (
-            <div style={{ marginBottom: '10px', fontSize: '12px' }}>
-              <DarkTooltip.Label>📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))}</DarkTooltip.Label>
-            </div>
-          )}
+              {/* Progress bar */}
+              {hoveredStory.totalEstimateSeconds && hoveredStory.totalEstimateSeconds > 0 && (
+                <div style={{ marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '12px' }}>
+                    <DarkTooltip.Label>Progress</DarkTooltip.Label>
+                    <DarkTooltip.Value>
+                      {formatHours(hoveredStory.totalLoggedSeconds)} / {formatHours(hoveredStory.totalEstimateSeconds)}
+                      <DarkTooltip.Label style={{ marginLeft: '6px' }}>
+                        ({hoveredStory.progressPercent ?? 0}%)
+                      </DarkTooltip.Label>
+                    </DarkTooltip.Value>
+                  </div>
+                  <DarkTooltip.Progress value={hoveredStory.progressPercent ?? 0} max={100} />
+                </div>
+              )}
 
-          {/* Phase breakdown with progress */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-            <tbody>
-              {(() => {
-                // Collect all roles from phases and roleProgress, ordered by config
-                const dataRoles = new Set<string>()
-                if (hoveredStory.phases) Object.keys(hoveredStory.phases).forEach(r => dataRoles.add(r))
-                if (hoveredStory.roleProgress) Object.keys(hoveredStory.roleProgress).forEach(r => dataRoles.add(r))
-                const configOrder = getRoleCodes()
-                const sortedRoles = configOrder.filter(r => dataRoles.has(r))
-                // Append any roles not in config at the end
-                dataRoles.forEach(r => { if (!configOrder.includes(r)) sortedRoles.push(r) })
-                return sortedRoles.map(role => {
-                  const phase = hoveredStory.phases?.[role]
-                  const progress = hoveredStory.roleProgress?.[role]
-                  if (!phaseHasHours(phase) && !progress) return null
-                  return (
-                    <tr key={role}>
-                      <td style={{ padding: '3px 4px' }}>
-                        <span style={{ color: getRoleColor(role) }}>●</span> {role}
-                        {progress?.completed && (
-                          <span style={{ color: TOOLTIP_SUCCESS, marginLeft: '4px' }}>✓</span>
-                        )}
-                      </td>
-                      <td style={{ padding: '3px 4px', color: TOOLTIP_TEXT }}>{phase?.assigneeDisplayName || '-'}</td>
-                      <td style={{ padding: '3px 4px', textAlign: 'right', color: TOOLTIP_VALUE }}>
-                        {progress ? (
-                          <span>
-                            {formatHours(progress.loggedSeconds)}/{formatHours(progress.estimateSeconds)}
-                          </span>
-                        ) : (
-                          <span>{phase?.hours.toFixed(0)}h</span>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })
-              })()}
-            </tbody>
-          </table>
+              {/* Dates */}
+              {hoveredStory.startDate && hoveredStory.endDate && (
+                <div style={{ marginBottom: '10px', fontSize: '12px' }}>
+                  <DarkTooltip.Label>📅 {formatDateShort(new Date(hoveredStory.startDate))} → {formatDateShort(new Date(hoveredStory.endDate))}</DarkTooltip.Label>
+                </div>
+              )}
+
+              {/* Phase breakdown with progress */}
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <tbody>
+                  {(() => {
+                    // Collect all roles from phases and roleProgress, ordered by config
+                    const dataRoles = new Set<string>()
+                    if (hoveredStory.phases) Object.keys(hoveredStory.phases).forEach(r => dataRoles.add(r))
+                    if (hoveredStory.roleProgress) Object.keys(hoveredStory.roleProgress).forEach(r => dataRoles.add(r))
+                    const configOrder = getRoleCodes()
+                    const sortedRoles = configOrder.filter(r => dataRoles.has(r))
+                    // Append any roles not in config at the end
+                    dataRoles.forEach(r => { if (!configOrder.includes(r)) sortedRoles.push(r) })
+                    return sortedRoles.map(role => {
+                      const phase = hoveredStory.phases?.[role]
+                      const progress = hoveredStory.roleProgress?.[role]
+                      if (!phaseHasHours(phase) && !progress) return null
+                      return (
+                        <tr key={role}>
+                          <td style={{ padding: '3px 4px' }}>
+                            <span style={{ color: getRoleColor(role) }}>●</span> {role}
+                            {progress?.completed && (
+                              <span style={{ color: TOOLTIP_SUCCESS, marginLeft: '4px' }}>✓</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: TOOLTIP_TEXT }}>{phase?.assigneeDisplayName || '-'}</td>
+                          <td style={{ padding: '3px 4px', textAlign: 'right', color: TOOLTIP_VALUE }}>
+                            {progress ? (
+                              <span>
+                                {formatHours(progress.loggedSeconds)}/{formatHours(progress.estimateSeconds)}
+                              </span>
+                            ) : (
+                              <span>{phase?.hours.toFixed(0)}h</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  })()}
+                </tbody>
+              </table>
+            </>
+          )}
 
           {/* Blocked by */}
           {hoveredStory.blockedBy && hoveredStory.blockedBy.length > 0 && (

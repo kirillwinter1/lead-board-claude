@@ -7,6 +7,7 @@ import { teamsApi } from '../api/teams'
 import * as forecastApi from '../api/forecast'
 import * as configApi from '../api/config'
 import * as boardApi from '../api/board'
+import * as statusHistoryApi from '../api/statusHistory'
 
 vi.mock('../api/teams', () => ({
   teamsApi: {
@@ -30,6 +31,11 @@ vi.mock('../api/config', () => ({
 vi.mock('../api/board', () => ({
   getStatusStyles: vi.fn().mockResolvedValue({}),
 }))
+
+vi.mock('../api/statusHistory', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/statusHistory')>()
+  return { ...actual, getStatusHistory: vi.fn() }
+})
 
 vi.mock('../contexts/WorkflowConfigContext', () => ({
   useWorkflowConfig: () => ({
@@ -653,6 +659,53 @@ describe('TimelinePage', () => {
         const expRight = ((daysBetween(range.start, today) + 1) / totalDays) * 100
         expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
         expect(Math.abs(parseFloat(bar.style.left) + parseFloat(bar.style.width) - expRight)).toBeLessThan(0.7)
+      })
+    })
+
+    describe('Status path tooltip (F92)', () => {
+      it('lazily loads and shows the Status path section when hovering a bar in Story statuses mode', async () => {
+        vi.mocked(statusHistoryApi.getStatusHistory).mockResolvedValue({
+          issueKey: 'PROJ-9',
+          currentStatus: 'In Development',
+          totalSeconds: 9 * 86400,
+          segments: [
+            { status: 'To Do', durationSeconds: 3 * 86400, current: false },
+            { status: 'In Development', durationSeconds: 4 * 86400, current: true },
+          ],
+        })
+
+        const { container } = renderTimelinePage()
+        await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+
+        fireEvent.click(screen.getAllByText('Logged time')[0])
+        fireEvent.click(screen.getByText('Story statuses'))
+
+        const bar = await waitFor(() => {
+          const el = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+          expect(el).toBeTruthy()
+          return el
+        })
+
+        fireEvent.mouseEnter(bar)
+
+        await waitFor(() =>
+          expect(statusHistoryApi.getStatusHistory).toHaveBeenCalledWith('PROJ-9', expect.anything())
+        )
+        expect(await screen.findByText('Status path')).toBeInTheDocument()
+        expect(screen.getByText('4d')).toBeInTheDocument()
+      })
+
+      it('keeps the old tooltip body (no Status path) when hovering in Logged time mode', async () => {
+        const { container } = renderTimelinePage()
+        await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+
+        const bar = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+        fireEvent.mouseEnter(bar)
+
+        // Sanity: the tooltip did open (existing worklog-mode body still shows the summary).
+        await waitFor(() => expect(screen.getByText('Retro Story')).toBeInTheDocument())
+        expect(screen.queryByText('Status path')).not.toBeInTheDocument()
+        expect(statusHistoryApi.getStatusHistory).not.toHaveBeenCalled()
       })
     })
   })
