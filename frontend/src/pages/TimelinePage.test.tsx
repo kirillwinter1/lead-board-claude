@@ -612,6 +612,10 @@ describe('TimelinePage', () => {
         const totalDays = daysBetween(range.start, range.end)
         const expLeft = (daysBetween(range.start, new Date(daysAgo(9))) / totalDays) * 100
         expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+        // Bar narrowed away from the DONE tail: width spans only the visible
+        // In Development interval (9→4 days ago), not up to the Closed interval end.
+        const expWidth = ((daysBetween(new Date(daysAgo(9)), new Date(daysAgo(4))) + 1) / totalDays) * 100
+        expect(Math.abs(parseFloat(bar.style.width) - expWidth)).toBeLessThan(0.7)
       })
     })
 
