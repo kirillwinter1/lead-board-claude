@@ -25,6 +25,9 @@ export interface StatusMappingDto {
   sortOrder: number
   scoreWeight: number
   color: string | null
+  // F92 — additive: IN_PROGRESS-only "kind" (Work/Review/Waiting) used to derive `color`
+  // from the role color when color is null (an "auto" status, no manual override).
+  statusKind: 'WORK' | 'REVIEW' | 'WAITING' | null
 }
 
 export interface StatusIssueCountDto {

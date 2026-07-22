@@ -35,6 +35,7 @@ export async function searchBoard(query: string, teamIds?: number[]): Promise<Bo
 export interface StatusStyle {
   color: string | null
   statusCategory: string
+  statusKind?: string | null
 }
 
 export async function getStatusStyles(): Promise<Record<string, StatusStyle>> {
