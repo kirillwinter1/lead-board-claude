@@ -431,6 +431,18 @@ public class DataQualityService {
             }
         }
 
+        // STORY_NOT_DONE_SUBTASKS_DONE - every subtask is closed but the story status
+        // lags behind (fires even when nothing was logged, unlike the rule above).
+        if (!subtasks.isEmpty()
+                && !workflowConfigService.isDone(story.getStatus(), story.getIssueType())
+                && subtasks.stream().allMatch(
+                        st -> workflowConfigService.isDone(st.getStatus(), st.getIssueType()))) {
+            violations.add(DataQualityViolation.of(
+                    DataQualityRule.STORY_NOT_DONE_SUBTASKS_DONE,
+                    story.getStatus()
+            ));
+        }
+
         // CHILD_DUE_AFTER_EPIC - Story due date is later than the parent epic's due date
         if (!workflowConfigService.isDone(story.getStatus(), story.getIssueType())
                 && story.getDueDate() != null

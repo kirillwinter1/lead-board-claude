@@ -388,6 +388,52 @@ class DataQualityServiceTest {
         }
 
         @Test
+        void allSubtasksDoneStoryNot_shouldReturnWarning() {
+            // LB-639 case: subtasks were closed (with or without worklogs) but the story
+            // status lags behind — flag it even when nothing was logged.
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+
+            JiraIssueEntity st1 = createSubtask("TEST-3", "Done", "TEST-2");
+            JiraIssueEntity st2 = createSubtask("TEST-4", "Done", "TEST-2");
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(st1, st2));
+
+            assertTrue(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_NOT_DONE_SUBTASKS_DONE));
+            assertTrue(violations.stream()
+                    .filter(v -> v.rule() == DataQualityRule.STORY_NOT_DONE_SUBTASKS_DONE)
+                    .allMatch(v -> v.severity() == DataQualitySeverity.WARNING
+                            && v.message().contains("Development")));
+        }
+
+        @Test
+        void someSubtasksNotDone_shouldNotReturnStoryBehindWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+            JiraIssueEntity story = createStory("TEST-2", "Development", "TEST-1");
+
+            JiraIssueEntity st1 = createSubtask("TEST-3", "Done", "TEST-2");
+            JiraIssueEntity st2 = createSubtask("TEST-4", "In Progress", "TEST-2");
+
+            List<DataQualityViolation> violations = dataQualityService.checkStory(story, epic, List.of(st1, st2));
+
+            assertFalse(violations.stream().anyMatch(v -> v.rule() == DataQualityRule.STORY_NOT_DONE_SUBTASKS_DONE));
+        }
+
+        @Test
+        void storyDoneOrNoSubtasks_shouldNotReturnStoryBehindWarning() {
+            JiraIssueEntity epic = createEpic("TEST-1", "Developing");
+
+            JiraIssueEntity doneStory = createStory("TEST-2", "Done", "TEST-1");
+            JiraIssueEntity doneSubtask = createSubtask("TEST-3", "Done", "TEST-2");
+            assertFalse(dataQualityService.checkStory(doneStory, epic, List.of(doneSubtask)).stream()
+                    .anyMatch(v -> v.rule() == DataQualityRule.STORY_NOT_DONE_SUBTASKS_DONE));
+
+            JiraIssueEntity emptyStory = createStory("TEST-4", "Development", "TEST-1");
+            assertFalse(dataQualityService.checkStory(emptyStory, epic, List.of()).stream()
+                    .anyMatch(v -> v.rule() == DataQualityRule.STORY_NOT_DONE_SUBTASKS_DONE));
+        }
+
+        @Test
         void storyDone_shouldNotReturnFullyLoggedWarning() {
             JiraIssueEntity epic = createEpic("TEST-1", "Developing");
             JiraIssueEntity story = createStory("TEST-2", "Done", "TEST-1");
