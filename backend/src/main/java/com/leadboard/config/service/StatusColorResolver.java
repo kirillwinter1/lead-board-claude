@@ -19,7 +19,8 @@ public final class StatusColorResolver {
             StatusCategory.IN_PROGRESS, "#DEEBFF",
             StatusCategory.DONE, "#E3FCEF",
             StatusCategory.REQUIREMENTS, "#E6FCFF",
-            StatusCategory.PLANNED, "#EAE6FF"));
+            StatusCategory.PLANNED, "#EAE6FF",
+            StatusCategory.DEV_DONE, "#FFF0B3"));
 
     private StatusColorResolver() {}
 

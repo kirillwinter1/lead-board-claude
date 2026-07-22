@@ -58,6 +58,8 @@ class StatusColorResolverTest {
                 m(null, null, StatusCategory.REQUIREMENTS, null), ROLES)).isEqualTo("#E6FCFF");
         assertThat(StatusColorResolver.resolve(
                 m(null, null, StatusCategory.PLANNED, null), ROLES)).isEqualTo("#EAE6FF");
+        assertThat(StatusColorResolver.resolve(
+                m(null, null, StatusCategory.DEV_DONE, null), ROLES)).isEqualTo("#FFF0B3");
     }
 
     @Test void noRoleWaitingIsGrey() {

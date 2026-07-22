@@ -16,6 +16,7 @@ const CATEGORY_DEFAULTS: Record<string, string> = {
   DONE: '#E3FCEF',
   REQUIREMENTS: '#E6FCFF',
   PLANNED: '#EAE6FF',
+  DEV_DONE: '#FFF0B3',
 }
 
 /**
