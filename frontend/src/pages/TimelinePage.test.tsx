@@ -625,6 +625,31 @@ describe('TimelinePage', () => {
       })
     })
 
+    it('hides the bar entirely in status mode when all intervals are NEW-category', async () => {
+      // LB-606/LB-610: a story sitting in a NEW-category status (e.g. «Waiting SA»)
+      // has no visible (non-NEW/DONE) interval — nothing ever happened, so the bar
+      // must not render at all (mirrors worklog mode hiding a done story with no worklogs).
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      retro.epics[0].stories[0].completed = false
+      retro.epics[0].stories[0].statusIntervals = [
+        { status: 'To Do',      startDate: daysAgo(10), endDate: daysAgo(6) }, // NEW
+        { status: 'Waiting SA', startDate: daysAgo(6),  endDate: daysAgo(0) }, // NEW
+      ]
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+        'To Do':      { color: '#DFE1E6', statusCategory: 'NEW' },
+        'Waiting SA': { color: '#DFE1E6', statusCategory: 'NEW' },
+      } as any)
+      const { container } = renderTimelinePage()
+      await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+      await waitFor(() => {
+        expect(screen.getByText('Story statuses')).toBeInTheDocument()
+      })
+      expect(container.querySelector('.story-bar[aria-label="Story PROJ-9"]')).toBeNull()
+    })
+
     it('extends the bar to today for an active story whose last visible interval has no DONE after it', async () => {
       const retro = JSON.parse(JSON.stringify(retroWithStatuses))
       retro.epics[0].stories[0].statusIntervals = [

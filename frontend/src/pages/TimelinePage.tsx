@@ -377,8 +377,9 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   // bar (statuses move after the work is logged), so the bar is clamped to the visible
   // (non-NEW/DONE) intervals' span instead of the subtask dates — this both widens it
   // (history extends beyond the subtask dates) and narrows it (drop NEW/DONE bookends).
-  // A story whose entire recorded history is NEW→DONE (no in-progress interval at all)
-  // has nothing meaningful to show in this mode, so its bar is hidden.
+  // A story with no visible interval at all (entire history is NEW and/or DONE — never
+  // started, or done with nothing distinguishable in between) has nothing meaningful to
+  // show in this mode, so its bar is hidden entirely.
   if (actualsMode === 'status' && (storySource === 'retro' || storySource === 'hybrid')
       && statusIntervals && statusIntervals.length > 0) {
     if (visibleStatusIntervals.length > 0) {
@@ -386,7 +387,7 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       let visibleEnd = new Date(visibleStatusIntervals[visibleStatusIntervals.length - 1].endDate)
       if (visibleEnd > today) visibleEnd = today
       endDate = visibleEnd
-    } else if (catOf(statusIntervals[statusIntervals.length - 1].status) === 'DONE') {
+    } else {
       hideBar = true
     }
   }
