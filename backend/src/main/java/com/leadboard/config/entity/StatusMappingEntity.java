@@ -38,6 +38,10 @@ public class StatusMappingEntity {
     @Column(name = "color", length = 20)
     private String color;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status_kind", length = 16)
+    private StatusKind statusKind;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -73,6 +77,9 @@ public class StatusMappingEntity {
 
     public String getColor() { return color; }
     public void setColor(String color) { this.color = color; }
+
+    public StatusKind getStatusKind() { return statusKind; }
+    public void setStatusKind(StatusKind statusKind) { this.statusKind = statusKind; }
 
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }

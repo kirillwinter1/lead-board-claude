@@ -1,6 +1,7 @@
 package com.leadboard.config.dto;
 
 import com.leadboard.config.entity.BoardCategory;
+import com.leadboard.config.entity.StatusKind;
 import com.leadboard.status.StatusCategory;
 
 public record StatusMappingDto(
@@ -11,5 +12,6 @@ public record StatusMappingDto(
         String workflowRoleCode,
         int sortOrder,
         int scoreWeight,
-        String color
+        String color,
+        StatusKind statusKind
 ) {}
