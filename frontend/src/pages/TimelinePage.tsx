@@ -374,18 +374,24 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   let hideBar = false
 
   // Story-status mode: the story's own status history often lags the subtask-derived
-  // bar (statuses move after the work is logged), so the bar is clamped to the visible
-  // (non-NEW/DONE) intervals' span instead of the subtask dates — this both widens it
-  // (history extends beyond the subtask dates) and narrows it (drop NEW/DONE bookends).
-  // A story with no visible interval at all (entire history is NEW and/or DONE, or the
-  // status never changed — empty changelog) has nothing meaningful to show in this
-  // mode, so its bar is hidden entirely.
+  // bar (statuses move after the work is logged), so the past part is clamped to the
+  // visible (non-NEW/DONE) intervals' span — this both widens it (history extends
+  // beyond the subtask dates) and narrows it (drop NEW/DONE bookends). A hybrid story
+  // (remaining work) additionally keeps its striped autoplanner remainder, so a story
+  // whose entire history is still NEW (subtasks in work, status lagging) shows up as
+  // the future remainder from today. A finished story with no visible interval (all
+  // NEW/DONE, or the status never changed) has nothing to show and is hidden.
   if (actualsMode === 'status' && (storySource === 'retro' || storySource === 'hybrid')) {
     if (visibleStatusIntervals.length > 0) {
       startDate = new Date(visibleStatusIntervals[0].startDate)
       let visibleEnd = new Date(visibleStatusIntervals[visibleStatusIntervals.length - 1].endDate)
       if (visibleEnd > today) visibleEnd = today
-      endDate = visibleEnd
+      if (storySource === 'retro' || endDate < visibleEnd) {
+        endDate = visibleEnd
+      }
+      // hybrid keeps its merged endDate (autoplanner forecast end) for the remainder
+    } else if (storySource === 'hybrid') {
+      if (today > startDate) startDate = today
     } else {
       hideBar = true
     }
@@ -599,9 +605,13 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       onMouseLeave={() => onHover(null)}
     >
       {/* Past part: worklog days or story-status intervals depending on actualsMode.
-          In Logged-time mode the striped autoplanner remainder is drawn on top. */}
+          The striped autoplanner remainder is drawn on top in both modes (it renders
+          nothing for retro stories — their phases end in the past). */}
       {(storySource === 'retro' || storySource === 'hybrid') && actualsMode === 'status'
-        ? renderStatusSegments()
+        ? <>
+            {renderStatusSegments()}
+            {renderForecastRemainder()}
+          </>
         : (storySource === 'retro' || storySource === 'hybrid')
           ? <>
               {renderWorklogSegments()}

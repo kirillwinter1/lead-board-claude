@@ -588,6 +588,141 @@ describe('TimelinePage', () => {
       })
     })
 
+    it('status mode shows only the striped autoplanner remainder for a hybrid story whose whole history is NEW', async () => {
+      // LB-602/606/610 case: subtasks are in work but the story itself still sits in a
+      // NEW-category status (Waiting SA). Nothing visible happened status-wise, yet the
+      // remaining work must still be drawn — striped, from today (user decision 22.07).
+      const daysFromNow = (n: number) => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() + n)
+        return d.toISOString().slice(0, 10)
+      }
+      const plan = JSON.parse(JSON.stringify(mockUnifiedPlan))
+      plan.epics[0].stories = [{
+        storyKey: 'PROJ-1', summary: 'Waiting Story', status: 'Waiting SA', issueType: 'Story',
+        autoScore: null, startDate: daysAgo(5), endDate: daysFromNow(5), warnings: [],
+        phases: {
+          DEV: { assigneeAccountId: null, assigneeDisplayName: null, startDate: daysAgo(5), endDate: daysFromNow(5), hours: 40, noCapacity: false },
+        },
+      }]
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue(plan as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue({
+        teamId: 1, calculatedAt: new Date().toISOString(),
+        epics: [{
+          epicKey: 'EPIC-1', summary: 'First Epic', status: 'In Progress',
+          startDate: daysAgo(5), endDate: null, progressPercent: 0,
+          stories: [{
+            storyKey: 'PROJ-1', summary: 'Waiting Story', status: 'Waiting SA', issueType: 'Story',
+            completed: false, startDate: daysAgo(5), endDate: null, progressPercent: 0,
+            autoScore: null, totalEstimateSeconds: null, totalLoggedSeconds: null, roleProgress: null,
+            phases: { DEV: { roleCode: 'DEV', startDate: daysAgo(5), endDate: null, durationDays: 5, active: true } },
+            worklogDays: [{ date: daysAgo(3), roleCode: 'DEV', timeSpentSeconds: 3600 }],
+            statusIntervals: [
+              { status: 'To Do', startDate: daysAgo(5), endDate: daysAgo(4) },
+              { status: 'Waiting SA', startDate: daysAgo(4), endDate: daysAgo(0) },
+            ],
+          }],
+        }],
+      } as any)
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+        'To Do':      { color: '#DFE1E6', statusCategory: 'NEW' },
+        'Waiting SA': { color: '#DFE1E6', statusCategory: 'NEW' },
+      } as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-1"]')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+
+      await waitFor(() => {
+        const bar = container.querySelector('.story-bar[aria-label="Story PROJ-1"]') as HTMLElement
+        expect(bar).toBeTruthy()
+        // No solid (status) segments — the whole history is NEW
+        const solid = Array.from(bar.querySelectorAll('div')).filter(
+          el => (el as HTMLElement).style.backgroundColor !== ''
+        )
+        expect(solid.length).toBe(0)
+        // Striped autoplanner remainder is drawn
+        expect(bar.querySelector('.phase-bar-forecast')).toBeTruthy()
+        // Bar starts today (remainder only)
+        const range = calculateDateRange(
+          { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(5), endDate: daysFromNow(5), phases: {} }] }] } as any,
+          null, DEFAULT_PAST_DAYS)
+        const totalDays = daysBetween(range.start, range.end)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const expLeft = (daysBetween(range.start, today) / totalDays) * 100
+        expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+      })
+    })
+
+    it('status mode extends a hybrid story bar with the striped remainder after the visible intervals', async () => {
+      const daysFromNow = (n: number) => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() + n)
+        return d.toISOString().slice(0, 10)
+      }
+      const plan = JSON.parse(JSON.stringify(mockUnifiedPlan))
+      plan.epics[0].stories = [{
+        storyKey: 'PROJ-1', summary: 'Hybrid Story', status: 'In Development', issueType: 'Story',
+        autoScore: null, startDate: daysAgo(5), endDate: daysFromNow(5), warnings: [],
+        phases: {
+          DEV: { assigneeAccountId: null, assigneeDisplayName: null, startDate: daysAgo(5), endDate: daysFromNow(5), hours: 40, noCapacity: false },
+        },
+      }]
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue(plan as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue({
+        teamId: 1, calculatedAt: new Date().toISOString(),
+        epics: [{
+          epicKey: 'EPIC-1', summary: 'First Epic', status: 'In Progress',
+          startDate: daysAgo(5), endDate: null, progressPercent: 0,
+          stories: [{
+            storyKey: 'PROJ-1', summary: 'Hybrid Story', status: 'In Development', issueType: 'Story',
+            completed: false, startDate: daysAgo(5), endDate: null, progressPercent: 10,
+            autoScore: null, totalEstimateSeconds: null, totalLoggedSeconds: null, roleProgress: null,
+            phases: { DEV: { roleCode: 'DEV', startDate: daysAgo(5), endDate: null, durationDays: 5, active: true } },
+            worklogDays: null,
+            statusIntervals: [
+              { status: 'In Development', startDate: daysAgo(5), endDate: daysAgo(0) },
+            ],
+          }],
+        }],
+      } as any)
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+        'In Development': { color: '#abe7d3', statusCategory: 'IN_PROGRESS' },
+      } as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-1"]')).toBeTruthy()
+      })
+
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+
+      await waitFor(() => {
+        const bar = container.querySelector('.story-bar[aria-label="Story PROJ-1"]') as HTMLElement
+        // Solid status segment for the visible interval…
+        const solid = Array.from(bar.querySelectorAll('div')).filter(
+          el => (el as HTMLElement).style.backgroundColor !== ''
+        )
+        expect(solid.length).toBeGreaterThan(0)
+        // …plus the striped remainder, and the bar reaches the forecast end (not today)
+        expect(bar.querySelector('.phase-bar-forecast')).toBeTruthy()
+        const range = calculateDateRange(
+          { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(5), endDate: daysFromNow(5), phases: {} }] }] } as any,
+          null, DEFAULT_PAST_DAYS)
+        const totalDays = daysBetween(range.start, range.end)
+        const expRight = ((daysBetween(range.start, new Date(daysFromNow(5))) + 1) / totalDays) * 100
+        expect(Math.abs(parseFloat(bar.style.left) + parseFloat(bar.style.width) - expRight)).toBeLessThan(0.7)
+      })
+    })
+
     it('falls back to StatusBadge palette for status without configured color', async () => {
       vi.mocked(boardApi.getStatusStyles).mockResolvedValue({} as any)
       const { container } = renderTimelinePage()
