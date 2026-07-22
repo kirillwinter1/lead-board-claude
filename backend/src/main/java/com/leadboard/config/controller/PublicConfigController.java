@@ -7,6 +7,8 @@ import com.leadboard.config.entity.StatusMappingEntity;
 import com.leadboard.config.entity.WorkflowRoleEntity;
 import com.leadboard.config.repository.IssueTypeMappingRepository;
 import com.leadboard.config.repository.StatusMappingRepository;
+import com.leadboard.config.repository.WorkflowRoleRepository;
+import com.leadboard.config.service.StatusColorResolver;
 import com.leadboard.config.service.WorkflowConfigService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,15 +30,18 @@ public class PublicConfigController {
     private final WorkflowConfigService workflowConfigService;
     private final IssueTypeMappingRepository issueTypeRepo;
     private final StatusMappingRepository statusMappingRepo;
+    private final WorkflowRoleRepository workflowRoleRepo;
 
     public PublicConfigController(
             WorkflowConfigService workflowConfigService,
             IssueTypeMappingRepository issueTypeRepo,
-            StatusMappingRepository statusMappingRepo
+            StatusMappingRepository statusMappingRepo,
+            WorkflowRoleRepository workflowRoleRepo
     ) {
         this.workflowConfigService = workflowConfigService;
         this.issueTypeRepo = issueTypeRepo;
         this.statusMappingRepo = statusMappingRepo;
+        this.workflowRoleRepo = workflowRoleRepo;
     }
 
     @GetMapping("/roles")
@@ -73,12 +78,17 @@ public class PublicConfigController {
         }
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
         for (Long configId : configIds) {
+            Map<String, String> roleColors = new LinkedHashMap<>();
+            for (WorkflowRoleEntity role : workflowRoleRepo.findByConfigIdOrderBySortOrderAsc(configId)) {
+                roleColors.put(role.getCode(), role.getColor());
+            }
             for (StatusMappingEntity s : statusMappingRepo.findByConfigId(configId)) {
                 String name = s.getJiraStatusName();
                 if (!result.containsKey(name)) {
                     Map<String, String> style = new LinkedHashMap<>();
-                    style.put("color", s.getColor());
+                    style.put("color", StatusColorResolver.resolve(s, roleColors));
                     style.put("statusCategory", s.getStatusCategory().name());
+                    style.put("statusKind", s.getStatusKind() == null ? null : s.getStatusKind().name());
                     result.put(name, style);
                 }
             }
