@@ -706,11 +706,15 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
     if (pos) setTooltipPos(pos)
 
     if (!story) {
-      // Reset nothing else on unhover (the tooltip unmounts anyway) — just stop any
-      // in-flight fetch so it doesn't resolve into a state nobody is looking at, and
-      // clear loading so an aborted fetch never leaves a re-hover stuck on "Loading…".
+      // Unhover: stop any pending/in-flight fetch so it doesn't resolve into a state
+      // nobody is looking at, and clear loading so an aborted fetch never leaves a
+      // re-hover stuck on "Loading…". Crucially also clear the per-hover dedup marker:
+      // a quick hover (< 300ms) cancels the debounce before the fetch ever runs, so
+      // without this reset a re-hover of the SAME story would short-circuit on the
+      // "already handled" guard below and never retry — a permanently empty tooltip.
       if (historyDebounceRef.current) clearTimeout(historyDebounceRef.current)
       historyAbortRef.current?.abort()
+      historyFetchedKeyRef.current = null
       setHistoryLoading(false)
       return
     }
@@ -719,15 +723,16 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
       && (getStorySource(story) === 'retro' || getStorySource(story) === 'hybrid')
 
     if (!showsStatusPath) {
-      // Not in Story-statuses mode (or a pure-forecast story) — reset the "already
-      // fetched" marker so switching back to status mode on the same story re-checks
-      // the cache instead of silently no-op'ing.
+      // Not in Story-statuses mode (or a pure-forecast story) — reset the dedup marker
+      // so switching back to status mode on the same story re-checks the cache/fetch
+      // instead of silently no-op'ing.
       historyFetchedKeyRef.current = null
       return
     }
 
-    // onHover also fires on every mousemove within the same bar — only act once per
-    // hover session (when the story actually changes).
+    // onHover also fires on every mousemove within the same bar. Dedup so we run the
+    // fetch/cache logic once per hover session (the marker is reset on unhover and on
+    // mode/story changes above, so a later re-hover always re-evaluates from real state).
     if (historyFetchedKeyRef.current === story.storyKey) return
     historyFetchedKeyRef.current = story.storyKey
 
