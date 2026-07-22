@@ -768,3 +768,40 @@
   background: rgba(222, 53, 11, 0.08);
 }
 
+/* F92 — "auto" derived-color badge + reset-to-derived control, next to the Color field */
+.pipeline-color-auto-badge {
+  margin-left: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #0052CC;
+  background: rgba(76, 154, 255, 0.16);
+  border-radius: 6px;
+  padding: 1px 5px;
+}
+
+.pipeline-color-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.pipeline-color-reset-btn {
+  background: none;
+  border: none;
+  font-size: 13px;
+  line-height: 1;
+  color: #6B778C;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pipeline-color-reset-btn:hover {
+  color: #172B4D;
+  background: rgba(0, 0, 0, 0.06);
+}
+

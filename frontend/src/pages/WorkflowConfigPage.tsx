@@ -18,6 +18,7 @@ import {
 import { useWorkflowConfig } from '../contexts/WorkflowConfigContext'
 import { ColorPicker as SharedColorPicker } from '../components/ColorPicker'
 import { BG_SUBTLE, ERROR_BG, ERROR_TEXT, SUCCESS_BG } from '../constants/colors'
+import { deriveStatusColor, StatusKind } from '../utils/deriveStatusColor'
 import './WorkflowConfigPage.css'
 
 type TabKey = 'roles' | 'issueTypes' | 'statuses' | 'linkTypes'
@@ -65,6 +66,14 @@ const STATUS_CATEGORY_DEFAULT_COLORS: Record<string, string> = {
   DEV_DONE: '#FFF0B3',
   DONE: '#E3FCEF',
 }
+
+// F92 — Kind is only meaningful for IN_PROGRESS statuses (it feeds deriveStatusColor).
+const STATUS_KIND_OPTIONS: { value: StatusKind | ''; label: string }[] = [
+  { value: '', label: '—' },
+  { value: 'WORK', label: 'Work' },
+  { value: 'REVIEW', label: 'Review' },
+  { value: 'WAITING', label: 'Waiting' },
+]
 
 // F91 — both pickers now delegate to the shared ColorPicker. Palettes stay here
 // (they are this page's config vocabulary); the popover/positioning/a11y is shared.
@@ -269,6 +278,7 @@ function suggestStatuses(
           sortOrder: categoryCounter[issueCat],
           scoreWeight: 0,
           color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
+          statusKind: null,
         })
       }
     }
@@ -306,6 +316,7 @@ function suggestStatuses(
         sortOrder: categoryCounter['EPIC'],
         scoreWeight: 0,
         color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
+        statusKind: null,
       })
     }
   }
@@ -326,6 +337,7 @@ function suggestStatuses(
         sortOrder: categoryCounter['STORY'],
         scoreWeight: 0,
         color: STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' || src.statusCategory === 'DEV_DONE' ? 'IN_PROGRESS' : src.statusCategory] || '#DFE1E6',
+        statusKind: src.statusKind,
       })
     }
   }
@@ -348,6 +360,7 @@ function suggestStatuses(
         sortOrder: categoryCounter['BUG'],
         scoreWeight: 0,
         color: src.color || STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory] || '#DFE1E6',
+        statusKind: src.statusKind,
       })
     }
   }
@@ -801,6 +814,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       statusCategory: 'NEW', workflowRoleCode: null,
       sortOrder: maxOrder + 1, scoreWeight: 0,
       color: STATUS_CATEGORY_DEFAULT_COLORS['NEW'],
+      statusKind: null,
     }])
   }
 
@@ -812,6 +826,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
         if (!s.color || s.color === oldDefault) {
           next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
+        }
+        // Kind only applies to IN_PROGRESS rows — the select is hidden otherwise,
+        // so drop a stale kind rather than leave it lingering unseen (F92).
+        if (value !== 'IN_PROGRESS') {
+          next.statusKind = null
         }
       }
       return next
@@ -996,6 +1015,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
         const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
         if (!s.color || s.color === oldDefault) {
           next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
+        }
+        // Kind only applies to IN_PROGRESS rows — the select is hidden otherwise,
+        // so drop a stale kind rather than leave it lingering unseen (F92).
+        if (value !== 'IN_PROGRESS') {
+          next.statusKind = null
         }
       }
       return next
@@ -1523,7 +1547,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                     </div>
                     {group.map(st => {
                       const realIdx = wizardStatuses.indexOf(st)
-                      const bgColor = st.color || STATUS_CATEGORY_DEFAULT_COLORS[st.statusCategory] || '#DFE1E6'
+                      const isAutoColor = st.color === null
+                      const roleColor = st.workflowRoleCode
+                        ? wizardRoles.find(r => r.code === st.workflowRoleCode)?.color ?? null
+                        : null
+                      const bgColor = st.color ?? deriveStatusColor(roleColor, st.statusKind, st.statusCategory)
                       return (
                         <div
                           key={realIdx}
@@ -1542,6 +1570,18 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                                 {STATUS_CATEGORIES.filter(c => wizardStatusFilter === 'EPIC' || wizardStatusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED' && c !== 'DEV_DONE')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
+                            {st.statusCategory === 'IN_PROGRESS' && (
+                              <label className="pipeline-field">
+                                <span className="pipeline-field-label">Kind</span>
+                                <select
+                                  className="pipeline-select"
+                                  value={st.statusKind ?? ''}
+                                  onChange={e => updateWizardStatus(realIdx, 'statusKind', e.target.value === '' ? null : e.target.value)}
+                                >
+                                  {STATUS_KIND_OPTIONS.map(o => <option key={o.value || 'unset'} value={o.value}>{o.label}</option>)}
+                                </select>
+                              </label>
+                            )}
                             <label className="pipeline-field">
                               <span className="pipeline-field-label">Weight</span>
                               <input
@@ -1554,11 +1594,28 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                               />
                             </label>
                             <label className="pipeline-field">
-                              <span className="pipeline-field-label">Color</span>
-                              <StatusColorPicker
-                                value={bgColor}
-                                onChange={color => updateWizardStatus(realIdx, 'color', color)}
-                              />
+                              <span className="pipeline-field-label">
+                                Color
+                                {isAutoColor && (
+                                  <span className="pipeline-color-auto-badge" title="Color derived from role + kind">auto</span>
+                                )}
+                              </span>
+                              <span className="pipeline-color-control">
+                                <StatusColorPicker
+                                  value={bgColor}
+                                  onChange={color => updateWizardStatus(realIdx, 'color', color)}
+                                />
+                                {!isAutoColor && (
+                                  <button
+                                    type="button"
+                                    className="pipeline-color-reset-btn"
+                                    title="Reset to derived"
+                                    onClick={() => updateWizardStatus(realIdx, 'color', null)}
+                                  >
+                                    ↺
+                                  </button>
+                                )}
+                              </span>
                             </label>
                           </div>
                         </div>
@@ -1959,7 +2016,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                     {group.map(st => {
                       const realIdx = statuses.indexOf(st)
                       const count = getIssueCount(st.jiraStatusName, st.issueCategory)
-                      const bgColor = st.color || STATUS_CATEGORY_DEFAULT_COLORS[st.statusCategory] || '#DFE1E6'
+                      const isAutoColor = st.color === null
+                      const roleColor = st.workflowRoleCode
+                        ? roles.find(r => r.code === st.workflowRoleCode)?.color ?? null
+                        : null
+                      const bgColor = st.color ?? deriveStatusColor(roleColor, st.statusKind, st.statusCategory)
                       return (
                         <div
                           key={st.id ?? `new-${realIdx}`}
@@ -1978,6 +2039,18 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                                 {STATUS_CATEGORIES.filter(c => statusFilter === 'EPIC' || statusFilter === 'PROJECT' || (c !== 'REQUIREMENTS' && c !== 'PLANNED' && c !== 'DEV_DONE')).map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
                             </label>
+                            {st.statusCategory === 'IN_PROGRESS' && (
+                              <label className="pipeline-field">
+                                <span className="pipeline-field-label">Kind</span>
+                                <select
+                                  className="pipeline-select"
+                                  value={st.statusKind ?? ''}
+                                  onChange={e => updateStatus(realIdx, 'statusKind', e.target.value === '' ? null : e.target.value)}
+                                >
+                                  {STATUS_KIND_OPTIONS.map(o => <option key={o.value || 'unset'} value={o.value}>{o.label}</option>)}
+                                </select>
+                              </label>
+                            )}
                             <label className="pipeline-field">
                               <span className="pipeline-field-label">Weight</span>
                               <input
@@ -1990,11 +2063,28 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                               />
                             </label>
                             <label className="pipeline-field">
-                              <span className="pipeline-field-label">Color</span>
-                              <StatusColorPicker
-                                value={bgColor}
-                                onChange={color => updateStatus(realIdx, 'color', color)}
-                              />
+                              <span className="pipeline-field-label">
+                                Color
+                                {isAutoColor && (
+                                  <span className="pipeline-color-auto-badge" title="Color derived from role + kind">auto</span>
+                                )}
+                              </span>
+                              <span className="pipeline-color-control">
+                                <StatusColorPicker
+                                  value={bgColor}
+                                  onChange={color => updateStatus(realIdx, 'color', color)}
+                                />
+                                {!isAutoColor && (
+                                  <button
+                                    type="button"
+                                    className="pipeline-color-reset-btn"
+                                    title="Reset to derived"
+                                    onClick={() => updateStatus(realIdx, 'color', null)}
+                                  >
+                                    ↺
+                                  </button>
+                                )}
+                              </span>
                             </label>
                           </div>
                           {count > 0 && (
