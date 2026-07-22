@@ -26,12 +26,17 @@ public final class StatusColorResolver {
 
     public static String resolve(StatusMappingEntity m, Map<String, String> roleColorsByCode) {
         if (m.getColor() != null && !m.getColor().isBlank()) return m.getColor();
-        if (m.getStatusKind() == StatusKind.WAITING) return WAITING_GREY;
-        String roleColor = m.getWorkflowRoleCode() == null ? null
-                : roleColorsByCode.get(m.getWorkflowRoleCode());
-        if (roleColor != null) {
-            // Активная работа — насыщенный цвет роли; ревью — светлый тон (решение 22.07).
-            return m.getStatusKind() == StatusKind.REVIEW ? lighten(roleColor, REVIEW_TINT) : roleColor;
+        // kind (и ролевой цвет) осмыслен только у IN_PROGRESS-статусов; NEW/DONE и прочие
+        // категории всегда берут категорийный дефолт — иначе NEW-статус с ролью красился
+        // бы как активная работа.
+        if (m.getStatusCategory() == StatusCategory.IN_PROGRESS) {
+            if (m.getStatusKind() == StatusKind.WAITING) return WAITING_GREY;
+            String roleColor = m.getWorkflowRoleCode() == null ? null
+                    : roleColorsByCode.get(m.getWorkflowRoleCode());
+            if (roleColor != null) {
+                // Активная работа — насыщенный цвет роли; ревью — светлый тон (решение 22.07).
+                return m.getStatusKind() == StatusKind.REVIEW ? lighten(roleColor, REVIEW_TINT) : roleColor;
+            }
         }
         return CATEGORY_DEFAULTS.getOrDefault(m.getStatusCategory(), "#DFE1E6");
     }

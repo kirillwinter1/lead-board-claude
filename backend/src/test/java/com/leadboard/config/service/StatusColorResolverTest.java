@@ -62,6 +62,17 @@ class StatusColorResolverTest {
                 m(null, null, StatusCategory.DEV_DONE, null), ROLES)).isEqualTo("#FFF0B3");
     }
 
+    @Test void roleColorAppliesOnlyToInProgress() {
+        // NEW/DONE statuses must not pick up the saturated role color even when a role
+        // is mapped (kind is meaningless outside IN_PROGRESS) — category default wins.
+        assertThat(StatusColorResolver.resolve(
+                m("DEV", null, StatusCategory.NEW, null), ROLES))
+                .isEqualTo("#DFE1E6");
+        assertThat(StatusColorResolver.resolve(
+                m("DEV", null, StatusCategory.DONE, null), ROLES))
+                .isEqualTo("#E3FCEF");
+    }
+
     @Test void noRoleWaitingIsGrey() {
         assertThat(StatusColorResolver.resolve(
                 m(null, StatusKind.WAITING, StatusCategory.IN_PROGRESS, null), ROLES))
