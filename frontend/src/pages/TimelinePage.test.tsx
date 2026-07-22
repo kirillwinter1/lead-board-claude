@@ -581,6 +581,76 @@ describe('TimelinePage', () => {
         expect(bgColors).toContain('rgb(223, 225, 230)')
       })
     })
+
+    it('status mode hides NEW and DONE intervals and clamps the bar to in-progress ones', async () => {
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      retro.epics[0].stories[0].statusIntervals = [
+        { status: 'To Do',          startDate: daysAgo(12), endDate: daysAgo(9) },  // NEW
+        { status: 'In Development', startDate: daysAgo(9),  endDate: daysAgo(4) },  // IN_PROGRESS
+        { status: 'Closed',         startDate: daysAgo(4),  endDate: daysAgo(2) },  // DONE
+      ]
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+        'To Do':          { color: '#DFE1E6', statusCategory: 'NEW' },
+        'In Development': { color: '#abe7d3', statusCategory: 'IN_PROGRESS' },
+        'Closed':         { color: '#E3FCEF', statusCategory: 'DONE' },
+      } as any)
+      const { container } = renderTimelinePage()
+      await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+      await waitFor(() => {
+        const bar = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+        const segs = Array.from(bar.querySelectorAll('div')).filter(d => (d as HTMLElement).style.backgroundColor !== '')
+        // Only one segment — In Development; NEW and DONE are not rendered
+        expect(segs.length).toBe(1)
+        expect((segs[0] as HTMLElement).style.backgroundColor).toBe('rgb(171, 231, 211)')
+        // Bar clamped to the in-progress interval: width = 6 days, from 9 to 4 days ago
+        const range = calculateDateRange(
+          { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(12), endDate: daysAgo(2), phases: {} }] }] } as any,
+          null, DEFAULT_PAST_DAYS)
+        const totalDays = daysBetween(range.start, range.end)
+        const expLeft = (daysBetween(range.start, new Date(daysAgo(9))) / totalDays) * 100
+        expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+      })
+    })
+
+    it('extends the bar to today for an active story whose last visible interval has no DONE after it', async () => {
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      retro.epics[0].stories[0].statusIntervals = [
+        { status: 'To Do',          startDate: daysAgo(10), endDate: daysAgo(6) }, // NEW
+        { status: 'In Development', startDate: daysAgo(6),  endDate: daysAgo(-2) }, // IN_PROGRESS, still ongoing (endDate beyond today — must clamp)
+      ]
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+      vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+        'To Do':          { color: '#DFE1E6', statusCategory: 'NEW' },
+        'In Development': { color: '#abe7d3', statusCategory: 'IN_PROGRESS' },
+      } as any)
+      const { container } = renderTimelinePage()
+      await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+      await waitFor(() => {
+        const bar = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+        const segs = Array.from(bar.querySelectorAll('div')).filter(d => (d as HTMLElement).style.backgroundColor !== '')
+        // Only In Development renders — the NEW interval is hidden
+        expect(segs.length).toBe(1)
+        expect((segs[0] as HTMLElement).style.backgroundColor).toBe('rgb(171, 231, 211)')
+
+        // Bar reaches today (the subtask-derived endDate of the base fixture is 2 days
+        // ago — the active status interval must still stretch the bar out to today).
+        const range = calculateDateRange(
+          { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(10), endDate: daysAgo(2), phases: {} }] }] } as any,
+          null, DEFAULT_PAST_DAYS)
+        const totalDays = daysBetween(range.start, range.end)
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const expLeft = (daysBetween(range.start, new Date(daysAgo(6))) / totalDays) * 100
+        const expRight = ((daysBetween(range.start, today) + 1) / totalDays) * 100
+        expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+        expect(Math.abs(parseFloat(bar.style.left) + parseFloat(bar.style.width) - expRight)).toBeLessThan(0.7)
+      })
+    })
   })
 })
 

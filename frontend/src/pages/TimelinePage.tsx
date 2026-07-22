@@ -361,22 +361,37 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   let startDate = new Date(story.startDate!)
   let endDate = new Date(story.endDate!)
 
+  // Story-status mode only cares about the in-progress span — NEW (not started yet)
+  // and DONE (finished) intervals are noise here. Unknown statuses (no config entry)
+  // are kept visible, same as before this filter existed.
+  const catOf = (status: string) => statusStyles[status]?.statusCategory
+  const visibleStatusIntervals: StatusInterval[] = (statusIntervals || []).filter(
+    i => catOf(i.status) !== 'NEW' && catOf(i.status) !== 'DONE'
+  )
+
+  let hideBar = false
+
   // Story-status mode: the story's own status history often lags the subtask-derived
-  // bar (statuses move after the work is logged), so widen the bar to cover the
-  // intervals — otherwise clipping leaves only the first (usually NEW) segment visible.
+  // bar (statuses move after the work is logged), so the bar is clamped to the visible
+  // (non-NEW/DONE) intervals' span instead of the subtask dates — this both widens it
+  // (history extends beyond the subtask dates) and narrows it (drop NEW/DONE bookends).
+  // A story whose entire recorded history is NEW→DONE (no in-progress interval at all)
+  // has nothing meaningful to show in this mode, so its bar is hidden.
   if (actualsMode === 'status' && (storySource === 'retro' || storySource === 'hybrid')
       && statusIntervals && statusIntervals.length > 0) {
-    const intervalsStart = new Date(statusIntervals[0].startDate)
-    let intervalsEnd = new Date(statusIntervals[statusIntervals.length - 1].endDate)
-    if (intervalsEnd > today) intervalsEnd = today
-    if (intervalsStart < startDate) startDate = intervalsStart
-    if (intervalsEnd > endDate) endDate = intervalsEnd
+    if (visibleStatusIntervals.length > 0) {
+      startDate = new Date(visibleStatusIntervals[0].startDate)
+      let visibleEnd = new Date(visibleStatusIntervals[visibleStatusIntervals.length - 1].endDate)
+      if (visibleEnd > today) visibleEnd = today
+      endDate = visibleEnd
+    } else if (catOf(statusIntervals[statusIntervals.length - 1].status) === 'DONE') {
+      hideBar = true
+    }
   }
 
   // Logged-time mode: the bar spans first→last worklog day; remaining work stays
   // visible as the striped autoplanner forecast. A story with nothing logged shows
   // only that remainder — or no bar at all when it is already done.
-  let hideBar = false
   if (actualsMode === 'worklog' && (storySource === 'retro' || storySource === 'hybrid')) {
     if (worklogDays && worklogDays.length > 0) {
       const wlDates = worklogDays.map(w => w.date).sort()
@@ -457,10 +472,10 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   // Clipped to bar boundaries and to today; same-day intervals overlap in DOM order —
   // last status of the day wins.
   const renderStatusSegments = () => {
-    if (!statusIntervals || statusIntervals.length === 0) return null
+    if (visibleStatusIntervals.length === 0) return null
 
     const segments: React.ReactNode[] = []
-    statusIntervals.forEach((interval, idx) => {
+    visibleStatusIntervals.forEach((interval, idx) => {
       const intervalStart = new Date(interval.startDate)
       const intervalEnd = new Date(interval.endDate)
 
