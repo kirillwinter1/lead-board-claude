@@ -271,6 +271,7 @@ public class WorkflowConfigAdminService {
             entity.setSortOrder(dto.sortOrder());
             entity.setScoreWeight(dto.scoreWeight());
             entity.setColor(dto.color());
+            entity.setStatusKind(dto.statusKind());
             statusMappingRepo.save(entity);
         }
 
@@ -606,7 +607,7 @@ public class WorkflowConfigAdminService {
                 .map(e -> new StatusMappingDto(e.getId(), e.getJiraStatusName(),
                         e.getIssueCategory(), e.getStatusCategory(),
                         e.getWorkflowRoleCode(), e.getSortOrder(), e.getScoreWeight(),
-                        e.getColor()))
+                        e.getColor(), e.getStatusKind()))
                 .toList();
     }
 

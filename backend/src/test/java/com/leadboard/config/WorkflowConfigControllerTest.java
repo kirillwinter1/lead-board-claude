@@ -13,18 +13,23 @@ import com.leadboard.config.service.WorkflowConfigService;
 import com.leadboard.status.StatusCategory;
 import com.leadboard.sync.JiraIssueRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -151,6 +156,50 @@ class WorkflowConfigControllerTest {
         verify(roleRepo).deleteByConfigId(1L);
         verify(roleRepo, times(2)).save(any());
         verify(workflowConfigService).clearCache();
+    }
+
+    @Test
+    void updateStatuses_roundTripsStatusKindAndNullColor() throws Exception {
+        // F92: statusKind=REVIEW + color=null must survive dto->entity (save) and
+        // entity->dto (the read-back response after save) unchanged.
+        ProjectConfigurationEntity config = createConfig(1L, "Default");
+        when(configRepo.findByIsDefaultTrue()).thenReturn(Optional.of(config));
+        when(statusMappingRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        StatusMappingEntity roundTripped = new StatusMappingEntity();
+        roundTripped.setId(5L);
+        roundTripped.setConfigId(1L);
+        roundTripped.setJiraStatusName("In Review");
+        roundTripped.setIssueCategory(BoardCategory.STORY);
+        roundTripped.setStatusCategory(StatusCategory.IN_PROGRESS);
+        roundTripped.setWorkflowRoleCode("DEV");
+        roundTripped.setSortOrder(1);
+        roundTripped.setScoreWeight(1);
+        roundTripped.setColor(null);
+        roundTripped.setStatusKind(StatusKind.REVIEW);
+        when(statusMappingRepo.findByConfigId(1L)).thenReturn(List.of(roundTripped));
+
+        List<StatusMappingDto> statuses = List.of(
+                new StatusMappingDto(null, "In Review", BoardCategory.STORY, StatusCategory.IN_PROGRESS,
+                        "DEV", 1, 1, null, StatusKind.REVIEW)
+        );
+
+        MvcResult result = mockMvc.perform(put("/api/admin/workflow-config/statuses")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(statuses)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        ArgumentCaptor<StatusMappingEntity> captor = ArgumentCaptor.forClass(StatusMappingEntity.class);
+        verify(statusMappingRepo).save(captor.capture());
+        assertEquals(StatusKind.REVIEW, captor.getValue().getStatusKind());
+        assertNull(captor.getValue().getColor());
+
+        List<StatusMappingDto> response = objectMapper.readValue(
+                result.getResponse().getContentAsString(),
+                new TypeReference<List<StatusMappingDto>>() {});
+        assertEquals(StatusKind.REVIEW, response.get(0).statusKind());
+        assertNull(response.get(0).color());
     }
 
     @Test
