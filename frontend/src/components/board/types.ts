@@ -98,8 +98,6 @@ export interface EpicRoleChipProps {
   config: RoughEstimateConfig | null
   onUpdate: RoughEstimateUpdateFn
   roleColor: string
-  // F23: 'clean' once poker estimates exist for the epic, else 'rough'.
-  estimateSource?: 'rough' | 'clean'
 }
 
 export interface RoleChipsProps {
