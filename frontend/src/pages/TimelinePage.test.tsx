@@ -695,6 +695,43 @@ describe('TimelinePage', () => {
         expect(screen.getByText('4d')).toBeInTheDocument()
       })
 
+      it('retries the fetch on re-hover after a quick hover cancelled the debounce', async () => {
+        vi.mocked(statusHistoryApi.getStatusHistory).mockResolvedValue({
+          issueKey: 'PROJ-9',
+          currentStatus: 'In Development',
+          totalSeconds: 9 * 86400,
+          segments: [
+            { status: 'To Do', durationSeconds: 3 * 86400, current: false },
+            { status: 'In Development', durationSeconds: 4 * 86400, current: true },
+          ],
+        })
+
+        const { container } = renderTimelinePage()
+        await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+
+        fireEvent.click(screen.getAllByText('Logged time')[0])
+        fireEvent.click(screen.getByText('Story statuses'))
+
+        const bar = await waitFor(() => {
+          const el = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+          expect(el).toBeTruthy()
+          return el
+        })
+
+        // Quick hover then leave BEFORE the 300ms debounce fires — nothing fetched/cached.
+        fireEvent.mouseEnter(bar)
+        fireEvent.mouseLeave(bar)
+        expect(statusHistoryApi.getStatusHistory).not.toHaveBeenCalled()
+
+        // Re-hover the SAME story: the debounce must be re-armed and the fetch retried
+        // (the pre-fix "already fetched" gate wrongly short-circuited here forever).
+        fireEvent.mouseEnter(bar)
+        await waitFor(() =>
+          expect(statusHistoryApi.getStatusHistory).toHaveBeenCalledWith('PROJ-9', expect.anything())
+        )
+        expect(await screen.findByText('Status path')).toBeInTheDocument()
+      })
+
       it('keeps the old tooltip body (no Status path) when hovering in Logged time mode', async () => {
         const { container } = renderTimelinePage()
         await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
