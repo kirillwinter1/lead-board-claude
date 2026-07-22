@@ -566,6 +566,28 @@ describe('TimelinePage', () => {
       expect(container.querySelector('.story-bar[aria-label="Story PROJ-9"]')).toBeNull()
     })
 
+    it('hides the bar in status mode when the story has no status transitions at all', async () => {
+      // LB-428 case: story never left its initial status — empty changelog means an
+      // empty statusIntervals list, which must hide the bar just like an all-NEW history.
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      retro.epics[0].stories[0].statusIntervals = []
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(screen.getByText('Retro Epic')).toBeInTheDocument()
+      })
+      // Bar exists in the default worklog mode
+      expect(container.querySelector('.story-bar[aria-label="Story PROJ-9"]')).toBeTruthy()
+
+      fireEvent.click(screen.getAllByText('Logged time')[0])
+      fireEvent.click(screen.getByText('Story statuses'))
+
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-9"]')).toBeNull()
+      })
+    })
+
     it('falls back to StatusBadge palette for status without configured color', async () => {
       vi.mocked(boardApi.getStatusStyles).mockResolvedValue({} as any)
       const { container } = renderTimelinePage()
@@ -688,6 +710,45 @@ describe('TimelinePage', () => {
     })
 
     describe('Status path tooltip (F92)', () => {
+      it('hides NEW-category segments from the Status path and totals only the shown ones', async () => {
+        vi.mocked(boardApi.getStatusStyles).mockResolvedValue({
+          'To Do':          { color: '#DFE1E6', statusCategory: 'NEW' },
+          'In Development': { color: '#abe7d3', statusCategory: 'IN_PROGRESS' },
+        } as any)
+        vi.mocked(statusHistoryApi.getStatusHistory).mockResolvedValue({
+          issueKey: 'PROJ-9',
+          currentStatus: 'In Development',
+          totalSeconds: 9 * 86400,
+          segments: [
+            { status: 'To Do', durationSeconds: 5 * 86400, current: false },
+            { status: 'In Development', durationSeconds: 4 * 86400, current: true },
+          ],
+        })
+
+        const { container } = renderTimelinePage()
+        await waitFor(() => expect(screen.getByText('Retro Epic')).toBeInTheDocument())
+
+        fireEvent.click(screen.getAllByText('Logged time')[0])
+        fireEvent.click(screen.getByText('Story statuses'))
+
+        const bar = await waitFor(() => {
+          const el = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+          expect(el).toBeTruthy()
+          return el
+        })
+
+        fireEvent.mouseEnter(bar)
+        expect(await screen.findByText('Status path')).toBeInTheDocument()
+        // Both the segment and the recomputed Total read 4d
+        await waitFor(() => expect(screen.getAllByText('4d').length).toBe(2))
+
+        // The NEW segment is filtered out of the path…
+        expect(screen.queryByText('To Do')).toBeNull()
+        // …and Total counts only the shown segments (4d), not the raw history (9d)
+        expect(screen.queryByText('9d')).toBeNull()
+        expect(screen.queryByText(/Excl\./)).toBeNull()
+      })
+
       it('lazily loads and shows the Status path section when hovering a bar in Story statuses mode', async () => {
         vi.mocked(statusHistoryApi.getStatusHistory).mockResolvedValue({
           issueKey: 'PROJ-9',
