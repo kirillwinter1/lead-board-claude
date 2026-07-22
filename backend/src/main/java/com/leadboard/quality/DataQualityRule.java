@@ -71,6 +71,13 @@ public enum DataQualityRule {
             "All estimated time is logged (100%%) but issue is not Done"
     ),
 
+    STORY_NOT_DONE_SUBTASKS_DONE(
+            DataQualityCategory.STATUS_CONSISTENCY,
+            "All subtasks done but story is not",
+            DataQualitySeverity.WARNING,
+            "All subtasks are done but the story is still in \"%s\""
+    ),
+
     // Estimate rules
     EPIC_NO_ESTIMATE(
             DataQualityCategory.ESTIMATES,
