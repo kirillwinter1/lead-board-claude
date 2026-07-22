@@ -23,19 +23,22 @@ const CATEGORY_DEFAULTS: Record<string, string> = {
  * Derive a status's background color from its role color and kind, the same way the
  * backend does when `color` is null (an "auto" status with no manual override).
  *
- * - WAITING kind -> always grey, even if a role color is available.
+ * Kind and role color only apply to IN_PROGRESS statuses (NEW/DONE carry no kind):
+ * - WAITING kind -> grey, even if a role color is available.
  * - Role color present -> WORK/null-kind uses it as-is (active work is saturated),
  *   REVIEW lightens it by 0.65 (decision 22.07 — review is the translucent tone).
- * - No/unknown role color -> falls back to the statusCategory default (grey if unmapped).
+ * Everything else falls back to the statusCategory default (grey if unmapped).
  */
 export function deriveStatusColor(
   roleColor: string | null,
   kind: StatusKind | null,
   statusCategory: string,
 ): string {
-  if (kind === 'WAITING') return WAITING_GREY
-  if (roleColor) {
-    return kind === 'REVIEW' ? lightenColor(roleColor, REVIEW_TINT) : roleColor
+  if (statusCategory === 'IN_PROGRESS') {
+    if (kind === 'WAITING') return WAITING_GREY
+    if (roleColor) {
+      return kind === 'REVIEW' ? lightenColor(roleColor, REVIEW_TINT) : roleColor
+    }
   }
   return CATEGORY_DEFAULTS[statusCategory] || WAITING_GREY
 }

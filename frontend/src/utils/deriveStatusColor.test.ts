@@ -18,6 +18,11 @@ describe('deriveStatusColor', () => {
     expect(deriveStatusColor(ROLE_COLOR, 'REVIEW', 'IN_PROGRESS')).toBe('#abe7d3')
   })
 
+  it('ignores the role color outside IN_PROGRESS (category default wins)', () => {
+    expect(deriveStatusColor(ROLE_COLOR, null, 'NEW')).toBe('#DFE1E6')
+    expect(deriveStatusColor(ROLE_COLOR, null, 'DONE')).toBe('#E3FCEF')
+  })
+
   it('is grey for WAITING kind even with a role color', () => {
     expect(deriveStatusColor(ROLE_COLOR, 'WAITING', 'IN_PROGRESS')).toBe('#DFE1E6')
   })

@@ -15,9 +15,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Public (no auth required) endpoints for workflow configuration.
@@ -77,6 +79,11 @@ public class PublicConfigController {
             return ResponseEntity.ok(Map.of());
         }
         Map<String, Map<String, String>> result = new LinkedHashMap<>();
+        // The map is keyed by status name only, but the same name can be mapped in several
+        // scopes (e.g. "Waiting SA" in both BUG and STORY). Timeline/board consumers care
+        // about the STORY semantics, so a STORY row replaces a same-named row from any
+        // other scope; otherwise first-wins as before.
+        Set<String> fromStory = new HashSet<>();
         for (Long configId : configIds) {
             Map<String, String> roleColors = new LinkedHashMap<>();
             for (WorkflowRoleEntity role : workflowRoleRepo.findByConfigIdOrderBySortOrderAsc(configId)) {
@@ -84,12 +91,14 @@ public class PublicConfigController {
             }
             for (StatusMappingEntity s : statusMappingRepo.findByConfigId(configId)) {
                 String name = s.getJiraStatusName();
-                if (!result.containsKey(name)) {
+                boolean isStory = s.getIssueCategory() == BoardCategory.STORY;
+                if (!result.containsKey(name) || (isStory && !fromStory.contains(name))) {
                     Map<String, String> style = new LinkedHashMap<>();
                     style.put("color", StatusColorResolver.resolve(s, roleColors));
                     style.put("statusCategory", s.getStatusCategory().name());
                     style.put("statusKind", s.getStatusKind() == null ? null : s.getStatusKind().name());
                     result.put(name, style);
+                    if (isStory) fromStory.add(name);
                 }
             }
         }

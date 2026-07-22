@@ -85,6 +85,36 @@ class PublicConfigControllerTest {
     }
 
     @Test
+    void getStatusStyles_storyScopeWinsOverOtherScopesOnDuplicateNames() throws Exception {
+        // Same status name mapped in BUG (NEW) and STORY (IN_PROGRESS) scopes: the map is
+        // keyed by name only, and Timeline/board consumers care about the STORY semantics —
+        // the STORY row must win regardless of iteration order.
+        when(workflowConfigService.getAllConfigIds()).thenReturn(List.of(1L));
+
+        StatusMappingEntity bugRow = new StatusMappingEntity();
+        bugRow.setJiraStatusName("Waiting SA");
+        bugRow.setIssueCategory(BoardCategory.BUG);
+        bugRow.setStatusCategory(StatusCategory.NEW);
+        bugRow.setColor(null);
+
+        StatusMappingEntity storyRow = new StatusMappingEntity();
+        storyRow.setJiraStatusName("Waiting SA");
+        storyRow.setIssueCategory(BoardCategory.STORY);
+        storyRow.setStatusCategory(StatusCategory.IN_PROGRESS);
+        storyRow.setStatusKind(StatusKind.WAITING);
+        storyRow.setColor(null);
+
+        when(statusMappingRepo.findByConfigId(1L)).thenReturn(List.of(bugRow, storyRow));
+        when(workflowRoleRepo.findByConfigIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/config/workflow/status-styles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$['Waiting SA'].statusCategory").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$['Waiting SA'].statusKind").value("WAITING"))
+                .andExpect(jsonPath("$['Waiting SA'].color").value("#DFE1E6"));
+    }
+
+    @Test
     void getStatusStyles_keepsManualOverrideColor() throws Exception {
         when(workflowConfigService.getAllConfigIds()).thenReturn(List.of(1L));
 
