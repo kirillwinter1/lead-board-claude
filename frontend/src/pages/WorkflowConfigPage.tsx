@@ -277,7 +277,7 @@ function suggestStatuses(
           workflowRoleCode,
           sortOrder: categoryCounter[issueCat],
           scoreWeight: 0,
-          color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
+          color: null, // F92 — derived from role+kind, not a stamped default
           statusKind: null,
         })
       }
@@ -315,7 +315,7 @@ function suggestStatuses(
         workflowRoleCode: null,
         sortOrder: categoryCounter['EPIC'],
         scoreWeight: 0,
-        color: STATUS_CATEGORY_DEFAULT_COLORS[statusCategory] || '#DFE1E6',
+        color: null, // F92 — derived from role+kind, not a stamped default
         statusKind: null,
       })
     }
@@ -336,7 +336,7 @@ function suggestStatuses(
         workflowRoleCode: src.workflowRoleCode,
         sortOrder: categoryCounter['STORY'],
         scoreWeight: 0,
-        color: STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory === 'REQUIREMENTS' || src.statusCategory === 'PLANNED' || src.statusCategory === 'DEV_DONE' ? 'IN_PROGRESS' : src.statusCategory] || '#DFE1E6',
+        color: null, // F92 — derived from role+kind, not a stamped default
         statusKind: src.statusKind,
       })
     }
@@ -359,7 +359,7 @@ function suggestStatuses(
         workflowRoleCode: src.workflowRoleCode,
         sortOrder: categoryCounter['BUG'],
         scoreWeight: 0,
-        color: src.color || STATUS_CATEGORY_DEFAULT_COLORS[src.statusCategory] || '#DFE1E6',
+        color: null, // F92 — derived from role+kind, not a stamped default
         statusKind: src.statusKind,
       })
     }
@@ -813,7 +813,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       id: null, jiraStatusName: '', issueCategory: statusFilter === 'EPIC' || statusFilter === 'STORY' || statusFilter === 'BUG' || statusFilter === 'SUBTASK' ? statusFilter as StatusMappingDto['issueCategory'] : 'STORY',
       statusCategory: 'NEW', workflowRoleCode: null,
       sortOrder: maxOrder + 1, scoreWeight: 0,
-      color: STATUS_CATEGORY_DEFAULT_COLORS['NEW'],
+      color: null, // F92 — derived from role+kind, not a stamped default
       statusKind: null,
     }])
   }
@@ -825,7 +825,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       if (field === 'statusCategory' && typeof value === 'string') {
         const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
         if (!s.color || s.color === oldDefault) {
-          next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
+          next.color = null // F92 — stay derived (auto) across category changes
         }
         // Kind only applies to IN_PROGRESS rows — the select is hidden otherwise,
         // so drop a stale kind rather than leave it lingering unseen (F92).
@@ -1014,7 +1014,7 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
       if (field === 'statusCategory' && typeof value === 'string') {
         const oldDefault = STATUS_CATEGORY_DEFAULT_COLORS[s.statusCategory]
         if (!s.color || s.color === oldDefault) {
-          next.color = STATUS_CATEGORY_DEFAULT_COLORS[value] || s.color
+          next.color = null // F92 — stay derived (auto) across category changes
         }
         // Kind only applies to IN_PROGRESS rows — the select is hidden otherwise,
         // so drop a stale kind rather than leave it lingering unseen (F92).
@@ -1547,11 +1547,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                     </div>
                     {group.map(st => {
                       const realIdx = wizardStatuses.indexOf(st)
-                      const isAutoColor = st.color === null
+                      const isAutoColor = !st.color
                       const roleColor = st.workflowRoleCode
                         ? wizardRoles.find(r => r.code === st.workflowRoleCode)?.color ?? null
                         : null
-                      const bgColor = st.color ?? deriveStatusColor(roleColor, st.statusKind, st.statusCategory)
+                      const bgColor = st.color || deriveStatusColor(roleColor, st.statusKind, st.statusCategory)
                       return (
                         <div
                           key={realIdx}
@@ -2016,11 +2016,11 @@ export function WorkflowConfigPage({ onComplete }: WorkflowConfigPageProps = {})
                     {group.map(st => {
                       const realIdx = statuses.indexOf(st)
                       const count = getIssueCount(st.jiraStatusName, st.issueCategory)
-                      const isAutoColor = st.color === null
+                      const isAutoColor = !st.color
                       const roleColor = st.workflowRoleCode
                         ? roles.find(r => r.code === st.workflowRoleCode)?.color ?? null
                         : null
-                      const bgColor = st.color ?? deriveStatusColor(roleColor, st.statusKind, st.statusCategory)
+                      const bgColor = st.color || deriveStatusColor(roleColor, st.statusKind, st.statusCategory)
                       return (
                         <div
                           key={st.id ?? `new-${realIdx}`}

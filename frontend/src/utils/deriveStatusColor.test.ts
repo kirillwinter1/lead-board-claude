@@ -32,9 +32,10 @@ describe('deriveStatusColor', () => {
     expect(deriveStatusColor(null, null, 'DONE')).toBe('#E3FCEF')
     expect(deriveStatusColor(null, null, 'REQUIREMENTS')).toBe('#E6FCFF')
     expect(deriveStatusColor(null, null, 'PLANNED')).toBe('#EAE6FF')
+    expect(deriveStatusColor(null, null, 'DEV_DONE')).toBe('#FFF0B3')
   })
 
   it('falls back to the grey default for an unmapped category', () => {
-    expect(deriveStatusColor(null, null, 'DEV_DONE')).toBe('#DFE1E6')
+    expect(deriveStatusColor(null, null, 'UNKNOWN_CATEGORY')).toBe('#DFE1E6')
   })
 })

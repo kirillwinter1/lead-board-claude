@@ -264,7 +264,7 @@ public class MappingAutoDetectService {
                 sm.setWorkflowRoleCode(roleCode);
                 sm.setSortOrder(statusSortOrder);
                 sm.setScoreWeight(scoreWeight);
-                sm.setColor(computeDefaultColor(mappedCategory));
+                sm.setColor(null); // F92 — leave color unset so it derives from role+kind
                 statusMappingRepo.save(sm);
                 savedMappings.put(dedupeKey, sm);
                 statusCount++;
@@ -448,7 +448,7 @@ public class MappingAutoDetectService {
             sm.setWorkflowRoleCode(roleCode);
             sm.setSortOrder(sortOrder);
             sm.setScoreWeight(scoreWeight);
-            sm.setColor(computeDefaultColor(mapped));
+            sm.setColor(null); // F92 — leave color unset so it derives from role+kind
             statusMappingRepo.save(sm);
             existingKeys.add(statusName);
             count++;
@@ -651,17 +651,6 @@ public class MappingAutoDetectService {
         // Linearly interpolate 5..30 based on position between level 1 and maxLevel-1
         double ratio = (double) (level - 1) / (maxLevel - 2);
         return 5 + (int) Math.round(ratio * 25);
-    }
-
-    String computeDefaultColor(StatusCategory cat) {
-        return switch (cat) {
-            case NEW, TODO -> "#DFE1E6";
-            case REQUIREMENTS -> "#E6FCFF";
-            case PLANNED -> "#EAE6FF";
-            case IN_PROGRESS -> "#DEEBFF";
-            case DEV_DONE -> "#FFF0B3";
-            case DONE -> "#E3FCEF";
-        };
     }
 
     // ==================== Helpers ====================
