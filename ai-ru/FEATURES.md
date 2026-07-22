@@ -91,6 +91,7 @@
 | F88 | My Work — личный рабочий стол участника | 2026-07-07 | [features/F88](features/F88_MY_WORK.md) |
 | F90 | Log time — списание времени со страницы My Work | 2026-07-08 | [features/F90](features/F90_LOG_TIME_MY_WORK.md) |
 | F91 | UI Consistency Pass (аудит визуальных багов, shared-примитивы, RU→EN, цвета на токенах, a11y, CSS-гигиена) | 2026-07-11 | [features/F91](features/F91_UI_CONSISTENCY.md) |
+| F92 | Цвета статусов из ролей (status_kind, derived colors) + чистый статус-режим Timeline + Status path тултип | 2026-07-22 | [features/F92](features/F92_ROLE_DERIVED_STATUS_COLORS.md) |
 
 ## Бэклог (BF)
 
