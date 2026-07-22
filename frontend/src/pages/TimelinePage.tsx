@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { teamsApi, Team } from '../api/teams'
 import { getForecast, getUnifiedPlanning, ForecastResponse, EpicForecast, UnifiedPlanningResult, PlannedStory, PlannedEpic, UnifiedPhaseSchedule, PlanningWarning, getAvailableSnapshotDates, getUnifiedPlanningSnapshot, getForecastSnapshot, getRetrospective, RetrospectiveResult, RetroStory, WorklogDay, StatusInterval } from '../api/forecast'
@@ -373,6 +373,28 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
     if (intervalsEnd > endDate) endDate = intervalsEnd
   }
 
+  // Logged-time mode: the bar spans first→last worklog day; remaining work stays
+  // visible as the striped autoplanner forecast. A story with nothing logged shows
+  // only that remainder — or no bar at all when it is already done.
+  let hideBar = false
+  if (actualsMode === 'worklog' && (storySource === 'retro' || storySource === 'hybrid')) {
+    if (worklogDays && worklogDays.length > 0) {
+      const wlDates = worklogDays.map(w => w.date).sort()
+      const firstWl = new Date(wlDates[0])
+      const lastWl = new Date(wlDates[wlDates.length - 1])
+      startDate = firstWl
+      if (storySource === 'retro') {
+        endDate = lastWl
+      } else if (endDate < lastWl) {
+        endDate = lastWl
+      }
+    } else if (storySource === 'hybrid') {
+      if (today > startDate) startDate = today
+    } else {
+      hideBar = true
+    }
+  }
+
   const daysFromStart = daysBetween(dateRange.start, startDate)
   const duration = daysBetween(startDate, endDate) + 1
   const leftPercent = (daysFromStart / totalDays) * 100
@@ -469,6 +491,40 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
     return segments
   }
 
+  // Striped remainder of the autoplanner forecast (from today onward), drawn in
+  // Logged-time mode on top of the worklog days for stories still in progress.
+  const renderForecastRemainder = () => {
+    if (!story.phases) return null
+    return Object.entries(story.phases).map(([role, phase]) => {
+      if (!phase || !phase.startDate || !phase.endDate) return null
+      const phaseEnd = new Date(phase.endDate)
+      if (phaseEnd < today) return null
+      const phaseStart = new Date(phase.startDate)
+      const segStart = phaseStart > today ? phaseStart : today
+      if (segStart > endDate || phaseEnd < startDate) return null
+      const clipStart = segStart < startDate ? startDate : segStart
+      const clipEnd = phaseEnd > endDate ? endDate : phaseEnd
+      const segLeft = (daysBetween(startDate, clipStart) / duration) * 100
+      const segWidth = Math.min(((daysBetween(clipStart, clipEnd) + 1) / duration) * 100, 100 - segLeft)
+      return (
+        <div
+          key={`remainder-${role}`}
+          className="phase-bar-forecast"
+          style={{
+            position: 'absolute',
+            left: `${segLeft}%`,
+            width: `${Math.max(segWidth, 1)}%`,
+            height: '100%',
+            '--phase-color': getPhaseColor(role),
+            opacity: phase.noCapacity ? 0.4 : 0.7,
+          } as React.CSSProperties}
+        />
+      )
+    })
+  }
+
+  // Phases of a pure-forecast story (no retro data) — always striped. Stories with
+  // retro data render worklog/status segments + the striped remainder instead.
   const renderPhaseSegment = (
     phase: UnifiedPhaseSchedule | null,
     phaseType: string
@@ -482,65 +538,18 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
     const phaseLeftPercent = Math.max(0, (phaseStartOffset / duration) * 100)
     const phaseWidthPercent = Math.min(100 - phaseLeftPercent, (phaseDuration / duration) * 100)
 
-    const color = getPhaseColor(phaseType)
-
-    // Determine if this phase is retro (past), forecast (future), or hybrid (crosses today)
-    const isForecast = storySource === 'forecast' || (storySource === 'hybrid' && phaseStart >= today)
-    const isHybrid = storySource === 'hybrid' && phaseStart < today && phaseEnd >= today
-
-    if (isHybrid) {
-      // Split into solid (past) + striped (future) segments
-      const pastDays = daysBetween(phaseStart, today)
-      const totalPhaseDays = phaseDuration
-      const pastPercent = (pastDays / totalPhaseDays) * phaseWidthPercent
-      const futurePercent = phaseWidthPercent - pastPercent
-
-      // Fragment, NOT a wrapper <div>: .story-bar:hover > div applies filter to direct
-      // children, and a filter on the 0-height wrapper would turn it into the containing
-      // block for these absolute segments — height:100% collapses to 0 and the phase
-      // vanishes on hover (bar looked grey).
-      return (
-        <Fragment key={phaseType}>
-          {/* Solid part (retro/actual) */}
-          <div
-            style={{
-              position: 'absolute',
-              left: `${phaseLeftPercent}%`,
-              width: `${pastPercent}%`,
-              height: '100%',
-              backgroundColor: color,
-              opacity: phase.noCapacity ? 0.4 : 1
-            }}
-          />
-          {/* Striped part (forecast) */}
-          <div
-            className="phase-bar-forecast"
-            style={{
-              position: 'absolute',
-              left: `${phaseLeftPercent + pastPercent}%`,
-              width: `${futurePercent}%`,
-              height: '100%',
-              '--phase-color': color,
-              opacity: phase.noCapacity ? 0.4 : 0.7
-            } as React.CSSProperties}
-          />
-        </Fragment>
-      )
-    }
-
     return (
       <div
         key={phaseType}
-        className={isForecast ? 'phase-bar-forecast' : undefined}
+        className="phase-bar-forecast"
         style={{
           position: 'absolute',
           left: `${phaseLeftPercent}%`,
           width: `${phaseWidthPercent}%`,
           height: '100%',
-          ...(isForecast
-            ? { '--phase-color': color, opacity: phase.noCapacity ? 0.4 : 0.7 } as React.CSSProperties
-            : { backgroundColor: color, opacity: phase.noCapacity ? 0.4 : 1 })
-        }}
+          '--phase-color': getPhaseColor(phaseType),
+          opacity: phase.noCapacity ? 0.4 : 0.7
+        } as React.CSSProperties}
       />
     )
   }
@@ -548,6 +557,8 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   const handleMouseEnter = (e: React.MouseEvent) => {
     onHover(story, { x: e.clientX, y: e.clientY - 12 })
   }
+
+  if (hideBar || endDate < startDate) return null
 
   return (
     <div
@@ -570,11 +581,15 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
       onMouseMove={e => onHover(story, { x: e.clientX, y: e.clientY - 12 })}
       onMouseLeave={() => onHover(null)}
     >
-      {/* Past part: worklog days or story-status intervals depending on actualsMode */}
+      {/* Past part: worklog days or story-status intervals depending on actualsMode.
+          In Logged-time mode the striped autoplanner remainder is drawn on top. */}
       {(storySource === 'retro' || storySource === 'hybrid') && actualsMode === 'status'
         ? renderStatusSegments()
-        : (storySource === 'retro' || storySource === 'hybrid') && worklogDays && worklogDays.length > 0
-          ? renderWorklogSegments()
+        : (storySource === 'retro' || storySource === 'hybrid')
+          ? <>
+              {renderWorklogSegments()}
+              {renderForecastRemainder()}
+            </>
           : story.phases && Object.entries(story.phases).map(([role, phase]) =>
               renderPhaseSegment(phase, role)
             )

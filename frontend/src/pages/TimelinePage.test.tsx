@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { TimelinePage, calculateDateRange, DEFAULT_PAST_DAYS } from './TimelinePage'
+import { daysBetween } from '../utils/dateGrid'
 import { teamsApi } from '../api/teams'
 import * as forecastApi from '../api/forecast'
 import * as configApi from '../api/config'
@@ -305,11 +306,11 @@ describe('TimelinePage', () => {
       })
     })
 
-    it('renders hybrid phase segments as direct children of the bar (no wrapper div)', async () => {
-      // Regression: the hybrid solid+striped pair was wrapped in a bare <div>. On
-      // .story-bar:hover the CSS filter on that 0-height wrapper made it the containing
-      // block for the absolute segments — height:100% collapsed to 0 and the phase
-      // disappeared (the bar looked grey on hover).
+    it('renders hybrid bar segments as direct children of the bar (no wrapper div)', async () => {
+      // Regression: absolute segments wrapped in a bare <div> collapse on
+      // .story-bar:hover (the CSS filter turns the 0-height wrapper into the
+      // containing block — height:100% becomes 0 and the bar looks grey on hover).
+      // Both the solid worklog day and the striped remainder must sit directly in the bar.
       const daysFromNow = (n: number) => {
         const d = new Date()
         d.setHours(0, 0, 0, 0)
@@ -368,7 +369,7 @@ describe('TimelinePage', () => {
                 phases: {
                   DEV: { roleCode: 'DEV', startDate: daysAgo(5), endDate: null, durationDays: 5, active: true },
                 },
-                worklogDays: null,
+                worklogDays: [{ date: daysAgo(4), roleCode: 'DEV', timeSpentSeconds: 3600 }],
                 statusIntervals: null,
               },
             ],
@@ -391,6 +392,172 @@ describe('TimelinePage', () => {
       expect(solid).toBeTruthy()
       expect(striped.parentElement).toBe(bar)
       expect(solid.parentElement).toBe(bar)
+    })
+
+    it('completed story bar spans first→last worklog day, not subtask phase dates', async () => {
+      // LB-303 case: subtask phases run wider than the actual logged days — the bar
+      // must start at the first worklog and end at the last one (no grey tail).
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      const story = retro.epics[0].stories[0]
+      story.startDate = daysAgo(20)
+      story.endDate = daysAgo(2)
+      story.phases = {
+        SA: { roleCode: 'SA', startDate: daysAgo(20), endDate: daysAgo(15), durationDays: 5, active: false },
+        DEV: { roleCode: 'DEV', startDate: daysAgo(15), endDate: daysAgo(2), durationDays: 13, active: false },
+      }
+      story.worklogDays = [
+        { date: daysAgo(18), roleCode: 'SA', timeSpentSeconds: 3600 },
+        { date: daysAgo(10), roleCode: 'DEV', timeSpentSeconds: 3600 },
+      ]
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue({ ...mockUnifiedPlan, epics: [] } as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-9"]')).toBeTruthy()
+      })
+      const bar = container.querySelector('.story-bar[aria-label="Story PROJ-9"]') as HTMLElement
+
+      // Replicate the page's date range from the merged story dates
+      const range = calculateDateRange(
+        { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(20), endDate: daysAgo(2), phases: {} }] }] } as any,
+        null, DEFAULT_PAST_DAYS)
+      const totalDays = daysBetween(range.start, range.end)
+      const expLeft = (daysBetween(range.start, new Date(daysAgo(18))) / totalDays) * 100
+      const expWidth = ((daysBetween(new Date(daysAgo(18)), new Date(daysAgo(10))) + 1) / totalDays) * 100
+
+      expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+      expect(Math.abs(parseFloat(bar.style.width) - expWidth)).toBeLessThan(0.7)
+      // Both worklog days painted (per-role solid segments)
+      const solid = Array.from(bar.querySelectorAll('div')).filter(
+        el => (el as HTMLElement).style.backgroundColor !== ''
+      )
+      expect(solid.length).toBe(2)
+    })
+
+    it('in-progress story bar starts at first worklog and shows striped forecast remainder', async () => {
+      const daysFromNow = (n: number) => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() + n)
+        return d.toISOString().slice(0, 10)
+      }
+      const plan = JSON.parse(JSON.stringify(mockUnifiedPlan))
+      plan.epics[0].stories = [{
+        storyKey: 'PROJ-1', summary: 'Hybrid Story', status: 'In Progress', issueType: 'Story',
+        autoScore: null, startDate: daysAgo(5), endDate: daysFromNow(5), warnings: [],
+        phases: {
+          DEV: { assigneeAccountId: null, assigneeDisplayName: null, startDate: daysAgo(5), endDate: daysFromNow(5), hours: 40, noCapacity: false },
+        },
+      }]
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue(plan as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue({
+        teamId: 1, calculatedAt: new Date().toISOString(),
+        epics: [{
+          epicKey: 'EPIC-1', summary: 'First Epic', status: 'In Progress',
+          startDate: daysAgo(5), endDate: null, progressPercent: 0,
+          stories: [{
+            storyKey: 'PROJ-1', summary: 'Hybrid Story', status: 'In Progress', issueType: 'Story',
+            completed: false, startDate: daysAgo(5), endDate: null, progressPercent: 10,
+            autoScore: null, totalEstimateSeconds: null, totalLoggedSeconds: null, roleProgress: null,
+            phases: { DEV: { roleCode: 'DEV', startDate: daysAgo(5), endDate: null, durationDays: 5, active: true } },
+            worklogDays: [{ date: daysAgo(3), roleCode: 'DEV', timeSpentSeconds: 3600 }],
+            statusIntervals: null,
+          }],
+        }],
+      } as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-1"]')).toBeTruthy()
+      })
+      const bar = container.querySelector('.story-bar[aria-label="Story PROJ-1"]') as HTMLElement
+
+      // Striped autoplanner remainder for the unfinished part
+      expect(bar.querySelector('.phase-bar-forecast')).toBeTruthy()
+      // Exactly one solid segment — the single logged day
+      const solid = Array.from(bar.querySelectorAll('div')).filter(
+        el => (el as HTMLElement).style.backgroundColor !== ''
+      )
+      expect(solid.length).toBe(1)
+
+      // Bar starts at the first worklog, not at the phase start
+      const range = calculateDateRange(
+        { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(5), endDate: daysFromNow(5), phases: {} }] }] } as any,
+        null, DEFAULT_PAST_DAYS)
+      const totalDays = daysBetween(range.start, range.end)
+      const expLeft = (daysBetween(range.start, new Date(daysAgo(3))) / totalDays) * 100
+      expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+    })
+
+    it('in-progress story without worklogs renders only the striped remainder (no solid past)', async () => {
+      // LB-602 case: nothing logged — the past must stay empty, only the autoplanner
+      // remainder (from today) is drawn, striped.
+      const daysFromNow = (n: number) => {
+        const d = new Date()
+        d.setHours(0, 0, 0, 0)
+        d.setDate(d.getDate() + n)
+        return d.toISOString().slice(0, 10)
+      }
+      const plan = JSON.parse(JSON.stringify(mockUnifiedPlan))
+      plan.epics[0].stories = [{
+        storyKey: 'PROJ-1', summary: 'Hybrid Story', status: 'In Progress', issueType: 'Story',
+        autoScore: null, startDate: daysAgo(5), endDate: daysFromNow(5), warnings: [],
+        phases: {
+          DEV: { assigneeAccountId: null, assigneeDisplayName: null, startDate: daysAgo(5), endDate: daysFromNow(5), hours: 40, noCapacity: false },
+        },
+      }]
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue(plan as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue({
+        teamId: 1, calculatedAt: new Date().toISOString(),
+        epics: [{
+          epicKey: 'EPIC-1', summary: 'First Epic', status: 'In Progress',
+          startDate: daysAgo(5), endDate: null, progressPercent: 0,
+          stories: [{
+            storyKey: 'PROJ-1', summary: 'Hybrid Story', status: 'In Progress', issueType: 'Story',
+            completed: false, startDate: daysAgo(5), endDate: null, progressPercent: 0,
+            autoScore: null, totalEstimateSeconds: null, totalLoggedSeconds: null, roleProgress: null,
+            phases: { DEV: { roleCode: 'DEV', startDate: daysAgo(5), endDate: null, durationDays: 5, active: true } },
+            worklogDays: null,
+            statusIntervals: null,
+          }],
+        }],
+      } as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(container.querySelector('.story-bar[aria-label="Story PROJ-1"]')).toBeTruthy()
+      })
+      const bar = container.querySelector('.story-bar[aria-label="Story PROJ-1"]') as HTMLElement
+
+      const solid = Array.from(bar.querySelectorAll('div')).filter(
+        el => (el as HTMLElement).style.backgroundColor !== ''
+      )
+      expect(solid.length).toBe(0)
+      expect(bar.querySelector('.phase-bar-forecast')).toBeTruthy()
+
+      // Bar starts today (remainder only)
+      const range = calculateDateRange(
+        { epics: [{ isRoughEstimate: false, stories: [{ startDate: daysAgo(5), endDate: daysFromNow(5), phases: {} }] }] } as any,
+        null, DEFAULT_PAST_DAYS)
+      const totalDays = daysBetween(range.start, range.end)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const expLeft = (daysBetween(range.start, today) / totalDays) * 100
+      expect(Math.abs(parseFloat(bar.style.left) - expLeft)).toBeLessThan(0.7)
+    })
+
+    it('completed story without any worklogs renders no bar in worklog mode', async () => {
+      const retro = JSON.parse(JSON.stringify(retroWithStatuses))
+      retro.epics[0].stories[0].worklogDays = null
+      vi.mocked(forecastApi.getUnifiedPlanning).mockResolvedValue({ ...mockUnifiedPlan, epics: [] } as any)
+      vi.mocked(forecastApi.getRetrospective).mockResolvedValue(retro as any)
+
+      const { container } = renderTimelinePage()
+      await waitFor(() => {
+        expect(screen.getByText('Retro Epic')).toBeInTheDocument()
+      })
+      expect(container.querySelector('.story-bar[aria-label="Story PROJ-9"]')).toBeNull()
     })
 
     it('falls back to StatusBadge palette for status without configured color', async () => {
