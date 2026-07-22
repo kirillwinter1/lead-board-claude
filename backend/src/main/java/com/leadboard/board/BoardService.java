@@ -551,8 +551,9 @@ public class BoardService {
             Map<String, BoardNode.RoleMetrics> roleProgressMap = buildDynamicRoleProgressMap(roleMetrics, roughEstimates);
             node.setRoleProgress(roleProgressMap);
             if (isEpic) {
-                // Epic past the planning phase -> the estimate is the clean/actual subtask total.
-                node.setEstimateSource("clean");
+                // Epic past the planning phase is clean only when subtask estimates actually
+                // exist; otherwise the badge still shows the rough (pre-planning) numbers.
+                node.setEstimateSource(totalEstimate > 0 ? "clean" : "rough");
             }
         }
     }

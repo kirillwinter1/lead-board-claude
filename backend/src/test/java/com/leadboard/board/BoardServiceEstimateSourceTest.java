@@ -117,4 +117,13 @@ class BoardServiceEstimateSourceTest {
         aggregate(e);
         assertEquals("clean", e.getEstimateSource());
     }
+
+    @Test
+    @DisplayName("epic past planning but with no subtask estimates -> still rough")
+    void inProgressEpicWithoutEstimatesIsRough() throws Exception {
+        BoardNode e = epic(false);
+        e.addChild(storyWithSubtask("LB-2-1", 0));
+        aggregate(e);
+        assertEquals("rough", e.getEstimateSource());
+    }
 }
