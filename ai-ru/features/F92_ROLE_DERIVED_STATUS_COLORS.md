@@ -74,6 +74,22 @@ PLANNED `#EAE6FF`). Ручной `color` (не NULL) всегда побежда
   автоматически). Статусы, отсутствующие в конфиге, — текущий fallback StatusBadge-палитры.
 - Режим «Logged time» (F-фикс worklog-span) не меняется.
 
+### 3a. Тултип бара в статус-режиме — «Status path» как на Board (F81)
+
+- В режиме «Story statuses» тултип бара стори заменяется на Board-стиль «Status path»:
+  заголовок стори (иконка типа + ключ + summary, как `TooltipIssueHeader`), затем список
+  сегментов «StatusBadge — время в статусе», метка `now` у текущего, снизу `Total` и
+  `Excl. "<первый статус>"` — один в один как тултип `StatusAgeBadge` на Board.
+- Данные — существующий API статус-истории (`getStatusHistory(issueKey)`, F81): точные
+  длительности из `status_changelog`; грузится лениво при ховере с debounce, как на Board.
+  Новых эндпоинтов не нужно.
+- Рендер-блок «Status path» выносится из `StatusHistoryTooltip` в переиспользуемый
+  компонент (например `StatusPathContent`), который используют и Board-тултип, и
+  Timeline-тултип — без дублирования (правило реюза Design System).
+- В тултипе показывается **полный** путь (включая New/Done — как на Board), даже если на
+  баре NEW/DONE скрыты; итог `Excl.` компенсирует «лежание в New».
+- В режиме «Logged time» тултип бара не меняется.
+
 ### 4. Wizard (`/workflow`, страница конфигурации статусов)
 
 - Для IN_PROGRESS-статусов — селект **Kind**: Work / Review / Waiting (рядом с ролью);
@@ -89,7 +105,8 @@ PLANNED `#EAE6FF`). Ручной `color` (не NULL) всегда побежда
 - **Backend:** юнит-матрица `resolveStatusColor` (роль × kind × override × без роли),
   контроллер `/status-styles` (resolved-цвет + statusKind), seed-миграция на копии данных.
 - **Frontend:** Timeline — NEW/DONE скрыты, границы бара по не-NEW/не-DONE интервалам,
-  цвет сегмента = derived; wizard — селект kind, override и сброс.
+  цвет сегмента = derived; тултип статус-режима — Status path (лениво, сегменты и Total);
+  wizard — селект kind, override и сброс; `StatusPathContent` — общий для Board и Timeline.
 - Полный прогон backend+frontend, live-QA на tenant_test2 (англ. статусы с ролями).
 
 ## Риски / заметки
