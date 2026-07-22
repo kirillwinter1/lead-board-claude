@@ -79,7 +79,7 @@ class PublicConfigControllerTest {
 
         mockMvc.perform(get("/api/config/workflow/status-styles"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$['In Progress'].color").value("#abe7d3"))
+                .andExpect(jsonPath("$['In Progress'].color").value("#10b981"))
                 .andExpect(jsonPath("$['In Progress'].statusKind").value("WORK"))
                 .andExpect(jsonPath("$['In Progress'].statusCategory").value("IN_PROGRESS"));
     }

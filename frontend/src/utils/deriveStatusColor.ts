@@ -7,7 +7,7 @@ import { lightenColor } from '../constants/colors'
 
 export type StatusKind = 'WORK' | 'REVIEW' | 'WAITING'
 
-const WORK_TINT = 0.65 // = TIMELINE_PHASE_TINT / backend StatusColorResolver.WORK_TINT
+const REVIEW_TINT = 0.65 // = TIMELINE_PHASE_TINT / backend StatusColorResolver.REVIEW_TINT
 const WAITING_GREY = '#DFE1E6'
 
 const CATEGORY_DEFAULTS: Record<string, string> = {
@@ -24,7 +24,8 @@ const CATEGORY_DEFAULTS: Record<string, string> = {
  * backend does when `color` is null (an "auto" status with no manual override).
  *
  * - WAITING kind -> always grey, even if a role color is available.
- * - Role color present -> REVIEW uses it as-is, WORK/null-kind lightens it by 0.65.
+ * - Role color present -> WORK/null-kind uses it as-is (active work is saturated),
+ *   REVIEW lightens it by 0.65 (decision 22.07 — review is the translucent tone).
  * - No/unknown role color -> falls back to the statusCategory default (grey if unmapped).
  */
 export function deriveStatusColor(
@@ -34,7 +35,7 @@ export function deriveStatusColor(
 ): string {
   if (kind === 'WAITING') return WAITING_GREY
   if (roleColor) {
-    return kind === 'REVIEW' ? roleColor : lightenColor(roleColor, WORK_TINT)
+    return kind === 'REVIEW' ? lightenColor(roleColor, REVIEW_TINT) : roleColor
   }
   return CATEGORY_DEFAULTS[statusCategory] || WAITING_GREY
 }
