@@ -6,16 +6,16 @@ import { deriveStatusColor } from './deriveStatusColor'
 const ROLE_COLOR = '#10b981'
 
 describe('deriveStatusColor', () => {
-  it('lightens the role color for WORK kind', () => {
-    expect(deriveStatusColor(ROLE_COLOR, 'WORK', 'IN_PROGRESS')).toBe('#abe7d3')
+  it('uses the saturated role color as-is for WORK kind', () => {
+    expect(deriveStatusColor(ROLE_COLOR, 'WORK', 'IN_PROGRESS')).toBe('#10b981')
   })
 
   it('treats a null kind the same as WORK when a role color is present', () => {
-    expect(deriveStatusColor(ROLE_COLOR, null, 'IN_PROGRESS')).toBe('#abe7d3')
+    expect(deriveStatusColor(ROLE_COLOR, null, 'IN_PROGRESS')).toBe('#10b981')
   })
 
-  it('uses the role color as-is for REVIEW kind', () => {
-    expect(deriveStatusColor(ROLE_COLOR, 'REVIEW', 'IN_PROGRESS')).toBe('#10b981')
+  it('lightens the role color for REVIEW kind', () => {
+    expect(deriveStatusColor(ROLE_COLOR, 'REVIEW', 'IN_PROGRESS')).toBe('#abe7d3')
   })
 
   it('is grey for WAITING kind even with a role color', () => {

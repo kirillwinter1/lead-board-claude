@@ -23,22 +23,22 @@ class StatusColorResolverTest {
                 .isEqualTo("#123456");
     }
 
-    @Test void workIsLightenedRoleColor() { // lighten(#10b981, 0.65)
+    @Test void workIsRawRoleColor() { // активная работа — насыщенный цвет роли
         assertThat(StatusColorResolver.resolve(
                 m("DEV", StatusKind.WORK, StatusCategory.IN_PROGRESS, null), ROLES))
-                .isEqualTo("#abe7d3");
+                .isEqualTo("#10b981");
     }
 
     @Test void nullKindBehavesAsWork() {
         assertThat(StatusColorResolver.resolve(
                 m("DEV", null, StatusCategory.IN_PROGRESS, null), ROLES))
-                .isEqualTo("#abe7d3");
+                .isEqualTo("#10b981");
     }
 
-    @Test void reviewIsRoleColorAsIs() {
+    @Test void reviewIsLightenedRoleColor() { // ревью — светлый тон: lighten(#10b981, 0.65)
         assertThat(StatusColorResolver.resolve(
                 m("DEV", StatusKind.REVIEW, StatusCategory.IN_PROGRESS, null), ROLES))
-                .isEqualTo("#10b981");
+                .isEqualTo("#abe7d3");
     }
 
     @Test void waitingIsGreyEvenWithRole() {

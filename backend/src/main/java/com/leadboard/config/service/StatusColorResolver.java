@@ -12,7 +12,7 @@ import java.util.Map;
  */
 public final class StatusColorResolver {
 
-    private static final double WORK_TINT = 0.65;        // = TIMELINE_PHASE_TINT на фронте
+    private static final double REVIEW_TINT = 0.65;      // = TIMELINE_PHASE_TINT на фронте
     private static final String WAITING_GREY = "#DFE1E6";
     private static final Map<StatusCategory, String> CATEGORY_DEFAULTS = new EnumMap<>(Map.of(
             StatusCategory.NEW, "#DFE1E6",
@@ -30,7 +30,8 @@ public final class StatusColorResolver {
         String roleColor = m.getWorkflowRoleCode() == null ? null
                 : roleColorsByCode.get(m.getWorkflowRoleCode());
         if (roleColor != null) {
-            return m.getStatusKind() == StatusKind.REVIEW ? roleColor : lighten(roleColor, WORK_TINT);
+            // Активная работа — насыщенный цвет роли; ревью — светлый тон (решение 22.07).
+            return m.getStatusKind() == StatusKind.REVIEW ? lighten(roleColor, REVIEW_TINT) : roleColor;
         }
         return CATEGORY_DEFAULTS.getOrDefault(m.getStatusCategory(), "#DFE1E6");
     }
