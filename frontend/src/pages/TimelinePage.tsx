@@ -377,11 +377,10 @@ function StoryBar({ story, lane, dateRange, jiraBaseUrl, globalWarnings, onHover
   // bar (statuses move after the work is logged), so the bar is clamped to the visible
   // (non-NEW/DONE) intervals' span instead of the subtask dates — this both widens it
   // (history extends beyond the subtask dates) and narrows it (drop NEW/DONE bookends).
-  // A story with no visible interval at all (entire history is NEW and/or DONE — never
-  // started, or done with nothing distinguishable in between) has nothing meaningful to
-  // show in this mode, so its bar is hidden entirely.
-  if (actualsMode === 'status' && (storySource === 'retro' || storySource === 'hybrid')
-      && statusIntervals && statusIntervals.length > 0) {
+  // A story with no visible interval at all (entire history is NEW and/or DONE, or the
+  // status never changed — empty changelog) has nothing meaningful to show in this
+  // mode, so its bar is hidden entirely.
+  if (actualsMode === 'status' && (storySource === 'retro' || storySource === 'hybrid')) {
     if (visibleStatusIntervals.length > 0) {
       startDate = new Date(visibleStatusIntervals[0].startDate)
       let visibleEnd = new Date(visibleStatusIntervals[visibleStatusIntervals.length - 1].endDate)
@@ -651,6 +650,7 @@ interface StoryBarsProps {
 
 function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMode }: StoryBarsProps) {
   const { getRoleColor, getRoleCodes, getIssueTypeIconUrl, getIssueTypeCategory } = useWorkflowConfig()
+  const statusStyles = useStatusStyles()
   const [hoveredStory, setHoveredStory] = useState<PlannedStory | null>(null)
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
 
@@ -808,14 +808,28 @@ function StoryBars({ stories, dateRange, jiraBaseUrl, globalWarnings, actualsMod
           {showsStatusPath ? (
             /* F92 — Story-statuses mode on a retro/hybrid story: show the same status
                journey as the Board's StatusHistoryTooltip instead of the phases/progress
-               body (which describes the autoplanner forecast, not what actually happened). */
+               body (which describes the autoplanner forecast, not what actually happened).
+               NEW-category segments are hidden here — the timeline bar hides them too,
+               and the Total then counts only the shown (actually worked) segments, which
+               also makes the Board-style "Excl. first status" row redundant. */
             <div style={{ marginTop: '4px' }}>
               <div style={{ fontWeight: 600, color: TOOLTIP_TEXT, marginBottom: 8, fontSize: '12px' }}>Status path</div>
               {historyLoading && <div style={{ color: TOOLTIP_LABEL, fontSize: '12px' }}>Loading…</div>}
               {historyError && <div style={{ color: TOOLTIP_DANGER, fontSize: '12px' }}>Failed to load</div>}
-              {statusHistory && !historyLoading && (
-                <StatusPathContent history={statusHistory} variant="dark" />
-              )}
+              {statusHistory && !historyLoading && (() => {
+                const segments = statusHistory.segments.filter(
+                  s => statusStyles[s.status]?.statusCategory !== 'NEW'
+                )
+                if (segments.length === 0) {
+                  return <div style={{ color: TOOLTIP_LABEL, fontSize: '12px' }}>No activity yet</div>
+                }
+                const shown = {
+                  ...statusHistory,
+                  segments,
+                  totalSeconds: segments.reduce((acc, s) => acc + s.durationSeconds, 0),
+                }
+                return <StatusPathContent history={shown} variant="dark" showExcl={false} />
+              })()}
             </div>
           ) : (
             <>

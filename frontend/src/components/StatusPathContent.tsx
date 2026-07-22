@@ -8,13 +8,16 @@ import {
 interface StatusPathContentProps {
   history: StatusHistory
   variant: 'light' | 'dark'
+  // The "Excl. <first status>" row compensates for time spent in the initial (backlog)
+  // status. Callers that pre-filter those segments out (Timeline status mode) pass false.
+  showExcl?: boolean
 }
 
 // F92 — segment list + Total/Excl summary shared by the (light) Board status-age
 // tooltip (StatusHistoryTooltip) and the (dark) Timeline story-bar tooltip in
 // Story-statuses mode. Text colors switch by variant; StatusBadge always renders
 // with its own configured background regardless of the surrounding tooltip theme.
-export function StatusPathContent({ history, variant }: StatusPathContentProps) {
+export function StatusPathContent({ history, variant, showExcl = true }: StatusPathContentProps) {
   const colors = variant === 'dark'
     ? { primary: TOOLTIP_VALUE, muted: TOOLTIP_LABEL, link: TOOLTIP_HIGHLIGHT, separator: TOOLTIP_DIVIDER }
     : { primary: TEXT_PRIMARY, muted: TEXT_MUTED, link: LINK_COLOR, separator: SEPARATOR }
@@ -68,7 +71,7 @@ export function StatusPathContent({ history, variant }: StatusPathContentProps) 
           <span>Total</span>
           <span style={{ fontWeight: 600, color: colors.primary }}>{formatDuration(history.totalSeconds)}</span>
         </div>
-        {history.segments.length > 1 && (
+        {showExcl && history.segments.length > 1 && (
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>Excl. “{history.segments[0].status}”</span>
             <span style={{ fontWeight: 600, color: colors.primary }}>
